@@ -8,7 +8,7 @@ evening-sized chunks.
    a grid floor with a Parkitect-style camera (pan, rotate, zoom). *Done.*
 2. **Building.** Floors and walls on the grid (walls on cell edges, like The
    Sims), then doors and a few objects (bed, toilet, table). Rooms detected
-   from enclosed walls and given a type such as cell or canteen.
+   from enclosed walls and given a type such as cell or canteen. *Done.*
 3. **People and needs.** Prisoners who walk around with pathfinding, two or
    three needs (hunger, sleep, hygiene) that send them to the right objects,
    and a simple daily schedule. This makes it a playable prototype.
@@ -17,3 +17,12 @@ evening-sized chunks.
    generic parts into `core/`.
 
 Deliberately left until after step 4: money, guards and staff, events.
+
+## Notes from step 2
+
+- The building data (`core/building/`) went straight into the core, since
+  floors, walls on edges, doors, objects and rooms are clearly the same in
+  every game. What a cell or canteen needs lives in the prison catalogue.
+- Objects and room types are `.tres` resources in
+  `games/prison/catalogue/`, so they can be tweaked in the inspector.
+- Not done yet: undo, saving and loading, multi-storey buildings, costs.

@@ -14,6 +14,9 @@ const KEY_ACTIONS := {
 	"camera_zoom_in": [KEY_EQUAL, KEY_KP_ADD],
 	"camera_zoom_out": [KEY_MINUS, KEY_KP_SUBTRACT],
 	"camera_fast": [KEY_SHIFT],
+	"build_cancel": [KEY_ESCAPE],
+	"build_rotate": [KEY_R],
+	"build_toggle_walls": [KEY_TAB],
 }
 
 

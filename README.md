@@ -6,7 +6,7 @@ its systems, Parkitect for its camera and style, and The Sims / Software Inc.
 for flexible building. Later games might include a hospital, an airport, a
 school and a museum.
 
-![Step 1: the grid and camera](docs/images/step1.png)
+![The sample prison, with walls cut away](docs/images/step2.png)
 
 All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/).
 
@@ -14,11 +14,34 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 
 1. Install Godot 4.7 (the standard build, not .NET).
 2. Open Godot, choose **Import**, and pick this folder's `project.godot`.
-3. Press **F5** to run. You should see a grassy grid you can fly around.
+3. Press **F5** to run. You start with a small sample prison you can fly
+   around and build on.
 
-Controls: WASD or arrows to pan, Q/E to rotate, mouse wheel or +/- to zoom,
-Shift to go faster, right-drag to pan, middle-drag to rotate and tilt, and
-left-click to drop or remove a crate.
+### Controls
+
+| Camera | |
+| --- | --- |
+| WASD or arrows | Pan |
+| Q / E | Rotate |
+| Mouse wheel or + / - | Zoom |
+| Shift | Go faster |
+| Right-drag | Pan |
+| Middle-drag | Rotate and tilt |
+
+| Building | |
+| --- | --- |
+| 1 Room | Drag to build a floor with walls all round |
+| 2 Floor | Drag to lay floor |
+| 3 Wall | Drag from corner to corner |
+| 4 Door | Click a wall to make it a door, or a door to make it a wall |
+| 5 Objects | Click to place; R rotates |
+| 6 Room type | Click a room to mark it as a cell, canteen and so on |
+| 7 Demolish | Click an object to remove it, or drag to clear an area |
+| Tab | Walls up or cut away |
+| Esc | Put the tool away |
+
+Rooms are worked out from the walls automatically. Once a room has a type, a
+label floats over it saying what it still needs, such as a toilet.
 
 ## Layout
 
@@ -41,7 +64,9 @@ godot --headless --import --path .          # once, to build the class cache
 godot --headless --path . -s res://tests/test_runner.gd
 ```
 
-To save a screenshot of the main scene (needs a display, not `--headless`):
+To save a screenshot of the main scene (needs a display, not `--headless`;
+on a machine without a GPU, `xvfb-run` with Mesa's lavapipe Vulkan driver
+works):
 
 ```sh
 godot --path . -s res://tools/screenshot.gd -- screenshot.png
