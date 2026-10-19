@@ -329,6 +329,15 @@ func _test_roofs_and_wall_views(main: Node, map: BuildingMap) -> void:
 	main.building.level(1).fill_floor(Rect2i(o + Vector2i(1, 6), Vector2i(1, 1)), &"wood", Building.STOREY)
 	_check(not ground_view.has_roof(o + Vector2i(1, 6)), "floor above stands in for the roof")
 	main.building.level(1).clear_floor(Rect2i(o + Vector2i(1, 6), Vector2i(1, 1)))
+	# Stairs up from the corridor: open over the flight below, roofed at the top.
+	var up: BuildingMap = main.building.level(1)
+	up.build_room(Rect2i(o + Vector2i(0, 3), Vector2i(12, 2)), &"concrete", &"brick", Building.STOREY)
+	var route: Array[Vector2i] = [o + Vector2i(4, 3), o + Vector2i(5, 3), o + Vector2i(6, 3)]
+	map.add_stairs(Staircase.create(route, [false, false, false] as Array[bool]))
+	_check(not ground_view.has_roof(o + Vector2i(5, 3)), "no roof cuts across stairs going up")
+	_check(main.views[1].has_roof(o + Vector2i(5, 3)), "the stairwell is roofed over upstairs")
+	map.remove_stairs(map.stairs.keys()[0])
+	up.demolish(Rect2i(o + Vector2i(0, 3), Vector2i(12, 2)))
 	main.building.active = 0
 	_check(controller.wall_view == BuildController.WallView.UP, "walls start up")
 	controller.next_wall_view()

@@ -157,14 +157,25 @@ func rebuild() -> void:
 
 
 ## Flat roofs at the top of the walls, over every piece of an indoor room
-## that has no floor above it (a stairwell's hole counts as open).
+## that has no floor above it. Stairs going up are left open, and the top
+## of a stairwell coming up from below is roofed over.
 func _build_roof() -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var cs := grid.cell_size
 	var any := false
+	for cell: Vector2i in map.holes:
+		var height := _stairwell_roof(cell)
+		if not is_nan(height):
+			var square := PackedVector2Array([Vector2(cell), Vector2(cell) + Vector2(1, 0),
+					Vector2(cell) + Vector2.ONE, Vector2(cell) + Vector2(0, 1)])
+			for i in square.size():
+				square[i] *= cs
+			MeshShapes.add_prism(st, square, height - roof_thickness, height + 0.01,
+					roof_colour.darkened(0.2), roof_colour)
+			any = true
 	for cell: Vector2i in map.floors:
-		if above != null and above.has_floor(cell):
+		if above != null and (above.has_floor(cell) or above.holes.has(cell)):
 			continue
 		for piece: TilePiece in map.pieces(cell):
 			if not map.piece_has_floor(piece):
@@ -188,10 +199,25 @@ func _build_roof() -> void:
 
 ## Is there a roof over this tile? For tests and the debug view.
 func has_roof(cell: Vector2i) -> bool:
-	if not map.has_floor(cell) or (above != null and above.has_floor(cell)):
+	if map.holes.has(cell):
+		return not is_nan(_stairwell_roof(cell))
+	if not map.has_floor(cell) or (above != null and (above.has_floor(cell) or above.holes.has(cell))):
 		return false
 	var room := map.room_at(cell)
 	return room != null and room.indoor
+
+
+## The roof height over a stairwell's top on this level, from the indoor
+## floor beside it, or NAN if it has none (or the floor above covers it).
+func _stairwell_roof(cell: Vector2i) -> float:
+	if above != null and above.has_floor(cell):
+		return NAN
+	for side in BuildingMap.DIRECTIONS:
+		var next: Vector2i = cell + side
+		var room := map.room_at(next) if map.has_floor(next) else null
+		if room != null and room.indoor:
+			return map.floor_height(next) + wall_height
+	return NAN
 
 
 func _build_floors() -> void:
