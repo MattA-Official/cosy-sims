@@ -125,6 +125,11 @@ func _describe_cell(cell: Vector2i) -> PackedStringArray:
 			lines.append("Water: sea, surface at %.2f m" % terrain.sea_level)
 		else:
 			lines.append("Water: none")
+	var flight := map.stairs_at(cell)
+	if flight != null:
+		lines.append("Stairs: %s, %d tiles from the foot, %s landings" % [
+				"landing" if flight.landings[flight.cells.find(cell)] else "steps",
+				flight.cells.find(cell), "rounded" if flight.rounded else "square"])
 	var floor_id: StringName = map.floors.get(cell, &"")
 	if map.holes.has(cell):
 		lines.append("Floor: open to stairs below")

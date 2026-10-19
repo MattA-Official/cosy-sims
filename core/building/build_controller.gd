@@ -14,7 +14,7 @@ signal hint_changed
 enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH }
 enum WaterMode { NONE, ADD, REMOVE }
 ## What the floor tool does: lay floor, or nudge existing floor up or down.
-enum FloorMode { LAY, RAISE, LOWER, RAMP }
+enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS }
 
 ## How far one floor nudge moves, in metres.
 const NUDGE_STEP := 0.25
@@ -46,6 +46,7 @@ const FLOOR_HINTS := {
 	FloorMode.RAISE: "Drag over floor to raise it a step, for split levels.",
 	FloorMode.LOWER: "Drag over floor to lower it a step, for split levels.",
 	FloorMode.RAMP: "Drag over floor from the low side to the high side to lay a ramp between them.",
+	FloorMode.STAIRS: "Click the foot of the stairs and move the way they climb. Click short of the top for a landing, at the top to build. Esc starts again, Ctrl-click removes stairs.",
 }
 
 const WATER_HINTS := {
@@ -103,11 +104,14 @@ var paths: PathNetwork:
 		path_tool.network = value
 ## The path tool's own state: its mode, style and the path being drawn.
 var path_tool := PathTool.new()
+## The stair builder's own state: the landing style and the stairs being drawn.
+var stair_tool := StairTool.new()
 var tool := Tool.NONE:
 	set(value):
 		tool = value
 		_dragging = false
 		path_tool.cancel()
+		stair_tool.cancel()
 		tool_changed.emit(tool)
 var object_def: ObjectDef
 ## Styles used by the room, floor and wall tools.
@@ -126,7 +130,10 @@ var window_kind := BuildingMap.WINDOW_GLASS
 var terrain_brush := Terrain.Brush.RAISE
 ## When not NONE, the terrain tool adds or removes water instead of sculpting.
 var water_mode := WaterMode.NONE
-var floor_mode := FloorMode.LAY
+var floor_mode := FloorMode.LAY:
+	set(value):
+		floor_mode = value
+		stair_tool.cancel()
 ## Walls go at any angle between corners, not just straight or 45°.
 var any_angle := false
 var plant_def: FoliageDef
@@ -206,6 +213,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_dragging = false
 		elif tool == Tool.PATH and path_tool.cancel():
 			pass
+		elif tool == Tool.FLOOR and stair_tool.cancel():
+			pass
 		else:
 			tool = Tool.NONE
 		get_viewport().set_input_as_handled()
@@ -239,6 +248,8 @@ func _on_press() -> void:
 	if _ground_only(tool) and _level() != 0:
 		return
 	match tool:
+		Tool.FLOOR when floor_mode == FloorMode.STAIRS:
+			_press_stairs()
 		Tool.ROOM, Tool.FLOOR, Tool.DEMOLISH:
 			_dragging = true
 			_drag_start_cell = _hover_cell()
@@ -328,14 +339,42 @@ func _on_release() -> void:
 			var placed := map.object_at(_hover_point)
 			var edge := _hover_edge()
 			var slant := _hover_slant()
+			var flight := map.stairs_at(_hover_cell())
 			if placed != null:
 				map.remove_object(placed.id)
+			elif flight != null:
+				map.remove_stairs(flight.id)
 			elif slant != NO_SLANT:
 				map.remove_slants([slant])
 			elif map.wall_at(edge) != BuildingMap.Wall.NONE and _edge_distance() < 0.25:
 				map.remove_walls([edge])
 			else:
 				map.demolish(rect)
+
+
+## A click with the stair builder: Ctrl removes the stairs under the mouse;
+## otherwise it sets the foot, adds a landing or builds the stairs.
+func _press_stairs() -> void:
+	if _erasing():
+		stair_tool.cancel()
+		var flight := map.stairs_at(_hover_cell())
+		if flight != null:
+			map.remove_stairs(flight.id)
+		return
+	var planned := stair_tool.plan(_hover_cell())
+	if stair_tool.is_drawing() and not _stairs_fit(planned[0]):
+		return
+	var flight := stair_tool.press(_hover_cell())
+	if flight != null:
+		flight.style = floor_style
+		map.add_stairs(flight)
+
+
+## Can stairs go along this route on the level being built?
+func _stairs_fit(route: Array[Vector2i]) -> bool:
+	if building != null:
+		return building.can_add_stairs(_level(), route)
+	return map.can_add_stairs(route)
 
 
 #region Ground and brushes
@@ -715,6 +754,14 @@ func _draw_preview() -> void:
 			for edge in BuildingMap.rect_perimeter(rect):
 				_preview_edge(edge, ok_colour if dry and map.can_build_wall(edge) else bad_colour,
 						_preview_height(rect))
+		Tool.FLOOR when floor_mode == FloorMode.STAIRS:
+			var planned := stair_tool.plan(_hover_cell())
+			if _erasing():
+				var flight := map.stairs_at(_hover_cell())
+				if flight != null:
+					_preview_cells(flight.cells, demolish_colour)
+			else:
+				_preview_stairs(planned, ok_colour if _stairs_fit(planned[0]) else bad_colour)
 		Tool.FLOOR when floor_mode == FloorMode.RAMP:
 			var ramp := planned_ramp()
 			_preview_cells(BuildingMap.cells_in(_drag_rect()), ok_colour if ramp != null else bad_colour)
@@ -738,10 +785,13 @@ func _draw_preview() -> void:
 			_preview_ring(_hover_point, brush_radius, colour)
 		Tool.DEMOLISH:
 			var placed := map.object_at(_hover_point)
+			var flight := map.stairs_at(_hover_cell())
 			if _dragging:
 				_preview_cells(BuildingMap.cells_in(_drag_rect()), demolish_colour)
 			elif placed != null:
 				_preview_rect(placed.rect, demolish_colour, placed.def.height + 0.05)
+			elif flight != null:
+				_preview_cells(flight.cells, demolish_colour, NAN, Building.STOREY * 0.5)
 			elif _hover_slant() != NO_SLANT:
 				_preview_slant(_hover_slant(), demolish_colour)
 			elif map.wall_at(_hover_edge()) != BuildingMap.Wall.NONE and _edge_distance() < 0.25:
@@ -887,6 +937,21 @@ func _preview_cells(cells: Array[Vector2i], colour: Color, base := NAN, height :
 		var centre := Vector3(cell.x + 0.5, ground, cell.y + 0.5) * Vector3(cs, 1.0, cs)
 		_preview_boxes.append([centre + Vector3.UP * height * 0.5,
 				Vector3(cs * 0.48, height * 0.5, cs * 0.48), colour])
+
+
+## The stairs a click would leave: each tread at its height, standing on
+## the floor at the foot.
+func _preview_stairs(planned: Array, colour: Color) -> void:
+	var route: Array[Vector2i] = planned[0]
+	var flags: Array[bool] = planned[1]
+	var flight := Staircase.create(route, flags, stair_tool.rounded)
+	var cs := grid.cell_size
+	var base := _ground_at(Vector2(route[0]) + Vector2(0.5, 0.5))
+	for tread: Array in flight.treads():
+		var points := PackedVector3Array()
+		for p: Vector2 in tread[0]:
+			points.append(Vector3(p.x * cs, base + tread[1] + 0.04, p.y * cs))
+		_preview_polygons.append([points, colour])
 
 
 ## A ring of small markers on the ground showing a brush's reach.

@@ -15,10 +15,10 @@ enum Snap {
 @export var size := Vector2.ONE
 ## How placement snaps. Holding Alt places freely whatever this says.
 @export var snap := Snap.TILE
-## Stairs and lifts link a level with the one above.
+## Lifts link a level with the one above. Stairs are drawn with their own
+## tool rather than placed as objects.
 enum Connects {
 	NONE,
-	STAIRS, ## Rises one storey along its length and cuts a hole in the floor above.
 	LIFT, ## Links with a lift in the same spot on the next level up.
 }
 

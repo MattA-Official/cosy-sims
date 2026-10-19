@@ -23,6 +23,7 @@ const FLOOR_MODES := [
 	[BuildController.FloorMode.RAISE, "Raise"],
 	[BuildController.FloorMode.LOWER, "Lower"],
 	[BuildController.FloorMode.RAMP, "Ramp"],
+	[BuildController.FloorMode.STAIRS, "Stairs"],
 ]
 
 const PATH_MODES := [
@@ -124,6 +125,9 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 		BuildController.Tool.FLOOR:
 			_add_floor_mode_choices()
 			_options.add_child(VSeparator.new())
+			if controller.floor_mode == BuildController.FloorMode.STAIRS:
+				_add_landing_choices()
+				_options.add_child(VSeparator.new())
 			_add_style_choices(PrisonCatalogue.FLOORS, true)
 		BuildController.Tool.WALL:
 			_add_wall_angle_choices()
@@ -172,9 +176,22 @@ func _add_floor_mode_choices() -> void:
 		var button := _make_button(entry[1], group)
 		button.button_pressed = controller.floor_mode == mode
 		button.toggled.connect(func(on: bool) -> void:
-			if on:
+			if on and controller.floor_mode != mode:
 				controller.floor_mode = mode
-				_hint.text = controller.hint())
+				# Stairs bring their own choices, so lay the row out again.
+				_on_tool_changed.call_deferred(controller.tool))
+		_options.add_child(button)
+
+
+func _add_landing_choices() -> void:
+	var group := ButtonGroup.new()
+	for entry: Array in [[false, "Square landings"], [true, "Rounded landings"]]:
+		var rounded: bool = entry[0]
+		var button := _make_button(entry[1], group)
+		button.button_pressed = controller.stair_tool.rounded == rounded
+		button.toggled.connect(func(on: bool) -> void:
+			if on:
+				controller.stair_tool.rounded = rounded)
 		_options.add_child(button)
 
 

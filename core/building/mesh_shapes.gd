@@ -81,6 +81,26 @@ static func add_polygon(st: SurfaceTool, points: Array[Vector3], outward: Vector
 			st.add_vertex(vertex)
 
 
+## Adds an upright solid with a flat convex outline (x and z in `points`),
+## from `bottom` to `top`.
+static func add_prism(st: SurfaceTool, points: PackedVector2Array, bottom: float, top: float,
+		colour: Color, top_colour: Color = colour) -> void:
+	var middle := Vector2.ZERO
+	for p in points:
+		middle += p
+	middle /= maxf(points.size(), 1)
+	var cap: Array[Vector3] = []
+	for p in points:
+		cap.append(Vector3(p.x, top, p.y))
+	add_polygon(st, cap, Vector3.UP, top_colour)
+	for i in points.size():
+		var a := points[i]
+		var b := points[(i + 1) % points.size()]
+		var outward := (a + b) * 0.5 - middle
+		add_quad(st, Vector3(a.x, top, a.y), Vector3(b.x, top, b.y), Vector3(b.x, bottom, b.y),
+				Vector3(a.x, bottom, a.y), Vector3(outward.x, 0.0, outward.y), colour)
+
+
 ## Adds an axis-aligned box to an ImmediateMesh surface that is already begun.
 static func add_box_immediate(mesh: ImmediateMesh, centre: Vector3, half: Vector3,
 		colour: Color) -> void:

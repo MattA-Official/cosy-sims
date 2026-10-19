@@ -33,7 +33,8 @@ var active := 0:
 ## A way between two levels: the tile you set off from and the tile you
 ## arrive on.
 class Link:
-	var kind: ObjectDef.Connects
+	enum Kind { STAIRS, LIFT }
+	var kind: Kind
 	var from_level: int
 	var from_cell: Vector2i
 	var to_level: int
@@ -122,13 +123,16 @@ func corner_in_use(corner: Vector2i) -> bool:
 	return false
 
 
-## Can an object go on a level? Stairs need a level above them.
+## Can an object go on a level?
 func can_place(n: int, def: ObjectDef, centre: Vector2, angle: float) -> bool:
-	if def.connects == ObjectDef.Connects.STAIRS and n >= MAX_LEVEL:
-		return false
 	if def.connects != ObjectDef.Connects.NONE:
 		angle = snappedf(angle, PI * 0.5)
 	return level(n).can_place_at(def, centre, angle)
+
+
+## Can stairs run along a route on a level? They need a level above.
+func can_add_stairs(n: int, route: Array[Vector2i]) -> bool:
+	return n < MAX_LEVEL and level(n).can_add_stairs(route)
 
 
 ## Every stair and lift link, both ways for stairs and lifts alike.
@@ -136,15 +140,11 @@ func links() -> Array[Link]:
 	var out: Array[Link] = []
 	for n: int in levels:
 		for placed: BuildingMap.PlacedObject in levels[n].objects.values():
-			match placed.def.connects:
-				ObjectDef.Connects.STAIRS:
-					var ends := BuildingMap.stair_ends(placed)
-					var dir := BuildingMap.rise_direction(placed.rotation)
-					_add_link(out, placed.def, n, ends[0] - dir, n + 1, ends[1] + dir)
-				ObjectDef.Connects.LIFT:
-					if _lift_above(n, placed) != null:
-						var cell := Vector2i(placed.rect.get_center().floor())
-						_add_link(out, placed.def, n, cell, n + 1, cell)
+			if placed.def.connects == ObjectDef.Connects.LIFT and _lift_above(n, placed) != null:
+				var cell := Vector2i(placed.rect.get_center().floor())
+				_add_link(out, Link.Kind.LIFT, n, cell, n + 1, cell)
+		for flight: Staircase in levels[n].stairs.values():
+			_add_link(out, Link.Kind.STAIRS, n, flight.entry(), n + 1, flight.exit())
 	return out
 
 
@@ -157,11 +157,11 @@ static func level_name(n: int) -> String:
 	return "Floor %d" % n
 
 
-func _add_link(out: Array[Link], def: ObjectDef, from_level: int, from_cell: Vector2i,
+func _add_link(out: Array[Link], kind: Link.Kind, from_level: int, from_cell: Vector2i,
 		to_level: int, to_cell: Vector2i) -> Link:
 	for way in 2:
 		var link := Link.new()
-		link.kind = def.connects
+		link.kind = kind
 		link.from_level = from_level if way == 0 else to_level
 		link.from_cell = from_cell if way == 0 else to_cell
 		link.to_level = to_level if way == 0 else from_level
@@ -191,11 +191,12 @@ func _sync_holes() -> void:
 	_syncing = true
 	var holes: Dictionary[int, Dictionary] = {}
 	for n: int in levels.keys():
-		for placed: BuildingMap.PlacedObject in levels[n].objects.values():
-			if placed.def.connects == ObjectDef.Connects.STAIRS and n < MAX_LEVEL:
-				var cells: Dictionary = holes.get_or_add(n + 1, {})
-				for cell in BuildingMap.cells_under(placed.rect):
-					cells[cell] = true
+		if n >= MAX_LEVEL:
+			continue
+		for flight: Staircase in levels[n].stairs.values():
+			var cells: Dictionary = holes.get_or_add(n + 1, {})
+			for cell in flight.cells:
+				cells[cell] = true
 	for n: int in holes:
 		level(n)
 	for n: int in levels.keys():

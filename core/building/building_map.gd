@@ -97,6 +97,7 @@ var slant_window_kinds: Dictionary[Vector4i, StringName] = {}
 var piece_styles: Dictionary[Vector2i, Array] = {}
 var objects: Dictionary[int, PlacedObject] = {}
 var ramps: Array[Ramp] = []
+var stairs: Dictionary[int, Staircase] = {}
 ## Tiles open to stairs coming up from the level below. No floor goes here.
 var holes: Dictionary[Vector2i, bool] = {}
 
@@ -104,6 +105,7 @@ var holes: Dictionary[Vector2i, bool] = {}
 ## or extended: each room takes the type most of its cells carry.
 var _room_types: Dictionary[Vector2i, StringName] = {}
 var _next_object_id := 1
+var _next_stairs_id := 1
 var _rooms: Array[Room] = []
 var _room_lookup: Dictionary[Vector2i, Room] = {}
 var _rooms_dirty := true
@@ -231,26 +233,6 @@ static func cells_under(rect: Rect2) -> Array[Vector2i]:
 
 
 ## The smallest rectangle covering both cells.
-## The way stairs climb for a rotation: along their length, away from the
-## foot.
-static func rise_direction(rotation: int) -> Vector2i:
-	return [Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 0)][posmod(rotation, 4)]
-
-
-## The tiles at the bottom and top of a flight of stairs, inside its footprint.
-static func stair_ends(placed: PlacedObject) -> Array[Vector2i]:
-	var dir := rise_direction(placed.rotation)
-	var cells := cells_under(placed.rect)
-	var low := cells[0]
-	var high := cells[0]
-	for cell in cells:
-		if Vector2(cell).dot(dir) < Vector2(low).dot(dir):
-			low = cell
-		if Vector2(cell).dot(dir) > Vector2(high).dot(dir):
-			high = cell
-	return [low, high]
-
-
 static func rect_between(a: Vector2i, b: Vector2i) -> Rect2i:
 	return Rect2i(a.min(b), (a - b).abs() + Vector2i.ONE)
 
@@ -431,6 +413,13 @@ func can_build_wall(edge: Vector3i) -> bool:
 	var ends := edge_ends(edge)
 	for placed: PlacedObject in objects.values():
 		if segment_crosses(placed.polygon(), ends[0], ends[1]):
+			return false
+	var sides := edge_cells(edge)
+	var flight := stairs_at(sides[0])
+	if flight != null and flight == stairs_at(sides[1]):
+		var i := flight.cells.find(sides[0])
+		var j := flight.cells.find(sides[1])
+		if absi(i - j) == 1:
 			return false
 	return true
 
@@ -781,7 +770,7 @@ func can_place_at(def: ObjectDef, centre: Vector2, angle: float) -> bool:
 				Vector2(cell) + Vector2.ONE, Vector2(cell) + Vector2(0, 1)])
 		if Geometry2D.intersect_polygons(inner, square).is_empty():
 			continue
-		if not has_floor(cell) or ramp_at(cell) != null:
+		if not has_floor(cell) or ramp_at(cell) != null or stairs_at(cell) != null:
 			return false
 	for placed: PlacedObject in objects.values():
 		if placed.rect.grow(-EPSILON).intersects(rect) \
@@ -805,8 +794,8 @@ func place_object(def: ObjectDef, position: Vector2, rotation: int) -> int:
 	return place_object_at(def, object_rect(def, position, rotation).get_center(), rotation * PI * 0.5)
 
 
-## Places an object centred on a point and turned by `angle` radians. Stairs
-## and lifts only take quarter turns. Returns its id, or 0 if it does not fit.
+## Places an object centred on a point and turned by `angle` radians. Lifts
+## only take quarter turns. Returns its id, or 0 if it does not fit.
 func place_object_at(def: ObjectDef, centre: Vector2, angle: float) -> int:
 	if def.connects != ObjectDef.Connects.NONE:
 		angle = snappedf(angle, PI * 0.5)
@@ -850,7 +839,7 @@ func can_add_ramp(rect: Rect2i) -> bool:
 	if rect.size.x < 1 or rect.size.y < 1:
 		return false
 	for cell in cells_in(rect):
-		if not has_floor(cell) or ramp_at(cell) != null:
+		if not has_floor(cell) or ramp_at(cell) != null or stairs_at(cell) != null:
 			return false
 	for edge in rect_edges(rect):
 		if wall_at(edge) != Wall.NONE and edge_crosses(edge, Rect2(rect)):
@@ -874,6 +863,62 @@ func add_ramp(rect: Rect2i, rise: Vector2i, low: float, high: float) -> bool:
 	# Each tile keeps its middle height, for anything that wants one number.
 	for cell in cells_in(rect):
 		floor_heights[cell] = ramp.height_at(Vector2(cell) + Vector2(0.5, 0.5))
+	_changed()
+	return true
+
+#endregion
+
+
+#region Stairs
+
+## The staircase covering a tile, if any.
+func stairs_at(cell: Vector2i) -> Staircase:
+	for flight: Staircase in stairs.values():
+		if flight.covers(cell):
+			return flight
+	return null
+
+
+## Can a staircase run along this route? Each tile needs floor, with no
+## object, ramp, stairwell, angled wall or other stairs on it, and each must
+## step straight on to the next without a wall between them.
+func can_add_stairs(route: Array[Vector2i]) -> bool:
+	if route.is_empty():
+		return false
+	var seen: Dictionary[Vector2i, bool] = {}
+	for i in route.size():
+		var cell := route[i]
+		if seen.has(cell) or not owns(cell) or not has_floor(cell) or ramp_at(cell) != null \
+				or holes.has(cell) or stairs_at(cell) != null or not slants_through(cell).is_empty():
+			return false
+		seen[cell] = true
+		if i > 0:
+			var step := cell - route[i - 1]
+			if absi(step.x) + absi(step.y) != 1 or wall_at(edge_between(route[i - 1], cell)) != Wall.NONE:
+				return false
+		var square := PackedVector2Array([Vector2(cell), Vector2(cell) + Vector2(1, 0),
+				Vector2(cell) + Vector2.ONE, Vector2(cell) + Vector2(0, 1)])
+		var inner: PackedVector2Array = Geometry2D.offset_polygon(square, -EPSILON * 2.0)[0]
+		for placed: PlacedObject in objects.values():
+			if not Geometry2D.intersect_polygons(inner, placed.polygon()).is_empty():
+				return false
+	return true
+
+
+## Adds a staircase and returns its id, or 0 if its route is not clear.
+func add_stairs(flight: Staircase) -> int:
+	if not can_add_stairs(flight.cells):
+		return 0
+	flight.id = _next_stairs_id
+	_next_stairs_id += 1
+	stairs[flight.id] = flight
+	_changed()
+	return flight.id
+
+
+func remove_stairs(id: int) -> bool:
+	if not stairs.erase(id):
+		return false
 	_changed()
 	return true
 
@@ -1005,6 +1050,10 @@ func _clear_floor(rect: Rect2i) -> int:
 	for ramp in ramps.duplicate():
 		if ramp.rect.intersects(rect):
 			ramps.erase(ramp)
+	for flight: Staircase in stairs.values():
+		if flight.cells.any(rect.has_point):
+			stairs.erase(flight.id)
+			count += 1
 	for placed: PlacedObject in objects.values():
 		if placed.rect.grow(-EPSILON).intersects(area):
 			objects.erase(placed.id)

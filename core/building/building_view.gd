@@ -37,6 +37,8 @@ extends Node3D
 @export var wall_colour := Color(0.93, 0.88, 0.8)
 @export var wall_top_colour := Color(0.36, 0.32, 0.3)
 @export var door_colour := Color(0.45, 0.65, 0.88)
+## Stairs whose floor style is missing.
+@export var stairs_colour := Color(0.72, 0.56, 0.4)
 @export var glass_colour := Color(0.7, 0.88, 1.0, 0.35)
 @export var bars_colour := Color(0.3, 0.32, 0.36)
 @export var problem_colour := Color(1.0, 0.55, 0.45)
@@ -367,10 +369,9 @@ func _build_objects() -> void:
 	for child in _objects.get_children():
 		child.queue_free()
 	var cs := grid.cell_size
+	for flight: Staircase in map.stairs.values():
+		_add_stairs(flight)
 	for placed: BuildingMap.PlacedObject in map.objects.values():
-		if placed.def.connects == ObjectDef.Connects.STAIRS:
-			_add_stairs(placed)
-			continue
 		# Shrink a touch so neighbours and walls do not look fused together.
 		var size := placed.def.size
 		var margin := minf(0.1, minf(size.x, size.y) * 0.1)
@@ -387,31 +388,24 @@ func _build_objects() -> void:
 		_objects.add_child(instance)
 
 
-## A flight of stairs climbing one storey along its length.
-func _add_stairs(placed: BuildingMap.PlacedObject) -> void:
+## A staircase as a stepped solid: each tread and landing stands on the
+## floor at the foot.
+func _add_stairs(flight: Staircase) -> void:
 	var cs := grid.cell_size
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var ends := BuildingMap.stair_ends(placed)
-	var dir := BuildingMap.rise_direction(placed.rotation)
-	var along := Vector3(dir.x, 0.0, dir.y)
-	var across := Vector3(absf(dir.y), 0.0, absf(dir.x))
-	var base := map.floor_height(ends[0]) + 0.03
-	var length := absf(placed.rect.size.dot(Vector2(dir)))
-	var width := absf(placed.rect.size.dot(Vector2(absf(dir.y), absf(dir.x))))
-	var steps := maxi(roundi(length * 2.5), 2)
-	var tread := length / steps
-	var rise := Building.STOREY / steps
-	var start := Vector3(placed.rect.get_center().x, 0.0, placed.rect.get_center().y) * cs \
-			- along * length * 0.5 * cs
-	var colour := placed.def.colour
-	for i in steps:
-		var top := base + rise * (i + 1)
-		var centre := start + along * (tread * (i + 0.5)) * cs
-		MeshShapes.add_box(st, centre + Vector3.UP * (base + top) * 0.5,
-				across * (width * 0.5 - 0.06) * cs + along * tread * 0.5 * cs
-				+ Vector3.UP * (top - base) * 0.5,
-				colour.darkened(0.2), colour.lightened(0.05 * (i % 2)))
+	var base := map.floor_height(flight.cells[0])
+	var def := map.floor_def(flight.style)
+	var colour := def.colour if def != null else stairs_colour
+	var treads := flight.treads()
+	for i in treads.size():
+		var outline: PackedVector2Array = treads[i][0]
+		var scaled := PackedVector2Array()
+		for p in outline:
+			scaled.append(p * cs)
+		var top: float = base + 0.03 + treads[i][1]
+		MeshShapes.add_prism(st, scaled, base, top, colour.darkened(0.25),
+				colour.lightened(0.06 * (i % 2)))
 	var instance := MeshInstance3D.new()
 	instance.mesh = st.commit()
 	instance.material_override = _stairs_material

@@ -22,6 +22,7 @@ func _process(_delta: float) -> bool:
 	_test_path_network()
 	_test_building_levels()
 	_test_ramps()
+	_test_stair_builder()
 	_test_angled_walls()
 	_test_path_profile()
 	_test_foliage()
@@ -779,11 +780,12 @@ func _test_building_levels() -> void:
 	_check(building.level(1).owns(Vector2i(21, 1)), "new land reaches every level")
 
 	# Stairs cut the floor above; lifts link with a lift above them.
-	var stairs: ObjectDef = load("res://games/prison/catalogue/stairs.tres")
 	var lift: ObjectDef = load("res://games/prison/catalogue/lift.tres")
 	var upstairs := building.level(1)
 	upstairs.fill_floor(Rect2i(2, 2, 4, 4), &"wood", 0.5 + Building.STOREY)
-	var flight := ground.place_object(stairs, Vector2(3, 2), 0)
+	var route: Array[Vector2i] = [Vector2i(3, 2), Vector2i(3, 3), Vector2i(3, 4)]
+	var flags: Array[bool] = [false, false, false]
+	var flight := ground.add_stairs(Staircase.create(route, flags))
 	_check(flight != 0 and not upstairs.has_floor(Vector2i(3, 3)) and upstairs.holes.has(Vector2i(3, 4))
 			and upstairs.has_floor(Vector2i(4, 3)), "stairs cut a hole in the floor above")
 	_check(upstairs.fill_floor(Rect2i(3, 2, 1, 3), &"wood", 0.5 + Building.STOREY) == 0,
@@ -791,17 +793,58 @@ func _test_building_levels() -> void:
 	var links := building.links()
 	_check(links.size() == 2 and links[0].from_cell == Vector2i(3, 1) and links[0].to_level == 1
 			and links[0].to_cell == Vector2i(3, 5), "stairs link the foot to the landing above")
-	ground.remove_object(flight)
+	ground.remove_stairs(flight)
 	_check(upstairs.holes.is_empty() and upstairs.fill_floor(Rect2i(3, 2, 1, 3), &"wood", 2.25) == 3,
 			"removing stairs lets floor back in")
-	_check(not building.can_place(Building.MAX_LEVEL, stairs, Vector2(3.5, 3.5), 0.0),
-			"no stairs on the top level")
+	_check(not building.can_add_stairs(Building.MAX_LEVEL, route), "no stairs on the top level")
 	ground.place_object(lift, Vector2(4, 4), 0)
 	_check(building.links().is_empty(), "a lift alone goes nowhere")
 	upstairs.place_object(lift, Vector2(4, 4), 0)
 	links = building.links()
-	_check(links.size() == 2 and links[0].kind == ObjectDef.Connects.LIFT,
+	_check(links.size() == 2 and links[0].kind == Building.Link.Kind.LIFT,
 			"lifts stacked up link")
+
+
+func _test_stair_builder() -> void:
+	var tool := StairTool.new()
+	# Before the first click it shows a straight flight; a click there sets the foot.
+	var straight := tool.plan(Vector2i(2, 2))
+	_check(straight[2] and straight[0] == [Vector2i(2, 2), Vector2i(2, 3), Vector2i(2, 4)],
+			"stairs start as a straight flight of three tiles")
+	_check(tool.press(Vector2i(2, 2)) == null and tool.is_drawing(), "the first click sets the foot")
+	var east := tool.plan(Vector2i(9, 2))
+	_check(east[2] and east[0][2] == Vector2i(4, 2), "moving off to one side climbs that way")
+	# Up two tiles, a landing, across, another landing, and back down.
+	_check(tool.press(Vector2i(2, 4)) == null and tool.steps_left() == 1, "a click short of the top adds a landing")
+	_check(tool.press(Vector2i(3, 4)) == null and tool.steps_left() == 1, "landings can sit side by side")
+	var back := tool.plan(Vector2i(3, 0))
+	_check(back[2] and back[0] == [Vector2i(2, 2), Vector2i(2, 3), Vector2i(2, 4), Vector2i(3, 4), Vector2i(3, 3)]
+			and back[1] == [false, false, true, true, false], "stairs can turn back on themselves")
+	tool.rounded = true
+	var flight := tool.press(Vector2i(3, 0))
+	_check(flight != null and not tool.is_drawing() and flight.entry() == Vector2i(2, 1)
+			and flight.exit() == Vector2i(3, 2), "the last click builds the stairs")
+	var treads := flight.treads()
+	_check(treads.size() == 8 and is_equal_approx(treads[3][1], 1.0) and is_equal_approx(treads[4][1], 1.0)
+			and is_equal_approx(treads[-1][1], 1.5), "every step rises the same, and landings stay level")
+	_check(is_equal_approx(flight.top_height() + Staircase.RISE, Building.STOREY), "seven steps make a storey")
+	var outline: PackedVector2Array = treads[4][0]
+	_check(outline.size() > 4 and outline[0] == Vector2(3, 4), "rounded landings swing round the inside corner")
+
+	var map := BuildingMap.new(Rect2i(0, 0, 10, 10))
+	map.fill_floor(Rect2i(0, 0, 8, 8))
+	_check(map.add_stairs(flight) != 0 and map.stairs_at(Vector2i(3, 4)) == flight, "stairs go on floor")
+	var bed: ObjectDef = load("res://games/prison/catalogue/bed.tres")
+	_check(not map.can_place_at(bed, Vector2(2.5, 3.0), 0.0), "nothing can be placed on stairs")
+	_check(not map.can_build_wall(BuildingMap.edge_between(Vector2i(2, 3), Vector2i(2, 4))),
+			"no wall across a flight")
+	_check(map.can_build_wall(BuildingMap.edge_between(Vector2i(2, 3), Vector2i(3, 3))),
+			"walls can run between the two halves")
+	var walled: Array[Vector2i] = [Vector2i(5, 1), Vector2i(5, 2), Vector2i(5, 3)]
+	map.build_walls([BuildingMap.edge_between(Vector2i(5, 1), Vector2i(5, 2))])
+	_check(not map.can_add_stairs(walled), "stairs cannot climb through a wall")
+	map.demolish(Rect2i(3, 3, 1, 1))
+	_check(map.stairs.is_empty(), "demolishing any of the stairs removes them")
 
 
 func _test_ramps() -> void:

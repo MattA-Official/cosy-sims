@@ -110,13 +110,23 @@ walls are done. Next come people and pathfinding.
   furniture is low and chunky. People will be about 0.9 m tall, so a
   quarter-metre split is a step they can take and anything taller needs a
   ramp or stairs.
-- Getting between levels: ready-made stair and lift objects, plus drawn
-  ramps for split levels and odd heights. Stairs are 1 by 3 tiles and
-  climb one storey; they cut a hole in the floor above, and the floor can
-  go back once they are removed. A stairwell stays part of the room around
-  it. Lifts link with a lift in the same spot on the next level up.
-  There is one kind of lift. `Building.links()` lists every way
-  between levels, ready for pathfinding.
+- Getting between levels: drawn stairs, lift objects, and drawn ramps for
+  split levels and odd heights. `Building.links()` lists every way between
+  levels, ready for pathfinding.
+- Stairs are drawn like the Sims 4 stair builder, with the floor tool's
+  Stairs mode: click the foot, move the way they climb, click short of the
+  top for a landing and carry on in any direction (round a corner, or back
+  on themselves), and click at the top to build. Every staircase has the
+  same steps: seven risers of 0.25 m make a storey, two treads to a tile,
+  so there are always three tiles of steps plus any landings. Landings are
+  square or rounded (a quarter circle round the inside of a turn, so a
+  landing that turns back makes a half circle). Treads take the chosen
+  floor style. Stairs cut a hole in the floor above over every tile they
+  cover, and the floor can go back once they are removed. Nothing can be
+  placed on stairs, no wall can cut across a flight, and demolishing any
+  tile of them removes them. A stairwell stays part of the room around it.
+- There is one kind of lift. Lifts link with a lift in the same spot on
+  the next level up.
 - Ramps are drawn with the floor tool's Ramp mode: drag over floor from the
   low side to the high side, and the ramp meets the floor just beyond each
   end. Nothing can be placed on a ramp, and nudging any of it flattens it
@@ -145,12 +155,11 @@ walls are done. Next come people and pathfinding.
 - Objects turn to any angle: R turns by a step (45° by default, [ and ]
   pick 90° down to 1°), and holding F pins the object and turns it to face
   the mouse. Turned objects snap their middle to half or quarter tiles.
-  Stairs and lifts stay square-on. Objects cannot straddle any wall.
+  Lifts stay square-on. Objects cannot straddle any wall.
 - People and pathfinding will use the tile pieces too.
 - Idea for later: curved walls, perhaps reusing the path curves.
 
 ## Open questions
-- Multi-storey buildings: when, and how do stairs work?
 - Roofs: drawn automatically for now. Do you want to be able to choose
   roof styles?
 - Undo: per action, or per drag?
