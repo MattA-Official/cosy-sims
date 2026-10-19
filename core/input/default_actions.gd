@@ -1,0 +1,28 @@
+extends Node
+## Registers the shared input actions in code, so every game in the series
+## gets the same controls without copying a long input map between projects.
+## Actions already defined in Project Settings are left alone, so a game can
+## still override a binding there.
+
+const KEY_ACTIONS := {
+	"camera_pan_forward": [KEY_W, KEY_UP],
+	"camera_pan_back": [KEY_S, KEY_DOWN],
+	"camera_pan_left": [KEY_A, KEY_LEFT],
+	"camera_pan_right": [KEY_D, KEY_RIGHT],
+	"camera_rotate_left": [KEY_Q],
+	"camera_rotate_right": [KEY_E],
+	"camera_zoom_in": [KEY_EQUAL, KEY_KP_ADD],
+	"camera_zoom_out": [KEY_MINUS, KEY_KP_SUBTRACT],
+	"camera_fast": [KEY_SHIFT],
+}
+
+
+func _enter_tree() -> void:
+	for action: String in KEY_ACTIONS:
+		if InputMap.has_action(action):
+			continue
+		InputMap.add_action(action)
+		for keycode: Key in KEY_ACTIONS[action]:
+			var event := InputEventKey.new()
+			event.physical_keycode = keycode
+			InputMap.action_add_event(action, event)

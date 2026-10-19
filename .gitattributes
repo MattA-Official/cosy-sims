@@ -1,0 +1,4 @@
+# Normalise line endings so Windows and macOS editors agree.
+* text=auto eol=lf
+*.png binary
+*.glb binary
