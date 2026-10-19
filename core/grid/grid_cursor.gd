@@ -16,6 +16,9 @@ const NO_CELL := Vector2i(-1_000_000, -1_000_000)
 
 ## The hovered cell, or NO_CELL when the mouse is off the grid.
 var hovered_cell := NO_CELL
+## Optional: the height to draw the highlight at for a cell, such as the
+## floor of an upper storey. Overrides the terrain when set.
+var height_at: Callable
 
 var _highlight: MeshInstance3D
 
@@ -46,7 +49,11 @@ func _process(_delta: float) -> void:
 	hovered_cell = cell
 	_highlight.visible = cell != NO_CELL
 	if _highlight.visible:
-		var lift := terrain.cell_height(cell) if terrain != null else 0.0
+		var lift := 0.0
+		if height_at.is_valid():
+			lift = height_at.call(cell)
+		elif terrain != null:
+			lift = terrain.cell_height(cell)
 		_highlight.global_position = grid.cell_to_world(cell) + Vector3.UP * (lift + 0.04)
 	cell_hovered.emit(cell)
 

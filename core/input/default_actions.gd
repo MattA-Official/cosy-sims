@@ -22,6 +22,8 @@ const KEY_ACTIONS := {
 	"build_brush_smaller": [KEY_BRACKETLEFT],
 	"build_brush_bigger": [KEY_BRACKETRIGHT],
 	"debug_toggle": [KEY_F3],
+	"level_up": [KEY_PAGEUP],
+	"level_down": [KEY_PAGEDOWN],
 }
 
 

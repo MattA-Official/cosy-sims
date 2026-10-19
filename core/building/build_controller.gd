@@ -63,10 +63,23 @@ const WATER_HINTS := {
 @export var demolish_colour := Color(1.0, 0.3, 0.25, 0.4)
 @export var preview_wall_height := 1.0
 
+## The level being built on. Follows `building` when that is set.
 var map: BuildingMap:
 	set(value):
 		map = value
-		path_tool.map = value
+		if building == null:
+			path_tool.map = value
+## All the storeys. Optional: without it, the controller works on `map` alone.
+var building: Building:
+	set(value):
+		building = value
+		map = building.current()
+		path_tool.map = building.ground()
+		building.active_changed.connect(func(_level: int) -> void:
+			_dragging = false
+			_brushing = false
+			path_tool.cancel()
+			map = building.current())
 ## The paths the path tool edits. Set together with `map`.
 var paths: PathNetwork:
 	set(value):
@@ -186,6 +199,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_press() -> void:
+	if _ground_only(tool) and _level() != 0:
+		return
 	match tool:
 		Tool.ROOM, Tool.FLOOR, Tool.DEMOLISH:
 			_dragging = true
@@ -233,13 +248,13 @@ func _on_release() -> void:
 	match tool:
 		Tool.ROOM:
 			var height := build_height(rect)
-			if _is_dry(rect):
+			if can_build_floor(rect):
 				map.build_room(rect, floor_style, wall_style, height)
 				settle_ground(rect)
 		Tool.FLOOR:
 			if erase:
 				map.clear_floor(rect)
-			elif _is_dry(rect):
+			elif can_build_floor(rect):
 				map.fill_floor(rect, floor_style, build_height(rect))
 				settle_ground(rect)
 		Tool.WALL:
@@ -267,6 +282,8 @@ func _on_release() -> void:
 
 ## What the current tool does, for the toolbar.
 func hint() -> String:
+	if _ground_only(tool) and _level() != 0:
+		return "This tool works on the ground floor. Page Down to go back to it."
 	if tool == Tool.TERRAIN and water_mode != WaterMode.NONE:
 		return WATER_HINTS[water_mode]
 	if tool == Tool.PATH:
@@ -278,6 +295,8 @@ func hint() -> String:
 ## Each corner under a floor drops to the lowest floor touching it, so the
 ## ground never pokes through a floor; higher floors stand on foundations.
 func settle_ground(rect: Rect2i) -> void:
+	if _level() != 0:
+		return
 	if foliage != null:
 		foliage.remove_in_rect(Rect2(rect))
 	if paths != null:
@@ -307,10 +326,33 @@ func build_height(rect: Rect2i) -> float:
 	var near := map.floor_height_near(rect)
 	if not is_nan(near):
 		return near
-	if terrain == null:
-		return 0.0
 	var start := _drag_start_cell if rect.has_point(_drag_start_cell) else rect.position
-	return snappedf(terrain.cell_height(start), 0.25)
+	var ground := snappedf(terrain.cell_height(start), 0.25) if terrain != null else 0.0
+	if _level() != 0:
+		return building.storey_height(_level(), start, ground)
+	return ground
+
+
+## Whether floor can go over a rectangle: out of the water on the ground,
+## and over floor on the level below when upstairs.
+func can_build_floor(rect: Rect2i) -> bool:
+	if not _is_dry(rect):
+		return false
+	if building != null and _level() > 0:
+		for cell in BuildingMap.cells_in(rect):
+			if map.owns(cell) and not building.is_supported(_level(), cell):
+				return false
+	return true
+
+
+## The level being built on: 0 without a building.
+func _level() -> int:
+	return building.active if building != null else 0
+
+
+## Tools that only make sense on the ground level.
+func _ground_only(t: Tool) -> bool:
+	return t == Tool.TERRAIN or t == Tool.PLANTS or t == Tool.PATH
 
 
 ## Does this edge already have the opening the tool would put in?
@@ -325,6 +367,8 @@ func _uses_brush() -> bool:
 
 
 func _apply_brush(delta: float) -> void:
+	if _level() != 0:
+		return
 	match tool:
 		Tool.TERRAIN:
 			if terrain == null:
@@ -440,10 +484,12 @@ func _draw_preview() -> void:
 	_draw_path_preview()
 	if map == null or tool == Tool.NONE or not _has_hover:
 		return
+	if _ground_only(tool) and _level() != 0:
+		return
 	match tool:
 		Tool.ROOM:
 			var rect := _drag_rect()
-			var dry := _is_dry(rect)
+			var dry := can_build_floor(rect)
 			_preview_cells(BuildingMap.cells_in(rect), ok_colour if dry else bad_colour,
 					_preview_height(rect))
 			for edge in BuildingMap.rect_perimeter(rect):
@@ -455,7 +501,7 @@ func _draw_preview() -> void:
 				_preview_cells(BuildingMap.cells_in(rect), demolish_colour)
 			else:
 				_preview_cells(BuildingMap.cells_in(rect),
-						ok_colour if _is_dry(rect) else bad_colour, _preview_height(rect))
+						ok_colour if can_build_floor(rect) else bad_colour, _preview_height(rect))
 		Tool.TERRAIN when water_mode != WaterMode.NONE:
 			_preview_water()
 		Tool.TERRAIN, Tool.PLANTS:
@@ -508,7 +554,7 @@ func _draw_preview() -> void:
 
 ## Would a new building here stay out of the water?
 func _is_dry(rect: Rect2i) -> bool:
-	if terrain == null:
+	if terrain == null or _level() != 0:
 		return true
 	var height := build_height(rect)
 	for cell in BuildingMap.cells_in(rect):
@@ -549,12 +595,16 @@ func _preview_height(rect: Rect2i) -> float:
 	return build_height(rect)
 
 
-## The floor height where there is floor, otherwise the ground.
+## The floor height where there is floor, otherwise the ground (or, off
+## the ground level, where a new floor would go).
 func _ground_at(point: Vector2) -> float:
 	var cell := Vector2i(point.floor())
 	if map.has_floor(cell):
 		return map.floor_height(cell)
-	return terrain.height_at(point) if terrain != null else 0.0
+	var ground := terrain.height_at(point) if terrain != null else 0.0
+	if _level() != 0:
+		return building.storey_height(_level(), cell, ground)
+	return ground
 
 
 func _draw_path_preview() -> void:

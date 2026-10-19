@@ -39,6 +39,10 @@ extends Node3D
 @export_group("Feel")
 @export var smoothing := 10.0 ## Higher is snappier.
 
+## When set, picking the ground uses a flat plane at this height instead
+## of the terrain, for building on upper storeys and in basements.
+var pick_height := NAN
+
 var _target_position: Vector3
 var _target_yaw: float
 var _target_pitch: float
@@ -140,6 +144,8 @@ func focus_on(world_position: Vector3) -> void:
 func ground_point_at(screen_position: Vector2) -> Variant:
 	var origin := camera.project_ray_origin(screen_position)
 	var direction := camera.project_ray_normal(screen_position)
+	if not is_nan(pick_height):
+		return Plane(Vector3.UP, pick_height).intersects_ray(origin, direction)
 	if terrain != null:
 		var to_local := terrain.global_transform.affine_inverse()
 		var hit: Variant = terrain.intersect_ray(to_local * origin, to_local.basis * direction)

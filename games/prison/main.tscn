@@ -124,7 +124,7 @@ offset_left = 16.0
 offset_top = 40.0
 offset_right = 900.0
 offset_bottom = 92.0
-text = "WASD / arrows: pan    Q / E: rotate    Wheel or + / -: zoom    Shift: faster
+text = "WASD / arrows: pan    Q / E: rotate    Wheel or + / -: zoom    Shift: faster    Page Up / Down: change floor
 Right-drag: pan    Middle-drag: rotate and tilt    Esc: put the tool away    [ / ]: brush size    F3: debug view"
 label_settings = SubResource("LabelSettings_hud")
 

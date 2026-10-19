@@ -9,6 +9,15 @@ extends Node3D
 ## Optional: buildings sit on the terrain's height instead of y = 0.
 @export var terrain: Terrain
 @export var room_types: Array[RoomTypeDef] = []
+## Which storey this view draws. Off the ground, floors are slabs of
+## `slab_depth` rather than foundations reaching into the terrain.
+@export var level := 0
+@export var slab_depth := 0.47
+## Room labels show only on the level being built on.
+@export var show_labels := true:
+	set(value):
+		show_labels = value
+		queue_rebuild()
 
 @export_group("Walls")
 @export var wall_height := 2.5
@@ -108,14 +117,19 @@ func _build_floors() -> void:
 			# A faint checkerboard makes floors read as tiles.
 			var shade := 1.0 if (cell.x + cell.y) % 2 == 0 else 0.95
 			var top_y := map.floor_height(cell) + 0.03
-			var bottom := _lowest_ground(cell) - FOUNDATION_DEPTH
+			var bottom := _lowest_ground(cell) - FOUNDATION_DEPTH if level == 0 \
+					else top_y - slab_depth
 			var centre := Vector3(cell.x + 0.5, 0.0, cell.y + 0.5) * cs
 			# The top face takes the floor colour; the sides show as foundations
 			# reaching down into the ground.
 			var depth := top_y - bottom
 			MeshShapes.add_box(st, centre + Vector3.UP * (top_y - depth * 0.5),
 					Vector3(0.5 * cs, depth * 0.5, 0.5 * cs), foundation_colour, colour * shade)
-	_add_land_edge(st)
+	if level == 0:
+		_add_land_edge(st)
+	elif map.floors.is_empty():
+		_floor_mesh.mesh = null
+		return
 	_floor_mesh.mesh = st.commit()
 
 
@@ -156,7 +170,8 @@ func _build_walls() -> void:
 		# Foundations reach below the lowest ground at either end.
 		var start := Vector2(edge.x, edge.y)
 		var end := start + Vector2(along.x, along.z)
-		var drop := middle.y - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH
+		var drop := middle.y - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
+				if level == 0 else 0.05
 		# Stretch each piece by half a thickness so corners join up.
 		var half_len := along * (cs + thickness) * 0.5
 		var half_across := across * thickness * 0.5
@@ -264,6 +279,8 @@ func _build_objects() -> void:
 func _build_labels() -> void:
 	for child in _labels.get_children():
 		child.queue_free()
+	if not show_labels:
+		return
 	var cs := grid.cell_size
 	for room in map.rooms():
 		var def := room_type(room.type)

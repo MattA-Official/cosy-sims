@@ -20,6 +20,7 @@ func _process(_delta: float) -> bool:
 	_test_terrain()
 	_test_water()
 	_test_path_network()
+	_test_building_levels()
 	_test_path_profile()
 	_test_foliage()
 	_test_main_scene_loads()
@@ -218,6 +219,14 @@ func _test_main_scene_loads() -> void:
 			"debug view describes a cell, its room and its window")
 	_check(overlay.describe(GridCursor.NO_CELL).contains("Rooms: "), "debug view shows totals")
 	_test_tools(main.controller, map)
+	main.building.active = 1
+	_check(main.views[1].visible and main.views[0].visible and not main.views[0].show_labels,
+			"upstairs shows the floor below without its labels")
+	main.building.active = -1
+	_check(not main.terrain.visible and not main.views[0].visible, "basements hide the land and the floors above")
+	_check(not is_nan(main.camera_rig.pick_height), "off the ground, picking uses a flat plane")
+	main.building.active = 0
+	_check(main.terrain.visible and is_nan(main.camera_rig.pick_height), "back on the ground, the land shows again")
 	main.free()
 
 
@@ -460,6 +469,43 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 			"Ctrl-click removes a path")
 	controller.path_view.rebuild()
 
+	# Storeys: build upstairs over the ground floor, not over thin air.
+	var building := controller.building
+	var ground_room := Rect2i(cell.call(36, 30), Vector2i(4, 4))
+	map.build_room(ground_room)
+	building.active = 1
+	controller.tool = BuildController.Tool.ROOM
+	hover.call(36.5, 30.5)
+	controller._on_press()
+	hover.call(39.5, 33.5)
+	controller._draw_preview()
+	controller._on_release()
+	var upstairs := building.level(1)
+	_check(upstairs.rooms().size() == 1 and is_equal_approx(upstairs.floor_height(cell.call(37, 31)),
+			map.floor_height(cell.call(37, 31)) + Building.STOREY), "room tool builds a storey up")
+	hover.call(41.5, 30.5)
+	controller._on_press()
+	hover.call(43.5, 32.5)
+	controller._on_release()
+	_check(upstairs.rooms().size() == 1, "upstairs rooms need floor below")
+	controller.tool = BuildController.Tool.TERRAIN
+	controller.terrain_brush = Terrain.Brush.RAISE
+	var before_sculpt := terrain.corner_height(cell.call(44, 44))
+	hover.call(44.0, 44.0)
+	controller._on_press()
+	controller._apply_brush(0.5)
+	controller._brushing = false
+	_check(terrain.corner_height(cell.call(44, 44)) == before_sculpt, "terrain tools only work on the ground floor")
+	building.active = -1
+	controller.tool = BuildController.Tool.ROOM
+	hover.call(41.5, 40.5)
+	controller._on_press()
+	hover.call(44.5, 43.5)
+	controller._on_release()
+	_check(building.level(-1).rooms().size() == 1 and building.level(-1).floor_height(cell.call(42, 41))
+			< terrain.cell_height(cell.call(42, 41)) - 2.0, "basements go below ground")
+	building.active = 0
+
 
 func _test_windows() -> void:
 	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
@@ -571,6 +617,28 @@ func _test_water() -> void:
 	_check(water.bodies.is_empty(), "flattening the ground drains the pond")
 	water.free()
 	terrain.free()
+
+
+func _test_building_levels() -> void:
+	var building := Building.new(Rect2i(0, 0, 20, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var ground := building.ground()
+	ground.build_room(Rect2i(2, 2, 4, 4), &"concrete", &"brick", 0.5)
+	_check(building.storey_height(1, Vector2i(3, 3), 0.0) == 0.5 + Building.STOREY,
+			"upstairs floor goes a storey above the floor below")
+	_check(building.storey_height(-1, Vector2i(3, 3), 0.0) == 0.5 - Building.STOREY,
+			"a basement goes a storey below the floor above")
+	_check(building.storey_height(-2, Vector2i(10, 10), 1.0) == 1.0 - 2.0 * Building.STOREY,
+			"a deep basement under open ground is two storeys down")
+	_check(building.is_supported(1, Vector2i(3, 3)) and not building.is_supported(1, Vector2i(10, 10)),
+			"upper floors need floor below")
+	building.active = 1
+	_check(building.current() != ground and building.levels.size() == 2, "going up a level makes it")
+	building.level(-1).fill_floor(Rect2i(12, 12, 2, 2), &"concrete", -3.0)
+	_check(building.corner_in_use(Vector2i(13, 13)), "basements lock the ground above them")
+	building.active = 99
+	_check(building.active == Building.MAX_LEVEL, "levels are limited")
+	building.add_land(Rect2i(20, 0, 5, 5))
+	_check(building.level(1).owns(Vector2i(21, 1)), "new land reaches every level")
 
 
 func _test_path_network() -> void:
