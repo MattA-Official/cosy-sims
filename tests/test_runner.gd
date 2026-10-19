@@ -1108,6 +1108,19 @@ func _test_nav_graph() -> void:
 	graph = NavGraph.build(building, paths)
 	var along := graph.find_path(0, Vector2(12.5, 8.5), 0, Vector2(12.5, 16.5))
 	_check(along.size() == 2, "a path is walked straight along")
+	# Reusing the ground layer after a building change gives the same graph
+	# as working everything out again.
+	ground.build_room(Rect2i(14, 10, 4, 3), &"concrete", &"fence", 0.0)
+	var reused := NavGraph.build(building, paths, null, graph.ground_layer)
+	var fresh := NavGraph.build(building, paths)
+	var joins := func(g: NavGraph) -> int:
+		var count := 0
+		for id in g.astar.get_point_ids():
+			count += g.astar.get_point_connections(id).size()
+		return count
+	_check(reused.ground_layer == graph.ground_layer
+			and reused.astar.get_point_count() == fresh.astar.get_point_count()
+			and joins.call(reused) == joins.call(fresh), "the ground layer is reused when only the building changes")
 	# A built bridge crosses what the ground cannot.
 	var land := Building.new(Rect2i(0, 0, 10, 10))
 	var walls_off := PathNetwork.new()

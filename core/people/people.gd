@@ -40,8 +40,8 @@ var paths: PathNetwork:
 	set(value):
 		paths = value
 		if paths != null:
-			paths.changed.connect(mark_dirty)
-		mark_dirty()
+			paths.changed.connect(mark_ground_dirty)
+		mark_ground_dirty()
 var needs: Array[NeedDef] = []
 var people: Array[Person] = []
 var graph: NavGraph
@@ -49,6 +49,9 @@ var graph: NavGraph
 var paused := false
 
 var _dirty := true
+## Whether the ground under the building has changed too (terrain, water or
+## paths), rather than only the building.
+var _ground_dirty := true
 ## Seconds until the ground has settled after sculpting, or below 0 when
 ## it has nothing waiting.
 var _ground_wait := -1.0
@@ -62,13 +65,15 @@ var _bodies: Dictionary[Person, Node3D] = {}
 func _ready() -> void:
 	if terrain != null:
 		terrain.changed.connect(_on_ground_changed)
+		if terrain.water != null:
+			terrain.water.changed.connect(mark_ground_dirty)
 
 
 func _process(delta: float) -> void:
 	if _ground_wait >= 0.0:
 		_ground_wait -= delta
 		if _ground_wait < 0.0:
-			mark_dirty()
+			mark_ground_dirty()
 	if not paused:
 		step(delta)
 	_update_bodies()
@@ -76,6 +81,13 @@ func _process(delta: float) -> void:
 
 func mark_dirty() -> void:
 	_dirty = true
+
+
+## Like mark_dirty, for changes to the ground itself, which cost more to
+## take in.
+func mark_ground_dirty() -> void:
+	_dirty = true
+	_ground_dirty = true
 
 
 ## People keep the old graph while the ground is being sculpted, and get a
@@ -88,7 +100,9 @@ func _on_ground_changed() -> void:
 func nav() -> NavGraph:
 	if _dirty or graph == null:
 		_dirty = false
-		graph = NavGraph.build(building, paths, terrain)
+		var ground := graph.ground_layer if graph != null and not _ground_dirty else null
+		_ground_dirty = false
+		graph = NavGraph.build(building, paths, terrain, ground)
 	return graph
 
 

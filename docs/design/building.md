@@ -54,7 +54,10 @@ Paths and roads are **not** tile floors. They work like Cities: Skylines
   about the same height makes a new junction; one at least 1 m above
   another passes over it. Where paths meet, the inside corners between
   them are filled with a smooth curve and the outside of a bend is
-  rounded off (no more round pads).
+  rounded off (no more round pads). A curve that crosses the same path
+  twice makes two junctions. An end dropped partway along another path
+  only joins it at about its own height, so a ground path ending under a
+  bridge stays on the ground rather than joining the bridge in mid-air.
 - Ground paths follow the land and that is all: too steep (over 0.35
   rise per tile) or through water and they cannot be built, and the hint
   says so. Stairs, ramps and bridges are a choice: Page Up or Down while
@@ -127,7 +130,12 @@ it follows the build exactly and needs no baking:
   change, and half a second after sculpting stops (rebuilding on every
   frame of the brush made it lag; the ground mesh is also built from
   packed arrays, and buildings only redraw when the brush is next to
-  them).
+  them). The open ground (heights, water, path costs and which
+  neighbours are gentle enough) is kept between rebuilds as a
+  `NavGraph.GroundLayer` and only worked out again when the terrain,
+  water, paths or land change, so a building change rebuilds in about a
+  third of the time (about 16 ms on the starter prison, down from 47).
+  A truly incremental graph is left for when prisons get much bigger.
 - People use an object from a tile inside its room, never through a
   wall from the other side.
 - Needs (`NeedDef` resources: sleep, hunger, hygiene for the prison) run
@@ -202,7 +210,17 @@ walls are done, and so is the first slice of people and pathfinding.
   door instead gets a few steps on the low side, for gaps up to a metre:
   one riser per quarter metre, with the treads sharing the tile in front
   of the door. People climb them, and nothing can be placed on them.
+  If the floors drift too far apart after a door goes in (say a floor is
+  raised), the door stays but gets a label saying nobody can use it and
+  how far apart the floors are.
 - There is one kind of lift.
+- Room and door labels never pile up on screen: where two would overlap,
+  the one about a problem wins, then the bigger room.
+- Upstairs walls reach down to the underside of the floor slab, so they
+  look whole from a stairwell.
+- Code layout: `GridGeometry` holds the pure cell, edge and angled-wall
+  maths, and `BuildingMap` extends it; `PreviewShapes` collects and draws
+  the build tools' see-through previews for `BuildController`.
 - **Roofs** (Matt, 2026-10-19): flat and generated, never placed. Every
   piece of an indoor room with no floor on the level above gets a roof at
   the top of its walls; fenced (outdoor) rooms don't. Roofs show on the

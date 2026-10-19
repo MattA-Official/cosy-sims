@@ -108,6 +108,7 @@ var _rooms_dirty := true
 var _piece_rooms: Dictionary[Vector3i, Room] = {}
 var _slant_cells: Dictionary[Vector2i, Array] = {}
 var _pieces: Dictionary[Vector2i, Array] = {}
+var _squares: Dictionary[Vector2i, Array] = {}
 var _slants_dirty := true
 var _floor_defs: Dictionary[StringName, FloorDef] = {}
 var _wall_defs: Dictionary[StringName, WallDef] = {}
@@ -483,7 +484,11 @@ func pieces(cell: Vector2i) -> Array:
 	_update_slants()
 	if _pieces.has(cell):
 		return _pieces[cell]
-	return [TilePiece.square(cell)]
+	# Uncut tiles are asked for a lot (the walking graph asks for every
+	# floor tile and its neighbours), so keep them rather than make new ones.
+	if not _squares.has(cell):
+		_squares[cell] = [TilePiece.square(cell)]
+	return _squares[cell]
 
 
 ## The piece of a tile holding a point, in tile units.

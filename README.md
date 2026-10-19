@@ -49,7 +49,10 @@ The room, floor and wall tools let you pick a style in the row above the
 toolbar. Fences, hedges, paving and lawn are outdoor styles: a room enclosed
 by walls is indoors, but one bounded by a fence stays outdoors. Rooms are
 worked out from the walls automatically. Once a room has a type, a label
-floats over it saying what it still needs, such as a toilet.
+floats over it saying what it still needs, such as a toilet. Labels that
+would overlap on screen are hidden, keeping the ones about problems. A
+door whose floors have drifted too far apart gets a label saying nobody
+can use it.
 
 You can only build, sculpt and plant inside the land you own, which is
 marked by a low kerb. Building a room or floor flattens the ground under it

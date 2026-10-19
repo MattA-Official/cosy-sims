@@ -20,11 +20,25 @@ const GROUND_COST := 1.6
 const LIFT_COST := 4.0
 ## Spacing of points along built paths, in tiles.
 const PATH_STEP := 1.0
-## Neighbours of a tile including diagonals, as offsets.
-const AROUND: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
-		Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
+
+
+## Open ground worked out from the terrain, water, paths and land alone,
+## kept between rebuilds while those stay the same: building only changes
+## which tiles are open and which walls are in the way, which is cheap to
+## apply on top. Working this out is most of the cost of a rebuild.
+class GroundLayer:
+	var land: Array[Rect2i] = []
+	## Each dry tile's walking point and weight (cheaper on ground paths).
+	var points: Dictionary[Vector2i, Vector3] = {}
+	var weights: Dictionary[Vector2i, float] = {}
+	## Neighbouring tiles (diagonals included) gentle enough to walk
+	## between, as (x, y, next x, next y), each pair once.
+	var links: Array[Vector4i] = []
+
 
 var astar := AStar3D.new()
+## The ground layer this graph was built on, to pass to the next build.
+var ground_layer: GroundLayer
 
 var _building: Building
 var _paths: PathNetwork
@@ -35,11 +49,18 @@ var _ids: Dictionary[Vector4i, int] = {}
 var _levels: Dictionary[int, int] = {} ## Point id: its level.
 
 
-static func build(building: Building, paths: PathNetwork = null, terrain: Terrain = null) -> NavGraph:
+## Builds the graph. Pass the last graph's `ground_layer` to reuse it when
+## only the building has changed; it is worked out afresh if the land has
+## grown.
+static func build(building: Building, paths: PathNetwork = null, terrain: Terrain = null,
+		ground: GroundLayer = null) -> NavGraph:
 	var graph := NavGraph.new()
 	graph._building = building
 	graph._paths = paths
 	graph._terrain = terrain
+	if ground == null or ground.land != building.ground().land:
+		ground = graph._work_out_ground()
+	graph.ground_layer = ground
 	for n: int in building.levels:
 		graph._add_floors(n)
 	graph._add_ground()
@@ -188,22 +209,42 @@ func _add_floors(n: int) -> void:
 			_surface[id] = true
 
 
-## Open ground on your land: every tile on the ground level with no floor,
-## out of the water. Ground paths make it cheaper.
-func _add_ground() -> void:
+## The ground layer for the current terrain, water, paths and land.
+func _work_out_ground() -> GroundLayer:
+	var layer := GroundLayer.new()
 	var map := _building.ground()
+	layer.land = map.land.duplicate()
 	var pathed := _path_cells()
 	for rect in map.land:
 		for cell in BuildingMap.cells_in(rect):
-			if map.has_floor(cell) or _ids.has(Vector4i(0, cell.x, cell.y, -1)):
+			if layer.points.has(cell):
 				continue
 			var middle := Vector2(cell) + Vector2(0.5, 0.5)
 			if _terrain != null and _terrain.is_underwater(middle):
 				continue
-			var id := _add_point(Vector4i(0, cell.x, cell.y, -1), 0,
-					Vector3(middle.x, _ground(middle), middle.y),
-					1.0 if pathed.has(cell) else GROUND_COST)
-			_surface[id] = true
+			layer.points[cell] = Vector3(middle.x, _ground(middle), middle.y)
+			layer.weights[cell] = 1.0 if pathed.has(cell) else GROUND_COST
+	for cell: Vector2i in layer.points:
+		var height := layer.points[cell].y
+		# Half the neighbours, so each pair is seen once.
+		for offset: Vector2i in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, -1)]:
+			var next := cell + offset
+			if layer.points.has(next) \
+					and absf(layer.points[next].y - height) <= MAX_GROUND_RISE * Vector2(offset).length():
+				layer.links.append(Vector4i(cell.x, cell.y, next.x, next.y))
+	return layer
+
+
+## Open ground on your land: every dry tile on the ground level with no
+## floor.
+func _add_ground() -> void:
+	var map := _building.ground()
+	for cell: Vector2i in ground_layer.points:
+		if map.has_floor(cell):
+			continue
+		var id := _add_point(Vector4i(0, cell.x, cell.y, -1), 0, ground_layer.points[cell],
+				ground_layer.weights[cell])
+		_surface[id] = true
 
 
 ## Joins floor pieces to their neighbours, across tile sides and through
@@ -241,8 +282,11 @@ func _join_floors(n: int) -> void:
 					var low := cell if map.floor_height(cell) < map.floor_height(next_cell) else next_cell
 					_stepped[_ids.get(Vector4i(n, low.x, low.y, 0), -1)] = true
 				continue
-			for next: TilePiece in map.pieces(next_cell):
-				if not next.sides_tagged(tag ^ 1).any(
+			var nexts := map.pieces(next_cell)
+			for next: TilePiece in nexts:
+				# Two uncut tiles always share their whole side.
+				var whole := nexts.size() == 1 and piece.is_whole()
+				if not whole and not next.sides_tagged(tag ^ 1).any(
 						func(s: PackedVector2Array) -> bool: return TilePiece.overlaps(stretch, s)):
 					continue
 				var other: int = _ids.get(Vector4i(n, next_cell.x, next_cell.y, next.index), -1)
@@ -260,28 +304,37 @@ func _join_floors(n: int) -> void:
 ## Joins open ground to the ground around it, diagonals included, where
 ## the slope is gentle enough and no wall or fence is in the way.
 func _join_ground() -> void:
+	# Walls are few next to tiles of ground, so list the pairs they block
+	# and the tiles they touch; links away from those need no checks.
+	var blocked: Dictionary[Vector4i, bool] = {}
+	var walled: Dictionary[Vector2i, bool] = {}
 	var map := _building.ground()
-	for key: Vector4i in _ids.keys():
-		if key.x != 0 or key.w != -1:
+	for edge: Vector3i in map.walls:
+		if map.walls[edge] == BuildingMap.Wall.DOOR:
 			continue
-		var cell := Vector2i(key.y, key.z)
-		var id := _ids[key]
-		for offset in AROUND:
-			var next := cell + offset
-			var other: int = _ids.get(Vector4i(0, next.x, next.y, -1), -1)
-			if other == -1 or other < id:
+		var cells := BuildingMap.edge_cells(edge)
+		blocked[Vector4i(cells[0].x, cells[0].y, cells[1].x, cells[1].y)] = true
+		blocked[Vector4i(cells[1].x, cells[1].y, cells[0].x, cells[0].y)] = true
+		walled[cells[0]] = true
+		walled[cells[1]] = true
+	for link: Vector4i in ground_layer.links:
+		var id: int = _ids.get(Vector4i(0, link.x, link.y, -1), -1)
+		var other: int = _ids.get(Vector4i(0, link.z, link.w, -1), -1)
+		if id == -1 or other == -1:
+			continue
+		if walled.has(Vector2i(link.x, link.y)) or walled.has(Vector2i(link.z, link.w)):
+			if blocked.has(link):
 				continue
-			if absf(position_of(other).y - position_of(id).y) > MAX_GROUND_RISE * Vector2(offset).length():
+			# A diagonal also needs both ways round open.
+			if link.x != link.z and link.y != link.w and (
+					blocked.has(Vector4i(link.x, link.y, link.z, link.y))
+					or blocked.has(Vector4i(link.x, link.y, link.x, link.w))
+					or blocked.has(Vector4i(link.z, link.y, link.z, link.w))
+					or blocked.has(Vector4i(link.x, link.w, link.z, link.w))):
 				continue
-			if offset.x != 0 and offset.y != 0:
-				if not _ground_open(map, cell, cell + Vector2i(offset.x, 0)) \
-						or not _ground_open(map, cell, cell + Vector2i(0, offset.y)) \
-						or not _ground_open(map, cell + Vector2i(offset.x, 0), next) \
-						or not _ground_open(map, cell + Vector2i(0, offset.y), next):
-					continue
-			elif not _ground_open(map, cell, next):
-				continue
-			_join(id, other)
+		# Each pair of new ground points comes up once, so no need to check
+		# whether they are joined already.
+		astar.connect_points(id, other)
 
 
 ## Each staircase: a point on every tread's tile, from the foot to the
@@ -378,12 +431,6 @@ func _join_diagonal(n: int, cell: Vector2i, d: Vector2i) -> void:
 func _join(a: int, b: int) -> void:
 	if a != -1 and b != -1 and a != b and not astar.are_points_connected(a, b):
 		astar.connect_points(a, b)
-
-
-## Nothing but a door between two neighbouring tiles of open ground.
-func _ground_open(map: BuildingMap, a: Vector2i, b: Vector2i) -> bool:
-	var kind := map.wall_at(BuildingMap.edge_between(a, b))
-	return kind == BuildingMap.Wall.NONE or kind == BuildingMap.Wall.DOOR
 
 
 ## Is a spot taken up by an object people walk round?
