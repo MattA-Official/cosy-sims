@@ -65,10 +65,15 @@ other, to doors and to buildings rather than to the grid. In practice:
   and storeys. You can't build where that height is under water.
 - **Windows** are a kind of wall piece, like doors: glass or barred. They
   block walking, keep rooms enclosed and indoors, and can't go in fences.
-- **Water** is a single flat level for now. Agreed replacement: placed
-  water bodies. Click a hollow to fill it as a pond or lake at its own
-  level, draw rivers as splines that flow downhill, and keep a sea level as
-  an option for coastal maps.
+- **Water** is placed bodies (`core/terrain/water_layer.gd`). Clicking a
+  hollow fills it to the height where it would spill over its rim, found
+  by rising from the lowest tile and always spreading to the lowest
+  neighbour. Each body refills from its seed tile whenever the ground
+  changes, so ponds follow digging, and drain if their hollow goes.
+  Floors block water. Hollows over 1500 tiles are refused, so a click on
+  a plain ringed by hills doesn't flood it. A sea level is available for
+  coastal maps (`Terrain.has_sea`). Rivers, as downhill splines, come
+  with paths.
 - **Foliage** (`core/terrain/foliage_layer.gd`): trees, bushes and flowers
   are free-placed (not on the grid), painted with a brush, and drawn with
   MultiMesh. Plants keep their distance from each other, won't grow on
@@ -85,7 +90,7 @@ links between areas. The tile grid stays the authority for rooms and
 building.
 
 ### Agreed order
-Debug view and windows, then water bodies, then spline paths (outdoors,
+Debug view and windows (done), then water bodies (done), then spline paths (outdoors,
 sloping with the ground, steps where steep, bridges; floors also count as
 paths, with one-way paths later), then storeys (manual floor heights,
 stairs, ramps, staff-only lifts, basements), then people.

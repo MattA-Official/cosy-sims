@@ -18,6 +18,7 @@ func _process(_delta: float) -> bool:
 	_test_demolish()
 	_test_windows()
 	_test_terrain()
+	_test_water()
 	_test_foliage()
 	_test_main_scene_loads()
 	if _failures == 0:
@@ -199,6 +200,7 @@ func _test_main_scene_loads() -> void:
 	_check(terrain.get_child_count() > 0, "terrain builds its mesh")
 	_check(is_zero_approx(terrain.cell_height(map.land_bounds().get_center())), "owned land starts flat")
 	_check(main.foliage.plants.size() > 50, "the world starts with some plants")
+	_check(main.water.bodies.size() == 1, "the world starts with a pond")
 	_check(map.rooms().size() == 6, "sample layout has six rooms")
 	var view: BuildingView = main.get_node("BuildGrid/BuildingView")
 	view.rebuild()
@@ -383,6 +385,27 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 		return p.position.distance_to(base + Vector2(8, 40)) < 4.0)
 	_check(left.is_empty(), "Ctrl clears plants")
 
+	# Water: dig a hollow, fill it, check you can't build in it, then drain it.
+	var water := controller.water
+	controller.tool = BuildController.Tool.TERRAIN
+	controller.terrain_brush = Terrain.Brush.LOWER
+	controller.brush_radius = 3.0
+	hover.call(8.0, 30.0)
+	controller._on_press()
+	controller._apply_brush(1.0)
+	controller._brushing = false
+	controller.water_mode = BuildController.WaterMode.ADD
+	controller._draw_preview()
+	controller._on_press()
+	var pond := water.body_at(cell.call(8, 30))
+	_check(pond != null, "terrain tool fills a dug hollow with water")
+	_check(not controller._is_dry(Rect2i(cell.call(7, 29), Vector2i(2, 2))), "you can't build in a pond")
+	controller.water_mode = BuildController.WaterMode.REMOVE
+	controller._draw_preview()
+	controller._on_press()
+	_check(water.body_at(cell.call(8, 30)) == null, "terrain tool drains a pond")
+	controller.water_mode = BuildController.WaterMode.NONE
+
 
 func _test_windows() -> void:
 	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
@@ -437,18 +460,62 @@ func _test_terrain() -> void:
 	terrain.flatten_cells([Vector2i(2, 2), Vector2i(3, 2)], 2.0)
 	_check(terrain.cell_height(Vector2i(2, 2)) == 2.0 and terrain.cell_height(Vector2i(3, 2)) == 2.0,
 			"flatten_cells levels whole tiles")
-	_check(terrain.is_underwater(Vector2(14, 14)) == (0.0 < terrain.water_level), "water level check")
+	_check(not terrain.is_underwater(Vector2(14, 14)), "no water without a sea or ponds")
+	terrain.has_sea = true
 	terrain.flatten_cells([Vector2i(14, 14)], -2.0)
-	_check(terrain.is_underwater(Vector2(14.5, 14.5)), "low ground is under water")
+	_check(terrain.is_underwater(Vector2(14.5, 14.5)), "ground below the sea is under water")
 
 	# A ray straight down lands on the ground, or on the water where it is lower.
 	var hit: Variant = terrain.intersect_ray(Vector3(2.5, 20, 2.5), Vector3.DOWN)
 	_check(hit != null and absf(hit.y - 2.0) < 0.01, "ray hits raised ground")
 	hit = terrain.intersect_ray(Vector3(14.5, 20, 14.5), Vector3.DOWN)
-	_check(hit != null and absf(hit.y - terrain.water_level) < 0.01, "ray stops at the water")
+	_check(hit != null and absf(hit.y - terrain.sea_level) < 0.01, "ray stops at the water")
 	hit = terrain.intersect_ray(Vector3(5.5, 20, 5.5), Vector3(1, -1, 0))
 	_check(hit != null and absf(hit.y - terrain.height_at(Vector2(hit.x, hit.z))) < 0.01,
 			"slanted ray lands on the surface")
+	terrain.free()
+
+
+func _test_water() -> void:
+	var terrain := Terrain.new()
+	terrain.size = Vector2i(30, 30)
+	var water := WaterLayer.new()
+	water.terrain = terrain
+	terrain.water = water
+	# A bowl: ground 1 m up everywhere, dipping to -1 m in the middle, with
+	# a low notch in the rim at 0.5 m on one side.
+	terrain.generate(func(corner: Vector2i) -> float:
+		var d := Vector2(corner).distance_to(Vector2(15, 15))
+		return lerpf(-1.0, 1.0, clampf(d / 5.0, 0.0, 1.0)))
+	_check(water.fill_at(Vector2i(2, 2)) == null, "flat ground holds no water")
+	var body := water.fill_at(Vector2i(15, 15))
+	_check(body != null, "a hollow fills with water")
+	_check(body != null and absf(body.level - (1.0 - WaterLayer.RIM_GAP)) < 0.01, "water rises to the rim")
+	_check(terrain.is_underwater(Vector2(15, 15)) and not terrain.is_underwater(Vector2(2, 2)),
+			"the bowl is under water and the plain is not")
+	_check(water.fill_at(Vector2i(15, 15)) == null, "a wet tile cannot be filled again")
+	var size_before := body.cells.size()
+
+	# Cutting a notch in the rim lowers the water to the notch.
+	var notch := {}
+	for x in range(15, 31):
+		for z in range(14, 17):
+			notch[Vector2i(x, z)] = minf(terrain.corner_height(Vector2i(x, z)), 0.5) if x > 15 \
+					else terrain.corner_height(Vector2i(x, z))
+	terrain.set_corners(notch)
+	_check(water.bodies.size() == 1 and absf(water.bodies[0].level - (0.5 - WaterLayer.RIM_GAP)) < 0.06,
+			"cutting the rim lets the water down to the notch")
+	_check(water.bodies[0].cells.size() < size_before, "and the pond shrinks")
+
+	# Blocked tiles (floors) stay dry.
+	water.is_blocked = func(cell: Vector2i) -> bool: return cell == Vector2i(13, 15)
+	water.refill()
+	_check(water.body_at(Vector2i(13, 15)) == null, "water stays off blocked tiles")
+
+	# Filling the whole bowl flat drains it.
+	terrain.generate(func(_corner: Vector2i) -> float: return 1.0)
+	_check(water.bodies.is_empty(), "flattening the ground drains the pond")
+	water.free()
 	terrain.free()
 
 

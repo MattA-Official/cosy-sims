@@ -37,7 +37,7 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | 5 Objects | Click to place; R rotates; hold Alt to place freely |
 | 6 Room type | Click a room to mark it as a cell, canteen and so on |
 | 7 Demolish | Click an object or wall to remove it, or drag to clear an area |
-| 8 Terrain | Hold to raise, lower, flatten or smooth the ground |
+| 8 Terrain | Hold to raise, lower, flatten or smooth the ground; or add water to a hollow, or drain a pond |
 | 9 Plants | Hold to plant trees, bushes or flowers; hold Ctrl to clear them |
 | [ / ] | Brush size, for terrain and plants |
 | Tab | Walls up or cut away |
@@ -53,7 +53,9 @@ floats over it saying what it still needs, such as a toilet.
 You can only build, sculpt and plant inside the land you own, which is
 marked by a low kerb. Building a room or floor flattens the ground under it
 and clears any plants, and the ground under buildings can't be sculpted.
-Lower the ground below the water level to dig a pond.
+To make a pond, dig a hollow and click it with **Add water**. The
+water rises to the lowest point of the rim, and moves when you dig deeper
+or cut through the rim. Water stays off floors.
 
 Each floor remembers its own height. New floor lines up with any floor
 next to it, or else with the ground where you started dragging (rounded to

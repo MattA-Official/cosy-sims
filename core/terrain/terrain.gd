@@ -1,8 +1,9 @@
 class_name Terrain
 extends Node3D
 ## Sculptable ground: a heightmap with one height per tile corner, drawn as
-## a single mesh, plus a flat water level. Anything below the water level is
-## underwater.
+## a single mesh. Water comes from an optional sea level (anything below it
+## is underwater, for coastal maps) and from the ponds and lakes in a
+## WaterLayer.
 ##
 ## Corner (x, z) is the top-left corner of tile (x, z), as in BuildingMap.
 ## Positions passed in and out are in this node's local space, which lines
@@ -18,9 +19,13 @@ const MAX_HEIGHT := 8.0
 		size = value
 		_heights.resize((size.x + 1) * (size.y + 1))
 @export var cell_size := 1.0
-@export var water_level := -0.35
 @export var ground_material: Material
-@export var water_colour := Color(0.35, 0.65, 0.9, 0.7)
+## Optional: ponds and lakes.
+@export var water: WaterLayer
+@export_group("Sea")
+@export var has_sea := false
+@export var sea_level := -0.35
+@export var sea_colour := Color(0.35, 0.65, 0.9, 0.7)
 
 ## Corners that sculpting must leave alone, such as those under buildings.
 ## Set by the game; takes a Vector2i corner and returns true when locked.
@@ -28,18 +33,18 @@ var is_locked: Callable = func(_corner: Vector2i) -> bool: return false
 
 var _heights := PackedFloat32Array()
 var _mesh_instance := MeshInstance3D.new()
-var _water := MeshInstance3D.new()
+var _sea := MeshInstance3D.new()
 var _rebuild_queued := false
 
 
 func _init() -> void:
 	_heights.resize((size.x + 1) * (size.y + 1))
 	add_child(_mesh_instance)
-	add_child(_water)
+	add_child(_sea)
 
 
 func _ready() -> void:
-	_build_water()
+	_build_sea()
 	rebuild()
 
 
@@ -75,8 +80,17 @@ func cell_height(cell: Vector2i) -> float:
 			+ corner_height(cell + Vector2i(0, 1)) + corner_height(cell + Vector2i.ONE)) * 0.25
 
 
+## The height of the water surface at a point (in tile units), or -INF if
+## there is no water there.
+func water_surface(point: Vector2) -> float:
+	var surface := sea_level if has_sea else -INF
+	if water != null:
+		surface = maxf(surface, water.level_at(point))
+	return surface
+
+
 func is_underwater(point: Vector2) -> bool:
-	return height_at(point) < water_level
+	return height_at(point) < water_surface(point)
 
 
 ## Sets every corner of the given tiles to one height, ignoring locks.
@@ -193,7 +207,8 @@ func intersect_ray(origin: Vector3, direction: Vector3) -> Variant:
 
 ## Height of the ground or the water, whichever is higher.
 func _surface_at(local: Vector3) -> float:
-	return maxf(height_at(Vector2(local.x, local.z) / cell_size), water_level)
+	var point := Vector2(local.x, local.z) / cell_size
+	return maxf(height_at(point), water_surface(point))
 
 #endregion
 
@@ -238,18 +253,16 @@ func _corner_normal(corner: Vector2i) -> Vector3:
 	return Vector3(-dx, 2.0 * cell_size, -dz).normalized()
 
 
-func _build_water() -> void:
+func _build_sea() -> void:
+	_sea.visible = has_sea
+	if not has_sea:
+		return
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(size) * cell_size
-	_water.mesh = plane
-	_water.position = Vector3(size.x * 0.5 * cell_size, water_level, size.y * 0.5 * cell_size)
-	var material := StandardMaterial3D.new()
-	material.albedo_color = water_colour
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.roughness = 0.1
-	material.metallic_specular = 0.8
-	_water.material_override = material
-	_water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_sea.mesh = plane
+	_sea.position = Vector3(size.x * 0.5 * cell_size, sea_level, size.y * 0.5 * cell_size)
+	_sea.material_override = WaterLayer.water_material(sea_colour)
+	_sea.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _changed() -> void:

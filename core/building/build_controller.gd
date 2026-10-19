@@ -10,6 +10,7 @@ extends Node3D
 signal tool_changed(tool: Tool)
 
 enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS }
+enum WaterMode { NONE, ADD, REMOVE }
 
 const HINTS := {
 	Tool.NONE: "",
@@ -24,6 +25,11 @@ const HINTS := {
 	Tool.PLANTS: "Hold the mouse to plant. Hold Ctrl to clear plants. [ and ] change the brush size.",
 }
 
+const WATER_HINTS := {
+	WaterMode.ADD: "Click a hollow to fill it with water. Digging deeper or cutting the rim moves the water.",
+	WaterMode.REMOVE: "Click a pond or lake to drain it.",
+}
+
 @export var grid: BuildGrid
 @export var camera_rig: CameraRig
 @export var view: BuildingView
@@ -31,6 +37,8 @@ const HINTS := {
 @export var terrain: Terrain
 ## Optional: the plants to paint and clear.
 @export var foliage: FoliageLayer
+## Optional: ponds and lakes for the terrain tool's water modes.
+@export var water: WaterLayer
 
 @export_group("Brushes")
 ## Metres per second at the middle of the brush when raising or lowering.
@@ -64,6 +72,8 @@ var room_type: RoomTypeDef
 var opening := BuildingMap.Wall.DOOR
 var window_kind := BuildingMap.WINDOW_GLASS
 var terrain_brush := Terrain.Brush.RAISE
+## When not NONE, the terrain tool adds or removes water instead of sculpting.
+var water_mode := WaterMode.NONE
 var plant_def: FoliageDef
 ## Brush radius in tiles, for the terrain and plant tools.
 var brush_radius := 3.0
@@ -84,9 +94,15 @@ var _brushing := false
 var _flatten_target := 0.0
 var _plant_cooldown := 0.0
 var _rng := RandomNumberGenerator.new()
+var _basin: WaterLayer.Body
+var _basin_cell := Vector2i(-1, -1)
+var _basin_dirty := true
 
 
 func _ready() -> void:
+	for source: Node in [terrain, water]:
+		if source != null:
+			source.changed.connect(func() -> void: _basin_dirty = true)
 	var preview := MeshInstance3D.new()
 	preview.mesh = _preview_mesh
 	preview.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -157,6 +173,11 @@ func _on_press() -> void:
 			var room := map.room_at(_hover_cell())
 			if room != null:
 				map.set_room_type(room, room_type.id if room_type != null else &"")
+		Tool.TERRAIN when water_mode != WaterMode.NONE:
+			if water != null and water_mode == WaterMode.ADD:
+				water.fill_at(_hover_cell())
+			elif water != null:
+				water.remove_at(_hover_cell())
 		Tool.TERRAIN, Tool.PLANTS:
 			_brushing = true
 			_flatten_target = terrain.height_at(_hover_point) if terrain != null else 0.0
@@ -203,6 +224,13 @@ func _on_release() -> void:
 
 
 #region Ground and brushes
+
+## What the current tool does, for the toolbar.
+func hint() -> String:
+	if tool == Tool.TERRAIN and water_mode != WaterMode.NONE:
+		return WATER_HINTS[water_mode]
+	return HINTS[tool]
+
 
 ## Fits the ground to the floor just laid in a rectangle, and clears plants.
 ## Each corner under a floor drops to the lowest floor touching it, so the
@@ -383,6 +411,8 @@ func _draw_preview() -> void:
 			else:
 				_preview_cells(BuildingMap.cells_in(rect),
 						ok_colour if _is_dry(rect) else bad_colour, _preview_height(rect))
+		Tool.TERRAIN when water_mode != WaterMode.NONE:
+			_preview_water()
 		Tool.TERRAIN, Tool.PLANTS:
 			var colour := demolish_colour if tool == Tool.PLANTS and _erasing() else ok_colour
 			_preview_ring(_hover_point, brush_radius, colour)
@@ -431,9 +461,43 @@ func _draw_preview() -> void:
 	_preview_mesh.surface_end()
 
 
-## Is the ground under a new building above the water?
+## Would a new building here stay out of the water?
 func _is_dry(rect: Rect2i) -> bool:
-	return terrain == null or build_height(rect) >= terrain.water_level
+	if terrain == null:
+		return true
+	var height := build_height(rect)
+	for cell in BuildingMap.cells_in(rect):
+		if terrain.water_surface(Vector2(cell) + Vector2(0.5, 0.5)) > height:
+			return false
+	return true
+
+
+## Shows the water a click would add (or a red tile if there is no hollow),
+## or the body a click would drain.
+func _preview_water() -> void:
+	if water == null:
+		return
+	var cell := _hover_cell()
+	var existing := water.body_at(cell)
+	if water_mode == WaterMode.REMOVE:
+		if existing != null:
+			_preview_cells(existing.cells.keys(), demolish_colour, existing.level)
+		else:
+			_preview_cells([cell], bad_colour)
+		return
+	if existing != null:
+		_preview_cells([cell], bad_colour, existing.level)
+		return
+	# Working a basin out can take a while on open ground, so only redo it
+	# when the tile under the mouse or the ground changes.
+	if cell != _basin_cell or _basin_dirty:
+		_basin_cell = cell
+		_basin_dirty = false
+		_basin = water.find_basin(cell)
+	if _basin != null:
+		_preview_cells(_basin.cells.keys(), ok_colour, _basin.level)
+	else:
+		_preview_cells([cell], bad_colour)
 
 
 func _preview_height(rect: Rect2i) -> float:

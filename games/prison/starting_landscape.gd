@@ -1,6 +1,6 @@
 class_name StartingLandscape
 ## The world around a new prison: flat land to build on, gentle hills beyond
-## it, a pond, and some trees. Seeded, so it comes out the same every time.
+## it, a hollow for a pond, and some trees. Seeded, so it comes out the same every time.
 
 
 ## Shapes the ground. Owned land stays flat at height 0 so the sample
@@ -28,9 +28,14 @@ static func plant(foliage: FoliageLayer, terrain: Terrain, map: BuildingMap,
 	var oak := PrisonCatalogue.PLANTS[0]
 	var blossom := PrisonCatalogue.PLANTS[1]
 	var bush := PrisonCatalogue.PLANTS[2]
+	# Keep trees out of the water and a little back from the shore.
 	var wild := func(position: Vector2) -> bool:
-		return not map.owns(Vector2i(position.floor())) and not terrain.is_underwater(position) \
-				and terrain.height_at(position) > terrain.water_level + 0.3
+		if map.owns(Vector2i(position.floor())):
+			return false
+		for offset: Vector2 in [Vector2.ZERO, Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+			if terrain.water_surface(position + offset) > terrain.height_at(position) - 0.3:
+				return false
+		return true
 	var size := Vector2(terrain.size)
 	for i in 700:
 		var position := Vector2(rng.randf() * size.x, rng.randf() * size.y)

@@ -113,10 +113,18 @@ func _describe_cell(cell: Vector2i) -> PackedStringArray:
 		for offset: Vector2i in [Vector2i.ZERO, Vector2i(1, 0), Vector2i(0, 1), Vector2i.ONE]:
 			corners.append(terrain.corner_height(cell + offset))
 		var centre := Vector2(cell) + Vector2(0.5, 0.5)
-		lines.append("Ground: %.2f m (corners %.2f to %.2f)%s" % [terrain.cell_height(cell),
-				corners.min(), corners.max(), ", under water" if terrain.is_underwater(centre) else ""])
+		lines.append("Ground: %.2f m (corners %.2f to %.2f)" % [terrain.cell_height(cell),
+				corners.min(), corners.max()])
 		lines.append("Sculpting: %s" % ("locked by a building" if terrain.is_locked.call(cell)
 				else "free"))
+		var body := terrain.water.body_at(cell) if terrain.water != null else null
+		if body != null:
+			lines.append("Water: pond of %d tiles, surface at %.2f m, %.2f m deep here" % [
+					body.cells.size(), body.level, body.level - terrain.cell_height(cell)])
+		elif terrain.has_sea and terrain.is_underwater(centre):
+			lines.append("Water: sea, surface at %.2f m" % terrain.sea_level)
+		else:
+			lines.append("Water: none")
 	var floor_id: StringName = map.floors.get(cell, &"")
 	if floor_id.is_empty():
 		lines.append("Floor: none")
@@ -190,8 +198,9 @@ func _describe_totals() -> PackedStringArray:
 	lines.append("Floor tiles: %d    Walls: %d    Doors: %d    Windows: %d" % [map.floors.size(),
 			counts.get(BuildingMap.Wall.WALL, 0), counts.get(BuildingMap.Wall.DOOR, 0),
 			counts.get(BuildingMap.Wall.WINDOW, 0)])
-	lines.append("Objects: %d    Plants: %d" % [map.objects.size(),
-			foliage.plants.size() if foliage != null else 0])
+	lines.append("Objects: %d    Plants: %d    Ponds and lakes: %d" % [map.objects.size(),
+			foliage.plants.size() if foliage != null else 0,
+			terrain.water.bodies.size() if terrain != null and terrain.water != null else 0])
 	var bounds := map.land_bounds()
 	lines.append("Land: %d x %d from %d, %d    FPS: %d" % [bounds.size.x, bounds.size.y,
 			bounds.position.x, bounds.position.y, Engine.get_frames_per_second()])

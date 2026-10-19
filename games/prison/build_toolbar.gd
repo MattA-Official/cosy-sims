@@ -23,6 +23,11 @@ const OPENINGS := [
 	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS, "Barred window"],
 ]
 
+const WATER_MODES := [
+	[BuildController.WaterMode.ADD, "Add water"],
+	[BuildController.WaterMode.REMOVE, "Drain water"],
+]
+
 const BRUSHES := [
 	[Terrain.Brush.RAISE, "Raise"],
 	[Terrain.Brush.LOWER, "Lower"],
@@ -93,7 +98,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _on_tool_changed(tool: BuildController.Tool) -> void:
 	for t: BuildController.Tool in _tool_buttons:
 		_tool_buttons[t].set_pressed_no_signal(t == tool)
-	_hint.text = BuildController.HINTS[tool]
+	_hint.text = controller.hint()
 	for child in _options.get_children():
 		child.queue_free()
 	match tool:
@@ -156,15 +161,29 @@ func _add_opening_choices() -> void:
 		_options.add_child(button)
 
 
+## Sculpting brushes, then the water modes, as one set of choices.
 func _add_brush_choices() -> void:
 	var group := ButtonGroup.new()
 	for entry: Array in BRUSHES:
 		var brush: Terrain.Brush = entry[0]
 		var button := _make_button(entry[1], group)
-		button.button_pressed = controller.terrain_brush == brush
+		button.button_pressed = controller.water_mode == BuildController.WaterMode.NONE \
+				and controller.terrain_brush == brush
 		button.toggled.connect(func(on: bool) -> void:
 			if on:
-				controller.terrain_brush = brush)
+				controller.terrain_brush = brush
+				controller.water_mode = BuildController.WaterMode.NONE
+				_hint.text = controller.hint())
+		_options.add_child(button)
+	_options.add_child(VSeparator.new())
+	for entry: Array in WATER_MODES:
+		var mode: BuildController.WaterMode = entry[0]
+		var button := _make_button(entry[1], group)
+		button.button_pressed = controller.water_mode == mode
+		button.toggled.connect(func(on: bool) -> void:
+			if on:
+				controller.water_mode = mode
+				_hint.text = controller.hint())
 		_options.add_child(button)
 
 

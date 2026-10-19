@@ -105,7 +105,8 @@ func _process(delta: float) -> void:
 
 	if terrain != null:
 		var local := terrain.to_local(_target_position) / terrain.cell_size
-		_target_position.y = maxf(terrain.height_at(Vector2(local.x, local.z)), terrain.water_level)
+		var point := Vector2(local.x, local.z)
+		_target_position.y = maxf(terrain.height_at(point), terrain.water_surface(point))
 	var t := 1.0 - exp(-smoothing * delta)
 	position = position.lerp(_target_position, t)
 	_yaw = lerpf(_yaw, _target_yaw, t)

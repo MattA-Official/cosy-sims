@@ -78,6 +78,13 @@ func remove_in_circle(centre: Vector2, radius: float) -> int:
 		return plant.position.distance_to(centre) <= radius)
 
 
+## Clears plants that are now under water.
+func remove_underwater() -> int:
+	if terrain == null:
+		return 0
+	return _remove_where(func(plant: Plant) -> bool: return terrain.is_underwater(plant.position))
+
+
 ## Clears plants from an area, for example when a building goes down.
 func remove_in_rect(rect: Rect2) -> int:
 	return _remove_where(func(plant: Plant) -> bool: return rect.has_point(plant.position))

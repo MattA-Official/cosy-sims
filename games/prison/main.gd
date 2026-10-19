@@ -9,6 +9,7 @@ extends Node3D
 @onready var controller: BuildController = $BuildGrid/BuildController
 @onready var terrain: Terrain = $BuildGrid/Terrain
 @onready var foliage: FoliageLayer = $BuildGrid/Foliage
+@onready var water: WaterLayer = $BuildGrid/Water
 @onready var debug_overlay: DebugOverlay = $BuildGrid/DebugOverlay
 @onready var camera_rig: CameraRig = $CameraRig
 @onready var cursor: GridCursor = $GridCursor
@@ -28,12 +29,17 @@ func _ready() -> void:
 	debug_overlay.room_types = PrisonCatalogue.ROOM_TYPES
 	debug_overlay.map = map
 
-	# Hills and a pond around the land, and ground under buildings stays put.
+	# Hills and a pond around the land. Ground under buildings stays put,
+	# water stays off floors, and plants drown when water reaches them.
 	terrain.is_locked = map.corner_in_use
+	water.is_blocked = map.has_floor
+	water.changed.connect(foliage.remove_underwater)
 	var ground: ShaderMaterial = terrain.ground_material
-	ground.set_shader_parameter("water_level", terrain.water_level)
+	ground.set_shader_parameter("water_level",
+			terrain.sea_level if terrain.has_sea else Terrain.MIN_HEIGHT - 10.0)
 	var pond := Vector2(land.end.x + 9, land.get_center().y + 6)
 	StartingLandscape.shape(terrain, land, pond)
+	water.fill_at(Vector2i(pond))
 
 	var layout_origin := land.get_center() - Vector2i(8, 7)
 	if build_sample_layout:
