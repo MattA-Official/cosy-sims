@@ -102,6 +102,19 @@ Debug view and windows, water bodies and spline paths are done. Next come
 storeys (manual floor heights, stairs, ramps, staff-only lifts, basements,
 angled and curved walls), then people.
 
+### Storeys (decided, not built yet)
+- Fixed 3 m storeys, stepped through with Page Up and Page Down. Each
+  floor can be nudged up or down within its storey for split levels.
+  Basements are storeys below ground.
+- Getting between levels: ready-made stair and lift objects (they cut the
+  hole in the floor above; lifts can be staff only), plus drawn ramps for
+  split levels and odd heights.
+
+### Wall shapes (decided, not built yet)
+- Straight walls at any angle, not just along tile edges or 45°. Floors
+  will need rethinking so they can be cut along such walls.
+- Idea for later: curved walls, perhaps reusing the path curves.
+
 ## Open questions
 - Multi-storey buildings: when, and how do stairs work?
 - Roofs: drawn automatically for now. Do you want to be able to choose
