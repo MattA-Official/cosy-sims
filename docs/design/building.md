@@ -56,12 +56,19 @@ other, to doors and to buildings rather than to the grid. In practice:
   tile corner, that you sculpt with raise, lower, flatten and smooth
   brushes. You can only sculpt your own land, and the ground under
   buildings is locked.
-- **Building flattens the ground.** A new room or floor levels its tiles to
-  the height of any floor already beside it, or else to the tile where the
-  drag started. Floors sit on foundations that reach into the slope, so
-  nothing floats. You can't build where that height is under water.
-- **Water** is a flat water level for now: anything below it is underwater,
-  and you can dig a pond by lowering the ground. Rivers can come later.
+- **Floors have their own height**, stored in `BuildingMap.floor_heights`
+  rather than read from the terrain. New floor takes the height of any
+  floor beside it, or else the ground where the drag started, rounded to
+  0.25 m. The ground is then fitted to the floor: each corner drops to the
+  lowest floor touching it, so it never pokes through, and higher floors
+  stand on foundations. This is the groundwork for manual floor heights
+  and storeys. You can't build where that height is under water.
+- **Windows** are a kind of wall piece, like doors: glass or barred. They
+  block walking, keep rooms enclosed and indoors, and can't go in fences.
+- **Water** is a single flat level for now. Agreed replacement: placed
+  water bodies. Click a hollow to fill it as a pond or lake at its own
+  level, draw rivers as splines that flow downhill, and keep a sea level as
+  an option for coastal maps.
 - **Foliage** (`core/terrain/foliage_layer.gd`): trees, bushes and flowers
   are free-placed (not on the grid), painted with a brush, and drawn with
   MultiMesh. Plants keep their distance from each other, won't grow on
@@ -76,6 +83,12 @@ tile grid. They'll use Godot's navigation meshes, baked from floors, paths
 and walkable terrain, with walls and objects as obstacles and doors as the
 links between areas. The tile grid stays the authority for rooms and
 building.
+
+### Agreed order
+Debug view and windows, then water bodies, then spline paths (outdoors,
+sloping with the ground, steps where steep, bridges; floors also count as
+paths, with one-way paths later), then storeys (manual floor heights,
+stairs, ramps, staff-only lifts, basements), then people.
 
 ## Open questions
 - Multi-storey buildings: when, and how do stairs work?

@@ -4,19 +4,19 @@ extends Node3D
 ## shows a see-through preview of what will happen before you commit.
 ##
 ## Drag tools (room, floor, wall, demolish) act when you let go of the left
-## mouse button. Click tools (door, object, room type) act on click. Brush
+## mouse button. Click tools (openings, object, room type) act on click. Brush
 ## tools (terrain, plants) act for as long as the button is held.
 
 signal tool_changed(tool: Tool)
 
-enum Tool { NONE, ROOM, FLOOR, WALL, DOOR, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS }
+enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS }
 
 const HINTS := {
 	Tool.NONE: "",
 	Tool.ROOM: "Drag to build a walled room.",
 	Tool.FLOOR: "Drag to lay or restyle floor. Hold Ctrl to remove floor.",
 	Tool.WALL: "Drag between corners to build or restyle walls. Hold Ctrl to remove them.",
-	Tool.DOOR: "Click a wall to make it a door. Click a door to make it a wall again.",
+	Tool.OPENING: "Click a wall to put in a door or window. Click it again to fill it in.",
 	Tool.OBJECT: "Click to place. R rotates. Hold Alt to place freely.",
 	Tool.ROOM_TYPE: "Click a room to mark it.",
 	Tool.DEMOLISH: "Click an object or wall to remove it, or drag to clear an area.",
@@ -44,6 +44,7 @@ const HINTS := {
 @export var ok_colour := Color(0.45, 0.95, 0.55, 0.45)
 @export var bad_colour := Color(1.0, 0.4, 0.4, 0.45)
 @export var demolish_colour := Color(1.0, 0.3, 0.25, 0.4)
+@export var preview_wall_height := 1.0
 
 var map: BuildingMap
 var tool := Tool.NONE:
@@ -58,6 +59,10 @@ var wall_style: StringName = BuildingMap.DEFAULT_WALL
 var object_rotation := 0
 ## The room type the room type tool applies. Null clears a room's type.
 var room_type: RoomTypeDef
+## What the opening tool puts in: Wall.DOOR or Wall.WINDOW, and which kind
+## of window.
+var opening := BuildingMap.Wall.DOOR
+var window_kind := BuildingMap.WINDOW_GLASS
 var terrain_brush := Terrain.Brush.RAISE
 var plant_def: FoliageDef
 ## Brush radius in tiles, for the terrain and plant tools.
@@ -139,9 +144,12 @@ func _on_press() -> void:
 		Tool.WALL:
 			_dragging = true
 			_drag_start_corner = _hover_corner()
-		Tool.DOOR:
+		Tool.OPENING:
 			var edge := _hover_edge()
-			map.set_door(edge, map.wall_at(edge) == BuildingMap.Wall.WALL)
+			if _has_chosen_opening(edge):
+				map.set_opening(edge, BuildingMap.Wall.WALL)
+			else:
+				map.set_opening(edge, opening, window_kind)
 		Tool.OBJECT:
 			if object_def != null:
 				map.place_object(object_def, _object_position(), object_rotation)
@@ -163,13 +171,16 @@ func _on_release() -> void:
 	var erase := _erasing()
 	match tool:
 		Tool.ROOM:
-			if prepare_ground(rect):
-				map.build_room(rect, floor_style, wall_style)
+			var height := build_height(rect)
+			if _is_dry(rect):
+				map.build_room(rect, floor_style, wall_style, height)
+				settle_ground(rect)
 		Tool.FLOOR:
 			if erase:
 				map.clear_floor(rect)
-			elif prepare_ground(rect):
-				map.fill_floor(rect, floor_style)
+			elif _is_dry(rect):
+				map.fill_floor(rect, floor_style, build_height(rect))
+				settle_ground(rect)
 		Tool.WALL:
 			var edges := BuildingMap.edges_on_line(_drag_start_corner, _wall_end_corner())
 			if erase:
@@ -193,33 +204,48 @@ func _on_release() -> void:
 
 #region Ground and brushes
 
-## Gets the ground ready for a building: flattens it to one height and
-## clears plants. Returns false if the area is under water. The height
-## comes from any floor already in or beside the area, so new rooms line up
-## with old ones, or else from where the drag started.
-func prepare_ground(rect: Rect2i) -> bool:
+## Fits the ground to the floor just laid in a rectangle, and clears plants.
+## Each corner under a floor drops to the lowest floor touching it, so the
+## ground never pokes through a floor; higher floors stand on foundations.
+func settle_ground(rect: Rect2i) -> void:
 	if foliage != null:
 		foliage.remove_in_rect(Rect2(rect))
 	if terrain == null:
-		return true
-	var height := build_height(rect)
-	if height < terrain.water_level:
-		return false
-	var cells: Array[Vector2i] = []
+		return
+	var heights := {}
 	for cell in BuildingMap.cells_in(rect):
-		if map.owns(cell):
-			cells.append(cell)
-	terrain.flatten_cells(cells, height)
-	return true
+		if not map.has_floor(cell):
+			continue
+		for offset: Vector2i in [Vector2i.ZERO, Vector2i(1, 0), Vector2i(0, 1), Vector2i.ONE]:
+			var corner := cell + offset
+			if heights.has(corner):
+				continue
+			var lowest := INF
+			for touch: Vector2i in [Vector2i.ZERO, Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]:
+				if map.has_floor(corner + touch):
+					lowest = minf(lowest, map.floor_height(corner + touch))
+			heights[corner] = lowest
+	terrain.set_corners(heights)
 
 
-## The height a building over this rectangle would stand at.
+## The height new floor over this rectangle would go in at: the same as
+## any floor already in or beside it, so rooms line up, or else the ground
+## where the drag started.
 func build_height(rect: Rect2i) -> float:
-	for cell in BuildingMap.cells_in(rect.grow(1)):
-		if map.has_floor(cell):
-			return terrain.cell_height(cell)
+	var near := map.floor_height_near(rect)
+	if not is_nan(near):
+		return near
+	if terrain == null:
+		return 0.0
 	var start := _drag_start_cell if rect.has_point(_drag_start_cell) else rect.position
-	return terrain.cell_height(start)
+	return snappedf(terrain.cell_height(start), 0.25)
+
+
+## Does this edge already have the opening the tool would put in?
+func _has_chosen_opening(edge: Vector3i) -> bool:
+	if map.wall_at(edge) != opening:
+		return false
+	return opening != BuildingMap.Wall.WINDOW or map.window_kind(edge) == window_kind
 
 
 func _uses_brush() -> bool:
@@ -348,7 +374,8 @@ func _draw_preview() -> void:
 			_preview_cells(BuildingMap.cells_in(rect), ok_colour if dry else bad_colour,
 					_preview_height(rect))
 			for edge in BuildingMap.rect_perimeter(rect):
-				_preview_edge(edge, ok_colour if dry and map.can_build_wall(edge) else bad_colour)
+				_preview_edge(edge, ok_colour if dry and map.can_build_wall(edge) else bad_colour,
+						_preview_height(rect))
 		Tool.FLOOR:
 			var rect := _drag_rect()
 			if _erasing():
@@ -378,9 +405,12 @@ func _draw_preview() -> void:
 						_preview_edge(edge, ok_colour if map.can_build_wall(edge) else bad_colour)
 			else:
 				_preview_corner(_hover_corner(), ok_colour)
-		Tool.DOOR:
+		Tool.OPENING:
 			var edge := _hover_edge()
-			_preview_edge(edge, ok_colour if map.wall_at(edge) != BuildingMap.Wall.NONE else bad_colour)
+			var ok := map.wall_at(edge) != BuildingMap.Wall.NONE
+			if opening == BuildingMap.Wall.WINDOW and map.is_outdoor_wall(edge):
+				ok = false
+			_preview_edge(edge, ok_colour if ok else bad_colour)
 		Tool.OBJECT:
 			if object_def != null:
 				var position := _object_position()
@@ -406,12 +436,15 @@ func _is_dry(rect: Rect2i) -> bool:
 	return terrain == null or build_height(rect) >= terrain.water_level
 
 
-## The height a building preview should show at, or NAN to follow the ground.
 func _preview_height(rect: Rect2i) -> float:
-	return build_height(rect) if terrain != null else NAN
+	return build_height(rect)
 
 
+## The floor height where there is floor, otherwise the ground.
 func _ground_at(point: Vector2) -> float:
+	var cell := Vector2i(point.floor())
+	if map.has_floor(cell):
+		return map.floor_height(cell)
 	return terrain.height_at(point) if terrain != null else 0.0
 
 
@@ -444,16 +477,24 @@ func _preview_rect(rect: Rect2, colour: Color, height: float) -> void:
 			Vector3(rect.size.x * cs * 0.5, height * 0.5, rect.size.y * cs * 0.5), colour])
 
 
-func _preview_edge(edge: Vector3i, colour: Color) -> void:
+## A wall preview. `base` sets the height it stands at; by default it
+## stands on the floor or ground beside it. Kept below full wall height so
+## a big drag does not hide what is behind it.
+func _preview_edge(edge: Vector3i, colour: Color, base := NAN) -> void:
 	if not map.edge_in_bounds(edge):
 		return
 	var cs := grid.cell_size
 	var along := Vector3.RIGHT if edge.z == BuildingMap.EDGE_X else Vector3.BACK
 	var across := Vector3.BACK if edge.z == BuildingMap.EDGE_X else Vector3.RIGHT
-	var height := view.low_wall_height if view.walls_low else view.wall_height
+	var height := view.low_wall_height if view.walls_low else preview_wall_height
 	var middle := Vector2(edge.x, edge.y) + Vector2(along.x, along.z) * 0.5
+	var ground := base
+	if is_nan(ground):
+		ground = -INF
+		for cell in BuildingMap.edge_cells(edge):
+			ground = maxf(ground, _ground_at(Vector2(cell) + Vector2(0.5, 0.5)))
 	var centre := Vector3(edge.x, 0.0, edge.y) * cs + along * cs * 0.5 \
-			+ Vector3.UP * (_ground_at(middle) + height * 0.5)
+			+ Vector3.UP * (ground + height * 0.5)
 	_preview_boxes.append([centre, along * cs * 0.5 + across * 0.1 + Vector3.UP * height * 0.5,
 			colour])
 

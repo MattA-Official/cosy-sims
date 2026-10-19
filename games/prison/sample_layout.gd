@@ -1,6 +1,7 @@
 class_name SampleLayout
-## A tiny starter prison: two cells off a corridor, a canteen, a shower room
-## and a fenced yard, with one thing left unfinished so the warnings show.
+## A tiny starter prison: two cells (with barred windows) off a corridor, a
+## canteen with glass windows, a shower room and a fenced yard, with one
+## thing left unfinished so the warnings show.
 
 
 static func build(map: BuildingMap, at: Vector2i) -> void:
@@ -20,6 +21,8 @@ static func build(map: BuildingMap, at: Vector2i) -> void:
 		var origin := at + Vector2i(i * 3, 0)
 		map.build_room(Rect2i(origin, Vector2i(3, 3)), &"concrete", &"brick")
 		map.set_door(Vector3i(origin.x + 1, origin.y + 3, BuildingMap.EDGE_X), true)
+		map.set_opening(Vector3i(origin.x + 1, origin.y, BuildingMap.EDGE_X),
+				BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS)
 		map.place_object(bed, Vector2(origin), 0)
 		if i == 0:
 			map.place_object(toilet, Vector2(origin) + Vector2(2.5, 0), 0)
@@ -32,6 +35,9 @@ static func build(map: BuildingMap, at: Vector2i) -> void:
 	map.set_door(Vector3i(at.x + 3, at.y + 5, BuildingMap.EDGE_X), true)
 	map.set_door(Vector3i(at.x + 9, at.y + 5, BuildingMap.EDGE_X), true)
 	map.set_door(Vector3i(at.x + 12, at.y + 3, BuildingMap.EDGE_Z), true)
+	for x: int in [1, 3, 5]:
+		map.set_opening(Vector3i(at.x + x, at.y + 10, BuildingMap.EDGE_X),
+				BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_GLASS)
 
 	var table := PrisonCatalogue.object(&"table")
 	for row in 2:

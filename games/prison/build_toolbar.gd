@@ -9,12 +9,18 @@ const TOOLS := [
 	[BuildController.Tool.ROOM, "Room"],
 	[BuildController.Tool.FLOOR, "Floor"],
 	[BuildController.Tool.WALL, "Wall"],
-	[BuildController.Tool.DOOR, "Door"],
+	[BuildController.Tool.OPENING, "Doors and windows"],
 	[BuildController.Tool.OBJECT, "Objects"],
 	[BuildController.Tool.ROOM_TYPE, "Room type"],
 	[BuildController.Tool.DEMOLISH, "Demolish"],
 	[BuildController.Tool.TERRAIN, "Terrain"],
 	[BuildController.Tool.PLANTS, "Plants"],
+]
+
+const OPENINGS := [
+	[BuildingMap.Wall.DOOR, &"", "Door"],
+	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_GLASS, "Glass window"],
+	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS, "Barred window"],
 ]
 
 const BRUSHES := [
@@ -105,6 +111,8 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 		BuildController.Tool.ROOM_TYPE:
 			_add_choices(PrisonCatalogue.ROOM_TYPES, controller.room_type,
 					func(def: Resource) -> void: controller.room_type = def, "Clear")
+		BuildController.Tool.OPENING:
+			_add_opening_choices()
 		BuildController.Tool.TERRAIN:
 			_add_brush_choices()
 		BuildController.Tool.PLANTS:
@@ -128,6 +136,23 @@ func _add_style_choices(defs: Array, floors: bool) -> void:
 				controller.floor_style = id
 			else:
 				controller.wall_style = id)
+		_options.add_child(button)
+
+
+func _add_opening_choices() -> void:
+	var group := ButtonGroup.new()
+	for entry: Array in OPENINGS:
+		var kind: BuildingMap.Wall = entry[0]
+		var window: StringName = entry[1]
+		var button := _make_button(entry[2], group)
+		button.button_pressed = controller.opening == kind \
+				and (kind != BuildingMap.Wall.WINDOW or controller.window_kind == window)
+		button.toggled.connect(func(on: bool) -> void:
+			if not on:
+				return
+			controller.opening = kind
+			if kind == BuildingMap.Wall.WINDOW:
+				controller.window_kind = window)
 		_options.add_child(button)
 
 

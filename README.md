@@ -33,7 +33,7 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | 1 Room | Drag to build a floor with walls all round |
 | 2 Floor | Drag to lay or restyle floor; hold Ctrl to remove |
 | 3 Wall | Drag from corner to corner to build or restyle; hold Ctrl to remove |
-| 4 Door | Click a wall to make it a door, or a door to make it a wall |
+| 4 Doors and windows | Pick a door, glass window or barred window, then click a wall; click it again to fill it in |
 | 5 Objects | Click to place; R rotates; hold Alt to place freely |
 | 6 Room type | Click a room to mark it as a cell, canteen and so on |
 | 7 Demolish | Click an object or wall to remove it, or drag to clear an area |
@@ -42,6 +42,7 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | [ / ] | Brush size, for terrain and plants |
 | Tab | Walls up or cut away |
 | Esc | Put the tool away |
+| F3 | Debug view: rooms tinted and labelled, and details of the tile under the mouse |
 
 The room, floor and wall tools let you pick a style in the row above the
 toolbar. Fences, hedges, paving and lawn are outdoor styles: a room enclosed
@@ -53,6 +54,11 @@ You can only build, sculpt and plant inside the land you own, which is
 marked by a low kerb. Building a room or floor flattens the ground under it
 and clears any plants, and the ground under buildings can't be sculpted.
 Lower the ground below the water level to dig a pond.
+
+Each floor remembers its own height. New floor lines up with any floor
+next to it, or else with the ground where you started dragging (rounded to
+a quarter of a metre), and the ground is fitted underneath so it never
+shows through. Higher floors stand on foundations.
 See [docs/design/building.md](docs/design/building.md) for the design
 decisions behind all this.
 

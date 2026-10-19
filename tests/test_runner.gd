@@ -16,6 +16,7 @@ func _process(_delta: float) -> bool:
 	_test_styles_and_indoors()
 	_test_land()
 	_test_demolish()
+	_test_windows()
 	_test_terrain()
 	_test_foliage()
 	_test_main_scene_loads()
@@ -202,6 +203,16 @@ func _test_main_scene_loads() -> void:
 	var view: BuildingView = main.get_node("BuildGrid/BuildingView")
 	view.rebuild()
 	_check(view.get_child_count() > 0, "view builds its parts")
+	var windows := map.walls.values().count(BuildingMap.Wall.WINDOW)
+	_check(windows == 5, "sample layout has five windows")
+	var overlay: DebugOverlay = main.debug_overlay
+	overlay.visible = true
+	overlay._draw_rooms()
+	# The first cell's middle tile, just inside its barred window.
+	var text := overlay.describe(map.land_bounds().get_center() - Vector2i(7, 7))
+	_check(text.contains("Enclosed: yes") and text.contains("Indoors") and text.contains("bars window"),
+			"debug view describes a cell, its room and its window")
+	_check(overlay.describe(GridCursor.NO_CELL).contains("Rooms: "), "debug view shows totals")
 	_test_tools(main.controller, map)
 	main.free()
 
@@ -246,11 +257,22 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	hover.call(3.8, 5.2)
 	controller._on_release()
 
-	controller.tool = BuildController.Tool.DOOR
+	controller.tool = BuildController.Tool.OPENING
 	hover.call(3.9, 3.5)
 	controller._on_press()
 	_check(map.wall_at(Vector3i(cell.call(4, 3).x, cell.call(4, 3).y, BuildingMap.EDGE_Z))
 			== BuildingMap.Wall.DOOR, "door tool makes a door")
+
+	controller.opening = BuildingMap.Wall.WINDOW
+	controller.window_kind = BuildingMap.WINDOW_GLASS
+	hover.call(3.9, 2.5)
+	controller._draw_preview()
+	controller._on_press()
+	var window_edge := Vector3i(cell.call(4, 2).x, cell.call(4, 2).y, BuildingMap.EDGE_Z)
+	_check(map.wall_at(window_edge) == BuildingMap.Wall.WINDOW, "opening tool puts in a window")
+	controller._on_press()
+	_check(map.wall_at(window_edge) == BuildingMap.Wall.WALL, "clicking a window again fills it in")
+	controller.opening = BuildingMap.Wall.DOOR
 
 	controller.tool = BuildController.Tool.OBJECT
 	controller.object_def = PrisonCatalogue.object(&"toilet")
@@ -306,6 +328,26 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	var floor_height := terrain.cell_height(cell.call(10, 10))
 	_check(is_equal_approx(terrain.cell_height(cell.call(12, 12)), floor_height)
 			and map.has_floor(cell.call(12, 12)), "a new room flattens the ground under it")
+	_check(is_equal_approx(map.floor_height(cell.call(12, 12)), floor_height),
+			"the room remembers its floor height")
+	controller.tool = BuildController.Tool.FLOOR
+	controller.floor_style = &"wood"
+	hover.call(9.5, 9.5)
+	controller._on_press()
+	hover.call(13.5, 13.5)
+	controller._on_release()
+	_check(map.floors[cell.call(11, 11)] == &"wood" and is_equal_approx(map.floor_height(cell.call(9, 9)),
+			floor_height), "floor next to a room is laid at the room's height")
+	var poking := false
+	for z in range(9, 15):
+		for x in range(9, 15):
+			var corner: Vector2i = cell.call(x, z)
+			for touch: Vector2i in [Vector2i.ZERO, Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]:
+				if map.has_floor(corner + touch) \
+						and terrain.corner_height(corner) > map.floor_height(corner + touch) + 0.001:
+					poking = true
+	_check(not poking, "the ground never pokes through a floor")
+	controller.floor_style = BuildingMap.DEFAULT_FLOOR
 	controller.tool = BuildController.Tool.TERRAIN
 	controller.terrain_brush = Terrain.Brush.LOWER
 	hover.call(11.0, 11.0)
@@ -339,6 +381,28 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	var left := foliage.plants.filter(func(p: FoliageLayer.Plant) -> bool:
 		return p.position.distance_to(base + Vector2(20, 20)) < 4.0)
 	_check(left.is_empty(), "Ctrl clears plants")
+
+
+func _test_windows() -> void:
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
+	map.register_styles(PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	map.build_room(Rect2i(0, 0, 3, 3), &"concrete", &"brick")
+	map.fill_floor(Rect2i(3, 0, 2, 3))
+	var edge := Vector3i(3, 1, BuildingMap.EDGE_Z)
+	_check(map.set_opening(edge, BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS), "a wall takes a window")
+	_check(map.window_kind(edge) == BuildingMap.WINDOW_BARS, "window kind is stored")
+	_check(not map.can_walk_between(Vector2i(2, 1), Vector2i(3, 1)), "windows block walking")
+	_check(map.room_at(Vector2i(1, 1)).indoor, "a room with a window stays indoors")
+	_check(map.room_at(Vector2i(1, 1)) != map.room_at(Vector2i(3, 1)), "windows split rooms")
+	_check(map.set_opening(edge, BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_GLASS), "windows can change kind")
+	_check(map.set_door(edge, true) and map.window_kind(edge) == &"", "a window can become a door")
+	_check(map.can_walk_between(Vector2i(2, 1), Vector2i(3, 1)), "doors let people through")
+	map.set_opening(edge, BuildingMap.Wall.WINDOW)
+	map.remove_walls([edge])
+	_check(not map.window_kinds.has(edge), "removing a wall forgets its window")
+	map.build_walls([Vector3i(10, 10, BuildingMap.EDGE_X)], &"fence")
+	_check(not map.set_opening(Vector3i(10, 10, BuildingMap.EDGE_X), BuildingMap.Wall.WINDOW),
+			"fences cannot take windows")
 
 
 func _test_terrain() -> void:

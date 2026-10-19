@@ -88,6 +88,14 @@ func flatten_cells(cells: Array[Vector2i], height: float) -> void:
 	_changed()
 
 
+## Sets many corners at once, ignoring locks. Takes Vector2i corners to heights.
+func set_corners(heights: Dictionary) -> void:
+	for corner: Vector2i in heights:
+		set_corner_height(corner, heights[corner])
+	if not heights.is_empty():
+		_changed()
+
+
 ## Fills the heights from a function of the corner, for world generation.
 func generate(height_for_corner: Callable) -> void:
 	for z in size.y + 1:

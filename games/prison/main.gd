@@ -9,6 +9,7 @@ extends Node3D
 @onready var controller: BuildController = $BuildGrid/BuildController
 @onready var terrain: Terrain = $BuildGrid/Terrain
 @onready var foliage: FoliageLayer = $BuildGrid/Foliage
+@onready var debug_overlay: DebugOverlay = $BuildGrid/DebugOverlay
 @onready var camera_rig: CameraRig = $CameraRig
 @onready var cursor: GridCursor = $GridCursor
 @onready var cell_label: Label = $HUD/CellLabel
@@ -24,6 +25,8 @@ func _ready() -> void:
 	view.room_types = PrisonCatalogue.ROOM_TYPES
 	view.map = map
 	controller.map = map
+	debug_overlay.room_types = PrisonCatalogue.ROOM_TYPES
+	debug_overlay.map = map
 
 	# Hills and a pond around the land, and ground under buildings stays put.
 	terrain.is_locked = map.corner_in_use

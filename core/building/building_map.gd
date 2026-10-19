@@ -34,7 +34,11 @@ const EPSILON := 0.001
 const DEFAULT_FLOOR := &"concrete"
 const DEFAULT_WALL := &"plaster"
 
-enum Wall { NONE, WALL, DOOR }
+enum Wall { NONE, WALL, DOOR, WINDOW }
+
+## Kinds of window. Both let light and sight through but nobody past.
+const WINDOW_GLASS := &"glass"
+const WINDOW_BARS := &"bars"
 
 
 class PlacedObject:
@@ -46,8 +50,12 @@ class PlacedObject:
 
 var land: Array[Rect2i] = []
 var floors: Dictionary[Vector2i, StringName] = {}
-var walls: Dictionary[Vector3i, int] = {} ## Values are Wall.WALL or Wall.DOOR.
+## The height of each floor tile's surface, in metres. Set when the floor is
+## laid; restyling a floor keeps its height.
+var floor_heights: Dictionary[Vector2i, float] = {}
+var walls: Dictionary[Vector3i, int] = {} ## Values are Wall.WALL, DOOR or WINDOW.
 var wall_styles: Dictionary[Vector3i, StringName] = {}
+var window_kinds: Dictionary[Vector3i, StringName] = {} ## For Wall.WINDOW edges only.
 var objects: Dictionary[int, PlacedObject] = {}
 
 ## Room types are stored per cell, so they survive rooms being split, merged
@@ -216,8 +224,22 @@ func has_floor(cell: Vector2i) -> bool:
 	return floors.has(cell)
 
 
-func fill_floor(rect: Rect2i, type: StringName = DEFAULT_FLOOR) -> int:
-	var count := _fill_floor(rect, type)
+func floor_height(cell: Vector2i) -> float:
+	return floor_heights.get(cell, 0.0)
+
+
+## The height of floor already in or right next to a rectangle, so new
+## floor can line up with it. NAN when there is none.
+func floor_height_near(rect: Rect2i) -> float:
+	for cell in cells_in(rect.grow(1)):
+		if floors.has(cell):
+			return floor_heights.get(cell, 0.0)
+	return NAN
+
+
+## Lays or restyles floor. New tiles go in at `height`; existing ones keep theirs.
+func fill_floor(rect: Rect2i, type: StringName = DEFAULT_FLOOR, height := 0.0) -> int:
+	var count := _fill_floor(rect, type, height)
 	if count > 0:
 		_changed()
 	return count
@@ -260,15 +282,23 @@ func wall_style(edge: Vector3i) -> StringName:
 	return wall_styles.get(edge, &"")
 
 
+func window_kind(edge: Vector3i) -> StringName:
+	return window_kinds.get(edge, &"")
+
+
 func is_outdoor_wall(edge: Vector3i) -> bool:
 	var def := wall_def(wall_style(edge))
 	return def != null and def.outdoor
 
 
-## Can people walk from one cell to its neighbour? Walls block; doors do not.
+## Can people walk from one cell to its neighbour? Walls and windows
+## block; doors do not.
 func can_walk_between(a: Vector2i, b: Vector2i) -> bool:
 	var edge := edge_between(a, b)
-	return edge != NO_EDGE and owns(a) and owns(b) and wall_at(edge) != Wall.WALL
+	if edge == NO_EDGE or not owns(a) or not owns(b):
+		return false
+	var kind := wall_at(edge)
+	return kind == Wall.NONE or kind == Wall.DOOR
 
 
 ## Can a wall go on this edge? Not off our land, and not through an object.
@@ -282,7 +312,7 @@ func can_build_wall(edge: Vector3i) -> bool:
 
 
 ## Builds walls on empty edges, and restyles walls already there.
-## Doors stay doors.
+## Doors and windows stay as they are.
 func build_walls(edges: Array[Vector3i], style: StringName = DEFAULT_WALL) -> int:
 	var count := _build_walls(edges, style)
 	if count > 0:
@@ -295,6 +325,7 @@ func remove_walls(edges: Array[Vector3i]) -> int:
 	for edge in edges:
 		if walls.erase(edge):
 			wall_styles.erase(edge)
+			window_kinds.erase(edge)
 			count += 1
 	if count > 0:
 		_changed()
@@ -303,12 +334,23 @@ func remove_walls(edges: Array[Vector3i]) -> int:
 
 ## Turns a wall into a door, or a door back into a wall.
 func set_door(edge: Vector3i, is_door: bool) -> bool:
-	if wall_at(edge) == Wall.NONE:
+	return set_opening(edge, Wall.DOOR if is_door else Wall.WALL)
+
+
+## Makes a wall piece plain, a door or a window. Windows need a kind, and
+## can't go in outdoor walls such as fences. Returns whether anything changed.
+func set_opening(edge: Vector3i, kind: Wall, window: StringName = WINDOW_GLASS) -> bool:
+	if wall_at(edge) == Wall.NONE or kind == Wall.NONE:
 		return false
-	var kind := Wall.DOOR if is_door else Wall.WALL
-	if walls[edge] == kind:
+	if kind == Wall.WINDOW and is_outdoor_wall(edge):
+		return false
+	if walls[edge] == kind and (kind != Wall.WINDOW or window_kind(edge) == window):
 		return false
 	walls[edge] = kind
+	if kind == Wall.WINDOW:
+		window_kinds[edge] = window
+	else:
+		window_kinds.erase(edge)
 	_changed()
 	return true
 
@@ -398,8 +440,8 @@ func set_room_type(room: Room, type: StringName) -> void:
 
 ## Floor plus walls all round, like the room tool in Software Inc.
 func build_room(rect: Rect2i, floor_type: StringName = DEFAULT_FLOOR,
-		wall_type: StringName = DEFAULT_WALL) -> void:
-	var count := _fill_floor(rect, floor_type) + _build_walls(rect_perimeter(rect), wall_type)
+		wall_type: StringName = DEFAULT_WALL, height := 0.0) -> void:
+	var count := _fill_floor(rect, floor_type, height) + _build_walls(rect_perimeter(rect), wall_type)
 	if count > 0:
 		_changed()
 
@@ -424,10 +466,12 @@ func demolish(rect: Rect2i) -> void:
 #endregion
 
 
-func _fill_floor(rect: Rect2i, type: StringName) -> int:
+func _fill_floor(rect: Rect2i, type: StringName, height: float) -> int:
 	var count := 0
 	for cell in cells_in(rect):
 		if owns(cell) and floors.get(cell) != type:
+			if not floors.has(cell):
+				floor_heights[cell] = height
 			floors[cell] = type
 			count += 1
 	return count
@@ -442,6 +486,7 @@ func _clear_floor(rect: Rect2i) -> int:
 			objects.erase(placed.id)
 			count += 1
 	for cell in cells_in(rect):
+		floor_heights.erase(cell)
 		if floors.erase(cell):
 			count += 1
 		_room_types.erase(cell)
@@ -473,7 +518,7 @@ func _changed() -> void:
 	changed.emit()
 
 
-## Flood-fills the floor into rooms. Walls and doors split rooms; reaching a
+## Flood-fills the floor into rooms. Walls, doors and windows split rooms; reaching a
 ## cell with no floor without passing a wall means the room is not enclosed.
 ## An enclosed room is indoors unless an outdoor wall (a fence) bounds it.
 func _update_rooms() -> void:

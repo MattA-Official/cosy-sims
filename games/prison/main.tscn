@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://games/prison/build_toolbar.gd" id="8_toolbar"]
 [ext_resource type="Script" path="res://core/terrain/terrain.gd" id="9_terrain"]
 [ext_resource type="Script" path="res://core/terrain/foliage_layer.gd" id="10_foliage"]
+[ext_resource type="Script" path="res://core/debug/debug_overlay.gd" id="11_debug"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ground"]
 render_priority = 0
@@ -79,6 +80,13 @@ view = NodePath("../BuildingView")
 terrain = NodePath("../Terrain")
 foliage = NodePath("../Foliage")
 
+[node name="DebugOverlay" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("cursor", "terrain", "foliage")]
+visible = false
+script = ExtResource("11_debug")
+cursor = NodePath("../../GridCursor")
+terrain = NodePath("../Terrain")
+foliage = NodePath("../Foliage")
+
 [node name="CameraRig" parent="." node_paths=PackedStringArray("terrain") instance=ExtResource("4_rig")]
 terrain = NodePath("../BuildGrid/Terrain")
 
@@ -104,7 +112,7 @@ offset_top = 40.0
 offset_right = 900.0
 offset_bottom = 92.0
 text = "WASD / arrows: pan    Q / E: rotate    Wheel or + / -: zoom    Shift: faster
-Right-drag: pan    Middle-drag: rotate and tilt    Esc: put the tool away    [ / ]: brush size"
+Right-drag: pan    Middle-drag: rotate and tilt    Esc: put the tool away    [ / ]: brush size    F3: debug view"
 label_settings = SubResource("LabelSettings_hud")
 
 [node name="BuildToolbar" type="VBoxContainer" parent="HUD" node_paths=PackedStringArray("controller")]
