@@ -98,11 +98,10 @@ links between areas. The tile grid stays the authority for rooms and
 building.
 
 ### Agreed order
-Debug view and windows, water bodies and spline paths are done. Next come
-storeys (manual floor heights, stairs, ramps, staff-only lifts, basements,
-angled and curved walls), then people.
+Debug view and windows, water bodies, spline paths and storeys are done.
+Next come walls at any angle (with floors rethought), then people.
 
-### Storeys (levels, nudges, stairs and lifts built; ramps next)
+### Storeys (built)
 - Fixed 1.75 m storeys, stepped through with Page Up and Page Down. Each
   floor can be nudged up or down in quarter-metre steps within its storey
   for split levels. Basements are storeys below ground.
@@ -118,6 +117,10 @@ angled and curved walls), then people.
   it. Lifts link with a lift in the same spot on the next level up; a
   staff lift makes the link staff only. `Building.links()` lists every way
   between levels, ready for pathfinding.
+- Ramps are drawn with the floor tool's Ramp mode: drag over floor from the
+  low side to the high side, and the ramp meets the floor just beyond each
+  end. Nothing can be placed on a ramp, and nudging any of it flattens it
+  back to tiles.
 
 ### Wall shapes (decided, not built yet)
 - Straight walls at any angle, not just along tile edges or 45°. Floors

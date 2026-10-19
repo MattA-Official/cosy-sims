@@ -12,7 +12,7 @@ signal tool_changed(tool: Tool)
 enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH }
 enum WaterMode { NONE, ADD, REMOVE }
 ## What the floor tool does: lay floor, or nudge existing floor up or down.
-enum FloorMode { LAY, RAISE, LOWER }
+enum FloorMode { LAY, RAISE, LOWER, RAMP }
 
 ## How far one floor nudge moves, in metres.
 const NUDGE_STEP := 0.25
@@ -43,6 +43,7 @@ const PATH_HINTS := {
 const FLOOR_HINTS := {
 	FloorMode.RAISE: "Drag over floor to raise it a step, for split levels.",
 	FloorMode.LOWER: "Drag over floor to lower it a step, for split levels.",
+	FloorMode.RAMP: "Drag over floor from the low side to the high side to lay a ramp between them.",
 }
 
 const WATER_HINTS := {
@@ -257,6 +258,7 @@ func _on_release() -> void:
 	if not _dragging:
 		return
 	var rect := _drag_rect()
+	var ramp := planned_ramp()
 	_dragging = false
 	var erase := _erasing()
 	match tool:
@@ -265,6 +267,9 @@ func _on_release() -> void:
 			if can_build_floor(rect):
 				map.build_room(rect, floor_style, wall_style, height)
 				settle_ground(rect)
+		Tool.FLOOR when floor_mode == FloorMode.RAMP:
+			if ramp != null:
+				map.add_ramp(ramp.rect, ramp.rise, ramp.low, ramp.high)
 		Tool.FLOOR when floor_mode != FloorMode.LAY:
 			nudge_floors(rect, NUDGE_STEP if floor_mode == FloorMode.RAISE else -NUDGE_STEP)
 		Tool.FLOOR:
@@ -372,6 +377,37 @@ func nudge_floors(rect: Rect2i, amount: float) -> int:
 	if count > 0:
 		settle_ground(rect)
 	return count
+
+
+## The ramp the current drag would lay: climbing from where the drag began
+## towards where it is now, from the floor before its foot to the floor past
+## its top. Null when it cannot go there.
+func planned_ramp() -> BuildingMap.Ramp:
+	if not _dragging:
+		return null
+	var rect := _drag_rect()
+	var start := _drag_start_cell
+	var end := _hover_cell().clamp(rect.position, rect.end - Vector2i.ONE)
+	var d := end - start
+	if d == Vector2i.ZERO or not map.can_add_ramp(rect):
+		return null
+	var ramp := BuildingMap.Ramp.new()
+	ramp.rect = rect
+	ramp.rise = Vector2i(signi(d.x), 0) if absi(d.x) >= absi(d.y) else Vector2i(0, signi(d.y))
+	ramp.low = _ramp_end_height(start, -ramp.rise)
+	ramp.high = _ramp_end_height(end, ramp.rise)
+	if is_equal_approx(ramp.low, ramp.high):
+		return null
+	return ramp
+
+
+## The height a ramp should meet at one end: the floor just beyond it, or
+## the tile itself when nothing is there.
+func _ramp_end_height(cell: Vector2i, outward: Vector2i) -> float:
+	var beyond := cell + outward
+	if map.has_floor(beyond):
+		return map.edge_height(beyond, -outward)
+	return map.floor_height(cell)
 
 
 ## Whether floor can go over a rectangle: out of the water on the ground,
@@ -542,6 +578,9 @@ func _draw_preview() -> void:
 			for edge in BuildingMap.rect_perimeter(rect):
 				_preview_edge(edge, ok_colour if dry and map.can_build_wall(edge) else bad_colour,
 						_preview_height(rect))
+		Tool.FLOOR when floor_mode == FloorMode.RAMP:
+			var ramp := planned_ramp()
+			_preview_cells(BuildingMap.cells_in(_drag_rect()), ok_colour if ramp != null else bad_colour)
 		Tool.FLOOR when floor_mode != FloorMode.LAY:
 			var cells: Array[Vector2i] = []
 			for cell in BuildingMap.cells_in(_drag_rect()):

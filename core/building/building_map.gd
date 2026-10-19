@@ -51,6 +51,22 @@ class PlacedObject:
 	var rect: Rect2 ## The footprint in tile units, after rotation.
 
 
+## A drawn slope between two floor heights, climbing one way.
+class Ramp:
+	var rect: Rect2i
+	var rise: Vector2i ## The way the ramp climbs.
+	var low: float ## Surface height at the bottom edge.
+	var high: float ## Surface height at the top edge.
+
+	func length() -> float:
+		return absf(Vector2(rect.size).dot(Vector2(rise)))
+
+	## Surface height at a point in tile units, held level past either end.
+	func height_at(point: Vector2) -> float:
+		var foot := Rect2(rect).get_center() - Vector2(rise) * length() * 0.5
+		return lerpf(low, high, clampf((point - foot).dot(Vector2(rise)) / length(), 0.0, 1.0))
+
+
 var land: Array[Rect2i] = []
 var floors: Dictionary[Vector2i, StringName] = {}
 ## The height of each floor tile's surface, in metres. Set when the floor is
@@ -60,6 +76,7 @@ var walls: Dictionary[Vector3i, int] = {} ## Values are Wall.WALL, DOOR or WINDO
 var wall_styles: Dictionary[Vector3i, StringName] = {}
 var window_kinds: Dictionary[Vector3i, StringName] = {} ## For Wall.WINDOW edges only.
 var objects: Dictionary[int, PlacedObject] = {}
+var ramps: Array[Ramp] = []
 ## Tiles open to stairs coming up from the level below. No floor goes here.
 var holes: Dictionary[Vector2i, bool] = {}
 
@@ -259,6 +276,10 @@ func set_floor_heights(heights: Dictionary) -> int:
 	var count := 0
 	for cell: Vector2i in heights:
 		if floors.has(cell) and not is_equal_approx(floor_heights.get(cell, 0.0), heights[cell]):
+			# Moving part of a ramp flattens the whole ramp back to tiles.
+			var ramp := ramp_at(cell)
+			if ramp != null:
+				ramps.erase(ramp)
 			floor_heights[cell] = heights[cell]
 			count += 1
 	if count > 0:
@@ -340,7 +361,7 @@ func can_walk_between(a: Vector2i, b: Vector2i) -> bool:
 	if kind != Wall.NONE and kind != Wall.DOOR:
 		return false
 	if floors.has(a) and floors.has(b):
-		return absf(floor_height(a) - floor_height(b)) <= MAX_STEP + EPSILON
+		return absf(edge_height(a, b - a) - edge_height(b, a - b)) <= MAX_STEP + EPSILON
 	return true
 
 
@@ -404,7 +425,7 @@ func set_opening(edge: Vector3i, kind: Wall, window: StringName = WINDOW_GLASS) 
 func can_place(def: ObjectDef, position: Vector2, rotation: int) -> bool:
 	var rect := object_rect(def, position, rotation)
 	for cell in cells_under(rect):
-		if not has_floor(cell):
+		if not has_floor(cell) or ramp_at(cell) != null:
 			return false
 	for placed: PlacedObject in objects.values():
 		if placed.rect.grow(-EPSILON).intersects(rect):
@@ -429,6 +450,60 @@ func place_object(def: ObjectDef, position: Vector2, rotation: int) -> int:
 	objects[placed.id] = placed
 	_changed()
 	return placed.id
+
+
+#region Ramps
+
+func ramp_at(cell: Vector2i) -> Ramp:
+	for ramp in ramps:
+		if ramp.rect.has_point(cell):
+			return ramp
+	return null
+
+
+## The surface height where a tile meets its neighbour in direction `side`:
+## the floor height, or partway up a ramp.
+func edge_height(cell: Vector2i, side: Vector2i) -> float:
+	var ramp := ramp_at(cell)
+	if ramp == null:
+		return floor_height(cell)
+	return ramp.height_at(Vector2(cell) + Vector2(0.5, 0.5) + Vector2(side) * 0.5)
+
+
+## A ramp needs floor under all of it, with no walls, objects or other ramps
+## in the way.
+func can_add_ramp(rect: Rect2i) -> bool:
+	if rect.size.x < 1 or rect.size.y < 1:
+		return false
+	for cell in cells_in(rect):
+		if not has_floor(cell) or ramp_at(cell) != null:
+			return false
+	for edge in rect_edges(rect):
+		if wall_at(edge) != Wall.NONE and edge_crosses(edge, Rect2(rect)):
+			return false
+	for placed: PlacedObject in objects.values():
+		if placed.rect.grow(-EPSILON).intersects(Rect2(rect)):
+			return false
+	return true
+
+
+## Lays a ramp over floor, climbing along `rise` from `low` to `high`.
+func add_ramp(rect: Rect2i, rise: Vector2i, low: float, high: float) -> bool:
+	if not can_add_ramp(rect) or rise not in DIRECTIONS:
+		return false
+	var ramp := Ramp.new()
+	ramp.rect = rect
+	ramp.rise = rise
+	ramp.low = low
+	ramp.high = high
+	ramps.append(ramp)
+	# Each tile keeps its middle height, for anything that wants one number.
+	for cell in cells_in(rect):
+		floor_heights[cell] = ramp.height_at(Vector2(cell) + Vector2(0.5, 0.5))
+	_changed()
+	return true
+
+#endregion
 
 
 ## Opens the floor for stairs below, clearing whatever was on those tiles.
@@ -535,6 +610,9 @@ func _fill_floor(rect: Rect2i, type: StringName, height: float) -> int:
 func _clear_floor(rect: Rect2i) -> int:
 	var count := 0
 	var area := Rect2(rect)
+	for ramp in ramps.duplicate():
+		if ramp.rect.intersects(rect):
+			ramps.erase(ramp)
 	for placed: PlacedObject in objects.values():
 		if placed.rect.grow(-EPSILON).intersects(area):
 			objects.erase(placed.id)

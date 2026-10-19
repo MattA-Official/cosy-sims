@@ -21,6 +21,7 @@ func _process(_delta: float) -> bool:
 	_test_water()
 	_test_path_network()
 	_test_building_levels()
+	_test_ramps()
 	_test_path_profile()
 	_test_foliage()
 	_test_main_scene_loads()
@@ -522,6 +523,16 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	for i in 3:
 		controller.nudge_floors(Rect2i(cell.call(38, 30), Vector2i(2, 4)), BuildController.NUDGE_STEP)
 	_check(not map.can_walk_between(cell.call(37, 31), high_cell), "a big split needs a ramp or stairs")
+	controller.floor_mode = BuildController.FloorMode.RAMP
+	hover.call(36.5, 31.5)
+	controller._on_press()
+	hover.call(37.5, 31.5)
+	controller._draw_preview()
+	var planned := controller.planned_ramp()
+	controller._on_release()
+	_check(planned != null and planned.rise == Vector2i.RIGHT and map.ramp_at(cell.call(37, 31)) != null
+			and map.can_walk_between(cell.call(37, 31), high_cell), "a dragged ramp climbs to the higher floor")
+	controller.floor_mode = BuildController.FloorMode.RAISE
 	building.active = 1
 	for i in 10:
 		controller.nudge_floors(Rect2i(cell.call(36, 30), Vector2i(4, 4)), BuildController.NUDGE_STEP)
@@ -689,6 +700,26 @@ func _test_building_levels() -> void:
 	links = building.links()
 	_check(links.size() == 2 and links[0].kind == ObjectDef.Connects.LIFT and links[0].staff_only
 			and links[1].staff_only, "lifts stacked up link, and staff lifts are staff only")
+
+
+func _test_ramps() -> void:
+	var map := BuildingMap.new(Rect2i(0, 0, 10, 10))
+	map.fill_floor(Rect2i(0, 0, 5, 2), &"concrete", 0.0)
+	map.set_floor_heights({Vector2i(4, 0): 1.0, Vector2i(4, 1): 1.0})
+	_check(not map.can_walk_between(Vector2i(3, 0), Vector2i(4, 0)), "a tall split blocks the way")
+	_check(map.add_ramp(Rect2i(1, 0, 3, 2), Vector2i.RIGHT, 0.0, 1.0), "a ramp goes over floor")
+	_check(map.can_walk_between(Vector2i(0, 0), Vector2i(1, 0))
+			and map.can_walk_between(Vector2i(1, 0), Vector2i(2, 0))
+			and map.can_walk_between(Vector2i(3, 0), Vector2i(4, 0)), "a ramp joins the two heights")
+	_check(is_equal_approx(map.floor_height(Vector2i(2, 1)), 0.5), "a ramp tile sits at its middle height")
+	_check(not map.add_ramp(Rect2i(2, 0, 2, 1), Vector2i.RIGHT, 0.0, 1.0), "ramps do not overlap")
+	_check(map.place_object(load("res://games/prison/catalogue/bed.tres"), Vector2(2, 0), 0) == 0,
+			"nothing is placed on a ramp")
+	map.set_floor_heights({Vector2i(2, 0): 0.25})
+	_check(map.ramps.is_empty(), "nudging a ramp flattens it back to tiles")
+	map.add_ramp(Rect2i(1, 0, 3, 2), Vector2i.RIGHT, 0.0, 1.0)
+	map.clear_floor(Rect2i(1, 0, 1, 1))
+	_check(map.ramps.is_empty(), "clearing floor under a ramp removes it")
 
 
 func _test_path_network() -> void:

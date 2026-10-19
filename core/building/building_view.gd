@@ -123,6 +123,10 @@ func _build_floors() -> void:
 			var centre := Vector3(cell.x + 0.5, 0.0, cell.y + 0.5) * cs
 			# The top face takes the floor colour; the sides show as foundations
 			# reaching down into the ground.
+			var ramp := map.ramp_at(cell)
+			if ramp != null:
+				_add_ramp_tile(st, cell, ramp, bottom, colour * shade)
+				continue
 			var depth := top_y - bottom
 			MeshShapes.add_box(st, centre + Vector3.UP * (top_y - depth * 0.5),
 					Vector3(0.5 * cs, depth * 0.5, 0.5 * cs), foundation_colour, colour * shade)
@@ -142,7 +146,8 @@ func _add_split_steps(st: SurfaceTool, cell: Vector2i, top_y: float, colour: Col
 	var cs := grid.cell_size
 	for step in BuildingMap.DIRECTIONS:
 		var next := cell + step
-		if not map.has_floor(next) or not map.can_walk_between(cell, next):
+		if not map.has_floor(next) or not map.can_walk_between(cell, next) \
+				or map.ramp_at(next) != null:
 			continue
 		var rise := map.floor_height(next) - map.floor_height(cell)
 		if rise <= BuildingMap.MAX_STEP * 0.5:
@@ -155,6 +160,40 @@ func _add_split_steps(st: SurfaceTool, cell: Vector2i, top_y: float, colour: Col
 		MeshShapes.add_box(st, centre + Vector3.UP * (top_y + half_rise),
 				across * 0.5 * cs + dir * tread * 0.5 + Vector3.UP * half_rise, colour.darkened(0.1),
 				colour)
+
+
+## One tile of a ramp: a sloped top over sides reaching down to `bottom`.
+func _add_ramp_tile(st: SurfaceTool, cell: Vector2i, ramp: BuildingMap.Ramp, bottom: float,
+		colour: Color) -> void:
+	var cs := grid.cell_size
+	var corners: Array[Vector3] = []
+	for offset: Vector2 in [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]:
+		var point := Vector2(cell) + offset
+		corners.append(Vector3(point.x * cs, ramp.height_at(point) + 0.03, point.y * cs))
+	var centre := (Vector3(cell.x + 0.5, 0.0, cell.y + 0.5) * cs)
+	_add_quad(st, corners[0], corners[1], corners[2], corners[3], Vector3.UP, colour)
+	for i in 4:
+		var a := corners[i]
+		var b := corners[(i + 1) % 4]
+		var outward := ((a + b) * 0.5 - centre)
+		outward.y = 0.0
+		_add_quad(st, a, b, Vector3(b.x, bottom, b.z), Vector3(a.x, bottom, a.z), outward.normalized(),
+				foundation_colour)
+
+
+## A four-sided face, wound to face `outward`.
+func _add_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, outward: Vector3,
+		colour: Color) -> void:
+	var normal := (b - a).cross(c - a).normalized()
+	if normal.dot(outward) < 0.0:
+		normal = -normal
+	st.set_normal(normal)
+	st.set_color(colour)
+	var order: Array[Vector3] = [a, b, c, a, c, d]
+	if (b - a).cross(c - a).dot(outward) >= 0.0:
+		order = [a, c, b, a, d, c]
+	for vertex in order:
+		st.add_vertex(vertex)
 
 
 ## A low kerb around the land you own, so you can see where you may build.

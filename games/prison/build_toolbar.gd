@@ -22,6 +22,7 @@ const FLOOR_MODES := [
 	[BuildController.FloorMode.LAY, "Lay"],
 	[BuildController.FloorMode.RAISE, "Raise"],
 	[BuildController.FloorMode.LOWER, "Lower"],
+	[BuildController.FloorMode.RAMP, "Ramp"],
 ]
 
 const PATH_MODES := [
