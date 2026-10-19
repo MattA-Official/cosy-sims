@@ -64,6 +64,18 @@ func point_at(level: int, spot: Vector2) -> int:
 	return _ids.get(Vector4i(level, cell.x, cell.y, -1), -1)
 
 
+## A random spot people can stand on, on a level, within `radius` tiles of
+## `near`, or null if none turned up.
+func random_spot(level: int, near: Vector2, radius: float, rng: RandomNumberGenerator) -> Variant:
+	for attempt in 12:
+		var spot := near + Vector2(rng.randf_range(-radius, radius), rng.randf_range(-radius, radius))
+		var id := point_at(level, spot)
+		if id != -1:
+			var p := position_of(id)
+			return Vector2(p.x, p.z)
+	return null
+
+
 ## The level a point is on.
 func level_of(id: int) -> int:
 	return _levels.get(id, 0)
@@ -75,8 +87,12 @@ func position_of(id: int) -> Vector3:
 
 ## A walk from one spot to another, as positions to head for in turn, or
 ## [] if there is no way there. Straight stretches with nothing in the way
-## are taken in one go rather than tile by tile.
-func find_path(from_level: int, from: Vector2, to_level: int, to: Vector2) -> Array[Vector3]:
+## are taken in one go rather than tile by tile. `levels` and
+## `on_surface`, if given, are filled with each position's level and
+## whether it is on floor or ground (rather than stairs, a lift or a built
+## path).
+func find_path(from_level: int, from: Vector2, to_level: int, to: Vector2,
+		levels: Array[int] = [], on_surface: Array[bool] = []) -> Array[Vector3]:
 	var start := point_at(from_level, from)
 	var goal := point_at(to_level, to)
 	var out: Array[Vector3] = []
@@ -96,7 +112,21 @@ func find_path(from_level: int, from: Vector2, to_level: int, to: Vector2) -> Ar
 		i = j
 	for id in kept:
 		out.append(position_of(id))
+		levels.append(level_of(id))
+		on_surface.append(_is_surface(id))
 	return out
+
+
+## The height of the floor or ground people stand on at a spot, or NAN if
+## they cannot stand there.
+func height_at(level: int, spot: Vector2) -> float:
+	var id := point_at(level, spot)
+	if id == -1:
+		return NAN
+	var map := _building.levels.get(level) as BuildingMap
+	if map != null and map.has_floor(Vector2i(spot.floor())):
+		return _floor_height(map, spot)
+	return _ground(spot)
 
 
 ## Can people walk straight from one point to another? Both must be floor

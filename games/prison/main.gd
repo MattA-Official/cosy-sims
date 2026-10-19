@@ -20,6 +20,7 @@ var building: Building
 ## The ground level's map. Other levels are in `building`.
 var map: BuildingMap
 var paths := PathNetwork.new()
+var people := People.new()
 ## One BuildingView per level, by level number.
 var views: Dictionary[int, BuildingView] = {}
 
@@ -58,6 +59,17 @@ func _ready() -> void:
 	if build_sample_layout:
 		SampleLayout.build(map, layout_origin)
 	StartingLandscape.plant(foliage, terrain, map, layout_origin)
+
+	# People walk the build; a few prisoners start out in the corridor.
+	people.name = "People"
+	people.terrain = terrain
+	people.needs = PrisonCatalogue.NEEDS
+	people.building = building
+	people.paths = paths
+	grid.add_child(people)
+	if build_sample_layout:
+		for i in 6:
+			people.add_person(0, Vector2(layout_origin) + Vector2(1.5 + i * 1.7, 3.5 + (i % 2)))
 
 	camera_rig.bounds = grid.world_rect()
 	camera_rig.position = grid.centre()

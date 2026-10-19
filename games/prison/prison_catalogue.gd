@@ -39,6 +39,13 @@ const PATHS: Array[PathStyleDef] = [
 	preload("res://games/prison/catalogue/path_road.tres"),
 ]
 
+## What prisoners need, and the objects that see to it.
+const NEEDS: Array[NeedDef] = [
+	preload("res://games/prison/catalogue/need_sleep.tres"),
+	preload("res://games/prison/catalogue/need_hunger.tres"),
+	preload("res://games/prison/catalogue/need_hygiene.tres"),
+]
+
 const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_cell.tres"),
 	preload("res://games/prison/catalogue/room_canteen.tres"),

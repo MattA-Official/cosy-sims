@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="NeedDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/people/need_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"hunger"
+display_name = "Hunger"
+object_tag = &"table"
+doing = "Eating"
+decay = 0.4
+use_seconds = 15.0

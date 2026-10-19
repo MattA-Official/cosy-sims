@@ -24,6 +24,7 @@ func _process(_delta: float) -> bool:
 	_test_ramps()
 	_test_stair_builder()
 	_test_nav_graph()
+	_test_people()
 	_test_angled_walls()
 	_test_path_profile()
 	_test_foliage()
@@ -841,6 +842,43 @@ func _test_building_levels() -> void:
 	links = building.links()
 	_check(links.size() == 2 and links[0].kind == Building.Link.Kind.LIFT,
 			"lifts stacked up link")
+
+
+func _test_people() -> void:
+	var building := Building.new(Rect2i(0, 0, 20, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var map := building.ground()
+	map.build_room(Rect2i(2, 2, 8, 5), &"concrete", &"brick", 0.0)
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(8, 2), 0)
+	var people := People.new()
+	people.needs = PrisonCatalogue.NEEDS
+	people.building = building
+	var sleepy := people.add_person(0, Vector2(3.5, 5.5), "Test Person")
+	_check(sleepy != null and sleepy.needs.size() == 3, "people start with every need")
+	_check(people.add_person(0, Vector2(15.5, 15.5)) != null, "people can stand on open ground")
+	sleepy.needs[&"sleep"] = 10.0
+	sleepy.needs[&"hunger"] = 100.0
+	sleepy.needs[&"hygiene"] = 100.0
+	people.step(0.1)
+	_check(sleepy.state == Person.State.WALKING and sleepy.activity.contains("bed"), "a sleepy person heads for a bed")
+	for i in 100:
+		people.step(0.1)
+	_check(sleepy.state == Person.State.USING and sleepy.activity == "Sleeping", "and sleeps in it")
+	for i in 450:
+		people.step(0.1)
+	_check(sleepy.state != Person.State.USING and sleepy.needs[&"sleep"] > 90.0, "and gets up rested")
+	sleepy.needs[&"hunger"] = 5.0
+	people.step(0.1)
+	_check(sleepy.activity == "Can't find a free table", "with no table, they say so")
+	_check(people.send(sleepy, 0, Vector2(15.5, 15.5)) == false and sleepy.activity == "Can't get there",
+			"people can't be sent through walls")
+	map.set_door(BuildingMap.edge_between(Vector2i(5, 6), Vector2i(5, 7)), true)
+	_check(people.send(sleepy, 0, Vector2(15.5, 15.5)), "but can go out of a door")
+	for i in 200:
+		people.step(0.1)
+	_check(sleepy.flat().distance_to(Vector2(15.5, 15.5)) < 6.5, "and walk out over the ground")
+	people.remove_person(sleepy)
+	_check(people.people.size() == 1, "people can be removed")
+	people.free()
 
 
 func _test_nav_graph() -> void:
