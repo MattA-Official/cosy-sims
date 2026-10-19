@@ -357,12 +357,13 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	_check(is_equal_approx(terrain.cell_height(cell.call(11, 11)), floor_height),
 			"sculpting leaves ground under buildings alone")
 
-	# Plants grow on open land but not on floors, and Ctrl clears them.
+	# Plants grow on open land but not on floors, and Ctrl clears them. The
+	# spot is well away from the sample layout's floors.
 	var foliage := controller.foliage
 	controller.tool = BuildController.Tool.PLANTS
 	controller.plant_def = PrisonCatalogue.PLANTS[3]
 	var before := foliage.plants.size()
-	hover.call(20.0, 20.0)
+	hover.call(8.0, 40.0)
 	controller._on_press()
 	for i in 5:
 		controller._apply_brush(0.1)
@@ -372,14 +373,14 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	before = foliage.plants.size()
 	controller._apply_brush(0.1)
 	_check(foliage.plants.size() == before, "plants do not grow on floors")
-	hover.call(20.0, 20.0)
+	hover.call(8.0, 40.0)
 	controller.brush_radius = 4.0
 	controller.force_erase = true
 	controller._apply_brush(0.1)
 	controller.force_erase = false
 	controller._brushing = false
 	var left := foliage.plants.filter(func(p: FoliageLayer.Plant) -> bool:
-		return p.position.distance_to(base + Vector2(20, 20)) < 4.0)
+		return p.position.distance_to(base + Vector2(8, 40)) < 4.0)
 	_check(left.is_empty(), "Ctrl clears plants")
 
 
