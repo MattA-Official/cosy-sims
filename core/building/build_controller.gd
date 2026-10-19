@@ -171,8 +171,7 @@ var _preview_mesh := ImmediateMesh.new()
 var _preview_material := MeshShapes.vertex_colour_material(true)
 ## [centre, half extents, colour] per box, or [centre, half along, colour,
 ## half across, half height] for a box at an angle.
-var _preview_boxes: Array[Array] = []
-var _preview_polygons: Array[Array] = [] ## [points, colour] per flat polygon.
+var _shapes := PreviewShapes.new()
 var _drag_start_point := Vector2.ZERO
 var _free_rotating := false
 var _rotate_anchor := Vector2.ZERO
@@ -192,6 +191,7 @@ func _ready() -> void:
 	path_tool.view = path_view
 	path_tool.terrain = terrain
 	path_tool.foliage = foliage
+	_shapes.ground_at = _ground_at
 	_path_preview.material_override = _preview_material
 	_path_preview.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_path_preview)
@@ -832,8 +832,10 @@ func _has_chosen_slant_opening(key: Vector4i) -> bool:
 
 func _draw_preview() -> void:
 	_preview_mesh.clear_surfaces()
-	_preview_boxes.clear()
-	_preview_polygons.clear()
+	_shapes.clear()
+	_shapes.map = map
+	_shapes.cell_size = grid.cell_size
+	_shapes.wall_height = view.low_wall_height if view != null and view.walls_low else preview_wall_height
 	_draw_path_preview()
 	if map == null or tool == Tool.NONE or not _has_hover:
 		return
@@ -843,73 +845,73 @@ func _draw_preview() -> void:
 		Tool.ROOM:
 			var rect := _drag_rect()
 			var dry := can_build_floor(rect)
-			_preview_cells(BuildingMap.cells_in(rect), ok_colour if dry else bad_colour,
+			_shapes.cells(BuildingMap.cells_in(rect), ok_colour if dry else bad_colour,
 					_preview_height(rect))
 			for edge in BuildingMap.rect_perimeter(rect):
-				_preview_edge(edge, ok_colour if dry and map.can_build_wall(edge) else bad_colour,
+				_shapes.edge(edge, ok_colour if dry and map.can_build_wall(edge) else bad_colour,
 						_preview_height(rect))
 		Tool.FLOOR when floor_mode == FloorMode.STAIRS:
 			var planned := stair_tool.plan(_hover_cell())
 			if _erasing():
 				var flight := map.stairs_at(_hover_cell())
 				if flight != null:
-					_preview_cells(flight.cells, demolish_colour)
+					_shapes.cells(flight.cells, demolish_colour)
 			else:
-				_preview_stairs(planned, ok_colour if _stairs_fit(planned[0]) else bad_colour)
+				_shapes.stairs(Staircase.create(planned[0], planned[1], stair_tool.rounded), ok_colour if _stairs_fit(planned[0]) else bad_colour)
 		Tool.FLOOR when floor_mode == FloorMode.RAMP:
 			var ramp := planned_ramp()
-			_preview_cells(BuildingMap.cells_in(_drag_rect()), ok_colour if ramp != null else bad_colour)
+			_shapes.cells(BuildingMap.cells_in(_drag_rect()), ok_colour if ramp != null else bad_colour)
 		Tool.FLOOR when floor_mode != FloorMode.LAY:
 			var cells: Array[Vector2i] = []
 			for cell in BuildingMap.cells_in(_drag_rect()):
 				if map.has_floor(cell):
 					cells.append(cell)
-			_preview_cells(cells, ok_colour)
+			_shapes.cells(cells, ok_colour)
 		Tool.FLOOR:
 			var chosen := planned_floor()
 			if chosen.is_empty():
-				_preview_cells([_hover_cell()], bad_colour)
+				_shapes.cells([_hover_cell()], bad_colour)
 			else:
 				var height := NAN if _erasing() else _preview_height(_pieces_bounds(chosen))
-				_preview_pieces(chosen, demolish_colour if _erasing() else ok_colour, height)
+				_shapes.pieces(chosen, demolish_colour if _erasing() else ok_colour, height)
 		Tool.TERRAIN when water_mode != WaterMode.NONE:
 			_preview_water()
 		Tool.TERRAIN, Tool.PLANTS:
 			var colour := demolish_colour if tool == Tool.PLANTS and _erasing() else ok_colour
-			_preview_ring(_hover_point, brush_radius, colour)
+			_shapes.ring(_hover_point, brush_radius, colour)
 		Tool.DEMOLISH:
 			var placed := map.object_at(_hover_point)
 			var flight := map.stairs_at(_hover_cell())
 			if _dragging:
-				_preview_cells(BuildingMap.cells_in(_drag_rect()), demolish_colour)
+				_shapes.cells(BuildingMap.cells_in(_drag_rect()), demolish_colour)
 			elif placed != null:
-				_preview_rect(placed.rect, demolish_colour, placed.def.height + 0.05)
+				_shapes.rect(placed.rect, demolish_colour, placed.def.height + 0.05)
 			elif flight != null:
-				_preview_cells(flight.cells, demolish_colour, NAN, Building.STOREY * 0.5)
+				_shapes.cells(flight.cells, demolish_colour, NAN, Building.STOREY * 0.5)
 			elif _hover_slant() != NO_SLANT:
-				_preview_slant(_hover_slant(), demolish_colour)
+				_shapes.slant(_hover_slant(), demolish_colour)
 			elif map.wall_at(_hover_edge()) != BuildingMap.Wall.NONE and _edge_distance() < 0.25:
-				_preview_edge(_hover_edge(), demolish_colour)
+				_shapes.edge(_hover_edge(), demolish_colour)
 			else:
-				_preview_cells(BuildingMap.cells_in(_drag_rect()), demolish_colour)
+				_shapes.cells(BuildingMap.cells_in(_drag_rect()), demolish_colour)
 		Tool.WALL:
 			if _dragging:
 				for edge in BuildingMap.edges_on_line(_drag_start_corner, _wall_end_corner()):
 					if _erasing():
-						_preview_edge(edge, demolish_colour)
+						_shapes.edge(edge, demolish_colour)
 					else:
-						_preview_edge(edge, ok_colour if map.can_build_wall(edge) else bad_colour)
+						_shapes.edge(edge, ok_colour if map.can_build_wall(edge) else bad_colour)
 				for key in BuildingMap.slants_on_line(_drag_start_corner, _wall_end_corner()):
 					if _erasing():
-						_preview_slant(key, demolish_colour)
+						_shapes.slant(key, demolish_colour)
 					else:
-						_preview_slant(key, ok_colour if map.can_build_slant(key) else bad_colour)
+						_shapes.slant(key, ok_colour if map.can_build_slant(key) else bad_colour)
 			else:
-				_preview_corner(_hover_corner(), ok_colour)
+				_shapes.corner(_hover_corner(), ok_colour)
 		Tool.OPENING when _hover_slant() != NO_SLANT:
 			var key := _hover_slant()
 			var ok := not (opening == BuildingMap.Wall.WINDOW and map.is_outdoor_slant(key))
-			_preview_slant(key, ok_colour if ok else bad_colour)
+			_shapes.slant(key, ok_colour if ok else bad_colour)
 		Tool.OPENING:
 			var edge := _hover_edge()
 			var ok := map.wall_at(edge) != BuildingMap.Wall.NONE
@@ -917,35 +919,19 @@ func _draw_preview() -> void:
 				ok = false
 			if opening == BuildingMap.Wall.DOOR and not map.can_put_door(edge):
 				ok = false
-			_preview_edge(edge, ok_colour if ok else bad_colour)
+			_shapes.edge(edge, ok_colour if ok else bad_colour)
 		Tool.OBJECT:
 			if object_def != null:
 				var centre := _object_centre()
 				var ok := _can_place(centre)
-				_preview_object(centre, ok_colour if ok else bad_colour)
+				_shapes.object(object_def, object_angle, centre, ok_colour if ok else bad_colour)
 		Tool.ROOM_TYPE:
 			var room := map.room_at_point(_hover_point)
 			if room != null:
 				var colour := room_type.colour if room_type != null else Color.WHITE
 				colour.a = 0.45
-				_preview_cells(room.cells, colour)
-	if _preview_boxes.is_empty() and _preview_polygons.is_empty():
-		return
-	_preview_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES, _preview_material)
-	for polygon in _preview_polygons:
-		var points: PackedVector3Array = polygon[0]
-		_preview_mesh.surface_set_normal(Vector3.UP)
-		_preview_mesh.surface_set_color(polygon[1])
-		# Both windings, so the slab shows whichever way the outline runs.
-		for i in range(1, points.size() - 1):
-			for vertex in [points[0], points[i], points[i + 1], points[0], points[i + 1], points[i]]:
-				_preview_mesh.surface_add_vertex(vertex)
-	for box in _preview_boxes:
-		if box.size() > 3:
-			MeshShapes.add_oriented_box_immediate(_preview_mesh, box[0], box[1], box[3], box[4], box[2])
-		else:
-			MeshShapes.add_box_immediate(_preview_mesh, box[0], box[1], box[2])
-	_preview_mesh.surface_end()
+				_shapes.cells(room.cells, colour)
+	_shapes.draw(_preview_mesh, _preview_material)
 
 
 ## Would a new building here stay out of the water?
@@ -968,12 +954,12 @@ func _preview_water() -> void:
 	var existing := water.body_at(cell)
 	if water_mode == WaterMode.REMOVE:
 		if existing != null:
-			_preview_cells(existing.cells.keys(), demolish_colour, existing.level)
+			_shapes.cells(existing.cells.keys(), demolish_colour, existing.level)
 		else:
-			_preview_cells([cell], bad_colour)
+			_shapes.cells([cell], bad_colour)
 		return
 	if existing != null:
-		_preview_cells([cell], bad_colour, existing.level)
+		_shapes.cells([cell], bad_colour, existing.level)
 		return
 	# Working a basin out can take a while on open ground, so only redo it
 	# when the tile under the mouse or the ground changes.
@@ -982,9 +968,9 @@ func _preview_water() -> void:
 		_basin_dirty = false
 		_basin = water.find_basin(cell)
 	if _basin != null:
-		_preview_cells(_basin.cells.keys(), ok_colour, _basin.level)
+		_shapes.cells(_basin.cells.keys(), ok_colour, _basin.level)
 	else:
-		_preview_cells([cell], bad_colour)
+		_shapes.cells([cell], bad_colour)
 
 
 func _preview_height(rect: Rect2i) -> float:
@@ -1011,114 +997,5 @@ func _draw_path_preview() -> void:
 		path_tool.preview(st, _hover_point, ok_colour, bad_colour)
 		_path_preview.mesh = st.commit()
 
-
-## Tile highlights. `base` sets one height for them all; by default each
-## follows the ground.
-## Thin slabs over pieces of tiles, following angled walls.
-func _preview_pieces(chosen: Array[TilePiece], colour: Color, base := NAN) -> void:
-	var cs := grid.cell_size
-	for piece in chosen:
-		var ground := base if not is_nan(base) else _ground_at(piece.centre())
-		var points := PackedVector3Array()
-		for point in piece.polygon:
-			var inset := point.lerp(piece.centre(), 0.04)
-			points.append(Vector3(inset.x * cs, ground + 0.06, inset.y * cs))
-		_preview_polygons.append([points, colour])
-
-
-func _preview_cells(cells: Array[Vector2i], colour: Color, base := NAN, height := 0.06) -> void:
-	var cs := grid.cell_size
-	for cell in cells:
-		var ground := base if not is_nan(base) else _ground_at(Vector2(cell) + Vector2(0.5, 0.5))
-		var centre := Vector3(cell.x + 0.5, ground, cell.y + 0.5) * Vector3(cs, 1.0, cs)
-		_preview_boxes.append([centre + Vector3.UP * height * 0.5,
-				Vector3(cs * 0.48, height * 0.5, cs * 0.48), colour])
-
-
-## The stairs a click would leave: each tread at its height, standing on
-## the floor at the foot.
-func _preview_stairs(planned: Array, colour: Color) -> void:
-	var route: Array[Vector2i] = planned[0]
-	var flags: Array[bool] = planned[1]
-	var flight := Staircase.create(route, flags, stair_tool.rounded)
-	var cs := grid.cell_size
-	var base := _ground_at(Vector2(route[0]) + Vector2(0.5, 0.5))
-	for tread: Array in flight.treads():
-		var points := PackedVector3Array()
-		for p: Vector2 in tread[0]:
-			points.append(Vector3(p.x * cs, base + tread[1] + 0.04, p.y * cs))
-		_preview_polygons.append([points, colour])
-
-
-## A ring of small markers on the ground showing a brush's reach.
-func _preview_ring(centre: Vector2, radius: float, colour: Color) -> void:
-	var cs := grid.cell_size
-	var count := maxi(16, ceili(radius * 10.0))
-	for i in count:
-		var point := centre + Vector2.from_angle(TAU * i / count) * radius
-		_preview_boxes.append([Vector3(point.x * cs, _ground_at(point) + 0.05, point.y * cs),
-				Vector3(0.07, 0.05, 0.07), colour])
-
-
-func _preview_rect(rect: Rect2, colour: Color, height: float) -> void:
-	var cs := grid.cell_size
-	var centre := rect.get_center() * cs
-	var ground := _ground_at(rect.get_center())
-	_preview_boxes.append([Vector3(centre.x, ground + height * 0.5, centre.y),
-			Vector3(rect.size.x * cs * 0.5, height * 0.5, rect.size.y * cs * 0.5), colour])
-
-
-## The object being placed, turned as it will go.
-func _preview_object(centre: Vector2, colour: Color) -> void:
-	var cs := grid.cell_size
-	var half := object_def.size * 0.5 * cs
-	var along := Vector2(1, 0).rotated(object_angle)
-	var height := object_def.height
-	_preview_boxes.append([Vector3(centre.x * cs, _ground_at(centre) + height * 0.5, centre.y * cs),
-			Vector3(along.x, 0.0, along.y) * half.x, colour,
-			Vector3(-along.y, 0.0, along.x) * half.y, height * 0.5])
-
-
-## A wall preview. `base` sets the height it stands at; by default it
-## stands on the floor or ground beside it. Kept below full wall height so
-## a big drag does not hide what is behind it.
-func _preview_slant(key: Vector4i, colour: Color) -> void:
-	var cs := grid.cell_size
-	var ends := BuildingMap.slant_ends(key)
-	var a := Vector2(ends[0])
-	var b := Vector2(ends[1])
-	var height := view.low_wall_height if view.walls_low else preview_wall_height
-	var ground := _ground_at((a + b) * 0.5)
-	var flat := (b - a).normalized()
-	var middle := (a + b) * 0.5 * cs
-	_preview_boxes.append([Vector3(middle.x, ground + height * 0.5, middle.y),
-			Vector3(flat.x, 0.0, flat.y) * a.distance_to(b) * cs * 0.5, colour,
-			Vector3(-flat.y, 0.0, flat.x) * 0.1, height * 0.5])
-
-
-func _preview_edge(edge: Vector3i, colour: Color, base := NAN) -> void:
-	if not map.edge_in_bounds(edge):
-		return
-	var cs := grid.cell_size
-	var along := Vector3.RIGHT if edge.z == BuildingMap.EDGE_X else Vector3.BACK
-	var across := Vector3.BACK if edge.z == BuildingMap.EDGE_X else Vector3.RIGHT
-	var height := view.low_wall_height if view.walls_low else preview_wall_height
-	var middle := Vector2(edge.x, edge.y) + Vector2(along.x, along.z) * 0.5
-	var ground := base
-	if is_nan(ground):
-		ground = -INF
-		for cell in BuildingMap.edge_cells(edge):
-			ground = maxf(ground, _ground_at(Vector2(cell) + Vector2(0.5, 0.5)))
-	var centre := Vector3(edge.x, 0.0, edge.y) * cs + along * cs * 0.5 \
-			+ Vector3.UP * (ground + height * 0.5)
-	_preview_boxes.append([centre, along * cs * 0.5 + across * 0.1 + Vector3.UP * height * 0.5,
-			colour])
-
-
-func _preview_corner(corner: Vector2i, colour: Color) -> void:
-	var cs := grid.cell_size
-	var ground := _ground_at(Vector2(corner))
-	_preview_boxes.append([Vector3(corner.x * cs, ground + 0.5, corner.y * cs), Vector3(0.12, 0.5, 0.12),
-			colour])
 
 #endregion
