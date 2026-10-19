@@ -172,6 +172,10 @@ func _add_style_choices(defs: Array, floors: bool) -> void:
 func _add_floor_mode_choices() -> void:
 	var group := ButtonGroup.new()
 	for entry: Array in FLOOR_MODES:
+		var split_only: bool = entry[0] in [BuildController.FloorMode.RAISE,
+				BuildController.FloorMode.LOWER, BuildController.FloorMode.RAMP]
+		if split_only and not Building.split_levels:
+			continue
 		var mode: BuildController.FloorMode = entry[0]
 		var button := _make_button(entry[1], group)
 		button.button_pressed = controller.floor_mode == mode

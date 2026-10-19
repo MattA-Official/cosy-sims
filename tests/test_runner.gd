@@ -222,6 +222,15 @@ func _test_main_scene_loads() -> void:
 	var text := overlay.describe(map.land_bounds().get_center() - Vector2i(7, 7))
 	_check(text.contains("Enclosed: yes") and text.contains("Indoors") and text.contains("bars window"),
 			"debug view describes a cell, its room and its window")
+	main.building.active = 1
+	main.level_grid.rebuild()
+	_check(main.level_grid._mesh.get_surface_count() == 1, "upstairs, a grid shows at floor level")
+	var below := map.floor_height(map.land_bounds().get_center() - Vector2i(7, 7))
+	_check(is_equal_approx(main.level_grid.sheet_height(), below + Building.STOREY),
+			"upstairs, open tiles show one storey above the floors below")
+	main.building.active = 0
+	main.level_grid.rebuild()
+	_check(main.level_grid._mesh.get_surface_count() == 0, "on the ground, the ground's own grid shows")
 	var people: People = main.people
 	_check(people.people.size() == 6, "six prisoners start in the sample prison")
 	people.step(0.5)
@@ -357,11 +366,15 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	_check(terrain.corner_height(cell.call(-1, -1)) == outside_before
 			and terrain.corner_height(cell.call(1, 1)) > 0.0, "sculpting stays on owned land")
 	controller.tool = BuildController.Tool.ROOM
+	var skirt_corner: Vector2i = cell.call(9, 13)
+	var skirt_before := terrain.corner_height(skirt_corner)
 	hover.call(10.5, 10.5)
 	controller._on_press()
 	hover.call(12.5, 12.5)
 	controller._on_release()
 	var floor_height := terrain.cell_height(cell.call(10, 10))
+	_check(absf(terrain.corner_height(skirt_corner) - floor_height) < absf(skirt_before - floor_height) - 0.01,
+			"the ground round a new room slopes to meet it")
 	_check(is_equal_approx(terrain.cell_height(cell.call(12, 12)), floor_height)
 			and map.has_floor(cell.call(12, 12)), "a new room flattens the ground under it")
 	_check(is_equal_approx(map.floor_height(cell.call(12, 12)), floor_height),
@@ -572,8 +585,13 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	controller._on_release()
 	_check(building.level(-1).rooms().size() == 1 and building.level(-1).floor_height(cell.call(42, 41))
 			< terrain.cell_height(cell.call(42, 41)) - Building.STOREY + 0.5, "basements go below ground")
-	# Split levels: raise half the ground room, then go too far.
+	# Split levels (behind a flag): raise half the ground room, then go too far.
 	building.active = 0
+	controller.floor_mode = BuildController.FloorMode.RAISE
+	_check(controller.floor_mode == BuildController.FloorMode.LAY
+			and controller.nudge_floors(Rect2i(cell.call(36, 30), Vector2i(4, 4)), 0.25) == 0,
+			"with split levels off, floors can't be nudged")
+	Building.split_levels = true
 	controller.tool = BuildController.Tool.FLOOR
 	controller.floor_mode = BuildController.FloorMode.RAISE
 	var low_cell: Vector2i = cell.call(36, 31)
@@ -606,6 +624,7 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	_check(upstairs.floor_height(cell.call(37, 31)) <= map.floor_height(cell.call(37, 31))
 			+ Building.STOREY + BuildController.NUDGE_UP + 0.001, "upstairs nudges stay within the storey")
 	controller.floor_mode = BuildController.FloorMode.LAY
+	Building.split_levels = false
 	building.active = 0
 
 	# Angled walls: 45° snaps by default, Alt allows any angle.

@@ -18,6 +18,8 @@ enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS }
 
 ## How far one floor nudge moves, in metres.
 const NUDGE_STEP := 0.25
+## How many tiles of ground round a new building slope to meet it.
+const GROUND_SKIRT := 2
 ## How far floors may be nudged from their storey's height, below and above.
 const NUDGE_DOWN := 0.5
 const NUDGE_UP := 0.75
@@ -132,6 +134,8 @@ var terrain_brush := Terrain.Brush.RAISE
 var water_mode := WaterMode.NONE
 var floor_mode := FloorMode.LAY:
 	set(value):
+		if not Building.split_levels and value in [FloorMode.RAISE, FloorMode.LOWER, FloorMode.RAMP]:
+			value = FloorMode.LAY
 		floor_mode = value
 		stair_tool.cancel()
 ## Walls go at any angle between corners, not just straight or 45°.
@@ -434,18 +438,47 @@ func settle_ground(rect: Rect2i) -> void:
 				if map.has_floor(corner + touch):
 					lowest = minf(lowest, map.floor_height(corner + touch))
 			heights[corner] = lowest
+	# The ground round the building slopes gently to meet it, rather than
+	# leaving a cliff or a bank at its edge.
+	var pull := {} # Corner: [how strongly it is pulled, the height it is pulled to]
+	for corner: Vector2i in heights:
+		for dx in range(-GROUND_SKIRT, GROUND_SKIRT + 1):
+			for dy in range(-GROUND_SKIRT, GROUND_SKIRT + 1):
+				var near: Vector2i = corner + Vector2i(dx, dy)
+				if heights.has(near) or not terrain.in_bounds(near) or _corner_built_on(near) \
+						or not (map.owns(near) or map.owns(near - Vector2i.ONE)):
+					continue
+				var weight := 1.0 - float(maxi(absi(dx), absi(dy))) / (GROUND_SKIRT + 1)
+				if not pull.has(near) or pull[near][0] < weight:
+					pull[near] = [weight, heights[corner]]
+	for corner: Vector2i in pull:
+		heights[corner] = lerpf(terrain.corner_height(corner), pull[corner][1], pull[corner][0])
 	terrain.set_corners(heights)
 
 
+## Is any floor, on the ground or below it, built at a terrain corner?
+func _corner_built_on(corner: Vector2i) -> bool:
+	if building != null:
+		return building.corner_in_use(corner)
+	return map.corner_in_use(corner)
+
+
 ## The height new floor over this rectangle would go in at: the same as
-## any floor already in or beside it, so rooms line up, or else the ground
-## where the drag started.
+## any floor already in or beside it, so rooms line up, or else the
+## average height of the ground under it.
 func build_height(rect: Rect2i) -> float:
 	var near := map.floor_height_near(rect)
 	if not is_nan(near):
 		return near
 	var start := _drag_start_cell if rect.has_point(_drag_start_cell) else rect.position
-	var ground := snappedf(terrain.cell_height(start), 0.25) if terrain != null else 0.0
+	# The average height of the ground it covers, so the ground is cut and
+	# filled about evenly.
+	var ground := 0.0
+	if terrain != null:
+		var cells := BuildingMap.cells_in(rect)
+		for cell in cells:
+			ground += terrain.cell_height(cell)
+		ground = snappedf(ground / maxi(cells.size(), 1), 0.25)
 	if _level() != 0:
 		return building.storey_height(_level(), start, ground)
 	return ground
@@ -456,6 +489,8 @@ func build_height(rect: Rect2i) -> float:
 ## they stay out of the water, and the ground is refitted underneath.
 ## Returns how many tiles moved.
 func nudge_floors(rect: Rect2i, amount: float) -> int:
+	if not Building.split_levels:
+		return 0
 	var heights := {}
 	for cell in BuildingMap.cells_in(rect):
 		if not map.has_floor(cell):
@@ -507,7 +542,7 @@ func _pieces_bounds(chosen: Array[TilePiece]) -> Rect2i:
 ## towards where it is now, from the floor before its foot to the floor past
 ## its top. Null when it cannot go there.
 func planned_ramp() -> BuildingMap.Ramp:
-	if not _dragging:
+	if not _dragging or not Building.split_levels:
 		return null
 	var rect := _drag_rect()
 	var start := _drag_start_cell

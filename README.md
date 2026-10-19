@@ -31,7 +31,7 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | Building | |
 | --- | --- |
 | 1 Room | Drag to build a floor with walls all round |
-| 2 Floor | Drag to lay or restyle floor on the side of any walls where you start; Shift-click floors or restyles the whole room; hold Ctrl to remove. Raise and Lower nudge floors for split levels; Ramp drags a slope from the low side to the high side. Stairs: click the foot, move the way they climb, click short of the top for a landing, at the top to build; choose square or rounded landings |
+| 2 Floor | Drag to lay or restyle floor on the side of any walls where you start; Shift-click floors or restyles the whole room; hold Ctrl to remove. Stairs: click the foot, move the way they climb, click short of the top for a landing, at the top to build; choose square or rounded landings |
 | 3 Wall | Drag from corner to corner to build or restyle; snaps straight or to 45°, or pick Any angle (or hold Alt); hold Ctrl to remove |
 | 4 Doors and windows | Pick a door, glass window or barred window, then click a wall; click it again to fill it in |
 | 5 Objects | Click to place; R turns by 45° and [ / ] change the step (90° down to 1°); hold F to pin it and turn it to face the mouse; hold Alt to place freely. Lifts link with a lift in the same spot upstairs |
@@ -67,9 +67,16 @@ Down while placing. Paths stay on your own land and off floors, and
 building over a path removes it.
 
 Each floor remembers its own height. New floor lines up with any floor
-next to it, or else with the ground where you started dragging (rounded to
-a quarter of a metre), and the ground is fitted underneath so it never
-shows through. Higher floors stand on foundations.
+next to it, or else with the average height of the ground under it
+(rounded to a quarter of a metre). The ground is fitted underneath so it
+never shows through, and eased into a gentle bank round the building.
+Higher floors stand on foundations. Upstairs and in basements, a grid
+shows at that floor's height.
+
+Split levels (floors nudged up or down within a storey, with ramps
+between them) are switched off for now. Tick **Split Levels** on the Main
+node in Godot's inspector to bring back the floor tool's Raise, Lower and
+Ramp modes.
 
 Prisoners walk the build: through doors, up stairs and lifts, along paths
 and over bridges. They get sleepy, hungry and grubby, and head off to a

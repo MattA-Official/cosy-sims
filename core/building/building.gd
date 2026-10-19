@@ -15,6 +15,12 @@ signal active_changed(level: int)
 signal changed
 
 const STOREY := 1.75
+
+## Split levels: floors nudged up or down within their storey, and ramps
+## drawn between them. Off for now to keep levels simple: every floor then
+## sits a whole storey above the one below. Turn it on from the Main node
+## (Split Levels) or by setting this.
+static var split_levels := false
 const MIN_LEVEL := -2
 const MAX_LEVEL := 4
 

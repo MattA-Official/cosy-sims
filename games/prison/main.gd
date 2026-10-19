@@ -3,6 +3,9 @@ extends Node3D
 ## start from. People arrive in step 3.
 
 @export var build_sample_layout := true
+## Split levels: floors nudged within their storey, and ramps between
+## them. Off keeps every floor a whole storey above the one below.
+@export var split_levels := false
 
 @onready var grid: BuildGrid = $BuildGrid
 @onready var view: BuildingView = $BuildGrid/BuildingView
@@ -23,11 +26,14 @@ var paths := PathNetwork.new()
 var people := People.new()
 ## The F3 inspector for people, objects and rooms.
 var inspector := Inspector.new()
+## Grid lines at the height of the level being built on, off the ground.
+var level_grid := LevelGrid.new()
 ## One BuildingView per level, by level number.
 var views: Dictionary[int, BuildingView] = {}
 
 
 func _ready() -> void:
+	Building.split_levels = split_levels
 	# The grid is the whole world; you start owning the middle of it.
 	var land := Rect2i(grid.size / 4, grid.size / 2)
 	building = Building.new(land, PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
@@ -69,6 +75,11 @@ func _ready() -> void:
 	people.building = building
 	people.paths = paths
 	grid.add_child(people)
+	level_grid.name = "LevelGrid"
+	level_grid.grid = grid
+	level_grid.height_at = _floor_level_at
+	level_grid.building = building
+	grid.add_child(level_grid)
 	inspector.name = "Inspector"
 	inspector.people = people
 	inspector.building = building

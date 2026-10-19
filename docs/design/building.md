@@ -80,11 +80,16 @@ Paths and roads are **not** tile floors. They work like Cities: Skylines
   buildings is locked.
 - **Floors have their own height**, stored in `BuildingMap.floor_heights`
   rather than read from the terrain. New floor takes the height of any
-  floor beside it, or else the ground where the drag started, rounded to
-  0.25 m. The ground is then fitted to the floor: each corner drops to the
-  lowest floor touching it, so it never pokes through, and higher floors
-  stand on foundations. This is the groundwork for manual floor heights
-  and storeys. You can't build where that height is under water.
+  floor beside it, or else the average ground height under the whole
+  drag, rounded to 0.25 m (so a room on a slope half sits in it rather
+  than perching on its highest or lowest corner). The ground is then
+  fitted to the floor: each corner drops to the lowest floor touching it,
+  so it never pokes through, and higher floors stand on foundations. The
+  ground for two tiles round the building is then eased towards the floor
+  height (`BuildController.GROUND_SKIRT`), so a building on a hill sits
+  in a gentle bank instead of a cliff or a trench; tiles already built on
+  and land you don't own are left alone. You can't build where that
+  height is under water.
 - **Windows** are a kind of wall piece, like doors: glass or barred. They
   block walking, keep rooms enclosed and indoors, and can't go in fences.
 - **Water** is placed bodies (`core/terrain/water_layer.gd`). Clicking a
@@ -141,9 +146,18 @@ Debug view and windows, water bodies, spline paths, storeys and angled
 walls are done, and so is the first slice of people and pathfinding.
 
 ### Storeys (built)
-- Fixed 1.75 m storeys, stepped through with Page Up and Page Down. Each
-  floor can be nudged up or down in quarter-metre steps within its storey
-  for split levels. Basements are storeys below ground.
+- Fixed 1.75 m storeys, stepped through with Page Up and Page Down.
+  Basements are storeys below ground. Above or below the ground, a grid
+  (`core/building/level_grid.gd`) shows over your land at that level's
+  height: on floors at their own height, and elsewhere on one flat sheet
+  at the level's usual height.
+- **Split levels are off for now** (Matt, 2026-10-19), to keep levels
+  simple: every floor sits at its storey's height. The code is kept
+  behind `Building.split_levels`, which you can turn on with the Split
+  Levels box on the Main node in the inspector. With it on, each floor
+  can be nudged up or down in quarter-metre steps within its storey
+  (the floor tool's Raise and Lower modes), and ramps can be drawn
+  between the heights.
 - Scale is stylised like Prison Architect and Parkitect rather than
   real-world: a tile is 1 m but walls are 1.5 m, doors 1.15 m, and
   furniture is low and chunky. People will be about 0.9 m tall, so a
@@ -166,7 +180,7 @@ walls are done, and so is the first slice of people and pathfinding.
   tile of them removes them. A stairwell stays part of the room around it.
 - There is one kind of lift. Lifts link with a lift in the same spot on
   the next level up.
-- Ramps are drawn with the floor tool's Ramp mode: drag over floor from the
+- With split levels on, ramps are drawn with the floor tool's Ramp mode: drag over floor from the
   low side to the high side, and the ramp meets the floor just beyond each
   end. Nothing can be placed on a ramp, and nudging any of it flattens it
   back to tiles.
