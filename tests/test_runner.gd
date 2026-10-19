@@ -23,6 +23,7 @@ func _process(_delta: float) -> bool:
 	_test_building_levels()
 	_test_ramps()
 	_test_stair_builder()
+	_test_nav_graph()
 	_test_angled_walls()
 	_test_path_profile()
 	_test_foliage()
@@ -840,6 +841,68 @@ func _test_building_levels() -> void:
 	links = building.links()
 	_check(links.size() == 2 and links[0].kind == Building.Link.Kind.LIFT,
 			"lifts stacked up link")
+
+
+func _test_nav_graph() -> void:
+	var building := Building.new(Rect2i(0, 0, 30, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var ground := building.ground()
+	# Two rooms side by side, sharing a wall with a door in it.
+	ground.build_room(Rect2i(2, 2, 4, 4), &"concrete", &"brick", 0.0)
+	ground.build_room(Rect2i(6, 2, 4, 4), &"concrete", &"brick", 0.0)
+	var graph := NavGraph.build(building)
+	_check(graph.find_path(0, Vector2(3.5, 3.5), 0, Vector2(8.5, 3.5)).is_empty(),
+			"no way between rooms with no door")
+	ground.set_door(BuildingMap.edge_between(Vector2i(5, 4), Vector2i(6, 4)), true)
+	graph = NavGraph.build(building)
+	var walk := graph.find_path(0, Vector2(3.5, 3.5), 0, Vector2(8.5, 3.5))
+	var through_door := false
+	for p in walk:
+		through_door = through_door or (absf(p.z - 4.5) < 0.01 and absf(p.x - 6.0) < 0.6)
+	_check(through_door, "people go through the door")
+	_check(walk.size() <= 5, "straight stretches are walked in one go")
+	# Out of a room through an outside door onto open ground.
+	ground.set_door(BuildingMap.edge_between(Vector2i(3, 5), Vector2i(3, 6)), true)
+	graph = NavGraph.build(building)
+	_check(not graph.find_path(0, Vector2(3.5, 3.5), 0, Vector2(15.5, 12.5)).is_empty(),
+			"people walk out of doors and over open ground")
+	_check(graph.point_at(0, Vector2(40, 40)) == -1, "nobody walks off your land")
+	# Upstairs by the stairs, and by the lift.
+	var up := building.level(1)
+	up.build_room(Rect2i(2, 2, 8, 4), &"wood", &"brick", Building.STOREY)
+	var route: Array[Vector2i] = [Vector2i(3, 3), Vector2i(4, 3), Vector2i(5, 3)]
+	ground.add_stairs(Staircase.create(route, [false, false, false] as Array[bool]))
+	graph = NavGraph.build(building)
+	var climb := graph.find_path(0, Vector2(2.5, 4.5), 1, Vector2(8.5, 4.5))
+	var on_stairs := false
+	for p in climb:
+		on_stairs = on_stairs or (p.y > 0.5 and p.y < 1.5)
+	_check(on_stairs, "people climb the stairs to the floor above")
+	building.ground().remove_stairs(building.ground().stairs.keys()[0])
+	graph = NavGraph.build(building)
+	_check(graph.find_path(0, Vector2(2.5, 4.5), 1, Vector2(8.5, 4.5)).is_empty(), "no stairs, no way up")
+	var lift: ObjectDef = load("res://games/prison/catalogue/lift.tres")
+	ground.place_object(lift, Vector2(8, 4), 0)
+	up.place_object(lift, Vector2(8, 4), 0)
+	graph = NavGraph.build(building)
+	_check(not graph.find_path(0, Vector2(2.5, 4.5), 1, Vector2(3.5, 4.5)).is_empty(), "people take the lift")
+	# Ground paths are cheaper to walk than open ground.
+	var paths := PathNetwork.new()
+	paths.add_segment(Vector2(12.5, 8.5), Vector2(12.5, 16.5))
+	graph = NavGraph.build(building, paths)
+	var along := graph.find_path(0, Vector2(12.5, 8.5), 0, Vector2(12.5, 16.5))
+	_check(along.size() == 2, "a path is walked straight along")
+	# A built bridge crosses what the ground cannot.
+	var land := Building.new(Rect2i(0, 0, 10, 10))
+	var walls_off := PathNetwork.new()
+	land.ground().build_walls(BuildingMap.edges_on_line(Vector2i(5, 0), Vector2i(5, 10)), &"fence")
+	graph = NavGraph.build(land, walls_off)
+	_check(graph.find_path(0, Vector2(2.5, 5.5), 0, Vector2(8.5, 5.5)).is_empty(), "a fence blocks the way")
+	walls_off.add_segment(Vector2(1.5, 5.5), Vector2(3.5, 5.5), null, &"", true, NAN, 1.25)
+	walls_off.add_segment(Vector2(3.5, 5.5), Vector2(7.5, 5.5), null, &"", true, NAN, 1.25)
+	walls_off.add_segment(Vector2(7.5, 5.5), Vector2(9.5, 5.5), null, &"", true)
+	graph = NavGraph.build(land, walls_off)
+	_check(not graph.find_path(0, Vector2(0.5, 5.5), 0, Vector2(8.5, 6.5)).is_empty(),
+			"people walk over built paths")
 
 
 func _test_stair_builder() -> void:
