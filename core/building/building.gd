@@ -38,7 +38,6 @@ class Link:
 	var from_cell: Vector2i
 	var to_level: int
 	var to_cell: Vector2i
-	var staff_only := false
 
 
 var _floor_defs: Array[FloorDef] = []
@@ -143,12 +142,9 @@ func links() -> Array[Link]:
 					var dir := BuildingMap.rise_direction(placed.rotation)
 					_add_link(out, placed.def, n, ends[0] - dir, n + 1, ends[1] + dir)
 				ObjectDef.Connects.LIFT:
-					var above := _lift_above(n, placed)
-					if above != null:
+					if _lift_above(n, placed) != null:
 						var cell := Vector2i(placed.rect.get_center().floor())
-						var link := _add_link(out, placed.def, n, cell, n + 1, cell)
-						link.staff_only = link.staff_only or above.def.staff_only
-						out[-2].staff_only = link.staff_only
+						_add_link(out, placed.def, n, cell, n + 1, cell)
 	return out
 
 
@@ -166,7 +162,6 @@ func _add_link(out: Array[Link], def: ObjectDef, from_level: int, from_cell: Vec
 	for way in 2:
 		var link := Link.new()
 		link.kind = def.connects
-		link.staff_only = def.staff_only
 		link.from_level = from_level if way == 0 else to_level
 		link.from_cell = from_cell if way == 0 else to_cell
 		link.to_level = to_level if way == 0 else from_level

@@ -9,7 +9,6 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/shower.tres"),
 	preload("res://games/prison/catalogue/stairs.tres"),
 	preload("res://games/prison/catalogue/lift.tres"),
-	preload("res://games/prison/catalogue/lift_staff.tres"),
 ]
 
 const FLOORS: Array[FloorDef] = [

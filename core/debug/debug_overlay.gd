@@ -159,8 +159,7 @@ func _describe_cell(cell: Vector2i) -> PackedStringArray:
 		lines.append("  Objects: %s" % (", ".join(names) if not names.is_empty() else "none"))
 	var under := map.object_at(Vector2(cell) + Vector2(0.5, 0.5))
 	if under != null and under.def.connects != ObjectDef.Connects.NONE:
-		lines.append("%s: goes up a level%s" % [under.def.display_name,
-				", staff only" if under.def.staff_only else ""])
+		lines.append("%s: goes up a level" % under.def.display_name)
 
 	lines.append("Edges:")
 	for side: Array in [["North (-Z)", Vector2i.UP], ["South (+Z)", Vector2i.DOWN],

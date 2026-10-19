@@ -30,5 +30,3 @@ enum Connects {
 @export var tags: Array[StringName] = []
 ## Whether this links to the level above, and how.
 @export var connects := Connects.NONE
-## Only staff may use it, such as a staff lift.
-@export var staff_only := false

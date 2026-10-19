@@ -114,8 +114,8 @@ walls are done. Next come people and pathfinding.
   ramps for split levels and odd heights. Stairs are 1 by 3 tiles and
   climb one storey; they cut a hole in the floor above, and the floor can
   go back once they are removed. A stairwell stays part of the room around
-  it. Lifts link with a lift in the same spot on the next level up; a
-  staff lift makes the link staff only. `Building.links()` lists every way
+  it. Lifts link with a lift in the same spot on the next level up.
+  There is one kind of lift. `Building.links()` lists every way
   between levels, ready for pathfinding.
 - Ramps are drawn with the floor tool's Ramp mode: drag over floor from the
   low side to the high side, and the ramp meets the floor just beyond each

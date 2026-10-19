@@ -781,7 +781,6 @@ func _test_building_levels() -> void:
 	# Stairs cut the floor above; lifts link with a lift above them.
 	var stairs: ObjectDef = load("res://games/prison/catalogue/stairs.tres")
 	var lift: ObjectDef = load("res://games/prison/catalogue/lift.tres")
-	var staff_lift: ObjectDef = load("res://games/prison/catalogue/lift_staff.tres")
 	var upstairs := building.level(1)
 	upstairs.fill_floor(Rect2i(2, 2, 4, 4), &"wood", 0.5 + Building.STOREY)
 	var flight := ground.place_object(stairs, Vector2(3, 2), 0)
@@ -799,10 +798,10 @@ func _test_building_levels() -> void:
 			"no stairs on the top level")
 	ground.place_object(lift, Vector2(4, 4), 0)
 	_check(building.links().is_empty(), "a lift alone goes nowhere")
-	upstairs.place_object(staff_lift, Vector2(4, 4), 0)
+	upstairs.place_object(lift, Vector2(4, 4), 0)
 	links = building.links()
-	_check(links.size() == 2 and links[0].kind == ObjectDef.Connects.LIFT and links[0].staff_only
-			and links[1].staff_only, "lifts stacked up link, and staff lifts are staff only")
+	_check(links.size() == 2 and links[0].kind == ObjectDef.Connects.LIFT,
+			"lifts stacked up link")
 
 
 func _test_ramps() -> void:
