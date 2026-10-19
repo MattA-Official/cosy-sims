@@ -53,8 +53,14 @@ const WINDOW_BARS := &"bars"
 class PlacedObject:
 	var id: int
 	var def: ObjectDef
-	var rotation: int ## Quarter turns, 0 to 3.
-	var rect: Rect2 ## The footprint in tile units, after rotation.
+	var rotation: int ## The nearest quarter turn, 0 to 3.
+	var angle := 0.0 ## The turn in radians; quarter turns are multiples of PI / 2.
+	var centre: Vector2 ## The middle of the footprint, in tile units.
+	var rect: Rect2 ## A box around the footprint, in tile units.
+
+	## The footprint's four corners, in tile units.
+	func polygon() -> PackedVector2Array:
+		return BuildingMap.object_polygon(def, centre, angle)
 
 
 ## A drawn slope between two floor heights, climbing one way.
@@ -85,9 +91,10 @@ var window_kinds: Dictionary[Vector3i, StringName] = {} ## For Wall.WINDOW edges
 var slants: Dictionary[Vector4i, int] = {}
 var slant_styles: Dictionary[Vector4i, StringName] = {}
 var slant_window_kinds: Dictionary[Vector4i, StringName] = {}
-## Points in tiles where a piece of floor was taken up. Any piece holding one
-## of these points has no floor, though the rest of its tile does.
-var floor_cuts: Dictionary[Vector2i, PackedVector2Array] = {}
+## Floor styles for single pieces of tiles cut by angled walls, where they
+## differ from the tile's own: [a point inside the piece, style] pairs. An
+## empty style means that piece has no floor.
+var piece_styles: Dictionary[Vector2i, Array] = {}
 var objects: Dictionary[int, PlacedObject] = {}
 var ramps: Array[Ramp] = []
 ## Tiles open to stairs coming up from the level below. No floor goes here.
@@ -254,6 +261,37 @@ static func object_rect(def: ObjectDef, position: Vector2, rotation: int) -> Rec
 	return Rect2(position, extent)
 
 
+## An object's footprint, turned by `angle` radians about its centre.
+static func object_polygon(def: ObjectDef, centre: Vector2, angle: float) -> PackedVector2Array:
+	var half := def.size * 0.5
+	var out := PackedVector2Array()
+	for corner: Vector2 in [Vector2(-half.x, -half.y), Vector2(half.x, -half.y), half,
+			Vector2(-half.x, half.y)]:
+		out.append(centre + corner.rotated(angle))
+	return out
+
+
+static func polygon_bounds(points: PackedVector2Array) -> Rect2:
+	var bounds := Rect2(points[0], Vector2.ZERO)
+	for point in points:
+		bounds = bounds.expand(point)
+	return bounds
+
+
+## Does the line from a to b pass through the inside of a polygon?
+static func segment_crosses(points: PackedVector2Array, a: Vector2, b: Vector2) -> bool:
+	var inner := Geometry2D.offset_polygon(points, -EPSILON * 2.0)
+	if inner.is_empty():
+		return false
+	return not Geometry2D.intersect_polyline_with_polygon(PackedVector2Array([a, b]), inner[0]).is_empty()
+
+
+## The two corners at the ends of an edge.
+static func edge_ends(edge: Vector3i) -> Array[Vector2]:
+	var start := Vector2(edge.x, edge.y)
+	return [start, start + (Vector2.RIGHT if edge.z == EDGE_X else Vector2.DOWN)]
+
+
 ## Where an object centred on a point should go, snapped as the object likes.
 ## Returns the top-left corner of its footprint.
 static func snapped_position(def: ObjectDef, centre: Vector2, rotation: int,
@@ -390,8 +428,9 @@ func can_walk_between(a: Vector2i, b: Vector2i) -> bool:
 func can_build_wall(edge: Vector3i) -> bool:
 	if not edge_in_bounds(edge):
 		return false
+	var ends := edge_ends(edge)
 	for placed: PlacedObject in objects.values():
-		if edge_crosses(edge, placed.rect):
+		if segment_crosses(placed.polygon(), ends[0], ends[1]):
 			return false
 	return true
 
@@ -489,24 +528,6 @@ static func slant_crossings(key: Vector4i) -> Array[Vector2i]:
 	return out
 
 
-## Does an angled wall piece pass through the inside of a rectangle?
-static func slant_crosses(key: Vector4i, rect: Rect2) -> bool:
-	var ends := slant_ends(key)
-	var inner := rect.grow(-EPSILON)
-	var a := Vector2(ends[0])
-	var b := Vector2(ends[1])
-	if not inner.intersects(Rect2(a.min(b), (b - a).abs())):
-		return false
-	if inner.has_point(a) or inner.has_point(b):
-		return true
-	var corners := [inner.position, Vector2(inner.end.x, inner.position.y), inner.end,
-			Vector2(inner.position.x, inner.end.y)]
-	for i in 4:
-		if Geometry2D.segment_intersects_segment(a, b, corners[i], corners[(i + 1) % 4]) != null:
-			return true
-	return false
-
-
 func slant_at(key: Vector4i) -> int:
 	return slants.get(key, Wall.NONE)
 
@@ -530,7 +551,8 @@ func can_build_slant(key: Vector4i) -> bool:
 		if not owns(cell):
 			return false
 	for placed: PlacedObject in objects.values():
-		if slant_crosses(key, placed.rect):
+		var ends := slant_ends(key)
+		if segment_crosses(placed.polygon(), Vector2(ends[0]), Vector2(ends[1])):
 			return false
 	return true
 
@@ -605,40 +627,111 @@ func piece_at(point: Vector2) -> TilePiece:
 	return pieces(cell)[0]
 
 
-## Whether a piece of a tile has floor: the tile has, and the piece was not
-## taken up on its own.
-func piece_has_floor(piece: TilePiece) -> bool:
+## A piece's floor style, or empty if it has no floor.
+func piece_floor(piece: TilePiece) -> StringName:
 	if not floors.has(piece.cell):
-		return false
-	for point in floor_cuts.get(piece.cell, PackedVector2Array()):
-		if piece.has_point(point):
-			return false
-	return true
+		return &""
+	for entry: Array in piece_styles.get(piece.cell, []):
+		if piece.has_point(entry[0]):
+			return entry[1]
+	return floors[piece.cell]
 
 
-## Takes up, or puts back, the floor of just the piece of a tile under a
-## point. Returns whether anything changed.
-func set_piece_floor(point: Vector2, has: bool) -> bool:
-	var piece := piece_at(point)
-	if not floors.has(piece.cell) or piece_has_floor(piece) == has:
-		return false
-	var cuts: PackedVector2Array = floor_cuts.get(piece.cell, PackedVector2Array())
-	if has:
-		var kept := PackedVector2Array()
-		for cut in cuts:
-			if not piece.has_point(cut):
-				kept.append(cut)
-		cuts = kept
+func piece_has_floor(piece: TilePiece) -> bool:
+	return not piece_floor(piece).is_empty()
+
+
+## Lays, restyles or takes up floor on just these pieces, leaving the rest
+## of their tiles alone. An empty style takes the floor up. New floor goes in
+## at `height`. Returns how many pieces changed.
+func set_piece_floors(chosen: Array[TilePiece], type: StringName, height := 0.0) -> int:
+	var by_cell: Dictionary[Vector2i, Array] = {}
+	for piece in chosen:
+		if owns(piece.cell) and not holes.has(piece.cell):
+			by_cell.get_or_add(piece.cell, []).append(piece.index)
+	var count := 0
+	for cell: Vector2i in by_cell:
+		var list := pieces(cell)
+		var types: Array[StringName] = []
+		for piece: TilePiece in list:
+			types.append(piece_floor(piece))
+		for index: int in by_cell[cell]:
+			if types[index] != type:
+				types[index] = type
+				count += 1
+		_store_piece_floors(cell, types, height)
+	if count > 0:
+		_changed()
+	return count
+
+
+## The pieces you can reach from the one under a point without crossing a
+## wall, door or window, nor leaving `limit` (cells) when one is given.
+## With `max_pieces`, an area that runs off your land or past that size
+## gives nothing back, so one click cannot flood the whole map.
+func pieces_within_walls(point: Vector2, limit := Rect2i(), max_pieces := 0) -> Array[TilePiece]:
+	var start := piece_at(point)
+	var out: Array[TilePiece] = []
+	if not owns(start.cell) or (limit.has_area() and not limit.has_point(start.cell)):
+		return out
+	var seen := {_piece_id(start): true}
+	var stack: Array[TilePiece] = [start]
+	while not stack.is_empty():
+		var piece: TilePiece = stack.pop_back()
+		out.append(piece)
+		if max_pieces > 0 and out.size() > max_pieces:
+			return []
+		for i in piece.sides.size():
+			var tag: Variant = piece.sides[i]
+			if tag is Vector4i:
+				continue
+			var next_cell: Vector2i = piece.cell + DIRECTIONS[tag]
+			if wall_at(edge_between(piece.cell, next_cell)) != Wall.NONE:
+				continue
+			if limit.has_area() and not limit.has_point(next_cell):
+				continue
+			if not owns(next_cell):
+				if max_pieces > 0:
+					return []
+				continue
+			var stretch := PackedVector2Array([piece.polygon[i],
+					piece.polygon[(i + 1) % piece.polygon.size()]])
+			for next: TilePiece in pieces(next_cell):
+				if seen.has(_piece_id(next)) or not next.sides_tagged(tag ^ 1).any(
+						func(other: PackedVector2Array) -> bool:
+							return TilePiece.overlaps(stretch, other)):
+					continue
+				seen[_piece_id(next)] = true
+				stack.append(next)
+	return out
+
+
+## Stores the floor of every piece of a tile: the most common style becomes
+## the tile's, and the others are kept per piece.
+func _store_piece_floors(cell: Vector2i, types: Array[StringName], height: float) -> void:
+	var votes := {}
+	for type in types:
+		if not type.is_empty():
+			votes[type] = votes.get(type, 0) + 1
+	if votes.is_empty():
+		_clear_floor(Rect2i(cell, Vector2i.ONE))
+		return
+	var base: StringName = votes.keys()[0]
+	for type: StringName in votes:
+		if votes[type] > votes[base]:
+			base = type
+	if not floors.has(cell):
+		floor_heights[cell] = height
+	floors[cell] = base
+	var list := pieces(cell)
+	var entries: Array = []
+	for i in types.size():
+		if types[i] != base:
+			entries.append([list[i].centre(), types[i]])
+	if entries.is_empty():
+		piece_styles.erase(cell)
 	else:
-		if pieces(piece.cell).size() < 2:
-			return false
-		cuts.append(piece.centre())
-	if cuts.is_empty():
-		floor_cuts.erase(piece.cell)
-	else:
-		floor_cuts[piece.cell] = cuts
-	_changed()
-	return true
+		piece_styles[cell] = entries
 
 
 func _update_slants() -> void:
@@ -671,33 +764,63 @@ static func _gcd(a: int, b: int) -> int:
 #region Objects
 
 func can_place(def: ObjectDef, position: Vector2, rotation: int) -> bool:
-	var rect := object_rect(def, position, rotation)
+	return can_place_at(def, object_rect(def, position, rotation).get_center(), rotation * PI * 0.5)
+
+
+## Can an object go with its centre here, turned by `angle` radians? It needs
+## floor under all of it, and no other object, wall or ramp in the way.
+func can_place_at(def: ObjectDef, centre: Vector2, angle: float) -> bool:
+	var points := object_polygon(def, centre, angle)
+	var rect := polygon_bounds(points)
+	var shrunk := Geometry2D.offset_polygon(points, -EPSILON * 2.0)
+	if shrunk.is_empty():
+		return false
+	var inner: PackedVector2Array = shrunk[0]
 	for cell in cells_under(rect):
+		var square := PackedVector2Array([Vector2(cell), Vector2(cell) + Vector2(1, 0),
+				Vector2(cell) + Vector2.ONE, Vector2(cell) + Vector2(0, 1)])
+		if Geometry2D.intersect_polygons(inner, square).is_empty():
+			continue
 		if not has_floor(cell) or ramp_at(cell) != null:
 			return false
 	for placed: PlacedObject in objects.values():
-		if placed.rect.grow(-EPSILON).intersects(rect):
+		if placed.rect.grow(-EPSILON).intersects(rect) \
+				and not Geometry2D.intersect_polygons(inner, placed.polygon()).is_empty():
 			return false
 	# An object cannot straddle a wall or door.
 	for edge in rect_edges(_cell_bounds(rect)):
-		if wall_at(edge) != Wall.NONE and edge_crosses(edge, rect):
-			return false
+		if wall_at(edge) != Wall.NONE:
+			var ends := edge_ends(edge)
+			if segment_crosses(points, ends[0], ends[1]):
+				return false
 	for key: Vector4i in slants:
-		if slant_crosses(key, rect):
+		var ends := slant_ends(key)
+		if segment_crosses(points, Vector2(ends[0]), Vector2(ends[1])):
 			return false
 	return true
 
 
 ## Places an object and returns its id, or 0 if it does not fit.
 func place_object(def: ObjectDef, position: Vector2, rotation: int) -> int:
-	if not can_place(def, position, rotation):
+	return place_object_at(def, object_rect(def, position, rotation).get_center(), rotation * PI * 0.5)
+
+
+## Places an object centred on a point and turned by `angle` radians. Stairs
+## and lifts only take quarter turns. Returns its id, or 0 if it does not fit.
+func place_object_at(def: ObjectDef, centre: Vector2, angle: float) -> int:
+	if def.connects != ObjectDef.Connects.NONE:
+		angle = snappedf(angle, PI * 0.5)
+	angle = wrapf(angle, 0.0, TAU)
+	if not can_place_at(def, centre, angle):
 		return 0
 	var placed := PlacedObject.new()
 	placed.id = _next_object_id
 	_next_object_id += 1
 	placed.def = def
-	placed.rotation = posmod(rotation, 4)
-	placed.rect = object_rect(def, position, rotation)
+	placed.angle = angle
+	placed.rotation = posmod(roundi(angle / (PI * 0.5)), 4)
+	placed.centre = centre
+	placed.rect = polygon_bounds(object_polygon(def, centre, angle))
 	objects[placed.id] = placed
 	_changed()
 	return placed.id
@@ -778,7 +901,7 @@ func remove_object(id: int) -> bool:
 ## The object covering a point in tile units, if any.
 func object_at(point: Vector2) -> PlacedObject:
 	for placed: PlacedObject in objects.values():
-		if placed.rect.has_point(point):
+		if placed.rect.has_point(point) and Geometry2D.is_point_in_polygon(point, placed.polygon()):
 			return placed
 	return null
 
@@ -786,7 +909,7 @@ func object_at(point: Vector2) -> PlacedObject:
 func objects_in_room(room: Room) -> Array[PlacedObject]:
 	var out: Array[PlacedObject] = []
 	for placed: PlacedObject in objects.values():
-		if room_at_point(placed.rect.get_center()) == room:
+		if room_at_point(placed.centre) == room:
 			out.append(placed)
 	return out
 
@@ -869,6 +992,7 @@ func _fill_floor(rect: Rect2i, type: StringName, height: float) -> int:
 		if owns(cell) and not holes.has(cell) and floors.get(cell) != type:
 			if not floors.has(cell):
 				floor_heights[cell] = height
+				piece_styles.erase(cell)
 			floors[cell] = type
 			count += 1
 	return count
@@ -887,7 +1011,7 @@ func _clear_floor(rect: Rect2i) -> int:
 			count += 1
 	for cell in cells_in(rect):
 		floor_heights.erase(cell)
-		floor_cuts.erase(cell)
+		piece_styles.erase(cell)
 		if floors.erase(cell):
 			count += 1
 		_room_types.erase(cell)

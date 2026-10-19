@@ -351,8 +351,16 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	controller._on_press()
 	hover.call(13.5, 13.5)
 	controller._on_release()
-	_check(map.floors[cell.call(11, 11)] == &"wood" and is_equal_approx(map.floor_height(cell.call(9, 9)),
+	_check(map.floors[cell.call(9, 9)] == &"wood" and is_equal_approx(map.floor_height(cell.call(9, 9)),
 			floor_height), "floor next to a room is laid at the room's height")
+	_check(map.floors[cell.call(11, 11)] != &"wood", "dragged floor stays on the side of the wall it began")
+	Input.action_press("build_whole_room")
+	hover.call(11.5, 11.5)
+	controller._on_press()
+	controller._on_release()
+	Input.action_release("build_whole_room")
+	_check(map.floors[cell.call(11, 11)] == &"wood" and map.floors[cell.call(12, 12)] == &"wood",
+			"Shift-click floors the whole room")
 	var poking := false
 	for z in range(9, 15):
 		for x in range(9, 15):
@@ -599,6 +607,41 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	controller._on_press()
 	controller._on_release()
 	_check(not map.slants.has(middle_key) and map.slants.size() == 2, "demolish removes one angled wall")
+	# Objects at any angle.
+	controller.tool = BuildController.Tool.OBJECT
+	controller.object_def = load("res://games/prison/catalogue/table.tres")
+	controller.object_angle = 0.0
+	controller.rotation_step = 45.0
+	var press_key := func(action: String) -> void:
+		var event := InputEventAction.new()
+		event.action = action
+		event.pressed = true
+		controller._unhandled_input(event)
+	press_key.call("build_rotate")
+	_check(is_equal_approx(controller.object_angle, PI * 0.25), "R turns an object by 45°")
+	press_key.call("build_brush_smaller")
+	_check(controller.rotation_step == 22.5 and controller.hint().contains("22.5"), "[ makes the turn finer")
+	controller.rotation_step = 45.0
+	var objects_before := map.objects.size()
+	hover.call(12.6, 42.1)
+	controller._on_press()
+	var table_id: int = map.objects.keys().max() if map.objects.size() > objects_before else 0
+	var table: BuildingMap.PlacedObject = map.objects.get(table_id)
+	_check(table != null and is_equal_approx(table.angle, PI * 0.25)
+			and table.centre == base + Vector2(12.5, 42.0), "a turned table snaps its middle to half tiles")
+	_check(map.object_at(base + Vector2(12.5, 42.0)) == table and map.object_at(base + Vector2(11.6, 41.1)) == null,
+			"picking a turned object follows its shape")
+	controller._on_press()
+	_check(map.objects.size() == objects_before + 1, "turned objects cannot overlap")
+	Input.action_press("build_free_rotate")
+	hover.call(14.8, 39.2)
+	controller._update_free_rotate()
+	hover.call(15.0, 42.5)
+	controller._update_free_rotate()
+	_check(controller._object_centre() == base + Vector2(15.0, 39.0)
+			and is_equal_approx(controller.object_angle, 0.0), "holding F pins the object and turns it to the mouse")
+	Input.action_release("build_free_rotate")
+	controller._update_free_rotate()
 	controller.tool = BuildController.Tool.NONE
 
 
@@ -752,7 +795,7 @@ func _test_building_levels() -> void:
 	ground.remove_object(flight)
 	_check(upstairs.holes.is_empty() and upstairs.fill_floor(Rect2i(3, 2, 1, 3), &"wood", 2.25) == 3,
 			"removing stairs lets floor back in")
-	_check(not building.can_place(Building.MAX_LEVEL, stairs, Vector2(3, 2), 0),
+	_check(not building.can_place(Building.MAX_LEVEL, stairs, Vector2(3.5, 3.5), 0.0),
 			"no stairs on the top level")
 	ground.place_object(lift, Vector2(4, 4), 0)
 	_check(building.links().is_empty(), "a lift alone goes nowhere")
@@ -800,10 +843,16 @@ func _test_angled_walls() -> void:
 			"each half of a cut tile belongs to its own side")
 	_check(map.place_object(load("res://games/prison/catalogue/bed.tres"), Vector2(1, 1), 0) == 0,
 			"objects cannot straddle an angled wall")
-	_check(map.set_piece_floor(Vector2(3.8, 3.2), false) and not map.room_at_point(Vector2(3.5, 2.5)).enclosed
+	_check(map.set_piece_floors([map.piece_at(Vector2(3.8, 3.2))], &"") == 1
+			and not map.room_at_point(Vector2(3.5, 2.5)).enclosed
 			and is_equal_approx(map.room_at_point(Vector2(3.5, 2.5)).area, 7.5),
 			"taking up half a tile leaves a gap in the room")
-	map.set_piece_floor(Vector2(3.8, 3.2), true)
+	map.set_piece_floors([map.piece_at(Vector2(3.8, 3.2))], &"wood")
+	map.set_piece_floors(map.pieces_within_walls(Vector2(2.8, 2.2)), &"tiles")
+	_check(map.piece_floor(map.piece_at(Vector2(2.8, 2.2))) == &"tiles"
+			and map.piece_floor(map.piece_at(Vector2(2.2, 2.8))) == &"wood"
+			and map.pieces_within_walls(Vector2(2.8, 2.2)).size() == 4 + 6,
+			"each side of an angled wall keeps its own floor style")
 	map.set_slant_opening(Vector4i(1, 1, 2, 2), BuildingMap.Wall.DOOR)
 	_check(map.slant_at(Vector4i(1, 1, 2, 2)) == BuildingMap.Wall.DOOR and map.rooms().size() == 2,
 			"a door in an angled wall still splits rooms")

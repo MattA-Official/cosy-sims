@@ -134,8 +134,19 @@ walls are done. Next come people and pathfinding.
   different room. Floor stays per tile, but one piece of a cut tile can be
   taken up on its own (Ctrl-click with the floor tool) to trim floor
   outside an angled wall.
-- Objects cannot straddle an angled wall. People and pathfinding will use
-  the pieces too.
+- Floor is stored per tile with per-piece styles where a cut tile's sides
+  differ, so each side of an angled wall can have its own floor. The floor
+  tool only fills the side of any walls where a drag starts, and
+  Shift-click floors or restyles everything walled in around the click
+  (Matt, 2026-10-19). So a building can be drawn walls first, then floored
+  with one click.
+- Doors and windows stay 1 m wide in longer angled wall pieces, with plain
+  wall either side.
+- Objects turn to any angle: R turns by a step (45° by default, [ and ]
+  pick 90° down to 1°), and holding F pins the object and turns it to face
+  the mouse. Turned objects snap their middle to half or quarter tiles.
+  Stairs and lifts stay square-on. Objects cannot straddle any wall.
+- People and pathfinding will use the tile pieces too.
 - Idea for later: curved walls, perhaps reusing the path curves.
 
 ## Open questions

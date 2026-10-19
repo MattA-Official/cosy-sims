@@ -31,10 +31,10 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | Building | |
 | --- | --- |
 | 1 Room | Drag to build a floor with walls all round |
-| 2 Floor | Drag to lay or restyle floor; hold Ctrl to remove. Raise and Lower nudge floors for split levels; Ramp drags a slope from the low side to the high side. On a tile cut by an angled wall, Ctrl-click takes up just one side |
-| 3 Wall | Drag from corner to corner to build or restyle; snaps straight or to 45°, hold Alt for any angle, hold Ctrl to remove |
+| 2 Floor | Drag to lay or restyle floor on the side of any walls where you start; Shift-click floors or restyles the whole room; hold Ctrl to remove. Raise and Lower nudge floors for split levels; Ramp drags a slope from the low side to the high side |
+| 3 Wall | Drag from corner to corner to build or restyle; snaps straight or to 45°, or pick Any angle (or hold Alt); hold Ctrl to remove |
 | 4 Doors and windows | Pick a door, glass window or barred window, then click a wall; click it again to fill it in |
-| 5 Objects | Click to place; R rotates; hold Alt to place freely. Stairs cut the floor above; lifts link with a lift in the same spot upstairs |
+| 5 Objects | Click to place; R turns by 45° and [ / ] change the step (90° down to 1°); hold F to pin it and turn it to face the mouse; hold Alt to place freely. Stairs cut the floor above; lifts link with a lift in the same spot upstairs |
 | 6 Room type | Click a room to mark it as a cell, canteen and so on |
 | 7 Demolish | Click an object or wall to remove it, or drag to clear an area |
 | 8 Terrain | Hold to raise, lower, flatten or smooth the ground; or add water to a hollow, or drain a pond |

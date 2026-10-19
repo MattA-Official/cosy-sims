@@ -90,6 +90,7 @@ func _ready() -> void:
 
 	_tool_group.allow_unpress = true
 	controller.tool_changed.connect(_on_tool_changed)
+	controller.hint_changed.connect(func() -> void: _hint.text = controller.hint())
 	_on_tool_changed(controller.tool)
 
 
@@ -125,6 +126,8 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 			_options.add_child(VSeparator.new())
 			_add_style_choices(PrisonCatalogue.FLOORS, true)
 		BuildController.Tool.WALL:
+			_add_wall_angle_choices()
+			_options.add_child(VSeparator.new())
 			_add_style_choices(PrisonCatalogue.WALLS, false)
 		BuildController.Tool.OBJECT:
 			_add_choices(PrisonCatalogue.OBJECTS, controller.object_def,
@@ -172,6 +175,18 @@ func _add_floor_mode_choices() -> void:
 			if on:
 				controller.floor_mode = mode
 				_hint.text = controller.hint())
+		_options.add_child(button)
+
+
+func _add_wall_angle_choices() -> void:
+	var group := ButtonGroup.new()
+	for entry: Array in [[false, "Straight and 45°"], [true, "Any angle"]]:
+		var any: bool = entry[0]
+		var button := _make_button(entry[1], group)
+		button.button_pressed = controller.any_angle == any
+		button.toggled.connect(func(on: bool) -> void:
+			if on:
+				controller.any_angle = any)
 		_options.add_child(button)
 
 

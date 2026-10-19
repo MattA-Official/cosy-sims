@@ -8,6 +8,8 @@ extends Node3D
 ## tools (terrain, plants) act for as long as the button is held.
 
 signal tool_changed(tool: Tool)
+## The hint text has changed without the tool changing.
+signal hint_changed
 
 enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH }
 enum WaterMode { NONE, ADD, REMOVE }
@@ -23,10 +25,10 @@ const NUDGE_UP := 0.75
 const HINTS := {
 	Tool.NONE: "",
 	Tool.ROOM: "Drag to build a walled room.",
-	Tool.FLOOR: "Drag to lay or restyle floor. Hold Ctrl to remove floor.",
+	Tool.FLOOR: "Drag to lay or restyle floor on this side of any walls. Shift-click for the whole room, Ctrl to remove.",
 	Tool.WALL: "Drag between corners to build or restyle walls. Hold Alt for any angle, Ctrl to remove.",
 	Tool.OPENING: "Click a wall to put in a door or window. Click it again to fill it in.",
-	Tool.OBJECT: "Click to place. R rotates. Hold Alt to place freely.",
+	Tool.OBJECT: "Click to place. R turns it by %s°; [ and ] change the step. Hold F to turn it freely, Alt to place freely.",
 	Tool.ROOM_TYPE: "Click a room to mark it.",
 	Tool.DEMOLISH: "Click an object or wall to remove it, or drag to clear an area.",
 	Tool.TERRAIN: "Hold the mouse to shape your land. [ and ] change the brush size.",
@@ -111,7 +113,10 @@ var object_def: ObjectDef
 ## Styles used by the room, floor and wall tools.
 var floor_style: StringName = BuildingMap.DEFAULT_FLOOR
 var wall_style: StringName = BuildingMap.DEFAULT_WALL
-var object_rotation := 0
+## How far placed objects are turned, in radians.
+var object_angle := 0.0
+## How far R turns an object, in degrees; [ and ] step through ROTATION_STEPS.
+var rotation_step := 45.0
 ## The room type the room type tool applies. Null clears a room's type.
 var room_type: RoomTypeDef
 ## What the opening tool puts in: Wall.DOOR or Wall.WINDOW, and which kind
@@ -122,6 +127,8 @@ var terrain_brush := Terrain.Brush.RAISE
 ## When not NONE, the terrain tool adds or removes water instead of sculpting.
 var water_mode := WaterMode.NONE
 var floor_mode := FloorMode.LAY
+## Walls go at any angle between corners, not just straight or 45°.
+var any_angle := false
 var plant_def: FoliageDef
 ## Brush radius in tiles, for the terrain and plant tools.
 var brush_radius := 3.0
@@ -140,6 +147,10 @@ var _preview_material := MeshShapes.vertex_colour_material(true)
 ## [centre, half extents, colour] per box, or [centre, half along, colour,
 ## half across, half height] for a box at an angle.
 var _preview_boxes: Array[Array] = []
+var _preview_polygons: Array[Array] = [] ## [points, colour] per flat polygon.
+var _drag_start_point := Vector2.ZERO
+var _free_rotating := false
+var _rotate_anchor := Vector2.ZERO
 var _path_preview := MeshInstance3D.new()
 var _brushing := false
 var _flatten_target := 0.0
@@ -168,6 +179,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_update_hover()
+	_update_free_rotate()
 	if _brushing and _has_hover:
 		_apply_brush(delta)
 	if tool == Tool.PATH and _has_hover:
@@ -198,7 +210,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			tool = Tool.NONE
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_rotate") and tool == Tool.OBJECT:
-		object_rotation = (object_rotation + 1) % 4
+		object_angle = wrapf(snappedf(object_angle + deg_to_rad(rotation_step), deg_to_rad(rotation_step)),
+				0.0, TAU)
+		get_viewport().set_input_as_handled()
+	elif tool == Tool.OBJECT and (event.is_action_pressed("build_brush_smaller")
+			or event.is_action_pressed("build_brush_bigger")):
+		var index := ROTATION_STEPS.find(rotation_step)
+		index += 1 if event.is_action_pressed("build_brush_smaller") else -1
+		rotation_step = ROTATION_STEPS[clampi(index, 0, ROTATION_STEPS.size() - 1)]
+		hint_changed.emit()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_brush_smaller") and _uses_brush():
 		brush_radius = maxf(brush_radius - 1.0, min_brush_radius)
@@ -222,6 +242,7 @@ func _on_press() -> void:
 		Tool.ROOM, Tool.FLOOR, Tool.DEMOLISH:
 			_dragging = true
 			_drag_start_cell = _hover_cell()
+			_drag_start_point = _hover_point
 		Tool.WALL:
 			_dragging = true
 			_drag_start_corner = _hover_corner()
@@ -239,8 +260,8 @@ func _on_press() -> void:
 			else:
 				map.set_opening(edge, opening, window_kind)
 		Tool.OBJECT:
-			if object_def != null and _can_place(_object_position()):
-				map.place_object(object_def, _object_position(), object_rotation)
+			if object_def != null and _can_place(_object_centre()):
+				map.place_object_at(object_def, _object_centre(), object_angle)
 		Tool.ROOM_TYPE:
 			var room := map.room_at_point(_hover_point)
 			if room != null:
@@ -268,6 +289,7 @@ func _on_release() -> void:
 		return
 	var rect := _drag_rect()
 	var ramp := planned_ramp()
+	var chosen := planned_floor() if tool == Tool.FLOOR else ([] as Array[TilePiece])
 	_dragging = false
 	var erase := _erasing()
 	match tool:
@@ -281,16 +303,13 @@ func _on_release() -> void:
 				map.add_ramp(ramp.rect, ramp.rise, ramp.low, ramp.high)
 		Tool.FLOOR when floor_mode != FloorMode.LAY:
 			nudge_floors(rect, NUDGE_STEP if floor_mode == FloorMode.RAISE else -NUDGE_STEP)
-		Tool.FLOOR when rect.size == Vector2i.ONE and map.pieces(rect.position).size() > 1:
-			# One tile cut by an angled wall: lay or lift just the piece clicked.
-			if not map.set_piece_floor(_hover_point, not erase) and not erase:
-				map.fill_floor(rect, floor_style, build_height(rect))
 		Tool.FLOOR:
 			if erase:
-				map.clear_floor(rect)
-			elif can_build_floor(rect):
-				map.fill_floor(rect, floor_style, build_height(rect))
-				settle_ground(rect)
+				map.set_piece_floors(chosen, &"")
+			elif not chosen.is_empty():
+				var area := _pieces_bounds(chosen)
+				map.set_piece_floors(chosen, floor_style, build_height(area))
+				settle_ground(area)
 		Tool.WALL:
 			var end := _wall_end_corner()
 			var edges := BuildingMap.edges_on_line(_drag_start_corner, end)
@@ -331,6 +350,8 @@ func hint() -> String:
 		return WATER_HINTS[water_mode]
 	if tool == Tool.PATH:
 		return PATH_HINTS[path_tool.mode]
+	if tool == Tool.OBJECT:
+		return HINTS[tool] % String.num(rotation_step)
 	return HINTS[tool]
 
 
@@ -399,6 +420,35 @@ func nudge_floors(rect: Rect2i, amount: float) -> int:
 	return count
 
 
+## The pieces of floor the current drag would lay, restyle or take up: those
+## on the same side of any walls as where the drag began, inside the drag.
+## With Shift, the whole walled-in area under the mouse, or the room there if
+## it is not walled in. Pieces that can't take floor are left out.
+func planned_floor() -> Array[TilePiece]:
+	var chosen: Array[TilePiece] = []
+	if Input.is_action_pressed("build_whole_room"):
+		chosen = map.pieces_within_walls(_hover_point, Rect2i(), WHOLE_ROOM_LIMIT)
+		var room := map.room_at_point(_hover_point)
+		if chosen.is_empty() and room != null:
+			for id in room.pieces:
+				chosen.append(map.pieces(Vector2i(id.x, id.y))[id.z])
+	elif _dragging:
+		chosen = map.pieces_within_walls(_drag_start_point, _drag_rect())
+	else:
+		chosen = map.pieces_within_walls(_hover_point, _drag_rect())
+	if _erasing():
+		return chosen
+	return chosen.filter(func(piece: TilePiece) -> bool:
+		return can_build_floor(Rect2i(piece.cell, Vector2i.ONE)))
+
+
+func _pieces_bounds(chosen: Array[TilePiece]) -> Rect2i:
+	var bounds := Rect2i(chosen[0].cell, Vector2i.ONE)
+	for piece in chosen:
+		bounds = bounds.expand(piece.cell).merge(Rect2i(piece.cell, Vector2i.ONE))
+	return bounds
+
+
 ## The ramp the current drag would lay: climbing from where the drag began
 ## towards where it is now, from the floor before its foot to the floor past
 ## its top. Null when it cannot go there.
@@ -444,8 +494,8 @@ func can_build_floor(rect: Rect2i) -> bool:
 
 func _can_place(position: Vector2) -> bool:
 	if building != null:
-		return building.can_place(_level(), object_def, position, object_rotation)
-	return map.can_place(object_def, position, object_rotation)
+		return building.can_place(_level(), object_def, position, object_angle)
+	return map.can_place_at(object_def, position, object_angle)
 
 
 ## The level being built on: 0 without a building.
@@ -561,12 +611,39 @@ func _drag_rect() -> Rect2i:
 	return BuildingMap.rect_between(start, end)
 
 
-## Where the object being placed would go, centred on the mouse.
-func _object_position() -> Vector2:
+## Where the middle of the object being placed would go: under the mouse,
+## snapped as the object likes. Square-on objects line up with tiles; turned
+## ones snap their middle to half or quarter tiles. While F is held the
+## object stays put and turns to face the mouse instead.
+func _object_centre() -> Vector2:
+	if _free_rotating:
+		return _rotate_anchor
 	var snap := object_def.snap
 	if Input.is_action_pressed("build_free_place"):
 		snap = ObjectDef.Snap.FREE
-	return BuildingMap.snapped_position(object_def, _hover_point, object_rotation, snap)
+	var quarter := object_angle / (PI * 0.5)
+	if is_equal_approx(quarter, roundf(quarter)):
+		var turns := posmod(roundi(quarter), 4)
+		var corner := BuildingMap.snapped_position(object_def, _hover_point, turns, snap)
+		return BuildingMap.object_rect(object_def, corner, turns).get_center()
+	match snap:
+		ObjectDef.Snap.TILE:
+			return _hover_point.snapped(Vector2(0.5, 0.5))
+		ObjectDef.Snap.QUARTER:
+			return _hover_point.snapped(Vector2(0.25, 0.25))
+	return _hover_point
+
+
+## Holding F pins the object where it is and turns it to face the mouse.
+func _update_free_rotate() -> void:
+	var held := tool == Tool.OBJECT and object_def != null \
+			and Input.is_action_pressed("build_free_rotate")
+	if held and not _free_rotating:
+		_rotate_anchor = _object_centre()
+	_free_rotating = held
+	if held and _hover_point.distance_to(_rotate_anchor) > 0.3:
+		# Point the object's length (its +Z side) at the mouse.
+		object_angle = wrapf((_hover_point - _rotate_anchor).angle() - PI * 0.5, 0.0, TAU)
 
 
 ## Walls go in straight lines, so snap to whichever axis the drag follows most.
@@ -574,7 +651,7 @@ func _object_position() -> Vector2:
 ## any angle while Alt is held.
 func _wall_end_corner() -> Vector2i:
 	var corner := _hover_corner()
-	if Input.is_action_pressed("build_free_place"):
+	if any_angle or Input.is_action_pressed("build_free_place"):
 		return corner
 	var delta := corner - _drag_start_corner
 	var size := maxi(absi(delta.x), absi(delta.y))
@@ -589,6 +666,10 @@ func _wall_end_corner() -> Vector2i:
 
 
 const NO_SLANT := Vector4i(-1, -1, -1, -1)
+## Steps R can turn objects by, in degrees, from coarse to fine.
+const ROTATION_STEPS: Array[float] = [90.0, 45.0, 22.5, 15.0, 5.0, 1.0]
+## The most pieces Shift-click floors at once; bigger areas are not rooms.
+const WHOLE_ROOM_LIMIT := 4000
 
 ## The angled wall nearest the mouse, if one is close enough to pick.
 func _hover_slant() -> Vector4i:
@@ -619,6 +700,7 @@ func _has_chosen_slant_opening(key: Vector4i) -> bool:
 func _draw_preview() -> void:
 	_preview_mesh.clear_surfaces()
 	_preview_boxes.clear()
+	_preview_polygons.clear()
 	_draw_path_preview()
 	if map == null or tool == Tool.NONE or not _has_hover:
 		return
@@ -643,12 +725,12 @@ func _draw_preview() -> void:
 					cells.append(cell)
 			_preview_cells(cells, ok_colour)
 		Tool.FLOOR:
-			var rect := _drag_rect()
-			if _erasing():
-				_preview_cells(BuildingMap.cells_in(rect), demolish_colour)
+			var chosen := planned_floor()
+			if chosen.is_empty():
+				_preview_cells([_hover_cell()], bad_colour)
 			else:
-				_preview_cells(BuildingMap.cells_in(rect),
-						ok_colour if can_build_floor(rect) else bad_colour, _preview_height(rect))
+				var height := NAN if _erasing() else _preview_height(_pieces_bounds(chosen))
+				_preview_pieces(chosen, demolish_colour if _erasing() else ok_colour, height)
 		Tool.TERRAIN when water_mode != WaterMode.NONE:
 			_preview_water()
 		Tool.TERRAIN, Tool.PLANTS:
@@ -692,19 +774,26 @@ func _draw_preview() -> void:
 			_preview_edge(edge, ok_colour if ok else bad_colour)
 		Tool.OBJECT:
 			if object_def != null:
-				var position := _object_position()
-				var ok := _can_place(position)
-				_preview_rect(BuildingMap.object_rect(object_def, position, object_rotation),
-						ok_colour if ok else bad_colour, object_def.height)
+				var centre := _object_centre()
+				var ok := _can_place(centre)
+				_preview_object(centre, ok_colour if ok else bad_colour)
 		Tool.ROOM_TYPE:
 			var room := map.room_at_point(_hover_point)
 			if room != null:
 				var colour := room_type.colour if room_type != null else Color.WHITE
 				colour.a = 0.45
 				_preview_cells(room.cells, colour)
-	if _preview_boxes.is_empty():
+	if _preview_boxes.is_empty() and _preview_polygons.is_empty():
 		return
 	_preview_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES, _preview_material)
+	for polygon in _preview_polygons:
+		var points: PackedVector3Array = polygon[0]
+		_preview_mesh.surface_set_normal(Vector3.UP)
+		_preview_mesh.surface_set_color(polygon[1])
+		# Both windings, so the slab shows whichever way the outline runs.
+		for i in range(1, points.size() - 1):
+			for vertex in [points[0], points[i], points[i + 1], points[0], points[i + 1], points[i]]:
+				_preview_mesh.surface_add_vertex(vertex)
 	for box in _preview_boxes:
 		if box.size() > 3:
 			MeshShapes.add_oriented_box_immediate(_preview_mesh, box[0], box[1], box[3], box[4], box[2])
@@ -779,6 +868,18 @@ func _draw_path_preview() -> void:
 
 ## Tile highlights. `base` sets one height for them all; by default each
 ## follows the ground.
+## Thin slabs over pieces of tiles, following angled walls.
+func _preview_pieces(chosen: Array[TilePiece], colour: Color, base := NAN) -> void:
+	var cs := grid.cell_size
+	for piece in chosen:
+		var ground := base if not is_nan(base) else _ground_at(piece.centre())
+		var points := PackedVector3Array()
+		for point in piece.polygon:
+			var inset := point.lerp(piece.centre(), 0.04)
+			points.append(Vector3(inset.x * cs, ground + 0.06, inset.y * cs))
+		_preview_polygons.append([points, colour])
+
+
 func _preview_cells(cells: Array[Vector2i], colour: Color, base := NAN, height := 0.06) -> void:
 	var cs := grid.cell_size
 	for cell in cells:
@@ -804,6 +905,17 @@ func _preview_rect(rect: Rect2, colour: Color, height: float) -> void:
 	var ground := _ground_at(rect.get_center())
 	_preview_boxes.append([Vector3(centre.x, ground + height * 0.5, centre.y),
 			Vector3(rect.size.x * cs * 0.5, height * 0.5, rect.size.y * cs * 0.5), colour])
+
+
+## The object being placed, turned as it will go.
+func _preview_object(centre: Vector2, colour: Color) -> void:
+	var cs := grid.cell_size
+	var half := object_def.size * 0.5 * cs
+	var along := Vector2(1, 0).rotated(object_angle)
+	var height := object_def.height
+	_preview_boxes.append([Vector3(centre.x * cs, _ground_at(centre) + height * 0.5, centre.y * cs),
+			Vector3(along.x, 0.0, along.y) * half.x, colour,
+			Vector3(-along.y, 0.0, along.x) * half.y, height * 0.5])
 
 
 ## A wall preview. `base` sets the height it stands at; by default it

@@ -124,10 +124,12 @@ func corner_in_use(corner: Vector2i) -> bool:
 
 
 ## Can an object go on a level? Stairs need a level above them.
-func can_place(n: int, def: ObjectDef, position: Vector2, rotation: int) -> bool:
+func can_place(n: int, def: ObjectDef, centre: Vector2, angle: float) -> bool:
 	if def.connects == ObjectDef.Connects.STAIRS and n >= MAX_LEVEL:
 		return false
-	return level(n).can_place(def, position, rotation)
+	if def.connects != ObjectDef.Connects.NONE:
+		angle = snappedf(angle, PI * 0.5)
+	return level(n).can_place_at(def, centre, angle)
 
 
 ## Every stair and lift link, both ways for stairs and lifts alike.

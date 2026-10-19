@@ -112,7 +112,8 @@ func _build_floors() -> void:
 		var type := room_type(room.type)
 		for id in room.pieces:
 			var cell := Vector2i(id.x, id.y)
-			var def := map.floor_def(map.floors[cell])
+			var piece: TilePiece = map.pieces(cell)[id.z]
+			var def := map.floor_def(map.piece_floor(piece))
 			var colour := def.colour if def != null else floor_colour
 			if type != null:
 				colour = colour.lerp(type.colour, 0.35)
@@ -124,7 +125,6 @@ func _build_floors() -> void:
 			var centre := Vector3(cell.x + 0.5, 0.0, cell.y + 0.5) * cs
 			# The top face takes the floor colour; the sides show as foundations
 			# reaching down into the ground.
-			var piece: TilePiece = map.pieces(cell)[id.z]
 			if not piece.is_whole():
 				_add_floor_piece(st, piece, top_y, bottom, colour * shade)
 				continue
@@ -274,6 +274,16 @@ func _add_wall_piece(st: SurfaceTool, glass: SurfaceTool, start: Vector2, end: V
 	# Stretch each piece by half a thickness so corners join up.
 	var half_len := along * (length + thickness) * 0.5
 	var half_across := across * thickness * 0.5
+	var opening := kind == BuildingMap.Wall.DOOR or kind == BuildingMap.Wall.WINDOW
+	if opening and length > cs + 0.01:
+		# Doors and windows keep their size in long angled walls: plain wall
+		# fills the rest either side.
+		var side := (length - cs) * 0.5
+		for sign in [-1.0, 1.0]:
+			_add_slab(st, middle + along * sign * (cs + side) * 0.5, along * (side + thickness) * 0.5,
+					half_across, -drop, height, colour, top)
+		length = cs
+		half_len = along * cs * 0.5
 	if kind == BuildingMap.Wall.DOOR:
 		_add_door(st, middle, half_len, half_across, height, full_height, colour, top)
 	elif kind == BuildingMap.Wall.WINDOW:
@@ -362,16 +372,18 @@ func _build_objects() -> void:
 			_add_stairs(placed)
 			continue
 		# Shrink a touch so neighbours and walls do not look fused together.
-		var margin := minf(0.1, minf(placed.rect.size.x, placed.rect.size.y) * 0.1)
+		var size := placed.def.size
+		var margin := minf(0.1, minf(size.x, size.y) * 0.1)
 		var box := BoxMesh.new()
-		box.size = Vector3((placed.rect.size.x - margin * 2.0) * cs, placed.def.height,
-				(placed.rect.size.y - margin * 2.0) * cs)
+		box.size = Vector3((size.x - margin * 2.0) * cs, placed.def.height, (size.y - margin * 2.0) * cs)
 		var instance := MeshInstance3D.new()
 		instance.mesh = box
 		instance.material_override = _object_material(placed.def.colour)
-		var centre := placed.rect.get_center() * cs
-		var ground := map.floor_height(Vector2i(placed.rect.get_center().floor()))
+		var centre := placed.centre * cs
+		var ground := map.floor_height(Vector2i(placed.centre.floor()))
 		instance.position = Vector3(centre.x, ground + 0.03 + placed.def.height * 0.5, centre.y)
+		# Turning about Y goes the other way to turning a Vector2 on the ground.
+		instance.rotation.y = -placed.angle
 		_objects.add_child(instance)
 
 
