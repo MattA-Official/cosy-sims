@@ -39,6 +39,7 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | 7 Demolish | Click an object or wall to remove it, or drag to clear an area |
 | 8 Terrain | Hold to raise, lower, flatten or smooth the ground; or add water to a hollow, or drain a pond |
 | 9 Plants | Hold to plant trees, bushes or flowers; hold Ctrl to clear them |
+| 0 Paths | Straight: click each end. Curved: click the start, a bend and the end. Freehand: drag. Esc stops; Ctrl-click removes a path |
 | [ / ] | Brush size, for terrain and plants |
 | Tab | Walls up or cut away |
 | Esc | Put the tool away |
@@ -56,6 +57,11 @@ and clears any plants, and the ground under buildings can't be sculpted.
 To make a pond, dig a hollow and click it with **Add water**. The
 water rises to the lowest point of the rim, and moves when you dig deeper
 or cut through the rim. Water stays off floors.
+
+Paths and roads are curves, not tiles. Ends snap to other paths (making
+a junction) and to outside doors. A path follows the ground, turns into
+steps where it's steep, and becomes a bridge over water. Paths stay on
+your own land and off floors, and building over a path removes it.
 
 Each floor remembers its own height. New floor lines up with any floor
 next to it, or else with the ground where you started dragging (rounded to

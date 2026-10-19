@@ -32,6 +32,12 @@ const PLANTS: Array[FoliageDef] = [
 	preload("res://games/prison/catalogue/plant_tulip.tres"),
 ]
 
+const PATHS: Array[PathStyleDef] = [
+	preload("res://games/prison/catalogue/path_gravel.tres"),
+	preload("res://games/prison/catalogue/path_paving.tres"),
+	preload("res://games/prison/catalogue/path_road.tres"),
+]
+
 const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_cell.tres"),
 	preload("res://games/prison/catalogue/room_canteen.tres"),

@@ -35,6 +35,8 @@ static func build(map: BuildingMap, at: Vector2i) -> void:
 	map.set_door(Vector3i(at.x + 3, at.y + 5, BuildingMap.EDGE_X), true)
 	map.set_door(Vector3i(at.x + 9, at.y + 5, BuildingMap.EDGE_X), true)
 	map.set_door(Vector3i(at.x + 12, at.y + 3, BuildingMap.EDGE_Z), true)
+	# The way in: a door at the west end of the corridor.
+	map.set_door(Vector3i(at.x, at.y + 3, BuildingMap.EDGE_Z), true)
 	for x: int in [1, 3, 5]:
 		map.set_opening(Vector3i(at.x + x, at.y + 10, BuildingMap.EDGE_X),
 				BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_GLASS)

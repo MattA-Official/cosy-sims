@@ -39,17 +39,25 @@ decisions are listed first within each section.
 
 ## Agreed direction
 
-### Paths and roads: off the grid
-Paths and roads will **not** be tile floors. They'll work like Cities:
-Skylines 2: you draw curved segments between nodes, and they snap to each
-other, to doors and to buildings rather than to the grid. In practice:
-- A `PathNetwork` of nodes and Bézier segments, each with a style (gravel
-  path, paving, road) and a width.
-- Meshes are generated along the curves, and they follow the terrain.
-- Junctions are made where segments meet, with simple rounded joins for
-  now.
-- Paths are outdoor-only. Grid floors stay for building interiors and
-  patios.
+### Paths and roads: off the grid (built)
+Paths and roads are **not** tile floors. They work like Cities: Skylines
+2 (`core/paths/`):
+- A `PathNetwork` of nodes and quadratic Bézier segments, each with a
+  style (`PathStyleDef`: gravel, paving, road) and a width.
+- The path tool has straight, curved (start, bend, end) and freehand
+  modes. Each path carries on from the last until Esc. Ends snap to
+  nodes, to the middle of segments (splitting them into a junction) and to
+  outside doors. Junctions and bends get a round pad.
+- `PathProfile` fits a path to the land: gentle slopes follow the ground,
+  stretches steeper than 0.35 rise per tile become steps, and stretches
+  over water become bridges running straight from bank to bank, at least
+  0.4 m above the water.
+- Paths are outdoor-only, stay on owned land, and can't cross floors
+  except right by their ends (to reach a door). Building over a path
+  removes it. Grid floors stay for interiors and patios; floors will
+  count as walkable paths when people arrive, with one-way paths later.
+- Not yet: rivers as downhill splines, paths across land you don't own,
+  and road junction shapes beyond round pads.
 
 ### Terrain, water and foliage (basics built)
 - **Terrain is a heightmap** (`core/terrain/terrain.gd`), one height per
@@ -90,7 +98,8 @@ links between areas. The tile grid stays the authority for rooms and
 building.
 
 ### Agreed order
-Debug view and windows (done), then water bodies (done), then spline paths (outdoors,
+Debug view and windows (done), then water bodies (done), then spline
+paths (done) (outdoors,
 sloping with the ground, steps where steep, bridges; floors also count as
 paths, with one-way paths later), then storeys (manual floor heights,
 stairs, ramps, staff-only lifts, basements), then people.

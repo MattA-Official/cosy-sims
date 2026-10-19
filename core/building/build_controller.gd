@@ -9,7 +9,7 @@ extends Node3D
 
 signal tool_changed(tool: Tool)
 
-enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS }
+enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH }
 enum WaterMode { NONE, ADD, REMOVE }
 
 const HINTS := {
@@ -23,6 +23,13 @@ const HINTS := {
 	Tool.DEMOLISH: "Click an object or wall to remove it, or drag to clear an area.",
 	Tool.TERRAIN: "Hold the mouse to shape your land. [ and ] change the brush size.",
 	Tool.PLANTS: "Hold the mouse to plant. Hold Ctrl to clear plants. [ and ] change the brush size.",
+	Tool.PATH: "",
+}
+
+const PATH_HINTS := {
+	PathTool.Mode.STRAIGHT: "Click to start a path and click again to end it. Esc stops. Ctrl-click removes a path.",
+	PathTool.Mode.CURVED: "Click the start, then a bend point, then the end. Esc stops. Ctrl-click removes a path.",
+	PathTool.Mode.FREEHAND: "Drag to draw a path; it is smoothed when you let go. Ctrl-click removes a path.",
 }
 
 const WATER_HINTS := {
@@ -39,6 +46,8 @@ const WATER_HINTS := {
 @export var foliage: FoliageLayer
 ## Optional: ponds and lakes for the terrain tool's water modes.
 @export var water: WaterLayer
+## Optional: draws paths, for the path tool.
+@export var path_view: PathView
 
 @export_group("Brushes")
 ## Metres per second at the middle of the brush when raising or lowering.
@@ -54,11 +63,22 @@ const WATER_HINTS := {
 @export var demolish_colour := Color(1.0, 0.3, 0.25, 0.4)
 @export var preview_wall_height := 1.0
 
-var map: BuildingMap
+var map: BuildingMap:
+	set(value):
+		map = value
+		path_tool.map = value
+## The paths the path tool edits. Set together with `map`.
+var paths: PathNetwork:
+	set(value):
+		paths = value
+		path_tool.network = value
+## The path tool's own state: its mode, style and the path being drawn.
+var path_tool := PathTool.new()
 var tool := Tool.NONE:
 	set(value):
 		tool = value
 		_dragging = false
+		path_tool.cancel()
 		tool_changed.emit(tool)
 var object_def: ObjectDef
 ## Styles used by the room, floor and wall tools.
@@ -90,6 +110,7 @@ var _has_hover := false
 var _preview_mesh := ImmediateMesh.new()
 var _preview_material := MeshShapes.vertex_colour_material(true)
 var _preview_boxes: Array[Array] = [] ## [centre, half extents, colour] per box.
+var _path_preview := MeshInstance3D.new()
 var _brushing := false
 var _flatten_target := 0.0
 var _plant_cooldown := 0.0
@@ -100,6 +121,12 @@ var _basin_dirty := true
 
 
 func _ready() -> void:
+	path_tool.view = path_view
+	path_tool.terrain = terrain
+	path_tool.foliage = foliage
+	_path_preview.material_override = _preview_material
+	_path_preview.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_path_preview)
 	for source: Node in [terrain, water]:
 		if source != null:
 			source.changed.connect(func() -> void: _basin_dirty = true)
@@ -113,6 +140,8 @@ func _process(delta: float) -> void:
 	_update_hover()
 	if _brushing and _has_hover:
 		_apply_brush(delta)
+	if tool == Tool.PATH and _has_hover:
+		path_tool.extend_trail(_hover_point)
 	_draw_preview()
 
 
@@ -123,6 +152,8 @@ func _input(event: InputEvent) -> void:
 		_brushing = false
 		if _dragging:
 			_on_release()
+		if tool == Tool.PATH and path_tool.mode == PathTool.Mode.FREEHAND and _has_hover:
+			path_tool.end_trail(_hover_point)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -131,6 +162,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("build_cancel"):
 		if _dragging:
 			_dragging = false
+		elif tool == Tool.PATH and path_tool.cancel():
+			pass
 		else:
 			tool = Tool.NONE
 		get_viewport().set_input_as_handled()
@@ -173,6 +206,13 @@ func _on_press() -> void:
 			var room := map.room_at(_hover_cell())
 			if room != null:
 				map.set_room_type(room, room_type.id if room_type != null else &"")
+		Tool.PATH:
+			if paths == null:
+				return
+			if path_tool.mode == PathTool.Mode.FREEHAND and not _erasing():
+				path_tool.begin_trail(_hover_point)
+			else:
+				path_tool.press(_hover_point, _erasing())
 		Tool.TERRAIN when water_mode != WaterMode.NONE:
 			if water != null and water_mode == WaterMode.ADD:
 				water.fill_at(_hover_cell())
@@ -229,6 +269,8 @@ func _on_release() -> void:
 func hint() -> String:
 	if tool == Tool.TERRAIN and water_mode != WaterMode.NONE:
 		return WATER_HINTS[water_mode]
+	if tool == Tool.PATH:
+		return PATH_HINTS[path_tool.mode]
 	return HINTS[tool]
 
 
@@ -238,6 +280,8 @@ func hint() -> String:
 func settle_ground(rect: Rect2i) -> void:
 	if foliage != null:
 		foliage.remove_in_rect(Rect2(rect))
+	if paths != null:
+		paths.remove_in_rect(Rect2(rect))
 	if terrain == null:
 		return
 	var heights := {}
@@ -393,6 +437,7 @@ func _wall_end_corner() -> Vector2i:
 func _draw_preview() -> void:
 	_preview_mesh.clear_surfaces()
 	_preview_boxes.clear()
+	_draw_path_preview()
 	if map == null or tool == Tool.NONE or not _has_hover:
 		return
 	match tool:
@@ -510,6 +555,15 @@ func _ground_at(point: Vector2) -> float:
 	if map.has_floor(cell):
 		return map.floor_height(cell)
 	return terrain.height_at(point) if terrain != null else 0.0
+
+
+func _draw_path_preview() -> void:
+	_path_preview.mesh = null
+	if tool == Tool.PATH and _has_hover and paths != null and path_view != null and map != null:
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		path_tool.preview(st, _hover_point, ok_colour, bad_colour)
+		_path_preview.mesh = st.commit()
 
 
 ## Tile highlights. `base` sets one height for them all; by default each

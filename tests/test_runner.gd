@@ -19,6 +19,8 @@ func _process(_delta: float) -> bool:
 	_test_windows()
 	_test_terrain()
 	_test_water()
+	_test_path_network()
+	_test_path_profile()
 	_test_foliage()
 	_test_main_scene_loads()
 	if _failures == 0:
@@ -407,6 +409,57 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	_check(water.body_at(cell.call(8, 30)) == null, "terrain tool drains a pond")
 	controller.water_mode = BuildController.WaterMode.NONE
 
+	# Paths: a straight path, chained on, a curve, freehand, and removal.
+	var paths := controller.paths
+	controller.tool = BuildController.Tool.PATH
+	controller.path_tool.style = &"gravel"
+	controller.path_tool.mode = PathTool.Mode.STRAIGHT
+	hover.call(2.0, 44.0)
+	controller._on_press()
+	hover.call(10.0, 44.0)
+	controller._draw_preview()
+	controller._on_press()
+	_check(paths.segments.size() == 1, "path tool draws a straight path")
+	hover.call(10.0, 46.0)
+	controller._on_press()
+	_check(paths.segments.size() == 2, "the next click carries the path on")
+	controller.path_tool.cancel()
+	hover.call(-3.0, 44.0)
+	controller._on_press()
+	hover.call(2.0, 44.0)
+	controller._on_press()
+	_check(paths.segments.size() == 2, "paths stay on your own land")
+	controller.path_tool.cancel()
+	controller.path_tool.mode = PathTool.Mode.CURVED
+	hover.call(12.0, 40.0)
+	controller._on_press()
+	hover.call(16.0, 36.0)
+	controller._on_press()
+	hover.call(20.0, 40.0)
+	controller._draw_preview()
+	controller._on_press()
+	_check(paths.segments.size() == 3, "curved mode takes a start, a bend and an end")
+	controller.path_tool.cancel()
+	controller.path_tool.mode = PathTool.Mode.FREEHAND
+	hover.call(24.0, 42.0)
+	controller._on_press()
+	for i in 20:
+		controller.path_tool.extend_trail(base + Vector2(24.0 + i * 0.6, 42.0 + sin(i * 0.4) * 2.0))
+	controller.path_tool.end_trail(base + Vector2(36.0, 44.0))
+	_check(paths.segments.size() >= 6, "freehand turns a drag into a chain of curves")
+	map.build_room(Rect2i(cell.call(30, 2), Vector2i(3, 3)))
+	map.set_door(Vector3i(cell.call(31, 5).x, cell.call(31, 5).y, BuildingMap.EDGE_X), true)
+	var door: Vector2 = controller.path_tool.door_points()[0]
+	_check(controller.path_tool.snap(door + Vector2(0.3, 0.3)) == door, "path ends snap to doors")
+	controller.force_erase = true
+	controller.path_tool.mode = PathTool.Mode.STRAIGHT
+	hover.call(6.0, 44.1)
+	controller._on_press()
+	controller.force_erase = false
+	_check(paths.segments.size() >= 5 and paths.closest(base + Vector2(6, 44))[2] > 1.0,
+			"Ctrl-click removes a path")
+	controller.path_view.rebuild()
+
 
 func _test_windows() -> void:
 	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
@@ -516,6 +569,56 @@ func _test_water() -> void:
 	# Filling the whole bowl flat drains it.
 	terrain.generate(func(_corner: Vector2i) -> float: return 1.0)
 	_check(water.bodies.is_empty(), "flattening the ground drains the pond")
+	water.free()
+	terrain.free()
+
+
+func _test_path_network() -> void:
+	var paths := PathNetwork.new()
+	var first := paths.add_segment(Vector2(0, 0), Vector2(10, 0))
+	_check(paths.nodes.size() == 2 and paths.segments.size() == 1, "a segment adds two nodes")
+	var second := paths.add_segment(Vector2(10.3, 0.2), Vector2(10, 8))
+	_check(second.a == first.b and paths.nodes.size() == 3, "an end near a node joins it")
+	paths.add_segment(Vector2(5, 0.3), Vector2(5, -6))
+	_check(paths.segments.size() == 4 and paths.nodes.size() == 5, "an end on a segment splits it into a junction")
+	var junction := paths.node_near(Vector2(5, 0))
+	_check(junction != -1 and paths.segments_at(junction).size() == 3, "the junction joins three segments")
+	_check(paths.add_segment(Vector2(1, 1), Vector2(1.2, 1.1)) == null, "a segment needs two different ends")
+	var curved := paths.add_segment(Vector2(20, 0), Vector2(30, 0), Vector2(25, 5))
+	var top := paths.point_on(curved, 0.5)
+	_check(absf(top.y - 2.5) < 0.01 and paths.length(curved) > 10.5, "the control point bends the curve")
+	var mid := paths.split(curved, 0.5)
+	_check(paths.node_position(mid).distance_to(top) < 0.01, "splitting keeps the shape")
+	_check(paths.remove_segment(curved.id) and not paths.nodes.has(curved.a), "removing a segment drops lonely nodes")
+	_check(paths.remove_in_rect(Rect2(4, -7, 2, 5)) == 1, "remove_in_rect removes paths running through it")
+
+
+func _test_path_profile() -> void:
+	var terrain := Terrain.new()
+	terrain.size = Vector2i(30, 10)
+	var water := WaterLayer.new()
+	water.terrain = terrain
+	terrain.water = water
+	# Flat at 1 m, a steep step up to 3 m at x = 20, and a pond around x = 8.
+	terrain.generate(func(corner: Vector2i) -> float:
+		if corner.x >= 20:
+			return 3.0
+		if corner.x >= 6 and corner.x <= 10 and corner.y >= 3 and corner.y <= 7:
+			return -0.5
+		return 1.0)
+	water.fill_at(Vector2i(8, 5))
+	var flat := PathProfile.build(PathNetwork.sample_curve(Vector2(1, 5), Vector2(2, 5), Vector2(4, 5)), terrain)
+	_check(not flat.has_kind(PathProfile.Kind.STEPS) and not flat.has_kind(PathProfile.Kind.BRIDGE),
+			"a flat path stays on the ground")
+	var over := PathProfile.build(PathNetwork.sample_curve(Vector2(3, 5), Vector2(8, 5), Vector2(13, 5)), terrain)
+	_check(over.has_kind(PathProfile.Kind.BRIDGE), "a path over the pond becomes a bridge")
+	var lowest := INF
+	for i in over.points.size():
+		if over.points[i].x > 6.5 and over.points[i].x < 9.5:
+			lowest = minf(lowest, over.heights[i])
+	_check(lowest >= water.bodies[0].level + PathProfile.BRIDGE_CLEARANCE - 0.01, "the bridge stays above the water")
+	var up := PathProfile.build(PathNetwork.sample_curve(Vector2(17, 2), Vector2(19.5, 2), Vector2(22, 2)), terrain)
+	_check(up.has_kind(PathProfile.Kind.STEPS), "a steep path becomes steps")
 	water.free()
 	terrain.free()
 

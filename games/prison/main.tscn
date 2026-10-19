@@ -12,6 +12,7 @@
 [ext_resource type="Script" path="res://core/terrain/foliage_layer.gd" id="10_foliage"]
 [ext_resource type="Script" path="res://core/debug/debug_overlay.gd" id="11_debug"]
 [ext_resource type="Script" path="res://core/terrain/water_layer.gd" id="12_water"]
+[ext_resource type="Script" path="res://core/paths/path_view.gd" id="13_paths"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ground"]
 render_priority = 0
@@ -73,12 +74,16 @@ terrain = NodePath("../Terrain")
 script = ExtResource("10_foliage")
 terrain = NodePath("../Terrain")
 
+[node name="PathView" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("terrain")]
+script = ExtResource("13_paths")
+terrain = NodePath("../Terrain")
+
 [node name="BuildingView" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid", "terrain")]
 script = ExtResource("6_view")
 grid = NodePath("..")
 terrain = NodePath("../Terrain")
 
-[node name="BuildController" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid", "camera_rig", "view", "terrain", "foliage", "water")]
+[node name="BuildController" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid", "camera_rig", "view", "terrain", "foliage", "water", "path_view")]
 script = ExtResource("7_build")
 grid = NodePath("..")
 camera_rig = NodePath("../../CameraRig")
@@ -86,6 +91,7 @@ view = NodePath("../BuildingView")
 terrain = NodePath("../Terrain")
 foliage = NodePath("../Foliage")
 water = NodePath("../Water")
+path_view = NodePath("../PathView")
 
 [node name="DebugOverlay" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("cursor", "terrain", "foliage")]
 visible = false

@@ -10,12 +10,14 @@ extends Node3D
 @onready var terrain: Terrain = $BuildGrid/Terrain
 @onready var foliage: FoliageLayer = $BuildGrid/Foliage
 @onready var water: WaterLayer = $BuildGrid/Water
+@onready var path_view: PathView = $BuildGrid/PathView
 @onready var debug_overlay: DebugOverlay = $BuildGrid/DebugOverlay
 @onready var camera_rig: CameraRig = $CameraRig
 @onready var cursor: GridCursor = $GridCursor
 @onready var cell_label: Label = $HUD/CellLabel
 
 var map: BuildingMap
+var paths := PathNetwork.new()
 
 
 func _ready() -> void:
@@ -26,6 +28,9 @@ func _ready() -> void:
 	view.room_types = PrisonCatalogue.ROOM_TYPES
 	view.map = map
 	controller.map = map
+	controller.paths = paths
+	path_view.styles = PrisonCatalogue.PATHS
+	path_view.network = paths
 	debug_overlay.room_types = PrisonCatalogue.ROOM_TYPES
 	debug_overlay.map = map
 

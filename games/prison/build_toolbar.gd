@@ -1,7 +1,7 @@
 extends VBoxContainer
 ## The build toolbar along the bottom of the screen: a row of tools, a row of
 ## choices for the current tool (which object, which room type), and a hint.
-## Number keys 1 to 9 pick tools.
+## Number keys 1 to 9, then 0, pick tools.
 
 @export var controller: BuildController
 
@@ -15,6 +15,13 @@ const TOOLS := [
 	[BuildController.Tool.DEMOLISH, "Demolish"],
 	[BuildController.Tool.TERRAIN, "Terrain"],
 	[BuildController.Tool.PLANTS, "Plants"],
+	[BuildController.Tool.PATH, "Paths"],
+]
+
+const PATH_MODES := [
+	[PathTool.Mode.STRAIGHT, "Straight"],
+	[PathTool.Mode.CURVED, "Curved"],
+	[PathTool.Mode.FREEHAND, "Freehand"],
 ]
 
 const OPENINGS := [
@@ -62,7 +69,7 @@ func _ready() -> void:
 	add_child(tools)
 	for i in TOOLS.size():
 		var tool: BuildController.Tool = TOOLS[i][0]
-		var button := _make_button("%d  %s" % [i + 1, TOOLS[i][1]], _tool_group)
+		var button := _make_button("%d  %s" % [(i + 1) % 10, TOOLS[i][1]], _tool_group)
 		button.toggled.connect(func(on: bool) -> void:
 			if on:
 				controller.tool = tool
@@ -88,7 +95,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return
-	var index := key.physical_keycode - KEY_1
+	var index := 9 if key.physical_keycode == KEY_0 else key.physical_keycode - KEY_1
 	if index >= 0 and index < TOOLS.size():
 		var tool: BuildController.Tool = TOOLS[index][0]
 		controller.tool = BuildController.Tool.NONE if controller.tool == tool else tool
@@ -120,6 +127,8 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 			_add_opening_choices()
 		BuildController.Tool.TERRAIN:
 			_add_brush_choices()
+		BuildController.Tool.PATH:
+			_add_path_choices()
 		BuildController.Tool.PLANTS:
 			_add_choices(PrisonCatalogue.PLANTS, controller.plant_def,
 					func(def: Resource) -> void: controller.plant_def = def)
@@ -141,6 +150,32 @@ func _add_style_choices(defs: Array, floors: bool) -> void:
 				controller.floor_style = id
 			else:
 				controller.wall_style = id)
+		_options.add_child(button)
+
+
+func _add_path_choices() -> void:
+	var modes := ButtonGroup.new()
+	for entry: Array in PATH_MODES:
+		var mode: PathTool.Mode = entry[0]
+		var button := _make_button(entry[1], modes)
+		button.button_pressed = controller.path_tool.mode == mode
+		button.toggled.connect(func(on: bool) -> void:
+			if on:
+				controller.path_tool.cancel()
+				controller.path_tool.mode = mode
+				_hint.text = controller.hint())
+		_options.add_child(button)
+	_options.add_child(VSeparator.new())
+	if controller.path_tool.style.is_empty():
+		controller.path_tool.style = PrisonCatalogue.PATHS[0].id
+	var styles := ButtonGroup.new()
+	for def in PrisonCatalogue.PATHS:
+		var button := _make_button(def.display_name, styles)
+		button.button_pressed = controller.path_tool.style == def.id
+		var id := def.id
+		button.toggled.connect(func(on: bool) -> void:
+			if on:
+				controller.path_tool.style = id)
 		_options.add_child(button)
 
 
