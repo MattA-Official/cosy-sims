@@ -52,6 +52,7 @@ directional_shadow_max_distance = 120.0
 
 [node name="BuildGrid" type="Node3D" parent="."]
 script = ExtResource("2_grid")
+size = Vector2i(96, 96)
 ground_material = SubResource("ShaderMaterial_ground")
 
 [node name="BuildingView" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid")]

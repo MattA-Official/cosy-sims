@@ -82,12 +82,39 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 	for child in _options.get_children():
 		child.queue_free()
 	match tool:
+		BuildController.Tool.ROOM:
+			_add_style_choices(PrisonCatalogue.FLOORS, true)
+			_options.add_child(VSeparator.new())
+			_add_style_choices(PrisonCatalogue.WALLS, false)
+		BuildController.Tool.FLOOR:
+			_add_style_choices(PrisonCatalogue.FLOORS, true)
+		BuildController.Tool.WALL:
+			_add_style_choices(PrisonCatalogue.WALLS, false)
 		BuildController.Tool.OBJECT:
 			_add_choices(PrisonCatalogue.OBJECTS, controller.object_def,
 					func(def: Resource) -> void: controller.object_def = def)
 		BuildController.Tool.ROOM_TYPE:
 			_add_choices(PrisonCatalogue.ROOM_TYPES, controller.room_type,
 					func(def: Resource) -> void: controller.room_type = def, "Clear")
+
+
+## Floor or wall style buttons, with outdoor styles marked.
+func _add_style_choices(defs: Array, floors: bool) -> void:
+	var current: StringName = controller.floor_style if floors else controller.wall_style
+	var group := ButtonGroup.new()
+	for def: Resource in defs:
+		var label: String = def.display_name + (" (outdoor)" if def.outdoor else "")
+		var button := _make_button(label, group)
+		button.button_pressed = def.id == current
+		var id: StringName = def.id
+		button.toggled.connect(func(on: bool) -> void:
+			if not on:
+				return
+			if floors:
+				controller.floor_style = id
+			else:
+				controller.wall_style = id)
+		_options.add_child(button)
 
 
 ## One toggle button per definition. The first is picked if nothing is yet.

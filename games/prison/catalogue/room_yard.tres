@@ -7,5 +7,5 @@ script = ExtResource("1_def")
 id = &"yard"
 display_name = "Yard"
 colour = Color(0.6, 0.9, 0.55, 1)
-needs_enclosure = false
+location = 1
 required_tags = Array[StringName]([])

@@ -5,8 +5,10 @@ extends Resource
 @export var id: StringName
 @export var display_name: String
 @export var colour := Color.WHITE
-## Most rooms need walls all round; a yard does not.
-@export var needs_enclosure := true
+enum Location { INDOORS, OUTDOORS, EITHER }
+
+## Most rooms need to be indoors; a yard needs to be outdoors.
+@export var location := Location.INDOORS
 ## Each tag needs at least one object carrying it inside the room.
 @export var required_tags: Array[StringName] = []
 
@@ -14,8 +16,10 @@ extends Resource
 ## What is stopping this room from working, in words. Empty means it is fine.
 func problems(room: Room, map: BuildingMap) -> PackedStringArray:
 	var out := PackedStringArray()
-	if needs_enclosure and not room.enclosed:
+	if location == Location.INDOORS and not room.indoor:
 		out.append("Needs walls all round")
+	elif location == Location.OUTDOORS and room.indoor:
+		out.append("Needs to be outdoors")
 	var present := {}
 	for placed in map.objects_in_room(room):
 		for tag in placed.def.tags:

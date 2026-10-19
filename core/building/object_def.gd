@@ -5,8 +5,16 @@ extends Resource
 
 @export var id: StringName
 @export var display_name: String
-## Footprint in cells before rotation: x across, y deep.
-@export var size := Vector2i.ONE
+enum Snap {
+	TILE, ## Lines up with whole tiles, like beds and tables.
+	QUARTER, ## Quarter-tile steps, for smaller things.
+	FREE, ## Anywhere, for decorations.
+}
+
+## Footprint in tiles before rotation: x across, y deep. Can be fractional.
+@export var size := Vector2.ONE
+## How placement snaps. Holding Alt places freely whatever this says.
+@export var snap := Snap.TILE
 ## Placeholder box height in metres.
 @export var height := 0.6
 @export var colour := Color.WHITE

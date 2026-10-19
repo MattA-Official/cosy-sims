@@ -12,6 +12,9 @@ func _process(_delta: float) -> bool:
 	_test_rooms()
 	_test_room_types()
 	_test_objects()
+	_test_snapping()
+	_test_styles_and_indoors()
+	_test_land()
 	_test_demolish()
 	_test_main_scene_loads()
 	if _failures == 0:
@@ -55,11 +58,11 @@ func _test_edges() -> void:
 
 
 func _test_rooms() -> void:
-	var map := BuildingMap.new(Vector2i(20, 20))
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
 	map.fill_floor(Rect2i(0, 0, 4, 4))
 	_check(map.rooms().size() == 1 and not map.rooms()[0].enclosed, "bare floor is one open room")
 
-	map = BuildingMap.new(Vector2i(20, 20))
+	map = BuildingMap.new(Rect2i(0, 0, 20, 20))
 	map.build_room(Rect2i(2, 2, 4, 3))
 	_check(map.rooms().size() == 1 and map.rooms()[0].enclosed, "built room is enclosed")
 	_check(map.rooms()[0].cells.size() == 12, "room has every cell")
@@ -81,14 +84,14 @@ func _test_rooms() -> void:
 
 func _test_room_types() -> void:
 	var cell_type := PrisonCatalogue.room_type(&"cell")
-	var map := BuildingMap.new(Vector2i(20, 20))
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
 	map.build_room(Rect2i(0, 0, 6, 3))
 	map.set_room_type(map.room_at(Vector2i.ZERO), &"cell")
 	_check(map.room_at(Vector2i(5, 2)).type == &"cell", "room type covers the room")
 	_check(Array(cell_type.problems(map.room_at(Vector2i.ZERO), map)) == ["Needs a bed", "Needs a toilet"],
 			"empty cell lists what it needs")
-	map.place_object(PrisonCatalogue.object(&"bed"), Vector2i(0, 0), 0)
-	map.place_object(PrisonCatalogue.object(&"toilet"), Vector2i(1, 0), 0)
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(0, 0), 0)
+	map.place_object(PrisonCatalogue.object(&"toilet"), Vector2(1, 0), 0)
 	_check(cell_type.problems(map.room_at(Vector2i.ZERO), map).is_empty(), "furnished cell is fine")
 
 	# Splitting keeps the type on both halves; extending spreads it.
@@ -104,29 +107,81 @@ func _test_room_types() -> void:
 
 func _test_objects() -> void:
 	var bed := PrisonCatalogue.object(&"bed")
-	var map := BuildingMap.new(Vector2i(20, 20))
-	_check(map.place_object(bed, Vector2i(1, 1), 0) == 0, "objects need floor")
+	var toilet := PrisonCatalogue.object(&"toilet")
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
+	_check(map.place_object(bed, Vector2(1, 1), 0) == 0, "objects need floor")
 	map.build_room(Rect2i(0, 0, 4, 4))
-	var id := map.place_object(bed, Vector2i(1, 1), 0)
-	_check(id != 0 and map.object_at(Vector2i(1, 2)).id == id, "bed covers two cells")
-	_check(map.place_object(bed, Vector2i(1, 2), 1) == 0, "objects cannot overlap")
-	_check(map.place_object(bed, Vector2i(0, 2), 1) == 0, "a rotated bed runs into the first one")
-	_check(map.place_object(bed, Vector2i(3, 3), 0) == 0, "objects stay on the floor")
+	var id := map.place_object(bed, Vector2(1, 1), 0)
+	_check(id != 0 and map.object_at(Vector2(1.5, 2.5)).id == id, "bed covers two tiles")
+	_check(map.place_object(bed, Vector2(1, 2), 1) == 0, "objects cannot overlap")
+	_check(map.place_object(bed, Vector2(0, 2), 1) == 0, "a rotated bed runs into the first one")
+	_check(map.place_object(bed, Vector2(3, 3), 0) == 0, "objects stay on the floor")
+	_check(map.place_object(toilet, Vector2(2, 1), 0) != 0, "objects can touch")
 	_check(not map.can_build_wall(Vector3i(1, 2, BuildingMap.EDGE_X)), "no wall through an object")
+	_check(map.can_build_wall(Vector3i(1, 1, BuildingMap.EDGE_X)), "walls can run along an object")
 	map.build_walls([Vector3i(3, 1, BuildingMap.EDGE_Z)])
-	_check(not map.can_place(bed, Vector2i(2, 1), 1), "objects cannot straddle a wall")
-	_check(map.remove_object(id) and map.object_at(Vector2i(1, 1)) == null, "objects can be removed")
+	_check(not map.can_place(bed, Vector2(2.5, 1), 1), "objects cannot straddle a wall")
+	_check(map.remove_object(id) and map.object_at(Vector2(1.5, 1.5)) == null, "objects can be removed")
+
+
+func _test_snapping() -> void:
+	var bed := PrisonCatalogue.object(&"bed")
+	var toilet := PrisonCatalogue.object(&"toilet")
+	_check(BuildingMap.snapped_position(bed, Vector2(3.4, 4.9), 0, ObjectDef.Snap.TILE) == Vector2(3, 4),
+			"tile snapping centres a bed on whole tiles")
+	_check(BuildingMap.snapped_position(toilet, Vector2(3.4, 4.9), 0, ObjectDef.Snap.QUARTER)
+			== Vector2(3.25, 4.5), "quarter snapping")
+	_check(BuildingMap.snapped_position(toilet, Vector2(3.4, 4.9), 0, ObjectDef.Snap.FREE)
+			.is_equal_approx(Vector2(3.15, 4.525)), "free placement does not snap")
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
+	map.build_room(Rect2i(0, 0, 2, 1))
+	_check(map.place_object(toilet, Vector2(0.25, 0.25), 0) != 0
+			and map.place_object(toilet, Vector2(0.75, 0.25), 0) != 0
+			and map.place_object(toilet, Vector2(1.25, 0.25), 0) != 0, "three toilets fit side by side")
+	_check(map.place_object(toilet, Vector2(1.5, 0.25), 0) == 0, "but not on top of each other")
+
+
+func _test_styles_and_indoors() -> void:
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
+	map.register_styles(PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	map.build_room(Rect2i(0, 0, 3, 3), &"tiles", &"brick")
+	_check(map.room_at(Vector2i.ZERO).indoor, "walled room is indoors")
+	_check(map.floors[Vector2i(1, 1)] == &"tiles" and map.wall_style(Vector3i(0, 0, 0)) == &"brick",
+			"styles are stored")
+	map.build_room(Rect2i(5, 0, 3, 3), &"lawn", &"fence")
+	var yard := map.room_at(Vector2i(5, 0))
+	_check(yard.enclosed and not yard.indoor, "fenced area is enclosed but outdoors")
+	map.build_walls(BuildingMap.rect_perimeter(Rect2i(5, 0, 3, 3)), &"plaster")
+	_check(map.room_at(Vector2i(5, 0)).indoor, "restyling the fence to walls brings it indoors")
+	var yard_type := PrisonCatalogue.room_type(&"yard")
+	map.set_room_type(map.room_at(Vector2i(5, 0)), &"yard")
+	_check(Array(yard_type.problems(map.room_at(Vector2i(5, 0)), map)) == ["Needs to be outdoors"],
+			"a yard has to be outdoors")
+	map.fill_floor(Rect2i(10, 0, 1, 1), &"paving")
+	_check(not map.room_at(Vector2i(10, 0)).indoor, "a lone patch of paving is outdoors")
+
+
+func _test_land() -> void:
+	var map := BuildingMap.new(Rect2i(10, 10, 5, 5))
+	_check(map.fill_floor(Rect2i(8, 8, 4, 4)) == 4, "floor only goes on owned land")
+	_check(map.can_build_wall(Vector3i(10, 10, BuildingMap.EDGE_Z))
+			and not map.can_build_wall(Vector3i(9, 10, BuildingMap.EDGE_Z)), "walls can run along the land edge")
+	map.add_land(Rect2i(15, 10, 5, 5))
+	_check(map.owns(Vector2i(16, 11)) and map.land_bounds() == Rect2i(10, 10, 10, 5), "land can grow")
 
 
 func _test_demolish() -> void:
-	var map := BuildingMap.new(Vector2i(20, 20))
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
 	map.build_room(Rect2i(0, 0, 3, 3))
 	map.build_room(Rect2i(3, 0, 3, 3))
-	map.place_object(PrisonCatalogue.object(&"toilet"), Vector2i(4, 1), 0)
+	map.place_object(PrisonCatalogue.object(&"toilet"), Vector2(4, 1), 0)
 	map.demolish(Rect2i(3, 0, 3, 3))
 	_check(map.objects.is_empty(), "demolish removes objects")
-	_check(map.rooms().size() == 1 and not map.rooms()[0].enclosed,
-			"demolish takes the shared wall with it")
+	_check(map.rooms().size() == 1 and map.rooms()[0].enclosed, "demolish keeps the shared wall")
+	_check(map.walls.size() == 12, "and removes the rest of the demolished room's walls")
+	map.build_walls(BuildingMap.edges_on_line(Vector2i(8, 0), Vector2i(8, 4)))
+	map.demolish(Rect2i(8, 1, 1, 1))
+	_check(map.walls.size() == 15, "demolishing next to a lone wall removes the touching piece")
 
 
 func _test_main_scene_loads() -> void:
@@ -138,7 +193,7 @@ func _test_main_scene_loads() -> void:
 	root.add_child(main)
 	_check(main.get_node("BuildGrid/Ground") != null, "grid builds its ground")
 	var map: BuildingMap = main.map
-	_check(map.rooms().size() == 5, "sample layout has five rooms")
+	_check(map.rooms().size() == 6, "sample layout has six rooms")
 	var view: BuildingView = main.get_node("BuildGrid/BuildingView")
 	view.rebuild()
 	_check(view.get_child_count() > 0, "view builds its parts")
@@ -147,52 +202,76 @@ func _test_main_scene_loads() -> void:
 
 
 ## Drives the build tools the way the mouse would, by moving the hover point.
+## Positions are relative to the corner of the owned land.
 func _test_tools(controller: BuildController, map: BuildingMap) -> void:
-	var hover := func(point: Vector2) -> void:
+	var base := Vector2(map.land_bounds().position)
+	var cell := func(x: int, z: int) -> Vector2i: return Vector2i(base) + Vector2i(x, z)
+	var hover := func(x: float, z: float) -> void:
 		controller._has_hover = true
-		controller._hover_point = point
+		controller._hover_point = base + Vector2(x, z)
 	var rooms_before := map.rooms().size()
 
 	controller.tool = BuildController.Tool.ROOM
-	hover.call(Vector2(2.5, 2.5))
+	hover.call(2.5, 2.5)
 	controller._on_press()
-	hover.call(Vector2(5.5, 4.5))
+	hover.call(5.5, 4.5)
 	controller._draw_preview()
 	controller._on_release()
-	_check(map.rooms().size() == rooms_before + 1 and map.room_at(Vector2i(2, 2)).cells.size() == 12,
+	_check(map.rooms().size() == rooms_before + 1 and map.room_at(cell.call(2, 2)).cells.size() == 12,
 			"room tool builds an enclosed room")
 
 	controller.tool = BuildController.Tool.WALL
-	hover.call(Vector2(4.1, 1.9))
+	hover.call(4.1, 1.9)
 	controller._on_press()
-	hover.call(Vector2(3.8, 5.2))
+	hover.call(3.8, 5.2)
 	controller._on_release()
 	_check(map.rooms().size() == rooms_before + 2, "wall tool splits the room")
 
-	controller.tool = BuildController.Tool.DOOR
-	hover.call(Vector2(3.9, 3.5))
+	controller.force_erase = true
+	hover.call(4.1, 1.9)
 	controller._on_press()
-	_check(map.wall_at(Vector3i(4, 3, BuildingMap.EDGE_Z)) == BuildingMap.Wall.DOOR, "door tool makes a door")
+	hover.call(3.8, 5.2)
+	controller._draw_preview()
+	controller._on_release()
+	controller.force_erase = false
+	_check(map.rooms().size() == rooms_before + 1, "wall tool with Ctrl removes walls")
+	controller.tool = BuildController.Tool.WALL
+	hover.call(4.1, 1.9)
+	controller._on_press()
+	hover.call(3.8, 5.2)
+	controller._on_release()
+
+	controller.tool = BuildController.Tool.DOOR
+	hover.call(3.9, 3.5)
+	controller._on_press()
+	_check(map.wall_at(Vector3i(cell.call(4, 3).x, cell.call(4, 3).y, BuildingMap.EDGE_Z))
+			== BuildingMap.Wall.DOOR, "door tool makes a door")
 
 	controller.tool = BuildController.Tool.OBJECT
 	controller.object_def = PrisonCatalogue.object(&"toilet")
-	hover.call(Vector2(2.5, 2.5))
+	hover.call(2.5, 2.5)
 	controller._draw_preview()
 	controller._on_press()
-	_check(map.object_at(Vector2i(2, 2)) != null, "object tool places an object")
+	_check(map.object_at(base + Vector2(2.5, 2.5)) != null, "object tool places an object")
 
 	controller.tool = BuildController.Tool.ROOM_TYPE
 	controller.room_type = PrisonCatalogue.room_type(&"cell")
 	controller._on_press()
-	_check(map.room_at(Vector2i(2, 2)).type == &"cell", "room type tool marks the room")
+	_check(map.room_at(cell.call(2, 2)).type == &"cell", "room type tool marks the room")
 
 	controller.tool = BuildController.Tool.DEMOLISH
+	controller._draw_preview()
 	controller._on_press()
 	controller._on_release()
-	_check(map.object_at(Vector2i(2, 2)) == null and map.has_floor(Vector2i(2, 2)),
+	_check(map.object_at(base + Vector2(2.5, 2.5)) == null and map.has_floor(cell.call(2, 2)),
 			"demolish click removes just the object")
-	hover.call(Vector2(2.5, 2.5))
+	hover.call(4.05, 2.5)
+	controller._draw_preview()
 	controller._on_press()
-	hover.call(Vector2(5.5, 4.5))
+	controller._on_release()
+	_check(map.rooms().size() == rooms_before + 1, "demolish click on a wall removes just that wall")
+	hover.call(2.5, 2.5)
+	controller._on_press()
+	hover.call(5.5, 4.5)
 	controller._on_release()
 	_check(map.rooms().size() == rooms_before, "demolish drag clears the area")

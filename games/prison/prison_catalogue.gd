@@ -9,6 +9,21 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/shower.tres"),
 ]
 
+const FLOORS: Array[FloorDef] = [
+	preload("res://games/prison/catalogue/floor_concrete.tres"),
+	preload("res://games/prison/catalogue/floor_tiles.tres"),
+	preload("res://games/prison/catalogue/floor_wood.tres"),
+	preload("res://games/prison/catalogue/floor_paving.tres"),
+	preload("res://games/prison/catalogue/floor_lawn.tres"),
+]
+
+const WALLS: Array[WallDef] = [
+	preload("res://games/prison/catalogue/wall_plaster.tres"),
+	preload("res://games/prison/catalogue/wall_brick.tres"),
+	preload("res://games/prison/catalogue/wall_fence.tres"),
+	preload("res://games/prison/catalogue/wall_hedge.tres"),
+]
+
 const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_cell.tres"),
 	preload("res://games/prison/catalogue/room_canteen.tres"),

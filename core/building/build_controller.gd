@@ -13,12 +13,12 @@ enum Tool { NONE, ROOM, FLOOR, WALL, DOOR, OBJECT, ROOM_TYPE, DEMOLISH }
 const HINTS := {
 	Tool.NONE: "",
 	Tool.ROOM: "Drag to build a walled room.",
-	Tool.FLOOR: "Drag to lay floor.",
-	Tool.WALL: "Drag between corners to build a wall.",
+	Tool.FLOOR: "Drag to lay or restyle floor. Hold Ctrl to remove floor.",
+	Tool.WALL: "Drag between corners to build or restyle walls. Hold Ctrl to remove them.",
 	Tool.DOOR: "Click a wall to make it a door. Click a door to make it a wall again.",
-	Tool.OBJECT: "Click to place. R rotates.",
+	Tool.OBJECT: "Click to place. R rotates. Hold Alt to place freely.",
 	Tool.ROOM_TYPE: "Click a room to mark it.",
-	Tool.DEMOLISH: "Click an object to remove it, or drag to clear an area.",
+	Tool.DEMOLISH: "Click an object or wall to remove it, or drag to clear an area.",
 }
 
 @export var grid: BuildGrid
@@ -37,9 +37,16 @@ var tool := Tool.NONE:
 		_dragging = false
 		tool_changed.emit(tool)
 var object_def: ObjectDef
+## Styles used by the room, floor and wall tools.
+var floor_style: StringName = BuildingMap.DEFAULT_FLOOR
+var wall_style: StringName = BuildingMap.DEFAULT_WALL
 var object_rotation := 0
 ## The room type the room type tool applies. Null clears a room's type.
 var room_type: RoomTypeDef
+
+## Makes the floor and wall tools remove instead of build, as if Ctrl were
+## held. Mainly for tests.
+var force_erase := false
 
 var _dragging := false
 var _drag_start_cell := Vector2i.ZERO
@@ -104,7 +111,7 @@ func _on_press() -> void:
 			map.set_door(edge, map.wall_at(edge) == BuildingMap.Wall.WALL)
 		Tool.OBJECT:
 			if object_def != null:
-				map.place_object(object_def, _hover_cell(), object_rotation)
+				map.place_object(object_def, _object_position(), object_rotation)
 		Tool.ROOM_TYPE:
 			var room := map.room_at(_hover_cell())
 			if room != null:
@@ -116,17 +123,32 @@ func _on_release() -> void:
 		return
 	var rect := _drag_rect()
 	_dragging = false
+	var erase := _erasing()
 	match tool:
 		Tool.ROOM:
-			map.build_room(rect)
+			map.build_room(rect, floor_style, wall_style)
 		Tool.FLOOR:
-			map.fill_floor(rect)
+			if erase:
+				map.clear_floor(rect)
+			else:
+				map.fill_floor(rect, floor_style)
 		Tool.WALL:
-			map.build_walls(BuildingMap.edges_on_line(_drag_start_corner, _wall_end_corner()))
+			var edges := BuildingMap.edges_on_line(_drag_start_corner, _wall_end_corner())
+			if erase:
+				map.remove_walls(edges)
+			else:
+				map.build_walls(edges, wall_style)
 		Tool.DEMOLISH:
-			var placed := map.object_at(_hover_cell())
-			if rect.size == Vector2i.ONE and placed != null:
+			if rect.size != Vector2i.ONE:
+				map.demolish(rect)
+				return
+			# A click takes the most specific thing under the mouse.
+			var placed := map.object_at(_hover_point)
+			var edge := _hover_edge()
+			if placed != null:
 				map.remove_object(placed.id)
+			elif map.wall_at(edge) != BuildingMap.Wall.NONE and _edge_distance() < 0.25:
+				map.remove_walls([edge])
 			else:
 				map.demolish(rect)
 
@@ -146,7 +168,18 @@ func _hover_cell() -> Vector2i:
 
 
 func _hover_corner() -> Vector2i:
-	return Vector2i(_hover_point.round()).clamp(Vector2i.ZERO, map.size)
+	var bounds := map.land_bounds()
+	return Vector2i(_hover_point.round()).clamp(bounds.position, bounds.end)
+
+
+func _erasing() -> bool:
+	return Input.is_action_pressed("build_erase") or force_erase
+
+
+## How far the mouse is from the nearest edge, in tiles.
+func _edge_distance() -> float:
+	var f := _hover_point - _hover_point.floor()
+	return minf(minf(f.x, 1.0 - f.x), minf(f.y, 1.0 - f.y))
 
 
 ## The wall edge nearest the mouse.
@@ -164,9 +197,18 @@ func _hover_edge() -> Vector3i:
 
 
 func _drag_rect() -> Rect2i:
-	var end := _hover_cell().clamp(Vector2i.ZERO, map.size - Vector2i.ONE)
+	var bounds := map.land_bounds()
+	var end := _hover_cell().clamp(bounds.position, bounds.end - Vector2i.ONE)
 	var start := _drag_start_cell if _dragging else end
 	return BuildingMap.rect_between(start, end)
+
+
+## Where the object being placed would go, centred on the mouse.
+func _object_position() -> Vector2:
+	var snap := object_def.snap
+	if Input.is_action_pressed("build_free_place"):
+		snap = ObjectDef.Snap.FREE
+	return BuildingMap.snapped_position(object_def, _hover_point, object_rotation, snap)
 
 
 ## Walls go in straight lines, so snap to whichever axis the drag follows most.
@@ -193,13 +235,25 @@ func _draw_preview() -> void:
 			for edge in BuildingMap.rect_perimeter(rect):
 				_preview_edge(edge, ok_colour if map.can_build_wall(edge) else bad_colour)
 		Tool.FLOOR:
-			_preview_cells(BuildingMap.cells_in(_drag_rect()), ok_colour)
+			_preview_cells(BuildingMap.cells_in(_drag_rect()),
+					demolish_colour if _erasing() else ok_colour)
 		Tool.DEMOLISH:
-			_preview_cells(BuildingMap.cells_in(_drag_rect()), demolish_colour)
+			var placed := map.object_at(_hover_point)
+			if _dragging:
+				_preview_cells(BuildingMap.cells_in(_drag_rect()), demolish_colour)
+			elif placed != null:
+				_preview_rect(placed.rect, demolish_colour, placed.def.height + 0.05)
+			elif map.wall_at(_hover_edge()) != BuildingMap.Wall.NONE and _edge_distance() < 0.25:
+				_preview_edge(_hover_edge(), demolish_colour)
+			else:
+				_preview_cells(BuildingMap.cells_in(_drag_rect()), demolish_colour)
 		Tool.WALL:
 			if _dragging:
 				for edge in BuildingMap.edges_on_line(_drag_start_corner, _wall_end_corner()):
-					_preview_edge(edge, ok_colour if map.can_build_wall(edge) else bad_colour)
+					if _erasing():
+						_preview_edge(edge, demolish_colour)
+					else:
+						_preview_edge(edge, ok_colour if map.can_build_wall(edge) else bad_colour)
 			else:
 				_preview_corner(_hover_corner(), ok_colour)
 		Tool.DOOR:
@@ -207,9 +261,10 @@ func _draw_preview() -> void:
 			_preview_edge(edge, ok_colour if map.wall_at(edge) != BuildingMap.Wall.NONE else bad_colour)
 		Tool.OBJECT:
 			if object_def != null:
-				var ok := map.can_place(object_def, _hover_cell(), object_rotation)
-				var cells := BuildingMap.footprint(object_def, _hover_cell(), object_rotation)
-				_preview_cells(cells, ok_colour if ok else bad_colour, object_def.height)
+				var position := _object_position()
+				var ok := map.can_place(object_def, position, object_rotation)
+				_preview_rect(BuildingMap.object_rect(object_def, position, object_rotation),
+						ok_colour if ok else bad_colour, object_def.height)
 		Tool.ROOM_TYPE:
 			var room := map.room_at(_hover_cell())
 			if room != null:
@@ -230,6 +285,13 @@ func _preview_cells(cells: Array[Vector2i], colour: Color, height := 0.06) -> vo
 		var centre := Vector3(cell.x + 0.5, 0.0, cell.y + 0.5) * cs
 		_preview_boxes.append([centre + Vector3.UP * height * 0.5,
 				Vector3(cs * 0.48, height * 0.5, cs * 0.48), colour])
+
+
+func _preview_rect(rect: Rect2, colour: Color, height: float) -> void:
+	var cs := grid.cell_size
+	var centre := rect.get_center() * cs
+	_preview_boxes.append([Vector3(centre.x, height * 0.5, centre.y),
+			Vector3(rect.size.x * cs * 0.5, height * 0.5, rect.size.y * cs * 0.5), colour])
 
 
 func _preview_edge(edge: Vector3i, colour: Color) -> void:

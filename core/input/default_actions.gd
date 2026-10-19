@@ -17,6 +17,8 @@ const KEY_ACTIONS := {
 	"build_cancel": [KEY_ESCAPE],
 	"build_rotate": [KEY_R],
 	"build_toggle_walls": [KEY_TAB],
+	"build_free_place": [KEY_ALT],
+	"build_erase": [KEY_CTRL],
 }
 
 

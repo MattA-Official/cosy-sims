@@ -1,15 +1,26 @@
 class_name BuildingMap
 extends RefCounted
-## Everything built on a grid: floors in cells, walls and doors on the edges
-## between cells (like The Sims), and objects covering one or more cells.
+## Everything built on the grid: floors in tiles, walls and doors on the edges
+## between tiles (like The Sims), and objects placed on floors.
 ## Pure data with no nodes, so it can be tested on its own and saved later.
 ##
-## Cells are Vector2i(x, z). Corners are Vector2i too: corner (x, z) is the
-## top-left corner of cell (x, z). Edges are Vector3i(x, z, axis):
+## Tiles ("cells") are Vector2i(x, z). Corners are Vector2i too: corner (x, z)
+## is the top-left corner of cell (x, z). Edges are Vector3i(x, z, axis):
 ## - EDGE_X runs along X from corner (x, z) to (x + 1, z),
 ##   between cells (x, z - 1) and (x, z).
 ## - EDGE_Z runs along Z from corner (x, z) to (x, z + 1),
 ##   between cells (x - 1, z) and (x, z).
+##
+## Walls and floors use whole tiles. Objects use positions in tile units
+## (Vector2, so 2.25 is a quarter of the way into tile 2) and can snap to
+## tiles, quarter tiles, or nothing.
+##
+## Floors and walls carry a style id (see FloorDef and WallDef). Whether a
+## room is indoors is decided by its walls: enclosed by indoor walls and
+## doors means indoors; fences and hedges leave it outdoors.
+##
+## You can only build on land you own, which starts as one rectangle and can
+## grow with add_land().
 
 signal changed
 
@@ -17,6 +28,11 @@ const EDGE_X := 0
 const EDGE_Z := 1
 const NO_EDGE := Vector3i(-1, -1, -1)
 const DIRECTIONS: Array[Vector2i] = [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]
+## Objects may touch each other and walls; this stops rounding from
+## counting a touch as an overlap.
+const EPSILON := 0.001
+const DEFAULT_FLOOR := &"concrete"
+const DEFAULT_WALL := &"plaster"
 
 enum Wall { NONE, WALL, DOOR }
 
@@ -24,17 +40,16 @@ enum Wall { NONE, WALL, DOOR }
 class PlacedObject:
 	var id: int
 	var def: ObjectDef
-	var origin: Vector2i
 	var rotation: int ## Quarter turns, 0 to 3.
-	var cells: Array[Vector2i]
+	var rect: Rect2 ## The footprint in tile units, after rotation.
 
 
-var size: Vector2i
+var land: Array[Rect2i] = []
 var floors: Dictionary[Vector2i, StringName] = {}
 var walls: Dictionary[Vector3i, int] = {} ## Values are Wall.WALL or Wall.DOOR.
+var wall_styles: Dictionary[Vector3i, StringName] = {}
 var objects: Dictionary[int, PlacedObject] = {}
 
-var _occupancy: Dictionary[Vector2i, int] = {} ## Cell to object id.
 ## Room types are stored per cell, so they survive rooms being split, merged
 ## or extended: each room takes the type most of its cells carry.
 var _room_types: Dictionary[Vector2i, StringName] = {}
@@ -42,15 +57,54 @@ var _next_object_id := 1
 var _rooms: Array[Room] = []
 var _room_lookup: Dictionary[Vector2i, Room] = {}
 var _rooms_dirty := true
+var _floor_defs: Dictionary[StringName, FloorDef] = {}
+var _wall_defs: Dictionary[StringName, WallDef] = {}
 
 
-func _init(map_size: Vector2i) -> void:
-	size = map_size
+func _init(starting_land: Rect2i) -> void:
+	land.append(starting_land)
 
 
-func in_bounds(cell: Vector2i) -> bool:
-	return cell.x >= 0 and cell.y >= 0 and cell.x < size.x and cell.y < size.y
+## Tells the map about the game's floor and wall styles, so it knows which
+## are outdoor. Unknown styles count as indoor.
+func register_styles(floor_list: Array[FloorDef], wall_list: Array[WallDef]) -> void:
+	for def in floor_list:
+		_floor_defs[def.id] = def
+	for def in wall_list:
+		_wall_defs[def.id] = def
+	_changed()
 
+
+func floor_def(id: StringName) -> FloorDef:
+	return _floor_defs.get(id)
+
+
+func wall_def(id: StringName) -> WallDef:
+	return _wall_defs.get(id)
+
+
+#region Land
+
+func owns(cell: Vector2i) -> bool:
+	for rect in land:
+		if rect.has_point(cell):
+			return true
+	return false
+
+
+func add_land(rect: Rect2i) -> void:
+	land.append(rect)
+	_changed()
+
+
+## The smallest rectangle covering all owned land.
+func land_bounds() -> Rect2i:
+	var bounds := land[0]
+	for rect in land:
+		bounds = bounds.merge(rect)
+	return bounds
+
+#endregion
 
 #region Geometry helpers
 
@@ -64,7 +118,7 @@ static func edge_between(a: Vector2i, b: Vector2i) -> Vector3i:
 	return NO_EDGE
 
 
-## The two cells either side of an edge. Either may be outside the map.
+## The two cells either side of an edge.
 static func edge_cells(edge: Vector3i) -> Array[Vector2i]:
 	if edge.z == EDGE_X:
 		return [Vector2i(edge.x, edge.y - 1), Vector2i(edge.x, edge.y)]
@@ -114,15 +168,45 @@ static func cells_in(rect: Rect2i) -> Array[Vector2i]:
 	return out
 
 
+## The cells a rectangle in tile units touches.
+static func cells_under(rect: Rect2) -> Array[Vector2i]:
+	var from := Vector2i((rect.position + Vector2.ONE * EPSILON).floor())
+	var to := Vector2i((rect.end - Vector2.ONE * EPSILON).ceil())
+	return cells_in(Rect2i(from, to - from))
+
+
 ## The smallest rectangle covering both cells.
 static func rect_between(a: Vector2i, b: Vector2i) -> Rect2i:
 	return Rect2i(a.min(b), (a - b).abs() + Vector2i.ONE)
 
 
-## The cells an object covers when placed at origin with the given rotation.
-static func footprint(def: ObjectDef, origin: Vector2i, rotation: int) -> Array[Vector2i]:
-	var extent := def.size if rotation % 2 == 0 else Vector2i(def.size.y, def.size.x)
-	return cells_in(Rect2i(origin, extent))
+## An object's footprint with its top-left corner at position.
+static func object_rect(def: ObjectDef, position: Vector2, rotation: int) -> Rect2:
+	var extent := def.size if rotation % 2 == 0 else Vector2(def.size.y, def.size.x)
+	return Rect2(position, extent)
+
+
+## Where an object centred on a point should go, snapped as the object likes.
+## Returns the top-left corner of its footprint.
+static func snapped_position(def: ObjectDef, centre: Vector2, rotation: int,
+		snap: ObjectDef.Snap) -> Vector2:
+	var corner := centre - object_rect(def, Vector2.ZERO, rotation).size * 0.5
+	match snap:
+		ObjectDef.Snap.TILE:
+			return corner.round()
+		ObjectDef.Snap.QUARTER:
+			return (corner * 4.0).round() / 4.0
+	return corner
+
+
+## Does a wall on this edge pass through the inside of a rectangle?
+static func edge_crosses(edge: Vector3i, rect: Rect2) -> bool:
+	var inner := rect.grow(-EPSILON)
+	if edge.z == EDGE_X:
+		return edge.y > inner.position.y and edge.y < inner.end.y \
+				and edge.x + 1 > inner.position.x and edge.x < inner.end.x
+	return edge.x > inner.position.x and edge.x < inner.end.x \
+			and edge.y + 1 > inner.position.y and edge.y < inner.end.y
 
 #endregion
 
@@ -132,7 +216,7 @@ func has_floor(cell: Vector2i) -> bool:
 	return floors.has(cell)
 
 
-func fill_floor(rect: Rect2i, type: StringName = &"concrete") -> int:
+func fill_floor(rect: Rect2i, type: StringName = DEFAULT_FLOOR) -> int:
 	var count := _fill_floor(rect, type)
 	if count > 0:
 		_changed()
@@ -150,34 +234,45 @@ func clear_floor(rect: Rect2i) -> int:
 
 #region Walls and doors
 
+## Walls can go on edges next to owned land.
 func edge_in_bounds(edge: Vector3i) -> bool:
-	if edge.z == EDGE_X:
-		return edge.x >= 0 and edge.x < size.x and edge.y >= 0 and edge.y <= size.y
-	return edge.x >= 0 and edge.x <= size.x and edge.y >= 0 and edge.y < size.y
+	var sides := edge_cells(edge)
+	return owns(sides[0]) or owns(sides[1])
 
 
 func wall_at(edge: Vector3i) -> int:
 	return walls.get(edge, Wall.NONE)
 
 
+func wall_style(edge: Vector3i) -> StringName:
+	return wall_styles.get(edge, &"")
+
+
+func is_outdoor_wall(edge: Vector3i) -> bool:
+	var def := wall_def(wall_style(edge))
+	return def != null and def.outdoor
+
+
 ## Can people walk from one cell to its neighbour? Walls block; doors do not.
 func can_walk_between(a: Vector2i, b: Vector2i) -> bool:
 	var edge := edge_between(a, b)
-	return edge != NO_EDGE and in_bounds(a) and in_bounds(b) and wall_at(edge) != Wall.WALL
+	return edge != NO_EDGE and owns(a) and owns(b) and wall_at(edge) != Wall.WALL
 
 
-## Can a wall go on this edge? Not off the map, and not through an object.
+## Can a wall go on this edge? Not off our land, and not through an object.
 func can_build_wall(edge: Vector3i) -> bool:
 	if not edge_in_bounds(edge):
 		return false
-	var sides := edge_cells(edge)
-	var a: int = _occupancy.get(sides[0], 0)
-	return a == 0 or a != _occupancy.get(sides[1], 0)
+	for placed: PlacedObject in objects.values():
+		if edge_crosses(edge, placed.rect):
+			return false
+	return true
 
 
-## Builds walls on empty edges. Existing walls and doors are left alone.
-func build_walls(edges: Array[Vector3i]) -> int:
-	var count := _build_walls(edges)
+## Builds walls on empty edges, and restyles walls already there.
+## Doors stay doors.
+func build_walls(edges: Array[Vector3i], style: StringName = DEFAULT_WALL) -> int:
+	var count := _build_walls(edges, style)
 	if count > 0:
 		_changed()
 	return count
@@ -187,6 +282,7 @@ func remove_walls(edges: Array[Vector3i]) -> int:
 	var count := 0
 	for edge in edges:
 		if walls.erase(edge):
+			wall_styles.erase(edge)
 			count += 1
 	if count > 0:
 		_changed()
@@ -208,52 +304,55 @@ func set_door(edge: Vector3i, is_door: bool) -> bool:
 
 #region Objects
 
-func can_place(def: ObjectDef, origin: Vector2i, rotation: int) -> bool:
-	var cells := footprint(def, origin, rotation)
-	for cell in cells:
-		if not has_floor(cell) or _occupancy.has(cell):
+func can_place(def: ObjectDef, position: Vector2, rotation: int) -> bool:
+	var rect := object_rect(def, position, rotation)
+	for cell in cells_under(rect):
+		if not has_floor(cell):
+			return false
+	for placed: PlacedObject in objects.values():
+		if placed.rect.grow(-EPSILON).intersects(rect):
 			return false
 	# An object cannot straddle a wall or door.
-	for cell in cells:
-		for step: Vector2i in [Vector2i.RIGHT, Vector2i.DOWN]:
-			if cells.has(cell + step) and wall_at(edge_between(cell, cell + step)) != Wall.NONE:
-				return false
+	for edge in rect_edges(_cell_bounds(rect)):
+		if wall_at(edge) != Wall.NONE and edge_crosses(edge, rect):
+			return false
 	return true
 
 
 ## Places an object and returns its id, or 0 if it does not fit.
-func place_object(def: ObjectDef, origin: Vector2i, rotation: int) -> int:
-	if not can_place(def, origin, rotation):
+func place_object(def: ObjectDef, position: Vector2, rotation: int) -> int:
+	if not can_place(def, position, rotation):
 		return 0
 	var placed := PlacedObject.new()
 	placed.id = _next_object_id
 	_next_object_id += 1
 	placed.def = def
-	placed.origin = origin
 	placed.rotation = posmod(rotation, 4)
-	placed.cells = footprint(def, origin, rotation)
+	placed.rect = object_rect(def, position, rotation)
 	objects[placed.id] = placed
-	for cell in placed.cells:
-		_occupancy[cell] = placed.id
 	_changed()
 	return placed.id
 
 
 func remove_object(id: int) -> bool:
-	if not _remove_object(id):
+	if not objects.erase(id):
 		return false
 	_changed()
 	return true
 
 
-func object_at(cell: Vector2i) -> PlacedObject:
-	return objects.get(_occupancy.get(cell, 0))
+## The object covering a point in tile units, if any.
+func object_at(point: Vector2) -> PlacedObject:
+	for placed: PlacedObject in objects.values():
+		if placed.rect.has_point(point):
+			return placed
+	return null
 
 
 func objects_in_room(room: Room) -> Array[PlacedObject]:
 	var out: Array[PlacedObject] = []
 	for placed: PlacedObject in objects.values():
-		if room_at(placed.origin) == room:
+		if room_at(Vector2i(placed.rect.get_center().floor())) == room:
 			out.append(placed)
 	return out
 
@@ -286,20 +385,29 @@ func set_room_type(room: Room, type: StringName) -> void:
 #region Compound actions
 
 ## Floor plus walls all round, like the room tool in Software Inc.
-func build_room(rect: Rect2i, floor_type: StringName = &"concrete") -> void:
-	var count := _fill_floor(rect, floor_type) + _build_walls(rect_perimeter(rect))
+func build_room(rect: Rect2i, floor_type: StringName = DEFAULT_FLOOR,
+		wall_type: StringName = DEFAULT_WALL) -> void:
+	var count := _fill_floor(rect, floor_type) + _build_walls(rect_perimeter(rect), wall_type)
 	if count > 0:
 		_changed()
 
 
-## Clears a rectangle: objects, floor, and every wall and door in or around it.
+## Clears a rectangle: objects, floor, and walls inside it. Walls around the
+## edge go too, unless they still have floor on their far side, so knocking
+## down one room leaves its neighbours closed in.
 func demolish(rect: Rect2i) -> void:
 	var count := _clear_floor(rect)
 	for edge in rect_edges(rect):
-		if walls.erase(edge):
+		if wall_at(edge) == Wall.NONE:
+			continue
+		var sides := edge_cells(edge)
+		var keep := has_floor(sides[0]) or has_floor(sides[1])
+		if not keep and walls.erase(edge):
+			wall_styles.erase(edge)
 			count += 1
 	if count > 0:
 		_changed()
+
 
 #endregion
 
@@ -307,40 +415,45 @@ func demolish(rect: Rect2i) -> void:
 func _fill_floor(rect: Rect2i, type: StringName) -> int:
 	var count := 0
 	for cell in cells_in(rect):
-		if in_bounds(cell) and floors.get(cell) != type:
+		if owns(cell) and floors.get(cell) != type:
 			floors[cell] = type
 			count += 1
 	return count
 
 
+## Removes floor in a rectangle, and every object touching it.
 func _clear_floor(rect: Rect2i) -> int:
 	var count := 0
-	for cell in cells_in(rect):
-		if _remove_object(_occupancy.get(cell, 0)):
+	var area := Rect2(rect)
+	for placed: PlacedObject in objects.values():
+		if placed.rect.grow(-EPSILON).intersects(area):
+			objects.erase(placed.id)
 			count += 1
+	for cell in cells_in(rect):
 		if floors.erase(cell):
 			count += 1
 		_room_types.erase(cell)
 	return count
 
 
-func _build_walls(edges: Array[Vector3i]) -> int:
+func _build_walls(edges: Array[Vector3i], style: StringName) -> int:
 	var count := 0
 	for edge in edges:
-		if wall_at(edge) == Wall.NONE and can_build_wall(edge):
+		if wall_at(edge) == Wall.NONE:
+			if not can_build_wall(edge):
+				continue
 			walls[edge] = Wall.WALL
-			count += 1
+		elif wall_style(edge) == style:
+			continue
+		wall_styles[edge] = style
+		count += 1
 	return count
 
 
-func _remove_object(id: int) -> bool:
-	var placed: PlacedObject = objects.get(id)
-	if placed == null:
-		return false
-	for cell in placed.cells:
-		_occupancy.erase(cell)
-	objects.erase(id)
-	return true
+## The whole cells around a rectangle in tile units.
+func _cell_bounds(rect: Rect2) -> Rect2i:
+	var from := Vector2i(rect.position.floor())
+	return Rect2i(from, Vector2i(rect.end.ceil()) - from)
 
 
 func _changed() -> void:
@@ -350,6 +463,7 @@ func _changed() -> void:
 
 ## Flood-fills the floor into rooms. Walls and doors split rooms; reaching a
 ## cell with no floor without passing a wall means the room is not enclosed.
+## An enclosed room is indoors unless an outdoor wall (a fence) bounds it.
 func _update_rooms() -> void:
 	if not _rooms_dirty:
 		return
@@ -363,18 +477,22 @@ func _update_rooms() -> void:
 		room.id = _rooms.size()
 		_room_lookup[start] = room
 		var stack: Array[Vector2i] = [start]
+		var fenced := false
 		while not stack.is_empty():
 			var cell: Vector2i = stack.pop_back()
 			room.cells.append(cell)
 			for step in DIRECTIONS:
 				var next := cell + step
-				if wall_at(edge_between(cell, next)) != Wall.NONE:
+				var edge := edge_between(cell, next)
+				if wall_at(edge) != Wall.NONE:
+					fenced = fenced or is_outdoor_wall(edge)
 					continue
 				if not floors.has(next):
 					room.enclosed = false
 				elif not _room_lookup.has(next):
 					_room_lookup[next] = room
 					stack.append(next)
+		room.indoor = room.enclosed and not fenced
 		_settle_room_type(room)
 		_rooms.append(room)
 

@@ -26,3 +26,6 @@ Deliberately left until after step 4: money, guards and staff, events.
 - Objects and room types are `.tres` resources in
   `games/prison/catalogue/`, so they can be tweaked in the inspector.
 - Not done yet: undo, saving and loading, multi-storey buildings, costs.
+- After review, added per-object snapping, growable land, floor and wall
+  styles (indoor and outdoor), and better demolition. Paths, roads and
+  terrain are agreed to be off-grid; see `docs/design/building.md`.

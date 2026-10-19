@@ -15,12 +15,15 @@ var map: BuildingMap
 
 
 func _ready() -> void:
-	map = BuildingMap.new(grid.size)
+	# The grid is the whole world; you start owning the middle of it.
+	var land := Rect2i(grid.size / 4, grid.size / 2)
+	map = BuildingMap.new(land)
+	map.register_styles(PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
 	view.room_types = PrisonCatalogue.ROOM_TYPES
 	view.map = map
 	controller.map = map
 	if build_sample_layout:
-		SampleLayout.build(map, grid.size / 2 - Vector2i(6, 5))
+		SampleLayout.build(map, land.get_center() - Vector2i(8, 7))
 
 	camera_rig.bounds = grid.world_rect()
 	camera_rig.position = grid.centre()
@@ -41,8 +44,8 @@ func _on_cell_hovered(cell: Vector2i) -> void:
 	var room := map.room_at(cell)
 	if room != null:
 		var def := PrisonCatalogue.room_type(room.type)
-		text += "    Room: %s, %d tiles%s" % [
+		text += "    Room: %s, %d tiles, %s" % [
 			def.display_name if def != null else "unassigned",
 			room.cells.size(),
-			"" if room.enclosed else ", open"]
+			"indoors" if room.indoor else "outdoors"]
 	cell_label.text = text

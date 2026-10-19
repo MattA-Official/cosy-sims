@@ -6,7 +6,7 @@ its systems, Parkitect for its camera and style, and The Sims / Software Inc.
 for flexible building. Later games might include a hospital, an airport, a
 school and a museum.
 
-![The sample prison, with walls cut away](docs/images/step2.png)
+![The sample prison with its fenced yard](docs/images/step2.png)
 
 All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/).
 
@@ -31,17 +31,24 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | Building | |
 | --- | --- |
 | 1 Room | Drag to build a floor with walls all round |
-| 2 Floor | Drag to lay floor |
-| 3 Wall | Drag from corner to corner |
+| 2 Floor | Drag to lay or restyle floor; hold Ctrl to remove |
+| 3 Wall | Drag from corner to corner to build or restyle; hold Ctrl to remove |
 | 4 Door | Click a wall to make it a door, or a door to make it a wall |
-| 5 Objects | Click to place; R rotates |
+| 5 Objects | Click to place; R rotates; hold Alt to place freely |
 | 6 Room type | Click a room to mark it as a cell, canteen and so on |
-| 7 Demolish | Click an object to remove it, or drag to clear an area |
+| 7 Demolish | Click an object or wall to remove it, or drag to clear an area |
 | Tab | Walls up or cut away |
 | Esc | Put the tool away |
 
-Rooms are worked out from the walls automatically. Once a room has a type, a
-label floats over it saying what it still needs, such as a toilet.
+The room, floor and wall tools let you pick a style in the row above the
+toolbar. Fences, hedges, paving and lawn are outdoor styles: a room enclosed
+by walls is indoors, but one bounded by a fence stays outdoors. Rooms are
+worked out from the walls automatically. Once a room has a type, a label
+floats over it saying what it still needs, such as a toilet.
+
+You can only build inside the land you own, which is marked by a low kerb.
+See [docs/design/building.md](docs/design/building.md) for the design
+decisions behind all this.
 
 ## Layout
 
@@ -51,7 +58,7 @@ label floats over it saying what it still needs, such as a toilet.
 | `games/prison/` | The prison game. Anything specific to prisons lives here. |
 | `tests/` | Headless checks (see below). |
 | `tools/` | Developer helpers, such as the screenshot script. |
-| `docs/` | The plan and design notes. |
+| `docs/` | The plan, and design notes in `docs/design/`. |
 
 The rule of thumb: build things in `games/prison/` first, and move them into
 `core/` once they work and we can see what is genuinely generic. See

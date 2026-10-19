@@ -7,6 +7,8 @@ var id := 0
 var cells: Array[Vector2i] = []
 ## True when walls or doors close off every side of the floor.
 var enclosed := true
+## True when enclosed by indoor walls only. Fences leave a room outdoors.
+var indoor := false
 ## The RoomTypeDef id, or empty when the player has not chosen one.
 var type: StringName = &""
 
