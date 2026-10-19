@@ -79,7 +79,12 @@ func _ready() -> void:
 	_glass_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_floor_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if terrain != null:
-		terrain.changed.connect(queue_rebuild)
+		terrain.changed.connect(_on_terrain_changed)
+
+
+func _on_terrain_changed() -> void:
+	if map == null or map.has_build_near(terrain.last_changed):
+		queue_rebuild()
 
 
 func queue_rebuild() -> void:

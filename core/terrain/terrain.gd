@@ -31,7 +31,14 @@ const MAX_HEIGHT := 8.0
 ## Set by the game; takes a Vector2i corner and returns true when locked.
 var is_locked: Callable = func(_corner: Vector2i) -> bool: return false
 
+## The corners the latest change touched, so listeners can skip work
+## when sculpting happens far from them. The whole map after generation,
+## flattening or setting many corners at once.
+var last_changed := Rect2i()
+
 var _heights := PackedFloat32Array()
+## Triangle indices for the ground mesh, which never change.
+var _indices := PackedInt32Array()
 var _mesh_instance := MeshInstance3D.new()
 var _sea := MeshInstance3D.new()
 var _rebuild_queued := false
@@ -99,7 +106,7 @@ func flatten_cells(cells: Array[Vector2i], height: float) -> void:
 	for cell in cells:
 		for offset: Vector2i in [Vector2i.ZERO, Vector2i(1, 0), Vector2i(0, 1), Vector2i.ONE]:
 			set_corner_height(cell + offset, height)
-	_changed()
+	_changed(_whole())
 
 
 ## Sets many corners at once, ignoring locks. Takes Vector2i corners to heights.
@@ -107,7 +114,7 @@ func set_corners(heights: Dictionary) -> void:
 	for corner: Vector2i in heights:
 		set_corner_height(corner, heights[corner])
 	if not heights.is_empty():
-		_changed()
+		_changed(_whole())
 
 
 ## Fills the heights from a function of the corner, for world generation.
@@ -115,7 +122,7 @@ func generate(height_for_corner: Callable) -> void:
 	for z in size.y + 1:
 		for x in size.x + 1:
 			set_corner_height(Vector2i(x, z), height_for_corner.call(Vector2i(x, z)))
-	_changed()
+	_changed(_whole())
 
 #endregion
 
@@ -157,7 +164,7 @@ func sculpt(brush: Brush, centre: Vector2, radius: float, strength: float,
 	for corner: Vector2i in updates:
 		set_corner_height(corner, updates[corner])
 	if not updates.is_empty():
-		_changed()
+		_changed(Rect2i(from, to - from + Vector2i.ONE))
 
 
 func _neighbour_average(corner: Vector2i) -> float:
@@ -225,32 +232,44 @@ func rebuild() -> void:
 	_rebuild_queued = false
 	if not is_inside_tree():
 		return
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for z in size.y + 1:
-		for x in size.x + 1:
-			var corner := Vector2i(x, z)
-			st.set_normal(_corner_normal(corner))
-			st.add_vertex(Vector3(x * cell_size, corner_height(corner), z * cell_size))
+	# Packed arrays rather than SurfaceTool: this runs every frame while
+	# sculpting, and is several times faster this way.
 	var stride := size.x + 1
-	for z in size.y:
-		for x in size.x:
+	var count := stride * (size.y + 1)
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	vertices.resize(count)
+	normals.resize(count)
+	var two := 2.0 * cell_size
+	for z in size.y + 1:
+		for x in stride:
 			var i := z * stride + x
-			# Clockwise from above, which Godot treats as the front.
-			st.add_index(i)
-			st.add_index(i + 1)
-			st.add_index(i + stride)
-			st.add_index(i + 1)
-			st.add_index(i + stride + 1)
-			st.add_index(i + stride)
-	_mesh_instance.mesh = st.commit()
+			var h := _heights[i]
+			vertices[i] = Vector3(x * cell_size, h, z * cell_size)
+			var left := _heights[i - 1] if x > 0 else 0.0
+			var right := _heights[i + 1] if x < size.x else 0.0
+			var up := _heights[i - stride] if z > 0 else 0.0
+			var down := _heights[i + stride] if z < size.y else 0.0
+			normals[i] = Vector3(left - right, two, up - down).normalized()
+	if _indices.size() != size.x * size.y * 6:
+		_indices.resize(size.x * size.y * 6)
+		var k := 0
+		for z in size.y:
+			for x in size.x:
+				var i := z * stride + x
+				# Clockwise from above, which Godot treats as the front.
+				for index in [i, i + 1, i + stride, i + 1, i + stride + 1, i + stride]:
+					_indices[k] = index
+					k += 1
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = _indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_mesh_instance.mesh = mesh
 	_mesh_instance.material_override = ground_material
-
-
-func _corner_normal(corner: Vector2i) -> Vector3:
-	var dx := corner_height(corner + Vector2i(1, 0)) - corner_height(corner - Vector2i(1, 0))
-	var dz := corner_height(corner + Vector2i(0, 1)) - corner_height(corner - Vector2i(0, 1))
-	return Vector3(-dx, 2.0 * cell_size, -dz).normalized()
 
 
 func _build_sea() -> void:
@@ -265,8 +284,13 @@ func _build_sea() -> void:
 	_sea.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
-func _changed() -> void:
+func _changed(area: Rect2i) -> void:
+	last_changed = area
 	queue_rebuild()
 	changed.emit()
+
+
+func _whole() -> Rect2i:
+	return Rect2i(Vector2i.ZERO, size + Vector2i.ONE)
 
 #endregion

@@ -753,6 +753,11 @@ func _test_terrain() -> void:
 	_check(terrain.corner_height(Vector2i(10, 8)) > 0.0 and terrain.corner_height(Vector2i(10, 8)) < 1.0,
 			"raise falls off towards the rim")
 	_check(terrain.corner_height(Vector2i(12, 8)) == 0.0, "raise leaves outside the brush alone")
+	_check(terrain.last_changed == Rect2i(5, 5, 7, 7), "the terrain says which corners a brush touched")
+	var far_map := BuildingMap.new(Rect2i(0, 0, 16, 16))
+	far_map.build_room(Rect2i(0, 0, 3, 3), &"concrete", &"brick", 0.0)
+	_check(not far_map.has_build_near(terrain.last_changed) and far_map.has_build_near(Rect2i(3, 3, 2, 2)),
+			"buildings only redraw when the ground changes next to them")
 	_check(is_equal_approx(terrain.height_at(Vector2(8.5, 8)),
 			(terrain.corner_height(Vector2i(8, 8)) + terrain.corner_height(Vector2i(9, 8))) * 0.5),
 			"heights blend between corners")
@@ -915,6 +920,18 @@ func _test_people() -> void:
 	_check(sleepy.flat().distance_to(Vector2(15.5, 15.5)) < 6.5, "and walk out over the ground")
 	people.remove_person(sleepy)
 	_check(people.people.size() == 1, "people can be removed")
+	var ground := Terrain.new()
+	people.terrain = ground
+	people._ready()
+	people.nav()
+	ground.sculpt(Terrain.Brush.RAISE, Vector2(15, 15), 2.0, 0.1)
+	_check(not people._dirty, "sculpting doesn't rebuild the walking graph straight away")
+	people._process(0.2)
+	_check(not people._dirty, "nor while the ground is still changing")
+	people.paused = true
+	people._process(0.4)
+	_check(people._dirty, "but does once the ground settles")
+	ground.free()
 	people.free()
 
 

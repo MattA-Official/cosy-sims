@@ -363,6 +363,21 @@ func wall_at(edge: Vector3i) -> int:
 	return walls.get(edge, Wall.NONE)
 
 
+## Is anything built in or right beside a block of tiles? Used to skip
+## redrawing buildings when the ground changes somewhere else.
+func has_build_near(rect: Rect2i) -> bool:
+	if floors.is_empty() and walls.is_empty() and slants.is_empty():
+		return false
+	var area := rect.grow(1)
+	for cell in cells_in(area):
+		if corner_in_use(cell):
+			return true
+	for key: Vector4i in slants:
+		if area.has_point(Vector2i(key.x, key.y)) or area.has_point(Vector2i(key.z, key.w)):
+			return true
+	return false
+
+
 ## Is anything built at this corner? Used to stop sculpting under buildings.
 func corner_in_use(corner: Vector2i) -> bool:
 	for offset: Vector2i in [Vector2i.ZERO, Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]:

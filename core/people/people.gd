@@ -3,8 +3,9 @@ extends Node3D
 ## Everyone walking about, and what they decide to do. Each person's needs
 ## run down over time; once one drops below the line they walk to the
 ## nearest free object that sees to it, use it, and carry on. With nothing
-## pressing they wander. The walking graph is rebuilt whenever the build,
-## the paths or the ground change.
+## pressing they wander. The walking graph is rebuilt whenever the build or
+## the paths change, and once the ground has stopped changing for a moment
+## (rebuilding on every frame of sculpting made the brush lag).
 
 signal person_added(person: Person)
 signal person_removed(person: Person)
@@ -13,6 +14,8 @@ signal person_removed(person: Person)
 const NEED_LINE := 40.0
 ## Seconds before trying again for a need nothing could be found for.
 const RETRY_SECONDS := 8.0
+## Seconds the ground must stay still before the walking graph catches up.
+const GROUND_SETTLE_SECONDS := 0.5
 const FIRST_NAMES: Array[String] = ["Alfie", "Bea", "Cass", "Dot", "Eli", "Fen", "Gus", "Hattie",
 		"Ivo", "Jude", "Kit", "Lou", "Mo", "Nell", "Ozzy", "Pip", "Quin", "Rory", "Sid", "Tess",
 		"Uma", "Vic", "Wren", "Zak"]
@@ -46,6 +49,9 @@ var graph: NavGraph
 var paused := false
 
 var _dirty := true
+## Seconds until the ground has settled after sculpting, or below 0 when
+## it has nothing waiting.
+var _ground_wait := -1.0
 var _next_id := 1
 var _rng := RandomNumberGenerator.new()
 ## (level, object id): the person using or heading for it.
@@ -55,10 +61,14 @@ var _bodies: Dictionary[Person, Node3D] = {}
 
 func _ready() -> void:
 	if terrain != null:
-		terrain.changed.connect(mark_dirty)
+		terrain.changed.connect(_on_ground_changed)
 
 
 func _process(delta: float) -> void:
+	if _ground_wait >= 0.0:
+		_ground_wait -= delta
+		if _ground_wait < 0.0:
+			mark_dirty()
 	if not paused:
 		step(delta)
 	_update_bodies()
@@ -66,6 +76,12 @@ func _process(delta: float) -> void:
 
 func mark_dirty() -> void:
 	_dirty = true
+
+
+## People keep the old graph while the ground is being sculpted, and get a
+## new one once it settles.
+func _on_ground_changed() -> void:
+	_ground_wait = GROUND_SETTLE_SECONDS
 
 
 ## The walking graph, rebuilt first if anything has changed.
