@@ -1,8 +1,12 @@
 extends Node3D
-## The prison sandbox: a grid you can build on, with a small sample block to
-## start from. People arrive in step 3.
+## The prison sandbox: a grid you can build on, with a sample prison to
+## start from (see SamplePrisons) and prisoners walking about it.
 
+## Off starts on empty land.
 @export var build_sample_layout := true
+## Which sample prison to start with. The F3 inspector can switch to another.
+@export_enum("Starter block", "Two storeys", "Hillside", "Island", "Long way round", "Basement",
+		"Crowded canteen", "Locked out") var sample := 0
 ## Split levels: floors nudged within their storey, and ramps between
 ## them. Off keeps every floor a whole storey above the one below.
 @export var split_levels := false
@@ -63,16 +67,8 @@ func _ready() -> void:
 	var ground: ShaderMaterial = terrain.ground_material
 	ground.set_shader_parameter("water_level",
 			terrain.sea_level if terrain.has_sea else Terrain.MIN_HEIGHT - 10.0)
-	var pond := Vector2(land.end.x + 9, land.get_center().y + 6)
-	StartingLandscape.shape(terrain, land, pond)
-	water.fill_at(Vector2i(pond))
 
-	var layout_origin := land.get_center() - Vector2i(8, 7)
-	if build_sample_layout:
-		SampleLayout.build(map, layout_origin)
-	StartingLandscape.plant(foliage, terrain, map, layout_origin)
-
-	# People walk the build; a few prisoners start out in the corridor.
+	# People walk the build.
 	people.name = "People"
 	people.terrain = terrain
 	people.needs = PrisonCatalogue.NEEDS
@@ -92,9 +88,21 @@ func _ready() -> void:
 	inspector.debug_overlay = debug_overlay
 	inspector.room_types = PrisonCatalogue.ROOM_TYPES
 	grid.add_child(inspector)
-	if build_sample_layout:
-		for i in 6:
-			people.add_person(0, Vector2(layout_origin) + Vector2(1.5 + i * 1.7, 3.5 + (i % 2)))
+	if SamplePrisons.next >= 0:
+		sample = SamplePrisons.next
+		SamplePrisons.next = -1
+	var site := SamplePrisons.Site.new()
+	site.building = building
+	site.terrain = terrain
+	site.water = water
+	site.foliage = foliage
+	site.paths = paths
+	site.people = people
+	SamplePrisons.build(sample if build_sample_layout else -1, site)
+	var load_sample := func(index: int) -> void:
+		SamplePrisons.next = index
+		get_tree().reload_current_scene()
+	inspector.offer_samples(SamplePrisons.NAMES, SamplePrisons.CHALLENGES, sample, load_sample)
 
 	camera_rig.bounds = grid.world_rect()
 	camera_rig.position = grid.centre()

@@ -5,6 +5,7 @@ extends Node3D
 ## about it in a panel on the left, and change it: set a person's needs,
 ## rename them, send them somewhere or remove them; remove an object; add
 ## a prisoner on a tile. The selected person's route is drawn on the ground.
+## The game can also offer ready-made layouts to switch to.
 
 @export var cursor: GridCursor
 @export var controller: BuildController
@@ -29,6 +30,11 @@ var _sending := false
 ## Labels and sliders refreshed every frame for the selected person.
 var _live_text: Label
 var _need_sliders: Dictionary[StringName, HSlider] = {}
+## Ready-made layouts the game offers, what each is for, and how to load one.
+var _samples: Array[String] = []
+var _sample_notes: Array[String] = []
+var _current_sample := -1
+var _load_sample: Callable
 
 
 func _ready() -> void:
@@ -79,6 +85,16 @@ func select(thing: Variant, level := 0) -> void:
 
 func selected() -> Variant:
 	return _selected
+
+
+## Lists layouts to switch to at the foot of the panel. `load` takes the
+## chosen index.
+func offer_samples(names: Array[String], notes: Array[String], current: int, load: Callable) -> void:
+	_samples = names
+	_sample_notes = notes
+	_current_sample = current
+	_load_sample = load
+	_rebuild()
 
 
 func _on_cell_clicked(cell: Vector2i, button: MouseButton) -> void:
@@ -155,6 +171,22 @@ func _rebuild() -> void:
 			people.paused = not people.paused
 			_rebuild())
 		pause.tooltip_text = "Stops everyone where they are."
+	if not _samples.is_empty():
+		_show_samples()
+
+
+func _show_samples() -> void:
+	_box.add_child(HSeparator.new())
+	_text("Sample prisons")
+	var picker := OptionButton.new()
+	for name in _samples:
+		picker.add_item(name)
+	picker.selected = clampi(_current_sample, 0, _samples.size() - 1)
+	_box.add_child(picker)
+	var note := _text(_sample_notes[picker.selected] if picker.selected < _sample_notes.size() else "")
+	picker.item_selected.connect(func(index: int) -> void:
+		note.text = _sample_notes[index] if index < _sample_notes.size() else "")
+	_button("Load this sample (starts again)", func() -> void: _load_sample.call(picker.selected))
 
 
 func _show_person(person: Person) -> void:

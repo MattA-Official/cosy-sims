@@ -123,8 +123,13 @@ it follows the build exactly and needs no baking:
   so they join levels and cross water and steep ground. Ground paths make
   the ground under them cheaper than bare grass, so people keep to them.
 - Walks are smoothed: straight stretches with nothing in the way are
-  taken in one go. The graph is rebuilt whenever the build, the paths or
-  the ground change.
+  taken in one go. The graph is rebuilt whenever the build or the paths
+  change, and half a second after sculpting stops (rebuilding on every
+  frame of the brush made it lag; the ground mesh is also built from
+  packed arrays, and buildings only redraw when the brush is next to
+  them).
+- People use an object from a tile inside its room, never through a
+  wall from the other side.
 - Needs (`NeedDef` resources: sleep, hunger, hygiene for the prison) run
   from 100 down. Below 40, people walk to the nearest free object that
   sees to the lowest need (bed, table, shower), claim it, use it until
@@ -139,6 +144,18 @@ it follows the build exactly and needs no baking:
   rename them, send them somewhere, or remove them, and their route is
   drawn on the ground. Objects show who is using them and can be removed;
   rooms and tiles can have a prisoner added. People can be paused.
+- **Sample prisons** (`games/prison/sample_prisons.gd`), picked with the
+  Main node's Sample setting or from the bottom of the inspector panel
+  (which reloads the scene). Each tests a different part of finding the
+  way: Starter block (doors, corridor, yard), Two storeys (stairs and a
+  lift), Hillside (terraces 2 m apart with banks too steep to climb, so
+  only path stairs and a long ramp join them), Island (one bridge over a
+  moat), Long way round (a corridor that doubles back, and a door in an
+  angled wall), Basement (stairs turning at a landing), Crowded canteen
+  (24 prisoners queueing for two tables and two showers) and Locked out
+  (showers with no door, and a raised canteen that needs door steps).
+  The tests load every sample and check who can reach a bed, a table and
+  a shower.
 - Next: the daily routine (lockup, meals, yard time) and more needs.
 
 ### Agreed order
@@ -178,6 +195,13 @@ walls are done, and so is the first slice of people and pathfinding.
   cover, and the floor can go back once they are removed. Nothing can be
   placed on stairs, no wall can cut across a flight, and demolishing any
   tile of them removes them. A stairwell stays part of the room around it.
+- **Doors between floors at different heights** (Matt, 2026-10-19): a
+  door can't join floors more than a step (0.25 m) apart; the door tool
+  shows the wall in red and says how far apart they are. Behind a flag,
+  `Building.door_steps` (the Door Steps box on the Main node), such a
+  door instead gets a few steps on the low side, for gaps up to a metre:
+  one riser per quarter metre, with the treads sharing the tile in front
+  of the door. People climb them, and nothing can be placed on them.
 - There is one kind of lift. Lifts link with a lift in the same spot on
   the next level up.
 - With split levels on, ramps are drawn with the floor tool's Ramp mode: drag over floor from the

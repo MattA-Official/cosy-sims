@@ -30,6 +30,7 @@ func _process(_delta: float) -> bool:
 	_test_path_profile()
 	_test_foliage()
 	_test_main_scene_loads()
+	_test_sample_prisons()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -195,6 +196,56 @@ func _test_demolish() -> void:
 	map.build_walls(BuildingMap.edges_on_line(Vector2i(8, 0), Vector2i(8, 4)))
 	map.demolish(Rect2i(8, 1, 1, 1))
 	_check(map.walls.size() == 15, "demolishing next to a lone wall removes the touching piece")
+
+
+## Loads every sample prison and checks who can reach a bed, a table and a
+## shower. Everyone should reach everything, except in Locked out, where
+## the showers have no door and the canteen needs door steps.
+func _test_sample_prisons() -> void:
+	var scene: PackedScene = load("res://games/prison/main.tscn")
+	for index in SamplePrisons.NAMES.size():
+		for steps: bool in ([false, true] if index == 7 else [false]):
+			var main := scene.instantiate()
+			main.sample = index
+			main.door_steps = steps
+			root.add_child(main)
+			var name := SamplePrisons.NAMES[index] + (" with door steps" if steps else "")
+			var people: People = main.people
+			_check(people.people.size() >= 4, "%s: prisoners start in it" % name)
+			var reach := _reachable_needs(people)
+			var expected: Array[StringName] = [&"sleep", &"hunger", &"hygiene"]
+			if index == 7:
+				expected.assign([&"sleep", &"hunger"] if steps else [&"sleep"])
+			_check(reach == expected, "%s: everyone can reach %s (got %s)" % [name, expected, reach])
+			if index == 2 or index == 3:
+				# Without its stairs, ramp or bridge, the cells are cut off.
+				people.graph = NavGraph.build(main.building, PathNetwork.new(), main.terrain)
+				people._dirty = false
+				_check(_reachable_needs(people) == ([&"sleep"] as Array[StringName]),
+						"%s: only the built paths lead to the canteen" % name)
+			main.free()
+	Building.door_steps = false
+
+
+## The needs every person in the build can reach an object for.
+func _reachable_needs(people: People) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for def in people.needs:
+		var everyone := true
+		for person in people.people:
+			var found := false
+			for n: int in people.building.levels:
+				for placed: BuildingMap.PlacedObject in people.building.levels[n].objects.values():
+					if found or not def.object_tag in placed.def.tags:
+						continue
+					for spot in people._spots_beside(n, placed, person.flat()):
+						if not people.nav().find_path(person.level, person.flat(), n, spot).is_empty():
+							found = true
+							break
+			everyone = everyone and found
+		if everyone:
+			out.append(def.id)
+	return out
 
 
 func _test_main_scene_loads() -> void:

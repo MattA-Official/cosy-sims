@@ -33,7 +33,7 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | 1 Room | Drag to build a floor with walls all round |
 | 2 Floor | Drag to lay or restyle floor on the side of any walls where you start; Shift-click floors or restyles the whole room; hold Ctrl to remove. Stairs: click the foot, move the way they climb, click short of the top for a landing, at the top to build; choose square or rounded landings |
 | 3 Wall | Drag from corner to corner to build or restyle; snaps straight or to 45°, or pick Any angle (or hold Alt); hold Ctrl to remove |
-| 4 Doors and windows | Pick a door, glass window or barred window, then click a wall; click it again to fill it in |
+| 4 Doors and windows | Pick a door, glass window or barred window, then click a wall; click it again to fill it in. A door can't join floors more than a step apart (see Door Steps below) |
 | 5 Objects | Click to place; R turns by 45° and [ / ] change the step (90° down to 1°); hold F to pin it and turn it to face the mouse; hold Alt to place freely. Lifts link with a lift in the same spot upstairs |
 | 6 Room type | Click a room to mark it as a cell, canteen and so on |
 | 7 Demolish | Click an object or wall to remove it, or drag to clear an area |
@@ -76,12 +76,31 @@ shows at that floor's height.
 Split levels (floors nudged up or down within a storey, with ramps
 between them) are switched off for now. Tick **Split Levels** on the Main
 node in Godot's inspector to bring back the floor tool's Raise, Lower and
-Ramp modes.
+Ramp modes. Likewise, tick **Door Steps** to let a door join floors up to
+a metre apart, with a few steps built on the low side; with it off, such
+doors are refused.
 
 Prisoners walk the build: through doors, up stairs and lifts, along paths
 and over bridges. They get sleepy, hungry and grubby, and head off to a
 free bed, table or shower when they need one; otherwise they wander.
 Press F3 and click someone to see what they're up to.
+
+### Sample prisons
+
+Pick a sample with **Sample** on the Main node, or press F3 and choose one
+at the bottom of the inspector panel. Each one tests a different part of
+how prisoners find their way:
+
+| Sample | What it tests |
+| --- | --- |
+| Starter block | Doors, a corridor and a fenced yard on flat ground |
+| Two storeys | Cells upstairs, canteen and showers downstairs, joined by stairs and a lift |
+| Hillside | Terraces too steep to climb, joined only by path stairs and a long ramp |
+| Island | Cells on an island in a moat, with one bridge |
+| Long way round | A corridor that doubles back, and showers behind an angled wall with a door |
+| Basement | Canteen and showers in the basement, down stairs with a landing |
+| Crowded canteen | 24 prisoners, 16 beds, two tables and two showers |
+| Locked out | Showers with no door, and a raised canteen that needs Door Steps |
 
 See [docs/design/building.md](docs/design/building.md) for the design
 decisions behind all this.

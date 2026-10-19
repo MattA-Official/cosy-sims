@@ -232,12 +232,17 @@ func _wander(person: Person) -> void:
 
 
 ## Tiles beside an object people could stand on to use it, nearest to
-## `from` first.
+## `from` first. In a walled room they must be inside it, not on the far
+## side of a wall.
 func _spots_beside(level: int, placed: BuildingMap.PlacedObject, from: Vector2) -> Array[Vector2]:
 	var out: Array[Vector2] = []
+	var map := building.levels.get(level) as BuildingMap
+	var room := map.room_at_point(placed.centre) if map != null else null
 	for cell in BuildingMap.cells_under(placed.rect.grow(0.8)):
 		var spot := Vector2(cell) + Vector2(0.5, 0.5)
 		if placed.rect.grow(-0.05).has_point(spot) or nav().point_at(level, spot) == -1:
+			continue
+		if room != null and room.enclosed and map.room_at_point(spot) != room:
 			continue
 		out.append(spot)
 	out.sort_custom(func(a: Vector2, b: Vector2) -> bool:

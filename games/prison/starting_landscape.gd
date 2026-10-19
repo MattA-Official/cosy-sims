@@ -4,9 +4,10 @@ class_name StartingLandscape
 
 
 ## Shapes the ground. Owned land stays flat at height 0 so the sample
-## layout sits on level ground; hills fade in a few tiles past its edge.
+## layout sits on level ground, unless `base` gives a height for each
+## corner of it (terraces, a moat); hills fade in a few tiles past its edge.
 static func shape(terrain: Terrain, land: Rect2i, pond_centre: Vector2, pond_radius := 6.0,
-		seed := 7) -> void:
+		seed := 7, base: Callable = Callable()) -> void:
 	var noise := FastNoiseLite.new()
 	noise.seed = seed
 	noise.frequency = 0.035
@@ -14,15 +15,20 @@ static func shape(terrain: Terrain, land: Rect2i, pond_centre: Vector2, pond_rad
 	terrain.generate(func(corner: Vector2i) -> float:
 		var outside := _distance_outside(Vector2(corner), land)
 		var hills := (noise.get_noise_2d(corner.x, corner.y) * 0.5 + 0.5) * 6.5
-		var height := hills * smoothstep(0.0, 8.0, outside)
+		var inside := 0.0
+		if base.is_valid():
+			var nearest := corner.clamp(land.position, land.end)
+			inside = base.call(nearest)
+		var height := lerpf(inside, hills, smoothstep(0.0, 8.0, outside))
 		var to_pond := Vector2(corner).distance_to(pond_centre)
 		var dip := 1.0 - smoothstep(pond_radius * 0.4, pond_radius, to_pond)
 		return lerpf(height, -1.4, dip))
 
 
-## Scatters trees and bushes outside the land, and a few around the prison.
+## Scatters trees and bushes outside the land, and (with `garden`) a few
+## flowers and bushes around the starter prison.
 static func plant(foliage: FoliageLayer, terrain: Terrain, map: BuildingMap,
-		layout_origin: Vector2i, seed := 7) -> void:
+		layout_origin: Vector2i, seed := 7, garden := true) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
 	var oak := PrisonCatalogue.PLANTS[0]
@@ -46,6 +52,8 @@ static func plant(foliage: FoliageLayer, terrain: Terrain, map: BuildingMap,
 		foliage.add(def, position, rng.randf_range(def.scale_range.x, def.scale_range.y),
 				rng.randf() * TAU)
 
+	if not garden:
+		return
 	# A little greenery around the prison itself.
 	var tame := func(position: Vector2) -> bool:
 		var cell := Vector2i(position.floor())
