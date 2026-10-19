@@ -125,12 +125,35 @@ func _build_floors() -> void:
 			var depth := top_y - bottom
 			MeshShapes.add_box(st, centre + Vector3.UP * (top_y - depth * 0.5),
 					Vector3(0.5 * cs, depth * 0.5, 0.5 * cs), foundation_colour, colour * shade)
+			_add_split_steps(st, cell, top_y, colour * shade)
 	if level == 0:
 		_add_land_edge(st)
 	elif map.floors.is_empty():
 		_floor_mesh.mesh = null
 		return
 	_floor_mesh.mesh = st.commit()
+
+
+## Where a neighbouring floor is up to MAX_STEP higher, with nothing in
+## between, a half-height step on this tile makes the climb read as two
+## easy steps rather than one tall one.
+func _add_split_steps(st: SurfaceTool, cell: Vector2i, top_y: float, colour: Color) -> void:
+	var cs := grid.cell_size
+	for step in BuildingMap.DIRECTIONS:
+		var next := cell + step
+		if not map.has_floor(next) or not map.can_walk_between(cell, next):
+			continue
+		var rise := map.floor_height(next) - map.floor_height(cell)
+		if rise <= 0.26:
+			continue
+		var tread := 0.3 * cs
+		var dir := Vector3(step.x, 0.0, step.y)
+		var across := Vector3(absf(step.y), 0.0, absf(step.x))
+		var centre := Vector3(cell.x + 0.5, 0.0, cell.y + 0.5) * cs + dir * (0.5 * cs - tread * 0.5)
+		var half_rise := rise * 0.25
+		MeshShapes.add_box(st, centre + Vector3.UP * (top_y + half_rise),
+				across * 0.5 * cs + dir * tread * 0.5 + Vector3.UP * half_rise, colour.darkened(0.1),
+				colour)
 
 
 ## A low kerb around the land you own, so you can see where you may build.
@@ -171,7 +194,7 @@ func _build_walls() -> void:
 		var start := Vector2(edge.x, edge.y)
 		var end := start + Vector2(along.x, along.z)
 		var drop := middle.y - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
-				if level == 0 else 0.05
+				if level == 0 else middle.y - _lowest_floor_beside(edge) + 0.05
 		# Stretch each piece by half a thickness so corners join up.
 		var half_len := along * (cs + thickness) * 0.5
 		var half_across := across * thickness * 0.5
@@ -308,6 +331,14 @@ func _build_labels() -> void:
 ## Ground height at a point in tile units.
 func _height_at(point: Vector2) -> float:
 	return terrain.height_at(point) if terrain != null else 0.0
+
+
+func _lowest_floor_beside(edge: Vector3i) -> float:
+	var lowest := INF
+	for cell in BuildingMap.edge_cells(edge):
+		if map.has_floor(cell):
+			lowest = minf(lowest, map.floor_height(cell))
+	return lowest if lowest < INF else _wall_base(edge)
 
 
 func _lowest_ground(cell: Vector2i) -> float:

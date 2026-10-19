@@ -33,6 +33,9 @@ const DIRECTIONS: Array[Vector2i] = [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOW
 const EPSILON := 0.001
 const DEFAULT_FLOOR := &"concrete"
 const DEFAULT_WALL := &"plaster"
+## Neighbouring floors further apart in height than this need a ramp or
+## stairs between them; closer ones are a step people can take.
+const MAX_STEP := 0.5
 
 enum Wall { NONE, WALL, DOOR, WINDOW }
 
@@ -228,6 +231,19 @@ func floor_height(cell: Vector2i) -> float:
 	return floor_heights.get(cell, 0.0)
 
 
+## Changes the height of existing floor tiles, for split levels. Takes
+## Vector2i tiles to heights; tiles without floor are skipped.
+func set_floor_heights(heights: Dictionary) -> int:
+	var count := 0
+	for cell: Vector2i in heights:
+		if floors.has(cell) and not is_equal_approx(floor_heights.get(cell, 0.0), heights[cell]):
+			floor_heights[cell] = heights[cell]
+			count += 1
+	if count > 0:
+		_changed()
+	return count
+
+
 ## The height of floor already in or right next to a rectangle, so new
 ## floor can line up with it. NAN when there is none.
 func floor_height_near(rect: Rect2i) -> float:
@@ -292,13 +308,18 @@ func is_outdoor_wall(edge: Vector3i) -> bool:
 
 
 ## Can people walk from one cell to its neighbour? Walls and windows
-## block; doors do not.
+## block; doors do not. Between two floors, a drop bigger than MAX_STEP
+## blocks too.
 func can_walk_between(a: Vector2i, b: Vector2i) -> bool:
 	var edge := edge_between(a, b)
 	if edge == NO_EDGE or not owns(a) or not owns(b):
 		return false
 	var kind := wall_at(edge)
-	return kind == Wall.NONE or kind == Wall.DOOR
+	if kind != Wall.NONE and kind != Wall.DOOR:
+		return false
+	if floors.has(a) and floors.has(b):
+		return absf(floor_height(a) - floor_height(b)) <= MAX_STEP + EPSILON
+	return true
 
 
 ## Can a wall go on this edge? Not off our land, and not through an object.

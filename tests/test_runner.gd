@@ -504,6 +504,30 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	controller._on_release()
 	_check(building.level(-1).rooms().size() == 1 and building.level(-1).floor_height(cell.call(42, 41))
 			< terrain.cell_height(cell.call(42, 41)) - 2.0, "basements go below ground")
+	# Split levels: raise half the ground room, then go too far.
+	building.active = 0
+	controller.tool = BuildController.Tool.FLOOR
+	controller.floor_mode = BuildController.FloorMode.RAISE
+	var low_cell: Vector2i = cell.call(36, 31)
+	var high_cell: Vector2i = cell.call(38, 31)
+	var start_height := map.floor_height(high_cell)
+	hover.call(38.5, 30.5)
+	controller._on_press()
+	hover.call(39.5, 33.5)
+	controller._draw_preview()
+	controller._on_release()
+	_check(is_equal_approx(map.floor_height(high_cell), start_height + BuildController.NUDGE_STEP)
+			and is_equal_approx(map.floor_height(low_cell), start_height), "raise nudges the dragged floor up")
+	_check(map.can_walk_between(cell.call(37, 31), high_cell), "a small split is a step people can take")
+	for i in 3:
+		controller.nudge_floors(Rect2i(cell.call(38, 30), Vector2i(2, 4)), BuildController.NUDGE_STEP)
+	_check(not map.can_walk_between(cell.call(37, 31), high_cell), "a big split needs a ramp or stairs")
+	building.active = 1
+	for i in 10:
+		controller.nudge_floors(Rect2i(cell.call(36, 30), Vector2i(4, 4)), BuildController.NUDGE_STEP)
+	_check(upstairs.floor_height(cell.call(37, 31)) <= map.floor_height(cell.call(37, 31))
+			+ Building.STOREY + BuildController.NUDGE_UP + 0.001, "upstairs nudges stay within the storey")
+	controller.floor_mode = BuildController.FloorMode.LAY
 	building.active = 0
 
 

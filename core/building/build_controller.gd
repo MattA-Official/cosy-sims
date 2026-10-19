@@ -11,6 +11,14 @@ signal tool_changed(tool: Tool)
 
 enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH }
 enum WaterMode { NONE, ADD, REMOVE }
+## What the floor tool does: lay floor, or nudge existing floor up or down.
+enum FloorMode { LAY, RAISE, LOWER }
+
+## How far one floor nudge moves, in metres.
+const NUDGE_STEP := 0.25
+## How far floors may be nudged from their storey's height, below and above.
+const NUDGE_DOWN := 0.5
+const NUDGE_UP := 1.5
 
 const HINTS := {
 	Tool.NONE: "",
@@ -30,6 +38,11 @@ const PATH_HINTS := {
 	PathTool.Mode.STRAIGHT: "Click to start a path and click again to end it. Esc stops. Ctrl-click removes a path.",
 	PathTool.Mode.CURVED: "Click the start, then a bend point, then the end. Esc stops. Ctrl-click removes a path.",
 	PathTool.Mode.FREEHAND: "Drag to draw a path; it is smoothed when you let go. Ctrl-click removes a path.",
+}
+
+const FLOOR_HINTS := {
+	FloorMode.RAISE: "Drag over floor to raise it a step, for split levels.",
+	FloorMode.LOWER: "Drag over floor to lower it a step, for split levels.",
 }
 
 const WATER_HINTS := {
@@ -107,6 +120,7 @@ var window_kind := BuildingMap.WINDOW_GLASS
 var terrain_brush := Terrain.Brush.RAISE
 ## When not NONE, the terrain tool adds or removes water instead of sculpting.
 var water_mode := WaterMode.NONE
+var floor_mode := FloorMode.LAY
 var plant_def: FoliageDef
 ## Brush radius in tiles, for the terrain and plant tools.
 var brush_radius := 3.0
@@ -251,6 +265,8 @@ func _on_release() -> void:
 			if can_build_floor(rect):
 				map.build_room(rect, floor_style, wall_style, height)
 				settle_ground(rect)
+		Tool.FLOOR when floor_mode != FloorMode.LAY:
+			nudge_floors(rect, NUDGE_STEP if floor_mode == FloorMode.RAISE else -NUDGE_STEP)
 		Tool.FLOOR:
 			if erase:
 				map.clear_floor(rect)
@@ -282,6 +298,8 @@ func _on_release() -> void:
 
 ## What the current tool does, for the toolbar.
 func hint() -> String:
+	if tool == Tool.FLOOR and floor_mode != FloorMode.LAY:
+		return FLOOR_HINTS[floor_mode]
 	if _ground_only(tool) and _level() != 0:
 		return "This tool works on the ground floor. Page Down to go back to it."
 	if tool == Tool.TERRAIN and water_mode != WaterMode.NONE:
@@ -331,6 +349,29 @@ func build_height(rect: Rect2i) -> float:
 	if _level() != 0:
 		return building.storey_height(_level(), start, ground)
 	return ground
+
+
+## Moves the floor in a rectangle up or down, for split levels. Upstairs
+## and in basements floors stay near their storey's height; on the ground
+## they stay out of the water, and the ground is refitted underneath.
+## Returns how many tiles moved.
+func nudge_floors(rect: Rect2i, amount: float) -> int:
+	var heights := {}
+	for cell in BuildingMap.cells_in(rect):
+		if not map.has_floor(cell):
+			continue
+		var height := map.floor_height(cell) + amount
+		var ground := terrain.cell_height(cell) if terrain != null else 0.0
+		if _level() != 0:
+			var base := building.storey_height(_level(), cell, ground)
+			height = clampf(height, base - NUDGE_DOWN, base + NUDGE_UP)
+		elif terrain != null and terrain.water_surface(Vector2(cell) + Vector2(0.5, 0.5)) > height:
+			continue
+		heights[cell] = height
+	var count := map.set_floor_heights(heights)
+	if count > 0:
+		settle_ground(rect)
+	return count
 
 
 ## Whether floor can go over a rectangle: out of the water on the ground,
@@ -495,6 +536,12 @@ func _draw_preview() -> void:
 			for edge in BuildingMap.rect_perimeter(rect):
 				_preview_edge(edge, ok_colour if dry and map.can_build_wall(edge) else bad_colour,
 						_preview_height(rect))
+		Tool.FLOOR when floor_mode != FloorMode.LAY:
+			var cells: Array[Vector2i] = []
+			for cell in BuildingMap.cells_in(_drag_rect()):
+				if map.has_floor(cell):
+					cells.append(cell)
+			_preview_cells(cells, ok_colour)
 		Tool.FLOOR:
 			var rect := _drag_rect()
 			if _erasing():

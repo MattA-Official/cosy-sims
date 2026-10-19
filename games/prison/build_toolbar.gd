@@ -18,6 +18,12 @@ const TOOLS := [
 	[BuildController.Tool.PATH, "Paths"],
 ]
 
+const FLOOR_MODES := [
+	[BuildController.FloorMode.LAY, "Lay"],
+	[BuildController.FloorMode.RAISE, "Raise"],
+	[BuildController.FloorMode.LOWER, "Lower"],
+]
+
 const PATH_MODES := [
 	[PathTool.Mode.STRAIGHT, "Straight"],
 	[PathTool.Mode.CURVED, "Curved"],
@@ -114,6 +120,8 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 			_options.add_child(VSeparator.new())
 			_add_style_choices(PrisonCatalogue.WALLS, false)
 		BuildController.Tool.FLOOR:
+			_add_floor_mode_choices()
+			_options.add_child(VSeparator.new())
 			_add_style_choices(PrisonCatalogue.FLOORS, true)
 		BuildController.Tool.WALL:
 			_add_style_choices(PrisonCatalogue.WALLS, false)
@@ -150,6 +158,19 @@ func _add_style_choices(defs: Array, floors: bool) -> void:
 				controller.floor_style = id
 			else:
 				controller.wall_style = id)
+		_options.add_child(button)
+
+
+func _add_floor_mode_choices() -> void:
+	var group := ButtonGroup.new()
+	for entry: Array in FLOOR_MODES:
+		var mode: BuildController.FloorMode = entry[0]
+		var button := _make_button(entry[1], group)
+		button.button_pressed = controller.floor_mode == mode
+		button.toggled.connect(func(on: bool) -> void:
+			if on:
+				controller.floor_mode = mode
+				_hint.text = controller.hint())
 		_options.add_child(button)
 
 
