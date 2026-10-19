@@ -15,6 +15,9 @@ var needs: Dictionary[StringName, float] = {}
 var state := State.IDLE
 ## What they are doing, in words, for the inspector.
 var activity := "Standing about"
+## Walking about with nowhere in particular to be, so a pressing need can
+## cut it short.
+var wandering := false
 
 ## The positions still to walk to, with each one's level and whether it
 ## is on floor or ground.

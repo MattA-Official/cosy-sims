@@ -162,7 +162,12 @@ func _think(person: Person, delta: float) -> void:
 		_stop(person) # The object went while they were on their way.
 	match person.state:
 		Person.State.WALKING:
-			_walk(person, delta)
+			var need := person.most_pressing(NEED_LINE) if person.wandering else &""
+			if need != &"":
+				_stop(person)
+				_seek(person, need)
+			else:
+				_walk(person, delta)
 		Person.State.USING:
 			if person.needs[person.target_need] >= 99.9:
 				_finish_using(person)
@@ -206,6 +211,7 @@ func _wander(person: Person) -> void:
 	var spot: Variant = nav().random_spot(person.level, person.flat(), 6.0, _rng)
 	if spot != null and _walk_to(person, person.level, spot):
 		person.activity = "Wandering"
+		person.wandering = true
 	person.timer = _rng.randf_range(2.0, 6.0)
 
 
@@ -230,6 +236,7 @@ func _walk_to(person: Person, level: int, spot: Vector2) -> bool:
 	var route := nav().find_path(person.level, person.flat(), level, spot, levels, surface)
 	if route.is_empty():
 		return false
+	person.wandering = false
 	person.route = route
 	person.route_levels = levels
 	person.route_on_surface = surface

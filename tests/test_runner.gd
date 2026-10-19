@@ -222,6 +222,24 @@ func _test_main_scene_loads() -> void:
 	var text := overlay.describe(map.land_bounds().get_center() - Vector2i(7, 7))
 	_check(text.contains("Enclosed: yes") and text.contains("Indoors") and text.contains("bars window"),
 			"debug view describes a cell, its room and its window")
+	var people: People = main.people
+	_check(people.people.size() == 6, "six prisoners start in the sample prison")
+	people.step(0.5)
+	var inspector: Inspector = main.inspector
+	inspector.select(people.people[0])
+	inspector._process(0.0)
+	_check(inspector._live_text != null and inspector._live_text.text.contains("Doing:"),
+			"the inspector describes a person")
+	inspector.select(Vector2i(map.land_bounds().position + Vector2i(2, 2)))
+	inspector._add_prisoner(map.land_bounds().position + Vector2i(2, 2))
+	_check(people.people.size() == 7 and inspector.selected() is Person, "the inspector adds a prisoner")
+	# Nobody near the mouse, so a click picks what is on the tile.
+	for person in people.people.duplicate():
+		people.remove_person(person)
+	_check(inspector.selected() == null, "removing the selected person clears the inspector")
+	inspector._on_cell_clicked(map.land_bounds().get_center() - Vector2i(8, 7), MOUSE_BUTTON_LEFT)
+	_check(inspector.selected() is Array, "clicking a bed in the debug view inspects it")
+	overlay.visible = false
 	_check(overlay.describe(GridCursor.NO_CELL).contains("Rooms: "), "debug view shows totals")
 	_test_tools(main.controller, map)
 	main.building.active = 1

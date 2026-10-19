@@ -21,6 +21,8 @@ var building: Building
 var map: BuildingMap
 var paths := PathNetwork.new()
 var people := People.new()
+## The F3 inspector for people, objects and rooms.
+var inspector := Inspector.new()
 ## One BuildingView per level, by level number.
 var views: Dictionary[int, BuildingView] = {}
 
@@ -67,6 +69,14 @@ func _ready() -> void:
 	people.building = building
 	people.paths = paths
 	grid.add_child(people)
+	inspector.name = "Inspector"
+	inspector.people = people
+	inspector.building = building
+	inspector.cursor = cursor
+	inspector.controller = controller
+	inspector.debug_overlay = debug_overlay
+	inspector.room_types = PrisonCatalogue.ROOM_TYPES
+	grid.add_child(inspector)
 	if build_sample_layout:
 		for i in 6:
 			people.add_person(0, Vector2(layout_origin) + Vector2(1.5 + i * 1.7, 3.5 + (i % 2)))

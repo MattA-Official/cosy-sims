@@ -12,6 +12,7 @@ evening-sized chunks.
 3. **People and needs.** Prisoners who walk around with pathfinding, two or
    three needs (hunger, sleep, hygiene) that send them to the right objects,
    and a simple daily schedule. This makes it a playable prototype.
+   *Walking and needs done; the daily schedule is next.*
 4. **Review and extract the core.** Note what is prison-specific and what is
    generic (camera, grid, building, agents, needs, schedules), then move the
    generic parts into `core/`.

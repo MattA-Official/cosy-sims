@@ -43,7 +43,7 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | [ / ] | Brush size, for terrain and plants |
 | Tab | Walls up or cut away |
 | Esc | Put the tool away |
-| F3 | Debug view: rooms tinted and labelled, and details of the tile under the mouse |
+| F3 | Debug view: rooms tinted and labelled, and details of the tile under the mouse. With no build tool (Esc), click a person, object, room or tile to inspect it: set a person's needs, send them somewhere, add or remove prisoners, pause everyone |
 
 The room, floor and wall tools let you pick a style in the row above the
 toolbar. Fences, hedges, paving and lawn are outdoor styles: a room enclosed
@@ -70,6 +70,12 @@ Each floor remembers its own height. New floor lines up with any floor
 next to it, or else with the ground where you started dragging (rounded to
 a quarter of a metre), and the ground is fitted underneath so it never
 shows through. Higher floors stand on foundations.
+
+Prisoners walk the build: through doors, up stairs and lifts, along paths
+and over bridges. They get sleepy, hungry and grubby, and head off to a
+free bed, table or shower when they need one; otherwise they wander.
+Press F3 and click someone to see what they're up to.
+
 See [docs/design/building.md](docs/design/building.md) for the design
 decisions behind all this.
 
@@ -77,7 +83,7 @@ decisions behind all this.
 
 | Path | What |
 | --- | --- |
-| `core/` | Parts every game will share: camera, grid, input, building, terrain. Kept free of prison-specific code. |
+| `core/` | Parts every game will share: camera, grid, input, building, terrain, paths, people. Kept free of prison-specific code. |
 | `games/prison/` | The prison game. Anything specific to prisons lives here. |
 | `tests/` | Headless checks (see below). |
 | `tools/` | Developer helpers, such as the screenshot script. |

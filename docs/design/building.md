@@ -104,16 +104,41 @@ Paths and roads are **not** tile floors. They work like Cities: Skylines
   generated from a seed (`games/prison/starting_landscape.gd`). Your land
   starts flat.
 
-### What this means for people (step 3)
-Since paths are curves and the ground can slope, people won't walk on the
-tile grid. They'll use Godot's navigation meshes, baked from floors, paths
-and walkable terrain, with walls and objects as obstacles and doors as the
-links between areas. The tile grid stays the authority for rooms and
-building.
+### People and pathfinding (step 3, first slice built)
+People walk on a graph rather than a baked navmesh (`core/people/`), so
+it follows the build exactly and needs no baking:
+- `NavGraph` is an A* graph (Godot's `AStar3D`) with a point for every
+  floor piece on every level (angled walls included) and every tile of
+  open ground on your land. Points join where people can step across:
+  no wall or window between (doors are fine), no drop over a step, and
+  gentle enough ground. Diagonals are allowed across whole tiles when
+  both ways round are open. Objects block the pieces they cover.
+- Stairs add a point per tile up the flight, lifts a point in each car
+  (with a cost for the wait), and built paths points along their length,
+  so they join levels and cross water and steep ground. Ground paths make
+  the ground under them cheaper than bare grass, so people keep to them.
+- Walks are smoothed: straight stretches with nothing in the way are
+  taken in one go. The graph is rebuilt whenever the build, the paths or
+  the ground change.
+- Needs (`NeedDef` resources: sleep, hunger, hygiene for the prison) run
+  from 100 down. Below 40, people walk to the nearest free object that
+  sees to the lowest need (bed, table, shower), claim it, use it until
+  the need is met and carry on. With nothing pressing they wander, and a
+  need that becomes pressing cuts the wander short. If nothing can be
+  found or reached they say so and try again a little later.
+- People are placeholder figures about 0.9 m tall, hidden above the level
+  being looked at, like floors.
+- The inspector (debug view, F3, with no build tool in hand): click a
+  person, object, room or tile. People show what they are doing, where
+  they are heading and their needs as sliders you can drag; you can
+  rename them, send them somewhere, or remove them, and their route is
+  drawn on the ground. Objects show who is using them and can be removed;
+  rooms and tiles can have a prisoner added. People can be paused.
+- Next: the daily routine (lockup, meals, yard time) and more needs.
 
 ### Agreed order
 Debug view and windows, water bodies, spline paths, storeys and angled
-walls are done. Next come people and pathfinding.
+walls are done, and so is the first slice of people and pathfinding.
 
 ### Storeys (built)
 - Fixed 1.75 m storeys, stepped through with Page Up and Page Down. Each
