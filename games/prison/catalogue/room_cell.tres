@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="RoomTypeDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="RoomTypeDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/building/room_type_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/room_cell.svg" id="2_icon"]
 
 [resource]
 script = ExtResource("1_def")
@@ -8,3 +9,4 @@ id = &"cell"
 display_name = "Cell"
 colour = Color(1, 0.72, 0.45, 1)
 required_tags = Array[StringName]([&"bed", &"toilet"])
+icon = ExtResource("2_icon")

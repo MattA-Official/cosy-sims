@@ -1,22 +1,26 @@
 extends VBoxContainer
-## The build toolbar along the bottom of the screen: a row of tools, a row of
-## choices for the current tool (which object, which room type), and a hint.
+## The build toolbar along the bottom of the screen: a row of tool icons, a
+## bar of choices for the current tool above it, and a hint. Choices from the
+## catalogue (objects, floors, walls, rooms, plants, paths) are picture tiles
+## with their name on hover, so new entries slot in without new code.
 ## Number keys 1 to 9, then 0, pick tools.
 
 @export var controller: BuildController
 
 const TOOLS := [
-	[BuildController.Tool.ROOM, "Room"],
-	[BuildController.Tool.FLOOR, "Floor"],
-	[BuildController.Tool.WALL, "Wall"],
-	[BuildController.Tool.OPENING, "Doors and windows"],
-	[BuildController.Tool.OBJECT, "Objects"],
-	[BuildController.Tool.ROOM_TYPE, "Room type"],
-	[BuildController.Tool.DEMOLISH, "Demolish"],
-	[BuildController.Tool.TERRAIN, "Terrain"],
-	[BuildController.Tool.PLANTS, "Plants"],
-	[BuildController.Tool.PATH, "Paths"],
+	[BuildController.Tool.ROOM, "Room", "Drag out a floor with walls all round.", "tool_room"],
+	[BuildController.Tool.FLOOR, "Floor", "Lay or restyle floors, and build stairs.", "tool_floor"],
+	[BuildController.Tool.WALL, "Wall", "Build or restyle walls, fences and hedges.", "tool_wall"],
+	[BuildController.Tool.OPENING, "Doors and windows", "Put a door or window in a wall.", "tool_opening"],
+	[BuildController.Tool.OBJECT, "Objects", "Place beds, tables, showers and more.", "tool_object"],
+	[BuildController.Tool.ROOM_TYPE, "Room type", "Mark a room as a cell, canteen and so on.", "tool_room_type"],
+	[BuildController.Tool.DEMOLISH, "Demolish", "Remove objects and walls, or clear an area.", "tool_demolish"],
+	[BuildController.Tool.TERRAIN, "Terrain", "Shape the ground, or add and drain water.", "tool_terrain"],
+	[BuildController.Tool.PLANTS, "Plants", "Plant trees, bushes and flowers.", "tool_plants"],
+	[BuildController.Tool.PATH, "Paths", "Lay paths and roads, with stairs and bridges.", "tool_path"],
 ]
+
+const ICONS := "res://core/ui/icons/%s.svg"
 
 const FLOOR_MODES := [
 	[BuildController.FloorMode.LAY, "Lay"],
@@ -56,10 +60,12 @@ var _options_bar := PanelContainer.new()
 var _tool_buttons := {} # Tool -> Button
 var _tool_group := ButtonGroup.new()
 var _walls_button: Button
+var _thumbnails := Thumbnails.new()
 
 
 func _ready() -> void:
 	alignment = BoxContainer.ALIGNMENT_END
+	add_child(_thumbnails)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Only the buttons should catch the mouse, so clicks elsewhere on this
 	# full-width strip still reach the build tools.
@@ -81,7 +87,7 @@ func _ready() -> void:
 	tools_bar.add_child(tools)
 	for i in TOOLS.size():
 		var tool: BuildController.Tool = TOOLS[i][0]
-		var button := _make_tool_button(str((i + 1) % 10), TOOLS[i][1], _tool_group)
+		var button := _make_tool_button(str((i + 1) % 10), TOOLS[i][1], TOOLS[i][2], TOOLS[i][3], _tool_group)
 		button.toggled.connect(func(on: bool) -> void:
 			if on:
 				controller.tool = tool
@@ -90,9 +96,12 @@ func _ready() -> void:
 		tools.add_child(button)
 		_tool_buttons[tool] = button
 	tools.add_child(VSeparator.new())
-	_walls_button = _make_tool_button("Tab", "")
+	_walls_button = _make_tool_button("Tab", "Wall view",
+			"Loops through walls up, cutaway, walls down and roofs on.", "tool_walls_view")
 	_walls_button.toggle_mode = false
-	_walls_button.tooltip_text = "Tab loops through walls up, cutaway, walls down and roofs on."
+	_walls_button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_walls_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_walls_button.add_theme_constant_override(&"h_separation", 8)
 	_walls_button.pressed.connect(controller.next_wall_view)
 	tools.add_child(_walls_button)
 	controller.wall_view_changed.connect(_show_wall_view)
@@ -105,8 +114,9 @@ func _ready() -> void:
 
 
 func _show_wall_view(mode: BuildController.WallView) -> void:
-	_walls_button.get_meta(&"label").text = BuildController.WALL_VIEW_NAMES[mode]
-	_fit_tool_button(_walls_button)
+	_walls_button.text = BuildController.WALL_VIEW_NAMES[mode]
+	# Leave room for the keycap after the words.
+	_walls_button.custom_minimum_size.x = _walls_button.get_minimum_size().x + 30.0
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -123,31 +133,25 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _on_tool_changed(tool: BuildController.Tool) -> void:
 	for t: BuildController.Tool in _tool_buttons:
 		_tool_buttons[t].set_pressed_no_signal(t == tool)
-		_paint_tool_button(_tool_buttons[t])
 	_hint.text = controller.hint()
 	for child in _options.get_children():
 		child.queue_free()
 	match tool:
 		BuildController.Tool.ROOM:
-			_add_style_choices(PrisonCatalogue.FLOORS, true)
-			_options.add_child(VSeparator.new())
-			_add_style_choices(PrisonCatalogue.WALLS, false)
+			_add_room_choices()
 		BuildController.Tool.FLOOR:
 			_add_floor_mode_choices()
-			_options.add_child(VSeparator.new())
 			if controller.floor_mode == BuildController.FloorMode.STAIRS:
 				_add_landing_choices()
-				_options.add_child(VSeparator.new())
 			_add_style_choices(PrisonCatalogue.FLOORS, true)
 		BuildController.Tool.WALL:
 			_add_wall_angle_choices()
-			_options.add_child(VSeparator.new())
 			_add_style_choices(PrisonCatalogue.WALLS, false)
 		BuildController.Tool.OBJECT:
-			_add_choices(PrisonCatalogue.OBJECTS, controller.object_def,
+			_add_choices("Objects", PrisonCatalogue.OBJECTS, controller.object_def,
 					func(def: Resource) -> void: controller.object_def = def)
 		BuildController.Tool.ROOM_TYPE:
-			_add_choices(PrisonCatalogue.ROOM_TYPES, controller.room_type,
+			_add_choices("Room types", PrisonCatalogue.ROOM_TYPES, controller.room_type,
 					func(def: Resource) -> void: controller.room_type = def, "Clear")
 		BuildController.Tool.OPENING:
 			_add_opening_choices()
@@ -156,7 +160,7 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 		BuildController.Tool.PATH:
 			_add_path_choices()
 		BuildController.Tool.PLANTS:
-			_add_choices(PrisonCatalogue.PLANTS, controller.plant_def,
+			_add_choices("Plants", PrisonCatalogue.PLANTS, controller.plant_def,
 					func(def: Resource) -> void: controller.plant_def = def)
 
 	_options_bar.visible = _options.get_children().any(func(c: Node) -> bool:
@@ -167,9 +171,10 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 func _add_style_choices(defs: Array, floors: bool) -> void:
 	var current: StringName = controller.floor_style if floors else controller.wall_style
 	var group := ButtonGroup.new()
+	var row := _section("Floors" if floors else "Walls")
 	for def: Resource in defs:
-		var label: String = def.display_name + (" (outdoor)" if def.outdoor else "")
-		var button := _make_button(label, group)
+		var picture: Texture2D = _thumbnails.floor_swatch(def) if floors else _thumbnails.wall_swatch(def)
+		var button := CosyButton.tile(def.display_name, _describe(def), picture, false, group)
 		button.button_pressed = def.id == current
 		var id: StringName = def.id
 		button.toggled.connect(func(on: bool) -> void:
@@ -179,11 +184,36 @@ func _add_style_choices(defs: Array, floors: bool) -> void:
 				controller.floor_style = id
 			else:
 				controller.wall_style = id)
-		_options.add_child(button)
+		row.add_child(button)
+
+
+## Every floor with every wall of the same kind (indoor or outdoor), each
+## shown as a cut-away corner of a room. Picking one sets both styles.
+func _add_room_choices() -> void:
+	var group := ButtonGroup.new()
+	var row := _section("Rooms")
+	for wall: WallDef in PrisonCatalogue.WALLS:
+		for floor: FloorDef in PrisonCatalogue.FLOORS:
+			if floor.outdoor != wall.outdoor:
+				continue
+			var details := "%s floor, %s walls" % [floor.display_name, wall.display_name.to_lower()]
+			if wall.outdoor:
+				details += "\nStays outdoors"
+			var button := CosyButton.tile("%s and %s" % [wall.display_name, floor.display_name.to_lower()],
+					details, _thumbnails.room(floor, wall), false, group)
+			button.button_pressed = controller.floor_style == floor.id and controller.wall_style == wall.id
+			var floor_id := floor.id
+			var wall_id := wall.id
+			button.toggled.connect(func(on: bool) -> void:
+				if on:
+					controller.floor_style = floor_id
+					controller.wall_style = wall_id)
+			row.add_child(button)
 
 
 func _add_floor_mode_choices() -> void:
 	var group := ButtonGroup.new()
+	var row := _section("Mode")
 	for entry: Array in FLOOR_MODES:
 		var split_only: bool = entry[0] in [BuildController.FloorMode.RAISE,
 				BuildController.FloorMode.LOWER, BuildController.FloorMode.RAMP]
@@ -197,11 +227,12 @@ func _add_floor_mode_choices() -> void:
 				controller.floor_mode = mode
 				# Stairs bring their own choices, so lay the row out again.
 				_on_tool_changed.call_deferred(controller.tool))
-		_options.add_child(button)
+		row.add_child(button)
 
 
 func _add_landing_choices() -> void:
 	var group := ButtonGroup.new()
+	var row := _section("Landings")
 	for entry: Array in [[false, "Square landings"], [true, "Rounded landings"]]:
 		var rounded: bool = entry[0]
 		var button := _make_button(entry[1], group)
@@ -209,11 +240,12 @@ func _add_landing_choices() -> void:
 		button.toggled.connect(func(on: bool) -> void:
 			if on:
 				controller.stair_tool.rounded = rounded)
-		_options.add_child(button)
+		row.add_child(button)
 
 
 func _add_wall_angle_choices() -> void:
 	var group := ButtonGroup.new()
+	var row := _section("Angles")
 	for entry: Array in [[false, "Straight and 45°"], [true, "Any angle"]]:
 		var any: bool = entry[0]
 		var button := _make_button(entry[1], group)
@@ -221,11 +253,12 @@ func _add_wall_angle_choices() -> void:
 		button.toggled.connect(func(on: bool) -> void:
 			if on:
 				controller.any_angle = any)
-		_options.add_child(button)
+		row.add_child(button)
 
 
 func _add_path_choices() -> void:
 	var modes := ButtonGroup.new()
+	var row := _section("Mode")
 	for entry: Array in PATH_MODES:
 		var mode: PathTool.Mode = entry[0]
 		var button := _make_button(entry[1], modes)
@@ -235,28 +268,28 @@ func _add_path_choices() -> void:
 				controller.path_tool.cancel()
 				controller.path_tool.mode = mode
 				_hint.text = controller.hint())
-		_options.add_child(button)
-	_options.add_child(VSeparator.new())
+		row.add_child(button)
 	var grid := _make_button("Snap to grid")
 	grid.button_pressed = controller.path_tool.snap_to_grid
 	grid.toggled.connect(func(on: bool) -> void: controller.path_tool.snap_to_grid = on)
-	_options.add_child(grid)
-	_options.add_child(VSeparator.new())
+	row.add_child(grid)
 	if controller.path_tool.style.is_empty():
 		controller.path_tool.style = PrisonCatalogue.PATHS[0].id
 	var styles := ButtonGroup.new()
+	var tiles := _section("Paths")
 	for def in PrisonCatalogue.PATHS:
-		var button := _make_button(def.display_name, styles)
+		var button := CosyButton.tile(def.display_name, _describe(def), _thumbnails.path(def), false, styles)
 		button.button_pressed = controller.path_tool.style == def.id
 		var id := def.id
 		button.toggled.connect(func(on: bool) -> void:
 			if on:
 				controller.path_tool.style = id)
-		_options.add_child(button)
+		tiles.add_child(button)
 
 
 func _add_opening_choices() -> void:
 	var group := ButtonGroup.new()
+	var row := _section("Openings")
 	for entry: Array in OPENINGS:
 		var kind: BuildingMap.Wall = entry[0]
 		var window: StringName = entry[1]
@@ -269,12 +302,13 @@ func _add_opening_choices() -> void:
 			controller.opening = kind
 			if kind == BuildingMap.Wall.WINDOW:
 				controller.window_kind = window)
-		_options.add_child(button)
+		row.add_child(button)
 
 
 ## Sculpting brushes, then the water modes, as one set of choices.
 func _add_brush_choices() -> void:
 	var group := ButtonGroup.new()
+	var row := _section("Brushes")
 	for entry: Array in BRUSHES:
 		var brush: Terrain.Brush = entry[0]
 		var button := _make_button(entry[1], group)
@@ -285,8 +319,8 @@ func _add_brush_choices() -> void:
 				controller.terrain_brush = brush
 				controller.water_mode = BuildController.WaterMode.NONE
 				_hint.text = controller.hint())
-		_options.add_child(button)
-	_options.add_child(VSeparator.new())
+		row.add_child(button)
+	row = _section("Water")
 	for entry: Array in WATER_MODES:
 		var mode: BuildController.WaterMode = entry[0]
 		var button := _make_button(entry[1], group)
@@ -295,12 +329,13 @@ func _add_brush_choices() -> void:
 			if on:
 				controller.water_mode = mode
 				_hint.text = controller.hint())
-		_options.add_child(button)
+		row.add_child(button)
 
 
-## One toggle button per definition. The first is picked if nothing is yet.
-func _add_choices(defs: Array, current: Resource, pick: Callable, none_label := "") -> void:
+## One picture tile per definition. The first is picked if nothing is yet.
+func _add_choices(title: String, defs: Array, current: Resource, pick: Callable, none_label := "") -> void:
 	var group := ButtonGroup.new()
+	var row := _section(title)
 	var entries: Array = defs.duplicate()
 	if not none_label.is_empty():
 		entries.append(null)
@@ -308,13 +343,70 @@ func _add_choices(defs: Array, current: Resource, pick: Callable, none_label := 
 		current = defs[0]
 		pick.call(current)
 	for def: Resource in entries:
-		var label: String = def.display_name if def != null else none_label
-		var button := _make_button(label, group)
+		var button: CosyButton
+		if def == null:
+			button = CosyButton.tile(none_label, "Unmark a room.", load(ICONS % "clear"), true, group)
+		elif def is RoomTypeDef:
+			button = CosyButton.tile(def.display_name, _describe(def), def.icon, true, group)
+		elif def is ObjectDef:
+			button = CosyButton.tile(def.display_name, _describe(def), _thumbnails.object(def), false, group)
+		else:
+			button = CosyButton.tile(def.display_name, _describe(def), _thumbnails.plant(def), false, group)
 		button.button_pressed = def == current
 		button.toggled.connect(func(on: bool) -> void:
 			if on:
 				pick.call(def))
-		_options.add_child(button)
+		row.add_child(button)
+
+
+## A titled group of choices in the options bar, after a divider if it isn't
+## the first. Returns the row to put the choices in.
+func _section(title: String) -> HBoxContainer:
+	var live := _options.get_children().filter(func(c: Node) -> bool: return not c.is_queued_for_deletion())
+	if not live.is_empty():
+		_options.add_child(VSeparator.new())
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	var label := Label.new()
+	label.text = title.to_upper()
+	label.theme_type_variation = &"TitleLabel"
+	label.add_theme_font_size_override("font_size", 12)
+	column.add_child(label)
+	var row := HBoxContainer.new()
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(row)
+	_options.add_child(column)
+	return row
+
+
+## The line or two under a choice's name on its hover card.
+func _describe(def: Resource) -> String:
+	if def is ObjectDef:
+		var size: Vector2 = def.size
+		return "%s × %s tiles" % [_number(size.x), _number(size.y)]
+	if def is FloorDef:
+		return "Outdoor floor" if def.outdoor else "Indoor floor"
+	if def is WallDef:
+		var kind := "Outdoor" if def.outdoor else "Indoor"
+		return "%s, %s m high\n%s" % [kind, _number(def.height),
+				"Leaves rooms outdoors" if def.outdoor else "Makes rooms indoors"]
+	if def is RoomTypeDef:
+		var where: String = ["Indoors", "Outdoors", "Indoors or outdoors"][def.location]
+		if def.required_tags.is_empty():
+			return where
+		var needs := PackedStringArray()
+		for tag: StringName in def.required_tags:
+			needs.append(String(tag))
+		return "%s\nNeeds a %s" % [where, " and a ".join(needs)]
+	if def is FoliageDef:
+		return ["Tree", "Bush", "Flower"][def.shape]
+	if def is PathStyleDef:
+		return "%s tiles wide" % _number(def.width)
+	return ""
+
+
+func _number(value: float) -> String:
+	return String.num(value, 2)
 
 
 func _make_button(text: String, group: ButtonGroup = null) -> Button:
@@ -326,45 +418,33 @@ func _make_button(text: String, group: ButtonGroup = null) -> Button:
 	return button
 
 
-## A big tool button with its shortcut on a keycap before the name.
-func _make_tool_button(key: String, text: String, group: ButtonGroup = null) -> Button:
-	var button := _make_button("", group)
+## A tool button: an icon with its shortcut on a keycap in the corner, and
+## its name and what it does on hover.
+func _make_tool_button(key: String, title: String, details: String, icon_name: String,
+		group: ButtonGroup = null) -> CosyButton:
+	var button := CosyButton.new()
+	button.title = title
+	button.details = details + "\nShortcut: " + key
+	button.icon = load(ICONS % icon_name)
 	button.theme_type_variation = &"ToolButton"
-	var row := HBoxContainer.new()
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 6)
-	button.add_child(row)
-	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	# Sits a little high, above the button's thick bottom edge.
-	row.offset_bottom = -2
+	button.toggle_mode = true
+	button.button_group = group
+	button.focus_mode = Control.FOCUS_NONE
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.add_theme_constant_override(&"icon_max_width", 26)
+	button.custom_minimum_size = Vector2(58, 50)
 	var keycap := Label.new()
 	keycap.text = key
 	keycap.theme_type_variation = &"KeyLabel"
-	keycap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(keycap)
-	var label := Label.new()
-	label.text = text
-	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(label)
-	button.set_meta(&"label", label)
-	button.toggled.connect(func(_on: bool) -> void: _paint_tool_button(button))
-	# The theme only reaches the button once it is in the tree.
-	button.ready.connect(func() -> void:
-		_paint_tool_button(button)
-		_fit_tool_button(button))
+	keycap.add_theme_font_size_override(&"font_size", 10)
+	keycap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(keycap)
+	# Tucked into the bottom-right corner, above the button's thick edge.
+	keycap.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	keycap.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	keycap.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	keycap.offset_left = -4.0
+	keycap.offset_right = -4.0
+	keycap.offset_top = -7.0
+	keycap.offset_bottom = -7.0
 	return button
-
-
-## Gives a tool button's label the button's font and its colour for the
-## button's state, which a plain Label inside a Button doesn't pick up.
-func _paint_tool_button(button: Button) -> void:
-	var label: Label = button.get_meta(&"label")
-	label.add_theme_font_override("font", button.get_theme_font("font"))
-	label.add_theme_color_override("font_color", button.get_theme_color(
-			"font_pressed_color" if button.button_pressed else "font_color"))
-
-
-func _fit_tool_button(button: Button) -> void:
-	var row: Control = button.get_meta(&"label").get_parent()
-	button.custom_minimum_size = Vector2(row.get_combined_minimum_size().x + 26, 44)

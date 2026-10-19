@@ -32,8 +32,10 @@ func _process(_delta: float) -> bool:
 		layer.add_child(preview)
 	if _frames < FRAMES_TO_WAIT:
 		return false
-	var args := OS.get_cmdline_user_args()
-	var path: String = args[0] if args.size() > 0 else "user://ui_preview.png"
+	var path := "user://ui_preview.png"
+	for arg in OS.get_cmdline_user_args():
+		if arg.ends_with(".png"):
+			path = arg
 	root.get_texture().get_image().save_png(path)
 	print("Saved ", path)
 	return true

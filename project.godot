@@ -27,6 +27,7 @@ window/size/viewport_height=900
 [gui]
 
 theme/custom="res://core/ui/cosy_theme.tres"
+timers/tooltip_delay_sec=0.25
 
 [rendering]
 

@@ -5,6 +5,8 @@ extends Resource
 @export var id: StringName
 @export var display_name: String
 @export var colour := Color.WHITE
+## A white line drawing for the build menu.
+@export var icon: Texture2D
 enum Location { INDOORS, OUTDOORS, EITHER }
 
 ## Most rooms need to be indoors; a yard needs to be outdoors.

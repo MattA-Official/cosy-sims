@@ -10,7 +10,7 @@ extends RefCounted
 ##
 ## Type variations, set on a control's Theme Type Variation:
 ##   Labels: HeaderLabel, TitleLabel, SubtleLabel, KeyLabel, HudLabel
-##   Buttons: ToolButton, AccentButton, DangerButton, FlatButton
+##   Buttons: ToolButton, AccentButton, DangerButton, FlatButton, TileButton
 ##   Panels: HudBar, InsetPanel, ToastPanel, TooltipPanel
 ##   Bars: BarWarning, BarDanger
 
@@ -214,9 +214,41 @@ func _buttons() -> void:
 	_variation("FlatButton", "Button")
 	var clear := Color(p.button, 0.0)
 	_button_type("FlatButton", clear, Color(p.button, 0.6), clear, p.ink, p.inset, p.ink)
+	_tiles()
 	var arrow := CosyIcons.chevron(14, p.muted)
 	theme.set_icon("arrow", "OptionButton", arrow)
 	theme.set_constant("arrow_margin", "OptionButton", 10)
+
+
+## Square picture tiles for the build menu. The picture keeps its own
+## colours; picking one rings it in the accent.
+func _tiles() -> void:
+	_variation("TileButton", "Button")
+	var normal := _box(p.inset, RADIUS)
+	normal.set_border_width_all(2)
+	normal.border_color = p.inset
+	normal.set_content_margin_all(4)
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = p.button_hover
+	hover.border_color = p.button_edge
+	var picked := normal.duplicate() as StyleBoxFlat
+	picked.bg_color = p.button_hover
+	picked.set_border_width_all(3)
+	picked.border_color = p.accent
+	for state in ["normal", "disabled"]:
+		theme.set_stylebox(state, "TileButton", normal)
+	theme.set_stylebox("hover", "TileButton", hover)
+	theme.set_stylebox("pressed", "TileButton", picked)
+	theme.set_stylebox("hover_pressed", "TileButton", picked)
+	theme.set_stylebox("focus", "TileButton", StyleBoxEmpty.new())
+	for state in ["icon_normal_color", "icon_hover_color", "icon_pressed_color",
+			"icon_hover_pressed_color", "icon_focus_color"]:
+		theme.set_color(state, "TileButton", Color.WHITE)
+	theme.set_color("icon_disabled_color", "TileButton", Color(1, 1, 1, 0.4))
+	theme.set_color("font_color", "TileButton", p.ink)
+	theme.set_color("font_pressed_color", "TileButton", p.ink)
+	theme.set_color("font_hover_pressed_color", "TileButton", p.ink)
+	theme.set_font_size("font_size", "TileButton", 13)
 
 
 ## Normal, hover, pressed (selected toggles), disabled and focus looks for one
@@ -248,7 +280,10 @@ func _button_type(type: StringName, fill: Color, hover: Color, edge: Color, text
 	theme.set_color("font_hover_pressed_color", type, on_text)
 	theme.set_color("font_disabled_color", type, Color(text, 0.45))
 	theme.set_color("icon_normal_color", type, text)
+	theme.set_color("icon_hover_color", type, text)
+	theme.set_color("icon_focus_color", type, text)
 	theme.set_color("icon_pressed_color", type, on_text)
+	theme.set_color("icon_hover_pressed_color", type, on_text)
 	theme.set_constant("h_separation", type, 8)
 
 
@@ -421,7 +456,8 @@ func _button_box(fill: Color, edge: Color, depth: int, pad: int) -> StyleBoxFlat
 	box.content_margin_left = 12 + pad - 8
 	box.content_margin_right = 12 + pad - 8
 	box.content_margin_top = 5 + pad / 2
-	box.content_margin_bottom = 5 + pad / 2 - (depth - 4)
+	# A shallower edge gives its height back, so pressing never resizes.
+	box.content_margin_bottom = 5 + pad / 2 - (4 - depth)
 	return box
 
 
