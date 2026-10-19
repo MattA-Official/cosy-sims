@@ -103,10 +103,17 @@ func is_underwater(point: Vector2) -> bool:
 ## Sets every corner of the given tiles to one height, ignoring locks.
 ## Used when a building goes down.
 func flatten_cells(cells: Array[Vector2i], height: float) -> void:
+	# Only says it changed if it did, so building on ground that is already
+	# flat doesn't make people work the ground out again.
+	var moved := false
 	for cell in cells:
 		for offset: Vector2i in [Vector2i.ZERO, Vector2i(1, 0), Vector2i(0, 1), Vector2i.ONE]:
-			set_corner_height(cell + offset, height)
-	_changed(_whole())
+			var corner := cell + offset
+			if in_bounds(corner) and not is_equal_approx(corner_height(corner), clampf(height, MIN_HEIGHT, MAX_HEIGHT)):
+				set_corner_height(corner, height)
+				moved = true
+	if moved:
+		_changed(_whole())
 
 
 ## Sets many corners at once, ignoring locks. Takes Vector2i corners to heights.

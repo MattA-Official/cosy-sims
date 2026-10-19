@@ -169,8 +169,6 @@ var _hover_point := Vector2.ZERO ## Mouse position on the ground, in cell units.
 var _has_hover := false
 var _preview_mesh := ImmediateMesh.new()
 var _preview_material := MeshShapes.vertex_colour_material(true)
-## [centre, half extents, colour] per box, or [centre, half along, colour,
-## half across, half height] for a box at an angle.
 var _shapes := PreviewShapes.new()
 var _drag_start_point := Vector2.ZERO
 var _free_rotating := false

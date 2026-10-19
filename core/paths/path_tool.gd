@@ -48,6 +48,9 @@ const FREEHAND_STEP := 3.0
 var _placed: Array[Vector2] = [] ## The start, then the bend in curved mode.
 var _start_height := NAN ## The start's height if it is off the ground.
 var _trail: Array[Vector2] = [] ## Points dragged through in freehand mode.
+## The last far end looked up, as [point, path count, node count, height]:
+## the preview asks several times a frame, and the lookup scans every path.
+var _end_height_at: Array = []
 
 
 func is_drawing() -> bool:
@@ -183,8 +186,8 @@ func snap(point: Vector2, is_end := true) -> Vector2:
 ## chosen.
 func end_heights(curve: Array) -> Array[float]:
 	var from := _start_height
-	var to := network.snap_height(curve[2])
-	if is_nan(to) and network.node_near(curve[2], 0.01) == -1 and _is_built(curve) and raise_steps > 0:
+	var to := _end_height(curve[2])
+	if is_nan(to) and network.node_near(curve[2]) == -1 and _is_built(curve) and raise_steps > 0:
 		to = _ground(curve[2]) + raise_steps * Staircase.RISE
 	return [from, to]
 
@@ -299,7 +302,15 @@ func _overlaps(curve: Array, heights: Array[float]) -> bool:
 func _is_built(curve: Array) -> bool:
 	if built:
 		return true
-	return not is_nan(_start_height) or not is_nan(network.snap_height(curve[2]))
+	return not is_nan(_start_height) or not is_nan(_end_height(curve[2]))
+
+
+## The height of what a far end at `point` snaps onto, NAN for the ground.
+func _end_height(point: Vector2) -> float:
+	var key := [point, network.segments.size(), network.nodes.size()]
+	if _end_height_at.slice(0, 3) != key:
+		_end_height_at = key + [network.snap_height(point)]
+	return _end_height_at[3]
 
 
 ## Draws the path a click would add, tinted to show if it is allowed, plus

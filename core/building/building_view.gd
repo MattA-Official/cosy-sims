@@ -107,6 +107,9 @@ var _labels := Node3D.new()
 ## What the labels were last decluttered for (camera, screen size and the
 ## labels themselves), so it only happens again when one of them changes.
 var _declutter_key: Array = []
+## The labels most important first, each with its rough size on a 900 px
+## high screen: [label, size].
+var _ranked: Array[Array] = []
 var _material := MeshShapes.vertex_colour_material()
 var _glass_material := _make_glass_material()
 var _object_materials := {} # Color -> StandardMaterial3D
@@ -588,6 +591,7 @@ func _add_door_steps(edge: Vector3i, low: Vector2i) -> void:
 
 func _build_labels() -> void:
 	_declutter_key.clear()
+	_ranked.clear()
 	for child in _labels.get_children():
 		child.queue_free()
 	if not show_labels:
@@ -613,10 +617,26 @@ func _build_labels() -> void:
 	for edge in map.unusable_doors():
 		var label := _label("Can't use this door:\nfloors %s m apart" % String.num(map.door_rise(edge), 2))
 		label.modulate = problem_colour
-		var middle := Vector2(edge.x, edge.y) + (Vector2(0.5, 0) if edge.z == BuildingMap.EDGE_X else Vector2(0, 0.5))
+		var ends := BuildingMap.edge_ends(edge)
+		var middle := (ends[0] + ends[1]) * 0.5
 		label.position = Vector3(middle.x * cs, _wall_base(edge) + door_height + 0.3, middle.y * cs)
 		label.set_meta(&"priority", 2000)
 		_labels.add_child(label)
+	_rank_labels()
+
+
+## Sorts the labels for decluttering, most important first, and estimates
+## each one's size on screen from its longest line and number of lines.
+func _rank_labels() -> void:
+	for child in _labels.get_children():
+		if child is Label3D and not child.is_queued_for_deletion():
+			var lines: PackedStringArray = child.text.split("\n")
+			var widest := 0
+			for line in lines:
+				widest = maxi(widest, line.length())
+			_ranked.append([child, Vector2(widest * 19.0, lines.size() * 40.0)])
+	_ranked.sort_custom(func(a: Array, b: Array) -> bool:
+		return int(a[0].get_meta(&"priority", 0)) > int(b[0].get_meta(&"priority", 0)))
 
 
 func _label(text: String) -> Label3D:
@@ -634,7 +654,7 @@ func _label(text: String) -> Label3D:
 
 
 func _process(_delta: float) -> void:
-	if show_labels and _labels.get_child_count() > 1:
+	if show_labels and _ranked.size() > 1:
 		_declutter_labels()
 
 
@@ -650,30 +670,26 @@ func _declutter_labels() -> void:
 		return
 	_declutter_key = key
 	var scale := get_viewport().get_visible_rect().size.y / 900.0
-	var labels: Array[Label3D] = []
-	for child in _labels.get_children():
-		if child is Label3D and not child.is_queued_for_deletion():
-			labels.append(child)
-	labels.sort_custom(func(a: Label3D, b: Label3D) -> bool:
-		return int(a.get_meta(&"priority", 0)) > int(b.get_meta(&"priority", 0)))
 	var taken: Array[Rect2] = []
-	for label in labels:
+	for entry in _ranked:
+		var label: Label3D = entry[0]
 		var at := label.global_position
+		label.visible = false
 		if camera.is_position_behind(at):
-			label.visible = false
 			continue
-		var lines := label.text.split("\n")
-		var widest := 0
-		for line in lines:
-			widest = maxi(widest, line.length())
-		var size := Vector2(widest * 19.0, lines.size() * 40.0) * scale
+		var size: Vector2 = entry[1] * scale
 		var rect := Rect2(camera.unproject_position(at) - size * 0.5, size)
-		label.visible = not taken.any(func(other: Rect2) -> bool: return other.intersects(rect))
-		if label.visible:
+		var free := true
+		for other in taken:
+			if other.intersects(rect):
+				free = false
+				break
+		if free:
+			label.visible = true
 			taken.append(rect)
 
 
-## Labels shown and hidden right now, for tests.
+## How many labels are shown right now, for tests.
 func visible_labels() -> int:
 	var count := 0
 	for child in _labels.get_children():

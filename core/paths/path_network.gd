@@ -74,12 +74,11 @@ func snap_height(position: Vector2) -> float:
 	var node := node_near(position)
 	if node != -1:
 		return heights.get(node, NAN)
-	var hit := closest(position)
-	if hit.is_empty() or hit[2] > SNAP_DISTANCE or hit[1] <= 0.0 or hit[1] >= 1.0:
+	var hit := _partway(position)
+	if hit.is_empty():
 		return NAN
 	var height := height_on(hit[0], hit[1])
-	var ground := terrain.height_at(position) if terrain != null else 0.0
-	return height if absf(height - ground) >= PASS_UNDER else NAN
+	return height if absf(height - _ground(position)) >= PASS_UNDER else NAN
 
 
 ## Where an end dropped at `position` would go: onto a nearby node, onto a
@@ -190,7 +189,7 @@ func height_on(segment: Segment, t: float) -> float:
 func node_height(node: int) -> float:
 	if heights.has(node):
 		return heights[node]
-	return terrain.height_at(nodes[node]) if terrain != null else 0.0
+	return _ground(nodes[node])
 
 
 ## The height partway along a curve. Ends without a height are on the
@@ -346,9 +345,21 @@ func _node_at(position: Vector2, height := NAN) -> int:
 	if node != -1 and (is_nan(height) or absf(node_height(node) - height) < PASS_UNDER):
 		return node
 	if is_nan(height):
-		height = terrain.height_at(position) if terrain != null else 0.0
-	var hit := closest(position)
-	if not hit.is_empty() and hit[2] <= SNAP_DISTANCE and hit[1] > 0.0 and hit[1] < 1.0 \
-			and absf(height_on(hit[0], hit[1]) - height) < PASS_UNDER:
+		height = _ground(position)
+	var hit := _partway(position)
+	if not hit.is_empty() and absf(height_on(hit[0], hit[1]) - height) < PASS_UNDER:
 		return split(hit[0], hit[1])
 	return add_node(position)
+
+
+## The segment an end at `position` would land partway along, as [segment,
+## t, distance], or [] if it is near none or only near an end.
+func _partway(position: Vector2) -> Array:
+	var hit := closest(position)
+	if hit.is_empty() or hit[2] > SNAP_DISTANCE or hit[1] <= 0.0 or hit[1] >= 1.0:
+		return []
+	return hit
+
+
+func _ground(position: Vector2) -> float:
+	return terrain.height_at(position) if terrain != null else 0.0

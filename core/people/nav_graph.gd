@@ -289,9 +289,9 @@ func _join_floors(n: int) -> void:
 					_stepped[_ids.get(Vector4i(n, low.x, low.y, 0), -1)] = true
 				continue
 			var nexts := map.pieces(next_cell)
+			# Two uncut tiles always share their whole side.
+			var whole := nexts.size() == 1 and piece.is_whole()
 			for next: TilePiece in nexts:
-				# Two uncut tiles always share their whole side.
-				var whole := nexts.size() == 1 and piece.is_whole()
 				if not whole and not next.sides_tagged(tag ^ 1).any(
 						func(s: PackedVector2Array) -> bool: return TilePiece.overlaps(stretch, s)):
 					continue
