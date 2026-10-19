@@ -41,7 +41,7 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | 9 Plants | Hold to plant trees, bushes or flowers; hold Ctrl to clear them |
 | 0 Paths | Straight: click each end. Curved: click the start, a bend and the end. Freehand: drag. Points snap to the middle of tiles (bends don't); hold Alt to swap that for one point, or turn Snap to grid off. Page Up / Down while placing builds stairs, a ramp or a bridge and raises its far end. Esc stops; Ctrl-click removes a path |
 | [ / ] | Brush size, for terrain and plants |
-| Tab | Walls up or cut away |
+| Tab | Loops through the wall views: Walls up; Cutaway (walls in front of rooms drop, following the camera round); Walls down; Roofs on (every level with its roofs, as from outside) |
 | Esc | Put the tool away |
 | F3 | Debug view: rooms tinted and labelled, and details of the tile under the mouse. With no build tool (Esc), click a person, object, room or tile to inspect it: set a person's needs, send them somewhere, add or remove prisoners, pause everyone |
 
@@ -72,6 +72,10 @@ next to it, or else with the average height of the ground under it
 never shows through, and eased into a gentle bank round the building.
 Higher floors stand on foundations. Upstairs and in basements, a grid
 shows at that floor's height.
+
+Indoor rooms get flat roofs at the top of their walls, wherever there is
+no floor above. You see them when you go up a floor, or with Tab's Roofs
+on view.
 
 Split levels (floors nudged up or down within a storey, with ramps
 between them) are switched off for now. Tick **Split Levels** on the Main

@@ -283,6 +283,7 @@ func _test_main_scene_loads() -> void:
 	main.building.active = 0
 	main.level_grid.rebuild()
 	_check(main.level_grid._mesh.get_surface_count() == 0, "on the ground, the ground's own grid shows")
+	_test_roofs_and_wall_views(main, map)
 	var people: People = main.people
 	_check(people.people.size() == 6, "six prisoners start in the sample prison")
 	people.step(0.5)
@@ -316,6 +317,37 @@ func _test_main_scene_loads() -> void:
 
 ## Drives the build tools the way the mouse would, by moving the hover point.
 ## Positions are relative to the corner of the owned land.
+func _test_roofs_and_wall_views(main: Node, map: BuildingMap) -> void:
+	var o := map.land_bounds().get_center() - Vector2i(8, 7)
+	var ground_view: BuildingView = main.views[0]
+	var controller: BuildController = main.controller
+	_check(ground_view.has_roof(o + Vector2i(1, 6)), "indoor rooms get a flat roof")
+	_check(not ground_view.has_roof(o + Vector2i(14, 2)), "the fenced yard doesn't")
+	_check(not ground_view.show_roof, "roofs are hidden on the floor you're building on")
+	main.building.active = 1
+	_check(ground_view.show_roof, "and show from the floor above")
+	main.building.level(1).fill_floor(Rect2i(o + Vector2i(1, 6), Vector2i(1, 1)), &"wood", Building.STOREY)
+	_check(not ground_view.has_roof(o + Vector2i(1, 6)), "floor above stands in for the roof")
+	main.building.level(1).clear_floor(Rect2i(o + Vector2i(1, 6), Vector2i(1, 1)))
+	main.building.active = 0
+	_check(controller.wall_view == BuildController.WallView.UP, "walls start up")
+	controller.next_wall_view()
+	_check(ground_view.cutaway and not ground_view.walls_low, "Tab goes to cutaway")
+	var north := [Vector2(o), Vector2(o) + Vector2(1, 0)]
+	ground_view.cut_direction = Vector2(0, 1)
+	_check(ground_view.is_cut(north[0], north[1]), "cutaway drops a wall with a room behind it")
+	ground_view.cut_direction = Vector2(0, -1)
+	_check(not ground_view.is_cut(north[0], north[1]), "and keeps the far wall up")
+	controller.next_wall_view()
+	_check(ground_view.walls_low and not ground_view.cutaway, "then to walls down")
+	controller.next_wall_view()
+	_check(ground_view.show_roof and not ground_view.walls_low and main.views[1].visible,
+			"then roofs on, showing every level")
+	controller.next_wall_view()
+	_check(controller.wall_view == BuildController.WallView.UP and not ground_view.show_roof
+			and not main.views[1].visible, "and back to walls up")
+
+
 func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	var base := Vector2(map.land_bounds().position)
 	var cell := func(x: int, z: int) -> Vector2i: return Vector2i(base) + Vector2i(x, z)

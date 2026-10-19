@@ -51,6 +51,7 @@ func _ready() -> void:
 	views[0] = view
 	building.level_added.connect(_add_level_view)
 	building.active_changed.connect(_on_level_changed)
+	controller.wall_view_changed.connect(func(_mode: BuildController.WallView) -> void: _apply_wall_view())
 	controller.building = building
 	paths.terrain = terrain
 	controller.paths = paths
@@ -114,6 +115,7 @@ func _ready() -> void:
 	cursor.height_at = _floor_level_at
 	building.changed.connect(func() -> void: _on_cell_hovered(cursor.hovered_cell))
 	_on_cell_hovered(cursor.hovered_cell)
+	_apply_wall_view()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -136,23 +138,52 @@ func _add_level_view(level: int, level_map: BuildingMap) -> void:
 	grid.add_child(level_view)
 	level_view.map = level_map
 	views[level] = level_view
+	# Roofs leave out tiles the level above has floor on.
+	if building.levels.has(level + 1):
+		level_view.above = building.levels[level + 1]
+	if views.has(level - 1):
+		views[level - 1].above = level_map
+	_apply_wall_view()
 
 
 ## Shows the levels up to the one being built on, and hides the land when
 ## looking at a basement.
 func _on_level_changed(level: int) -> void:
-	var walls_low := controller.view.walls_low
-	for n: int in views:
-		views[n].visible = n <= level
-		views[n].show_labels = n == level
 	var above_ground := level >= 0
 	for node: Node3D in [terrain, water, foliage, path_view]:
 		node.visible = above_ground
 	controller.view = views[level]
-	controller.view.walls_low = walls_low
+	_apply_wall_view()
 	debug_overlay.map = building.current()
 	camera_rig.pick_height = NAN if level == 0 else _level_height(level)
 	_on_cell_hovered(cursor.hovered_cell)
+
+
+## Sets every level's walls and roofs for the Tab view. Levels below the
+## one being built on have their walls up and their roofs on, so you see
+## the floor above them; the level being built on takes the Tab view.
+## Roofs on shows every level, roofs and all, as from outside.
+func _apply_wall_view() -> void:
+	if building == null:
+		return
+	var mode := controller.wall_view
+	var level := building.active
+	for n: int in views:
+		var v := views[n]
+		var current := n == level
+		v.visible = n <= level or (mode == BuildController.WallView.ROOFS and n >= 0)
+		v.show_labels = current and mode != BuildController.WallView.ROOFS
+		v.walls_low = current and mode == BuildController.WallView.DOWN
+		v.cutaway = current and mode == BuildController.WallView.CUTAWAY
+		v.show_roof = n < level or mode == BuildController.WallView.ROOFS
+
+
+func _process(_delta: float) -> void:
+	# Cutaway follows the camera round.
+	var camera := get_viewport().get_camera_3d()
+	if camera != null and controller.wall_view == BuildController.WallView.CUTAWAY:
+		var look := -camera.global_transform.basis.z
+		controller.view.cut_direction = Vector2(look.x, look.z)
 
 
 ## A typical floor height for a level, for picking: the middle of the land

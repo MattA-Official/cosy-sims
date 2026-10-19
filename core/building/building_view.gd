@@ -1,7 +1,8 @@
 class_name BuildingView
 extends Node3D
 ## Draws a BuildingMap with placeholder geometry: floors, walls, doors,
-## objects, and a floating label over each room that has a type.
+## objects, a floating label over each room that has a type, and flat roofs
+## over indoor rooms with no floor above them.
 ## Rebuilds everything whenever the map changes, which is plenty fast at
 ## prototype sizes.
 
@@ -30,6 +31,34 @@ extends Node3D
 	set(value):
 		walls_low = value
 		queue_rebuild()
+## Cutaway: like The Sims, only walls with floor behind them (as the camera
+## looks) drop low, so you see into rooms but the far walls stay up.
+@export var cutaway := false:
+	set(value):
+		cutaway = value
+		queue_rebuild()
+## Which way the camera looks across the ground, for cutaway. Snapped to
+## eighths of a turn so walls only change as you rotate past each one.
+var cut_direction := Vector2(1, 1).normalized():
+	set(value):
+		if value.is_zero_approx():
+			return
+		var snapped := Vector2.RIGHT.rotated(snappedf(value.angle(), PI / 4.0))
+		if snapped.is_equal_approx(cut_direction):
+			return
+		cut_direction = snapped
+		if cutaway:
+			queue_rebuild()
+
+@export_group("Roofs")
+## Roofs show when looking from a level above this one (see Building
+## views in main.gd). Toggling this is cheap: the roof is always built.
+@export var show_roof := false:
+	set(value):
+		show_roof = value
+		_roof_mesh.visible = value
+@export var roof_thickness := 0.12
+@export var roof_colour := Color(0.5, 0.47, 0.45)
 
 @export_group("Colours")
 ## Used for floors and walls whose style the map does not know.
@@ -58,6 +87,17 @@ var map: BuildingMap:
 			map.changed.connect(queue_rebuild)
 		queue_rebuild()
 
+## The level above, if any: roofs leave out tiles it has floor on.
+var above: BuildingMap:
+	set(value):
+		if above != null:
+			above.changed.disconnect(queue_rebuild)
+		above = value
+		if above != null:
+			above.changed.connect(queue_rebuild)
+		queue_rebuild()
+
+var _roof_mesh := MeshInstance3D.new()
 var _floor_mesh := MeshInstance3D.new()
 var _wall_mesh := MeshInstance3D.new()
 var _glass_mesh := MeshInstance3D.new()
@@ -68,11 +108,15 @@ var _material := MeshShapes.vertex_colour_material()
 var _glass_material := _make_glass_material()
 var _object_materials := {} # Color -> StandardMaterial3D
 var _rebuild_queued := false
+## Whether the wall piece being drawn is cut low.
+var _piece_low := false
 
 
 func _ready() -> void:
-	for child: Node in [_floor_mesh, _wall_mesh, _glass_mesh, _objects, _labels]:
+	for child: Node in [_floor_mesh, _wall_mesh, _glass_mesh, _objects, _labels, _roof_mesh]:
 		add_child(child)
+	_roof_mesh.material_override = _material
+	_roof_mesh.visible = show_roof
 	_floor_mesh.material_override = _material
 	_wall_mesh.material_override = _material
 	_glass_mesh.material_override = _glass_material
@@ -109,6 +153,45 @@ func rebuild() -> void:
 	_build_walls()
 	_build_objects()
 	_build_labels()
+	_build_roof()
+
+
+## Flat roofs at the top of the walls, over every piece of an indoor room
+## that has no floor above it (a stairwell's hole counts as open).
+func _build_roof() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cs := grid.cell_size
+	var any := false
+	for cell: Vector2i in map.floors:
+		if above != null and above.has_floor(cell):
+			continue
+		for piece: TilePiece in map.pieces(cell):
+			if not map.piece_has_floor(piece):
+				continue
+			var middle := Vector2.ZERO
+			for point in piece.polygon:
+				middle += point
+			middle /= maxi(piece.polygon.size(), 1)
+			var room := map.room_at_point(middle)
+			if room == null or not room.indoor:
+				continue
+			var scaled := PackedVector2Array()
+			for point in piece.polygon:
+				scaled.append(point * cs)
+			var top := map.floor_height(cell) + wall_height
+			MeshShapes.add_prism(st, scaled, top - roof_thickness, top + 0.01, roof_colour.darkened(0.2),
+					roof_colour.lightened(0.04 * ((cell.x + cell.y) % 2)))
+			any = true
+	_roof_mesh.mesh = st.commit() if any else null
+
+
+## Is there a roof over this tile? For tests and the debug view.
+func has_roof(cell: Vector2i) -> bool:
+	if not map.has_floor(cell) or (above != null and above.has_floor(cell)):
+		return false
+	var room := map.room_at(cell)
+	return room != null and room.indoor
 
 
 func _build_floors() -> void:
@@ -237,6 +320,7 @@ func _build_walls() -> void:
 		var start := Vector2(edge.x, edge.y)
 		var end := start + (Vector2.RIGHT if edge.z == BuildingMap.EDGE_X else Vector2.DOWN)
 		var base := _wall_base(edge)
+		_piece_low = walls_low or (cutaway and _cut_away(start, end))
 		# Foundations reach below the lowest ground at either end.
 		var drop := base - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
 				if level == 0 else base - _lowest_floor_beside(edge) + 0.05
@@ -253,6 +337,7 @@ func _build_walls() -> void:
 				highest = maxf(highest, map.floor_height(cell))
 				lowest = minf(lowest, map.floor_height(cell))
 		var base := highest if highest > -INF else _height_at((start + end) * 0.5)
+		_piece_low = walls_low or (cutaway and _cut_away(start, end))
 		var drop := base - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
 				if level == 0 else base - (lowest if lowest < INF else base) + 0.05
 		has_glass = _add_wall_piece(st, glass, start, end, base, drop, map.slant_at(key),
@@ -262,13 +347,30 @@ func _build_walls() -> void:
 	_glass_mesh.mesh = glass.commit() if has_glass else null
 
 
+## Does a wall stand in front of floor, as the camera looks? Then cutaway
+## drops it. Walls running along the line of sight stay up.
+func _cut_away(start: Vector2, end: Vector2) -> bool:
+	var flat := (end - start).normalized()
+	var normal := Vector2(-flat.y, flat.x)
+	var facing := normal.dot(cut_direction)
+	if absf(facing) < 0.2:
+		return false
+	var behind := (start + end) * 0.5 + normal * signf(facing) * 0.5
+	return map.has_floor(Vector2i(behind.floor()))
+
+
+## Is this stretch of wall drawn low, in the current view? For tests.
+func is_cut(start: Vector2, end: Vector2) -> bool:
+	return walls_low or (cutaway and _cut_away(start, end))
+
+
 ## One stretch of wall between two corners, as a plain wall, door, window or
 ## fence. Returns whether it added any glass.
 func _add_wall_piece(st: SurfaceTool, glass: SurfaceTool, start: Vector2, end: Vector2,
 		base: float, drop: float, kind: int, def: WallDef, window: StringName) -> bool:
 	var cs := grid.cell_size
 	var full_height := def.height if def != null else wall_height
-	var height := minf(low_wall_height, full_height) if walls_low else full_height
+	var height := minf(low_wall_height, full_height) if _piece_low else full_height
 	var thickness := def.thickness if def != null else wall_thickness
 	var colour := def.colour if def != null else wall_colour
 	var top := def.top_colour if def != null else wall_top_colour
@@ -296,11 +398,11 @@ func _add_wall_piece(st: SurfaceTool, glass: SurfaceTool, start: Vector2, end: V
 	elif kind == BuildingMap.Wall.WINDOW:
 		_add_window(st, middle, along, half_len, half_across, height, full_height, length, window,
 				drop, colour, top)
-		if window == BuildingMap.WINDOW_GLASS and not walls_low:
+		if window == BuildingMap.WINDOW_GLASS and not _piece_low:
 			_add_slab(glass, middle, along * length * 0.5, half_across * 0.25, window_sill,
 					window_head, glass_colour, glass_colour)
 			return true
-	elif def != null and def.see_through and not walls_low:
+	elif def != null and def.see_through and not _piece_low:
 		_add_fence(st, middle, along, half_across, height, length, drop, colour, top)
 	else:
 		_add_slab(st, middle, half_len, half_across, -drop, height, colour, top)
@@ -318,7 +420,7 @@ func _add_slab(st: SurfaceTool, middle: Vector3, half_len: Vector3, half_across:
 
 func _add_door(st: SurfaceTool, middle: Vector3, half_len: Vector3, half_across: Vector3,
 		height: float, full_height: float, colour: Color, top: Color) -> void:
-	if walls_low or full_height <= door_height:
+	if _piece_low or full_height <= door_height:
 		_add_slab(st, middle, half_len, half_across, 0.0, minf(height, low_wall_height) * 0.5,
 				door_colour, door_colour)
 		return
@@ -335,7 +437,7 @@ func _add_window(st: SurfaceTool, middle: Vector3, along: Vector3, half_len: Vec
 		drop: float, colour: Color, top: Color) -> void:
 	var accent := bars_colour if kind == BuildingMap.WINDOW_BARS else glass_colour
 	accent.a = 1.0
-	if walls_low or full_height <= window_head:
+	if _piece_low or full_height <= window_head:
 		_add_slab(st, middle, half_len, half_across, -drop, height, colour, accent)
 		return
 	_add_slab(st, middle, half_len, half_across, -drop, window_sill, colour, top)

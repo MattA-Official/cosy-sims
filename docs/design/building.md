@@ -202,7 +202,19 @@ walls are done, and so is the first slice of people and pathfinding.
   door instead gets a few steps on the low side, for gaps up to a metre:
   one riser per quarter metre, with the treads sharing the tile in front
   of the door. People climb them, and nothing can be placed on them.
-- There is one kind of lift. Lifts link with a lift in the same spot on
+- There is one kind of lift.
+- **Roofs** (Matt, 2026-10-19): flat and generated, never placed. Every
+  piece of an indoor room with no floor on the level above gets a roof at
+  the top of its walls; fenced (outdoor) rooms don't. Roofs show on the
+  levels below the one you are building on, so going up a floor shows
+  the building below roofed over. Pitched roofs and a roof tool are for
+  later.
+- **Wall views** (card 2026-10-19, "Sims style"): Tab loops Walls up,
+  Cutaway, Walls down and Roofs on. Cutaway drops any wall with floor
+  behind it as the camera looks, so you see into rooms while far walls
+  stay up; it follows the camera in eighths of a turn. The view applies
+  to the level being built on; levels below keep their walls up and
+  their roofs on. Roofs on shows every level above ground, roofs and all. Lifts link with a lift in the same spot on
   the next level up.
 - With split levels on, ramps are drawn with the floor tool's Ramp mode: drag over floor from the
   low side to the high side, and the ramp meets the floor just beyond each

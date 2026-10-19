@@ -85,9 +85,13 @@ func _ready() -> void:
 				controller.tool = BuildController.Tool.NONE)
 		tools.add_child(button)
 		_tool_buttons[tool] = button
-	_walls_button = _make_button("Tab  Walls down")
-	_walls_button.toggled.connect(func(on: bool) -> void: controller.view.walls_low = on)
+	_walls_button = _make_button("")
+	_walls_button.toggle_mode = false
+	_walls_button.tooltip_text = "Tab loops through walls up, cutaway, walls down and roofs on."
+	_walls_button.pressed.connect(controller.next_wall_view)
 	tools.add_child(_walls_button)
+	controller.wall_view_changed.connect(_show_wall_view)
+	_show_wall_view(controller.wall_view)
 
 	_tool_group.allow_unpress = true
 	controller.tool_changed.connect(_on_tool_changed)
@@ -95,9 +99,8 @@ func _ready() -> void:
 	_on_tool_changed(controller.tool)
 
 
-func _process(_delta: float) -> void:
-	# Tab toggles walls without going through the button, so keep it in step.
-	_walls_button.set_pressed_no_signal(controller.view.walls_low)
+func _show_wall_view(mode: BuildController.WallView) -> void:
+	_walls_button.text = "Tab  " + BuildController.WALL_VIEW_NAMES[mode]
 
 
 func _unhandled_key_input(event: InputEvent) -> void:

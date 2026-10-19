@@ -10,6 +10,20 @@ extends Node3D
 signal tool_changed(tool: Tool)
 ## The hint text has changed without the tool changing.
 signal hint_changed
+signal wall_view_changed(mode: WallView)
+
+## What Tab loops through, like The Sims: walls up; cutaway (walls in front
+## of rooms drop, as the camera looks); every wall down; and roofs on, for
+## a look at the whole building from outside.
+enum WallView { UP, CUTAWAY, DOWN, ROOFS }
+const WALL_VIEW_NAMES: Array[String] = ["Walls up", "Cutaway", "Walls down", "Roofs on"]
+
+var wall_view := WallView.UP:
+	set(value):
+		if value == wall_view:
+			return
+		wall_view = value
+		wall_view_changed.emit(value)
 
 enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH }
 enum WaterMode { NONE, ADD, REMOVE }
@@ -260,7 +274,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		brush_radius = minf(brush_radius + 1.0, max_brush_radius)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_toggle_walls"):
-		view.walls_low = not view.walls_low
+		next_wall_view()
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed and tool != Tool.NONE and _has_hover:
@@ -402,6 +416,11 @@ func _stairs_fit(route: Array[Vector2i]) -> bool:
 
 
 #region Ground and brushes
+
+## Moves Tab on to the next wall view.
+func next_wall_view() -> void:
+	wall_view = ((wall_view + 1) % WallView.size()) as WallView
+
 
 ## What the current tool does, for the toolbar.
 func hint() -> String:
