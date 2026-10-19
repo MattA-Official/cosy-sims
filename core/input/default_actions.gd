@@ -26,6 +26,7 @@ const KEY_ACTIONS := {
 	"debug_toggle": [KEY_F3],
 	"level_up": [KEY_PAGEUP],
 	"level_down": [KEY_PAGEDOWN],
+	"help_toggle": [KEY_F1],
 }
 
 

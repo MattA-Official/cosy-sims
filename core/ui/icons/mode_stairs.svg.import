@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bi0y1fq1d4vh7"
-path="res://.godot/imported/tool_walls_view.svg-1031ffda3f3979209454e21a48b69c21.ctex"
+uid="uid://4h2wgqnitt0o"
+path="res://.godot/imported/mode_stairs.svg-17cd05ec4ad26f35311ad45bac937db4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://core/ui/icons/tool_walls_view.svg"
-dest_files=["res://.godot/imported/tool_walls_view.svg-1031ffda3f3979209454e21a48b69c21.ctex"]
+source_file="res://core/ui/icons/mode_stairs.svg"
+dest_files=["res://.godot/imported/mode_stairs.svg-17cd05ec4ad26f35311ad45bac937db4.ctex"]
 
 [params]
 

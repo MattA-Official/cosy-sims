@@ -31,22 +31,27 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | Building | |
 | --- | --- |
 | 1 Room | Drag to build a floor with walls all round |
-| 2 Floor | Drag to lay or restyle floor on the side of any walls where you start; Shift-click floors or restyles the whole room; hold Ctrl to remove. Stairs: click the foot, move the way they climb, click short of the top for a landing, at the top to build; choose square or rounded landings |
-| 3 Wall | Drag from corner to corner to build or restyle; snaps straight or to 45°, or pick Any angle (or hold Alt); hold Ctrl to remove |
+| 2 Wall | Drag from corner to corner to build or restyle; snaps straight or to 45°, or pick Any angle (or hold Alt); hold Ctrl to remove |
+| 3 Floor | Drag to lay or restyle floor on the side of any walls where you start; Shift-click floors or restyles the whole room; hold Ctrl to remove. Stairs: click the foot, move the way they climb, click short of the top for a landing, at the top to build; choose square or rounded landings |
 | 4 Doors and windows | Pick a door, glass window or barred window, then click a wall; click it again to fill it in. A door can't join floors more than a step apart (see Door Steps below) |
 | 5 Objects | Click to place; R turns by 45° and [ / ] change the step (90° down to 1°); hold F to pin it and turn it to face the mouse; hold Alt to place freely. Lifts link with a lift in the same spot upstairs |
 | 6 Room type | Click a room to mark it as a cell, canteen and so on |
-| 7 Demolish | Click an object or wall to remove it, or drag to clear an area |
-| 8 Terrain | Hold to raise, lower, flatten or smooth the ground; or add water to a hollow, or drain a pond |
-| 9 Plants | Hold to plant trees, bushes or flowers; hold Ctrl to clear them |
-| 0 Paths | Straight: click each end. Curved: click the start, a bend and the end. Freehand: drag. Points snap to the middle of tiles (bends don't); hold Alt to swap that for one point, or turn Snap to grid off. Page Up / Down while placing builds stairs, a ramp or a bridge and raises its far end. Esc stops; Ctrl-click removes a path |
+| 7 Paths | Straight: click each end. Curved: click the start, a bend and the end. Freehand: drag. Points snap to the middle of tiles (bends don't); hold Alt to swap that for one point, or turn Snap to grid off. Page Up / Down while placing builds stairs, a ramp or a bridge and raises its far end. Esc stops; Ctrl-click removes a path |
+| 8 Plants | Hold to plant trees, bushes or flowers; hold Ctrl to clear them |
+| 9 Terrain | Hold to raise, lower, flatten or smooth the ground; or add water to a hollow, or drain a pond |
+| 0 Demolish | Click an object or wall to remove it, or drag to clear an area |
 | [ / ] | Brush size, for terrain and plants |
 | Tab | Loops through the wall views: Walls up; Cutaway (walls in front of rooms drop, following the camera round); Walls down; Roofs on (every level with its roofs, as from outside) |
 | Esc | Put the tool away |
+| F1 | The controls card |
 | F3 | Debug view: rooms tinted and labelled, and details of the tile under the mouse. With no build tool (Esc), click a person, object, room or tile to inspect it: set a person's needs, send them somewhere, add or remove prisoners, pause everyone |
 
-The room, floor and wall tools let you pick a style in the row above the
-toolbar. Fences, hedges, paving and lawn are outdoor styles: a room enclosed
+Hover any button in the build menu to see what it is. The room, floor and
+wall tools let you pick a style from the picture tiles above the toolbar;
+the Room tool shows each floor and wall pairing as a little cut-away room.
+The level, wall view (Tab), controls card (F1) and debug view (F3) also have
+buttons in the top-right corner. See [docs/ui.md](docs/ui.md) for how the UI
+is put together. Fences, hedges, paving and lawn are outdoor styles: a room enclosed
 by walls is indoors, but one bounded by a fence stays outdoors. Rooms are
 worked out from the walls automatically. Once a room has a type, a label
 floats over it saying what it still needs, such as a toilet. Labels that

@@ -10,7 +10,7 @@ extends RefCounted
 ##
 ## Type variations, set on a control's Theme Type Variation:
 ##   Labels: HeaderLabel, TitleLabel, SubtleLabel, KeyLabel, HudLabel
-##   Buttons: ToolButton, AccentButton, DangerButton, FlatButton, TileButton
+##   Buttons: ToolButton, AccentButton, DangerButton, FlatButton, TileButton, ModeButton
 ##   Panels: HudBar, InsetPanel, ToastPanel, TooltipPanel
 ##   Bars: BarWarning, BarDanger
 
@@ -215,6 +215,19 @@ func _buttons() -> void:
 	var clear := Color(p.button, 0.0)
 	_button_type("FlatButton", clear, Color(p.button, 0.6), clear, p.ink, p.inset, p.ink)
 	_tiles()
+	# Small square icon buttons for a tool's modes, two to a tile's height.
+	_variation("ModeButton", "Button")
+	_button_type("ModeButton", p.button, p.button_hover, p.button_edge, p.ink, p.accent, p.on_accent)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		var box := theme.get_stylebox(state, "ModeButton").duplicate() as StyleBoxFlat
+		box.set_corner_radius_all(8)
+		box.content_margin_left = 5
+		box.content_margin_right = 5
+		var pressed_down := 2 if state.contains("pressed") else 0
+		box.content_margin_top = 4 + pressed_down
+		box.content_margin_bottom = 4
+		theme.set_stylebox(state, "ModeButton", box)
+	theme.set_constant("icon_max_width", "ModeButton", 18)
 	var arrow := CosyIcons.chevron(14, p.muted)
 	theme.set_icon("arrow", "OptionButton", arrow)
 	theme.set_constant("arrow_margin", "OptionButton", 10)

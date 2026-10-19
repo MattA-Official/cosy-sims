@@ -7,51 +7,70 @@ extends VBoxContainer
 
 @export var controller: BuildController
 
+## In the order they're used: put up rooms, then fit them out, then the
+## grounds, with demolish set apart at the end. Keys 1 to 9 then 0 follow
+## this order. Each is [tool, name, what it does, icon].
 const TOOLS := [
 	[BuildController.Tool.ROOM, "Room", "Drag out a floor with walls all round.", "tool_room"],
-	[BuildController.Tool.FLOOR, "Floor", "Lay or restyle floors, and build stairs.", "tool_floor"],
 	[BuildController.Tool.WALL, "Wall", "Build or restyle walls, fences and hedges.", "tool_wall"],
+	[BuildController.Tool.FLOOR, "Floor", "Lay or restyle floors, and build stairs.", "tool_floor"],
 	[BuildController.Tool.OPENING, "Doors and windows", "Put a door or window in a wall.", "tool_opening"],
 	[BuildController.Tool.OBJECT, "Objects", "Place beds, tables, showers and more.", "tool_object"],
 	[BuildController.Tool.ROOM_TYPE, "Room type", "Mark a room as a cell, canteen and so on.", "tool_room_type"],
-	[BuildController.Tool.DEMOLISH, "Demolish", "Remove objects and walls, or clear an area.", "tool_demolish"],
-	[BuildController.Tool.TERRAIN, "Terrain", "Shape the ground, or add and drain water.", "tool_terrain"],
-	[BuildController.Tool.PLANTS, "Plants", "Plant trees, bushes and flowers.", "tool_plants"],
 	[BuildController.Tool.PATH, "Paths", "Lay paths and roads, with stairs and bridges.", "tool_path"],
+	[BuildController.Tool.PLANTS, "Plants", "Plant trees, bushes and flowers.", "tool_plants"],
+	[BuildController.Tool.TERRAIN, "Terrain", "Shape the ground, or add and drain water.", "tool_terrain"],
+	[BuildController.Tool.DEMOLISH, "Demolish", "Remove objects and walls, or clear an area.", "tool_demolish"],
 ]
+## A divider goes before each of these tools, grouping building, grounds
+## and demolish.
+const GROUP_STARTS: Array[int] = [6, 9]
 
 const ICONS := "res://core/ui/icons/%s.svg"
 
+# Modes are [value, name, icon, what it does].
+
 const FLOOR_MODES := [
-	[BuildController.FloorMode.LAY, "Lay"],
-	[BuildController.FloorMode.RAISE, "Raise"],
-	[BuildController.FloorMode.LOWER, "Lower"],
-	[BuildController.FloorMode.RAMP, "Ramp"],
-	[BuildController.FloorMode.STAIRS, "Stairs"],
+	[BuildController.FloorMode.LAY, "Lay", "mode_lay", "Lay or restyle floor."],
+	[BuildController.FloorMode.RAISE, "Raise", "mode_raise", "Nudge a floor up within its storey."],
+	[BuildController.FloorMode.LOWER, "Lower", "mode_lower", "Nudge a floor down within its storey."],
+	[BuildController.FloorMode.RAMP, "Ramp", "mode_ramp", "Slope a floor between two heights."],
+	[BuildController.FloorMode.STAIRS, "Stairs", "mode_stairs", "Build a staircase up to the next storey."],
+]
+
+const LANDINGS := [
+	[false, "Square landings", "landing_square", "Landings with square corners."],
+	[true, "Rounded landings", "landing_round", "Landings with a rounded outer corner."],
+]
+
+const WALL_ANGLES := [
+	[false, "Straight and 45°", "angle_45", "Walls snap straight or to 45°."],
+	[true, "Any angle", "angle_any", "Walls run corner to corner at any angle. Or hold Alt."],
 ]
 
 const PATH_MODES := [
-	[PathTool.Mode.STRAIGHT, "Straight"],
-	[PathTool.Mode.CURVED, "Curved"],
-	[PathTool.Mode.FREEHAND, "Freehand"],
-]
-
-const OPENINGS := [
-	[BuildingMap.Wall.DOOR, &"", "Door"],
-	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_GLASS, "Glass window"],
-	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS, "Barred window"],
-]
-
-const WATER_MODES := [
-	[BuildController.WaterMode.ADD, "Add water"],
-	[BuildController.WaterMode.REMOVE, "Drain water"],
+	[PathTool.Mode.STRAIGHT, "Straight", "path_straight", "Click each end."],
+	[PathTool.Mode.CURVED, "Curved", "path_curved", "Click the start, a bend and the end."],
+	[PathTool.Mode.FREEHAND, "Freehand", "path_freehand", "Drag to draw."],
 ]
 
 const BRUSHES := [
-	[Terrain.Brush.RAISE, "Raise"],
-	[Terrain.Brush.LOWER, "Lower"],
-	[Terrain.Brush.FLATTEN, "Flatten"],
-	[Terrain.Brush.SMOOTH, "Smooth"],
+	[Terrain.Brush.RAISE, "Raise", "brush_raise", "Hold to raise the ground."],
+	[Terrain.Brush.LOWER, "Lower", "brush_lower", "Hold to lower the ground."],
+	[Terrain.Brush.FLATTEN, "Flatten", "brush_flatten", "Hold to level the ground."],
+	[Terrain.Brush.SMOOTH, "Smooth", "brush_smooth", "Hold to soften bumps and edges."],
+]
+
+const WATER_MODES := [
+	[BuildController.WaterMode.ADD, "Add water", "water_add", "Click a hollow to fill it."],
+	[BuildController.WaterMode.REMOVE, "Drain water", "water_drain", "Click a pond to drain it."],
+]
+
+## Each is [wall kind, window kind, name, icon, what it does].
+const OPENINGS := [
+	[BuildingMap.Wall.DOOR, &"", "Door", "opening_door", "A door people can walk through."],
+	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_GLASS, "Glass window", "opening_glass", "Lets light in."],
+	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS, "Barred window", "opening_bars", "For cells and secure rooms."],
 ]
 
 var _hint := Label.new()
@@ -59,7 +78,6 @@ var _options := HBoxContainer.new()
 var _options_bar := PanelContainer.new()
 var _tool_buttons := {} # Tool -> Button
 var _tool_group := ButtonGroup.new()
-var _walls_button: Button
 var _thumbnails := Thumbnails.new()
 
 
@@ -93,30 +111,15 @@ func _ready() -> void:
 				controller.tool = tool
 			elif controller.tool == tool:
 				controller.tool = BuildController.Tool.NONE)
+		if i in GROUP_STARTS:
+			tools.add_child(VSeparator.new())
 		tools.add_child(button)
 		_tool_buttons[tool] = button
-	tools.add_child(VSeparator.new())
-	_walls_button = _make_tool_button("Tab", "Wall view",
-			"Loops through walls up, cutaway, walls down and roofs on.", "tool_walls_view")
-	_walls_button.toggle_mode = false
-	_walls_button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_walls_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_walls_button.add_theme_constant_override(&"h_separation", 8)
-	_walls_button.pressed.connect(controller.next_wall_view)
-	tools.add_child(_walls_button)
-	controller.wall_view_changed.connect(_show_wall_view)
-	_show_wall_view(controller.wall_view)
 
 	_tool_group.allow_unpress = true
 	controller.tool_changed.connect(_on_tool_changed)
 	controller.hint_changed.connect(func() -> void: _hint.text = controller.hint())
 	_on_tool_changed(controller.tool)
-
-
-func _show_wall_view(mode: BuildController.WallView) -> void:
-	_walls_button.text = BuildController.WALL_VIEW_NAMES[mode]
-	# Leave room for the keycap after the words.
-	_walls_button.custom_minimum_size.x = _walls_button.get_minimum_size().x + 30.0
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -212,67 +215,38 @@ func _add_room_choices() -> void:
 
 
 func _add_floor_mode_choices() -> void:
-	var group := ButtonGroup.new()
-	var row := _section("Mode")
-	for entry: Array in FLOOR_MODES:
+	var modes := FLOOR_MODES.filter(func(entry: Array) -> bool:
 		var split_only: bool = entry[0] in [BuildController.FloorMode.RAISE,
 				BuildController.FloorMode.LOWER, BuildController.FloorMode.RAMP]
-		if split_only and not Building.split_levels:
-			continue
-		var mode: BuildController.FloorMode = entry[0]
-		var button := _make_button(entry[1], group)
-		button.button_pressed = controller.floor_mode == mode
-		button.toggled.connect(func(on: bool) -> void:
-			if on and controller.floor_mode != mode:
-				controller.floor_mode = mode
-				# Stairs bring their own choices, so lay the row out again.
-				_on_tool_changed.call_deferred(controller.tool))
-		row.add_child(button)
+		return Building.split_levels or not split_only)
+	_columns("Mode", _mode_buttons(modes, controller.floor_mode, func(mode: BuildController.FloorMode) -> void:
+		if controller.floor_mode != mode:
+			controller.floor_mode = mode
+			# Stairs bring their own choices, so lay the row out again.
+			_on_tool_changed.call_deferred(controller.tool)))
 
 
 func _add_landing_choices() -> void:
-	var group := ButtonGroup.new()
-	var row := _section("Landings")
-	for entry: Array in [[false, "Square landings"], [true, "Rounded landings"]]:
-		var rounded: bool = entry[0]
-		var button := _make_button(entry[1], group)
-		button.button_pressed = controller.stair_tool.rounded == rounded
-		button.toggled.connect(func(on: bool) -> void:
-			if on:
-				controller.stair_tool.rounded = rounded)
-		row.add_child(button)
+	_columns("Landings", _mode_buttons(LANDINGS, controller.stair_tool.rounded,
+			func(rounded: bool) -> void: controller.stair_tool.rounded = rounded))
 
 
 func _add_wall_angle_choices() -> void:
-	var group := ButtonGroup.new()
-	var row := _section("Angles")
-	for entry: Array in [[false, "Straight and 45°"], [true, "Any angle"]]:
-		var any: bool = entry[0]
-		var button := _make_button(entry[1], group)
-		button.button_pressed = controller.any_angle == any
-		button.toggled.connect(func(on: bool) -> void:
-			if on:
-				controller.any_angle = any)
-		row.add_child(button)
+	_columns("Angles", _mode_buttons(WALL_ANGLES, controller.any_angle,
+			func(any: bool) -> void: controller.any_angle = any))
 
 
 func _add_path_choices() -> void:
-	var modes := ButtonGroup.new()
-	var row := _section("Mode")
-	for entry: Array in PATH_MODES:
-		var mode: PathTool.Mode = entry[0]
-		var button := _make_button(entry[1], modes)
-		button.button_pressed = controller.path_tool.mode == mode
-		button.toggled.connect(func(on: bool) -> void:
-			if on:
-				controller.path_tool.cancel()
-				controller.path_tool.mode = mode
-				_hint.text = controller.hint())
-		row.add_child(button)
-	var grid := _make_button("Snap to grid")
+	var buttons := _mode_buttons(PATH_MODES, controller.path_tool.mode, func(mode: PathTool.Mode) -> void:
+		controller.path_tool.cancel()
+		controller.path_tool.mode = mode
+		_hint.text = controller.hint())
+	var grid := _make_mode_button("Snap to grid",
+			"Path ends snap to the middle of tiles. Hold Alt to swap for one point.", "snap_grid")
 	grid.button_pressed = controller.path_tool.snap_to_grid
 	grid.toggled.connect(func(on: bool) -> void: controller.path_tool.snap_to_grid = on)
-	row.add_child(grid)
+	buttons.append(grid)
+	_columns("Mode", buttons)
 	if controller.path_tool.style.is_empty():
 		controller.path_tool.style = PrisonCatalogue.PATHS[0].id
 	var styles := ButtonGroup.new()
@@ -293,7 +267,7 @@ func _add_opening_choices() -> void:
 	for entry: Array in OPENINGS:
 		var kind: BuildingMap.Wall = entry[0]
 		var window: StringName = entry[1]
-		var button := _make_button(entry[2], group)
+		var button := CosyButton.tile(entry[2], entry[4], load(ICONS % entry[3]), true, group)
 		button.button_pressed = controller.opening == kind \
 				and (kind != BuildingMap.Wall.WINDOW or controller.window_kind == window)
 		button.toggled.connect(func(on: bool) -> void:
@@ -308,28 +282,45 @@ func _add_opening_choices() -> void:
 ## Sculpting brushes, then the water modes, as one set of choices.
 func _add_brush_choices() -> void:
 	var group := ButtonGroup.new()
-	var row := _section("Brushes")
-	for entry: Array in BRUSHES:
-		var brush: Terrain.Brush = entry[0]
-		var button := _make_button(entry[1], group)
-		button.button_pressed = controller.water_mode == BuildController.WaterMode.NONE \
-				and controller.terrain_brush == brush
-		button.toggled.connect(func(on: bool) -> void:
-			if on:
+	var sculpting := controller.water_mode == BuildController.WaterMode.NONE
+	_columns("Brushes", _mode_buttons(BRUSHES, controller.terrain_brush if sculpting else null,
+			func(brush: Terrain.Brush) -> void:
 				controller.terrain_brush = brush
 				controller.water_mode = BuildController.WaterMode.NONE
-				_hint.text = controller.hint())
-		row.add_child(button)
-	row = _section("Water")
-	for entry: Array in WATER_MODES:
-		var mode: BuildController.WaterMode = entry[0]
-		var button := _make_button(entry[1], group)
-		button.button_pressed = controller.water_mode == mode
+				_hint.text = controller.hint(), group))
+	_columns("Water", _mode_buttons(WATER_MODES, controller.water_mode, func(mode: BuildController.WaterMode) -> void:
+		controller.water_mode = mode
+		_hint.text = controller.hint(), group))
+
+
+## One small icon button per mode entry, picked when its value is
+## `current`. `pick` gets the value of the one chosen.
+func _mode_buttons(entries: Array, current: Variant, pick: Callable,
+		group := ButtonGroup.new()) -> Array[Button]:
+	var buttons: Array[Button] = []
+	for entry: Array in entries:
+		var value: Variant = entry[0]
+		var button := _make_mode_button(entry[1], entry[3], entry[2], group)
+		button.button_pressed = current != null and value == current
 		button.toggled.connect(func(on: bool) -> void:
 			if on:
-				controller.water_mode = mode
-				_hint.text = controller.hint())
-		row.add_child(button)
+				pick.call(value))
+		buttons.append(button)
+	return buttons
+
+
+## A titled section of mode buttons stacked two to a column, so four fit in
+## the space of one tile.
+func _columns(title: String, buttons: Array[Button]) -> void:
+	var row := _section(title)
+	row.add_theme_constant_override(&"separation", 4)
+	var column: VBoxContainer
+	for i in buttons.size():
+		if i % 2 == 0:
+			column = VBoxContainer.new()
+			column.add_theme_constant_override(&"separation", 4)
+			row.add_child(column)
+		column.add_child(buttons[i])
 
 
 ## One picture tile per definition. The first is picked if nothing is yet.
@@ -409,12 +400,18 @@ func _number(value: float) -> String:
 	return String.num(value, 2)
 
 
-func _make_button(text: String, group: ButtonGroup = null) -> Button:
-	var button := Button.new()
-	button.text = text
+func _make_mode_button(title: String, details: String, icon_name: String,
+		group: ButtonGroup = null) -> CosyButton:
+	var button := CosyButton.new()
+	button.title = title
+	button.details = details
+	button.icon = load(ICONS % icon_name)
+	button.theme_type_variation = &"ModeButton"
 	button.toggle_mode = true
 	button.button_group = group
 	button.focus_mode = Control.FOCUS_NONE
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.custom_minimum_size = Vector2(30, 30)
 	return button
 
 

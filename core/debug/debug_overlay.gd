@@ -48,7 +48,8 @@ func _ready() -> void:
 	_panel.anchor_right = 1.0
 	_panel.offset_left = -430.0
 	_panel.offset_right = -12.0
-	_panel.offset_top = 12.0
+	# Below the view bar in the top-right corner.
+	_panel.offset_top = 70.0
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_text.add_theme_font_size_override("font_size", 14)
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

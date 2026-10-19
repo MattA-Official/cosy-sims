@@ -24,7 +24,7 @@ extends Node3D
 @onready var debug_overlay: DebugOverlay = $BuildGrid/DebugOverlay
 @onready var camera_rig: CameraRig = $CameraRig
 @onready var cursor: GridCursor = $GridCursor
-@onready var cell_label: Label = $HUD/CellLabel
+@onready var hud: CanvasLayer = $HUD
 
 var building: Building
 ## The ground level's map. Other levels are in `building`.
@@ -35,6 +35,12 @@ var people := People.new()
 var inspector := Inspector.new()
 ## Grid lines at the height of the level being built on, off the ground.
 var level_grid := LevelGrid.new()
+## The bar across the top: level, room under the mouse, people.
+var status := StatusBar.new()
+## Level, wall view, help and debug buttons, top right.
+var view_bar := ViewBar.new()
+## Every control, on F1.
+var help_card := HelpCard.new()
 ## One BuildingView per level, by level number.
 var views: Dictionary[int, BuildingView] = {}
 
@@ -114,9 +120,24 @@ func _ready() -> void:
 	cursor.cell_hovered.connect(_on_cell_hovered)
 	cursor.height_at = _floor_level_at
 	building.changed.connect(func() -> void: _on_cell_hovered(cursor.hovered_cell))
+	_add_hud()
 	_on_cell_hovered(cursor.hovered_cell)
 	_apply_wall_view()
+	if build_sample_layout:
+		Toasts.post(SamplePrisons.NAMES[sample], SamplePrisons.CHALLENGES[sample]
+				+ "\nPress F1 for the controls.", 8.0)
 
+
+func _add_hud() -> void:
+	hud.add_child(status)
+	view_bar.building = building
+	view_bar.controller = controller
+	view_bar.help_pressed.connect(func() -> void: help_card.visible = not help_card.visible)
+	view_bar.debug_pressed.connect(func() -> void: debug_overlay.visible = not debug_overlay.visible)
+	debug_overlay.visibility_changed.connect(func() -> void: view_bar.show_debug(debug_overlay.visible))
+	hud.add_child(view_bar)
+	help_card.sections = PrisonHelp.SECTIONS
+	hud.add_child(help_card)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("level_up"):
@@ -184,6 +205,9 @@ func _process(_delta: float) -> void:
 	if camera != null and controller.wall_view == BuildController.WallView.CUTAWAY:
 		var look := -camera.global_transform.basis.z
 		controller.view.cut_direction = Vector2(look.x, look.z)
+	var count := "%d people" % people.people.size()
+	if status.item_text(&"people") != count:
+		status.set_item(&"people", count, &"SubtleLabel")
 
 
 ## A typical floor height for a level, for picking: the middle of the land
@@ -208,16 +232,13 @@ func _floor_level_at(cell: Vector2i) -> float:
 
 
 func _on_cell_hovered(cell: Vector2i) -> void:
-	var prefix := Building.level_name(building.active) + "    "
-	if cell == GridCursor.NO_CELL:
-		cell_label.text = prefix + "Cell: none"
+	status.set_item(&"level", Building.level_name(building.active), &"HeaderLabel")
+	var room := building.current().room_at(cell) if cell != GridCursor.NO_CELL else null
+	if room == null:
+		status.set_item(&"room", "No room here" if cell != GridCursor.NO_CELL else "Off the map", &"SubtleLabel")
 		return
-	var text := prefix + "Cell: %d, %d" % [cell.x, cell.y]
-	var room := building.current().room_at(cell)
-	if room != null:
-		var def := PrisonCatalogue.room_type(room.type)
-		text += "    Room: %s, %d tiles, %s" % [
-			def.display_name if def != null else "unassigned",
-			room.cells.size(),
-			"indoors" if room.indoor else "outdoors"]
-	cell_label.text = text
+	var def := PrisonCatalogue.room_type(room.type)
+	status.set_item(&"room", "%s  ·  %d tiles  ·  %s" % [
+		def.display_name if def != null else "Unmarked room",
+		room.cells.size(),
+		"indoors" if room.indoor else "outdoors"])
