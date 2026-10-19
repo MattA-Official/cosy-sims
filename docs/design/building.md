@@ -98,11 +98,9 @@ links between areas. The tile grid stays the authority for rooms and
 building.
 
 ### Agreed order
-Debug view and windows (done), then water bodies (done), then spline
-paths (done) (outdoors,
-sloping with the ground, steps where steep, bridges; floors also count as
-paths, with one-way paths later), then storeys (manual floor heights,
-stairs, ramps, staff-only lifts, basements), then people.
+Debug view and windows, water bodies and spline paths are done. Next come
+storeys (manual floor heights, stairs, ramps, staff-only lifts, basements,
+angled and curved walls), then people.
 
 ## Open questions
 - Multi-storey buildings: when, and how do stairs work?
