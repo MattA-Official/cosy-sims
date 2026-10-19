@@ -1,10 +1,13 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://games/prison/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://core/grid/build_grid.gd" id="2_grid"]
 [ext_resource type="Shader" path="res://core/grid/grid_ground.gdshader" id="3_shader"]
 [ext_resource type="PackedScene" path="res://core/camera/camera_rig.tscn" id="4_rig"]
 [ext_resource type="Script" path="res://core/grid/grid_cursor.gd" id="5_cursor"]
+[ext_resource type="Script" path="res://core/building/building_view.gd" id="6_view"]
+[ext_resource type="Script" path="res://core/building/build_controller.gd" id="7_build"]
+[ext_resource type="Script" path="res://games/prison/build_toolbar.gd" id="8_toolbar"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ground"]
 render_priority = 0
@@ -24,11 +27,10 @@ background_mode = 2
 sky = SubResource("Sky_main")
 ambient_light_source = 3
 ambient_light_sky_contribution = 0.5
-ambient_light_energy = 0.7
+ambient_light_energy = 0.35
 tonemap_mode = 2
 ssao_enabled = true
-glow_enabled = true
-glow_intensity = 0.4
+glow_enabled = false
 
 [sub_resource type="LabelSettings" id="LabelSettings_hud"]
 font_size = 18
@@ -52,6 +54,16 @@ directional_shadow_max_distance = 120.0
 script = ExtResource("2_grid")
 ground_material = SubResource("ShaderMaterial_ground")
 
+[node name="BuildingView" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid")]
+script = ExtResource("6_view")
+grid = NodePath("..")
+
+[node name="BuildController" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid", "camera_rig", "view")]
+script = ExtResource("7_build")
+grid = NodePath("..")
+camera_rig = NodePath("../../CameraRig")
+view = NodePath("../BuildingView")
+
 [node name="CameraRig" parent="." instance=ExtResource("4_rig")]
 
 [node name="GridCursor" type="Node3D" parent="." node_paths=PackedStringArray("grid", "camera_rig")]
@@ -64,20 +76,28 @@ camera_rig = NodePath("../CameraRig")
 [node name="CellLabel" type="Label" parent="HUD"]
 offset_left = 16.0
 offset_top = 12.0
-offset_right = 400.0
+offset_right = 900.0
 offset_bottom = 40.0
 text = "Cell: none"
 label_settings = SubResource("LabelSettings_hud")
 
 [node name="HelpLabel" type="Label" parent="HUD"]
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -64.0
+offset_top = 40.0
 offset_right = 900.0
-offset_bottom = -12.0
-grow_vertical = 0
+offset_bottom = 92.0
 text = "WASD / arrows: pan    Q / E: rotate    Wheel or + / -: zoom    Shift: faster
-Right-drag: pan    Middle-drag: rotate and tilt    Left-click: drop or remove a crate"
+Right-drag: pan    Middle-drag: rotate and tilt    Esc: put the tool away"
 label_settings = SubResource("LabelSettings_hud")
+
+[node name="BuildToolbar" type="VBoxContainer" parent="HUD" node_paths=PackedStringArray("controller")]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -140.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("8_toolbar")
+controller = NodePath("../../BuildGrid/BuildController")
