@@ -9,6 +9,6 @@ display_name = "Hedge"
 colour = Color(0.3, 0.56, 0.28, 1)
 top_colour = Color(0.36, 0.64, 0.32, 1)
 outdoor = true
-height = 1.0
+height = 0.7
 thickness = 0.45
 see_through = false

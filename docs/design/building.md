@@ -102,10 +102,15 @@ Debug view and windows, water bodies and spline paths are done. Next come
 storeys (manual floor heights, stairs, ramps, staff-only lifts, basements,
 angled and curved walls), then people.
 
-### Storeys (decided, not built yet)
-- Fixed 3 m storeys, stepped through with Page Up and Page Down. Each
-  floor can be nudged up or down within its storey for split levels.
-  Basements are storeys below ground.
+### Storeys (levels and nudges built; stairs, lifts and ramps next)
+- Fixed 1.75 m storeys, stepped through with Page Up and Page Down. Each
+  floor can be nudged up or down in quarter-metre steps within its storey
+  for split levels. Basements are storeys below ground.
+- Scale is stylised like Prison Architect and Parkitect rather than
+  real-world: a tile is 1 m but walls are 1.5 m, doors 1.15 m, and
+  furniture is low and chunky. People will be about 0.9 m tall, so a
+  quarter-metre split is a step they can take and anything taller needs a
+  ramp or stairs.
 - Getting between levels: ready-made stair and lift objects (they cut the
   hole in the floor above; lifts can be staff only), plus drawn ramps for
   split levels and odd heights.

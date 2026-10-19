@@ -9,6 +9,6 @@ display_name = "Plaster"
 colour = Color(0.93, 0.88, 0.8, 1)
 top_colour = Color(0.36, 0.32, 0.3, 1)
 outdoor = false
-height = 2.5
+height = 1.5
 thickness = 0.15
 see_through = false

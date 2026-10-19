@@ -9,6 +9,6 @@ display_name = "Fence"
 colour = Color(0.66, 0.5, 0.34, 1)
 top_colour = Color(0.5, 0.36, 0.24, 1)
 outdoor = true
-height = 1.1
+height = 0.8
 thickness = 0.08
 see_through = true

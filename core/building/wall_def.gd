@@ -9,7 +9,7 @@ extends Resource
 @export var top_colour := Color(0.36, 0.32, 0.3)
 @export var outdoor := false
 ## Height in metres when walls are up. Fences are usually lower.
-@export var height := 2.5
+@export var height := 1.5
 @export var thickness := 0.15
 ## Draw as posts and rails rather than a solid wall.
 @export var see_through := false

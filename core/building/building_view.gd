@@ -12,7 +12,7 @@ extends Node3D
 ## Which storey this view draws. Off the ground, floors are slabs of
 ## `slab_depth` rather than foundations reaching into the terrain.
 @export var level := 0
-@export var slab_depth := 0.47
+@export var slab_depth := 0.28
 ## Room labels show only on the level being built on.
 @export var show_labels := true:
 	set(value):
@@ -20,12 +20,12 @@ extends Node3D
 		queue_rebuild()
 
 @export_group("Walls")
-@export var wall_height := 2.5
-@export var low_wall_height := 0.35 ## Height when walls are cut away.
+@export var wall_height := 1.5
+@export var low_wall_height := 0.25 ## Height when walls are cut away.
 @export var wall_thickness := 0.15
-@export var door_height := 2.0
-@export var window_sill := 0.9
-@export var window_head := 2.0
+@export var door_height := 1.15
+@export var window_sill := 0.5
+@export var window_head := 1.15
 @export var walls_low := false:
 	set(value):
 		walls_low = value
@@ -144,7 +144,7 @@ func _add_split_steps(st: SurfaceTool, cell: Vector2i, top_y: float, colour: Col
 		if not map.has_floor(next) or not map.can_walk_between(cell, next):
 			continue
 		var rise := map.floor_height(next) - map.floor_height(cell)
-		if rise <= 0.26:
+		if rise <= BuildingMap.MAX_STEP * 0.5:
 			continue
 		var tread := 0.3 * cs
 		var dir := Vector3(step.x, 0.0, step.y)

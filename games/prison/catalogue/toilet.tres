@@ -8,6 +8,6 @@ id = &"toilet"
 display_name = "Toilet"
 size = Vector2(0.5, 0.75)
 snap = 1
-height = 0.5
+height = 0.35
 colour = Color(0.95, 0.95, 0.97, 1)
 tags = Array[StringName]([&"toilet"])

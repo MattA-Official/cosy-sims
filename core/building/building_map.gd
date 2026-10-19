@@ -35,7 +35,7 @@ const DEFAULT_FLOOR := &"concrete"
 const DEFAULT_WALL := &"plaster"
 ## Neighbouring floors further apart in height than this need a ramp or
 ## stairs between them; closer ones are a step people can take.
-const MAX_STEP := 0.5
+const MAX_STEP := 0.25
 
 enum Wall { NONE, WALL, DOOR, WINDOW }
 

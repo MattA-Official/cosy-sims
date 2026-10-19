@@ -14,7 +14,7 @@ signal active_changed(level: int)
 ## Something changed on any level.
 signal changed
 
-const STOREY := 3.0
+const STOREY := 1.75
 const MIN_LEVEL := -2
 const MAX_LEVEL := 4
 

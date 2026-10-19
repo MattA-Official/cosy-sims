@@ -164,7 +164,7 @@ func _add_bridge(st: SurfaceTool, p0: Vector2, p1: Vector2, half: float, top0: f
 	# Rails along both edges.
 	for s in [-1.0, 1.0]:
 		var offset: Vector2 = side * (half - 0.05) * s
-		add_block(st, p0 + offset, p1 + offset, 0.05, top0 + 0.45, top1 + 0.45, minf(top0, top1),
+		add_block(st, p0 + offset, p1 + offset, 0.05, top0 + 0.35, top1 + 0.35, minf(top0, top1),
 				wood.darkened(0.15), wood.darkened(0.15))
 	# A pier under the start of every other stretch keeps it from floating.
 	if terrain != null and int(p0.x * 7.0 + p0.y * 13.0) % 2 == 0:

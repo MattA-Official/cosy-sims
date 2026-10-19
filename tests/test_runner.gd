@@ -503,7 +503,7 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	hover.call(44.5, 43.5)
 	controller._on_release()
 	_check(building.level(-1).rooms().size() == 1 and building.level(-1).floor_height(cell.call(42, 41))
-			< terrain.cell_height(cell.call(42, 41)) - 2.0, "basements go below ground")
+			< terrain.cell_height(cell.call(42, 41)) - Building.STOREY + 0.5, "basements go below ground")
 	# Split levels: raise half the ground room, then go too far.
 	building.active = 0
 	controller.tool = BuildController.Tool.FLOOR

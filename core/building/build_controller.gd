@@ -18,7 +18,7 @@ enum FloorMode { LAY, RAISE, LOWER }
 const NUDGE_STEP := 0.25
 ## How far floors may be nudged from their storey's height, below and above.
 const NUDGE_DOWN := 0.5
-const NUDGE_UP := 1.5
+const NUDGE_UP := 0.75
 
 const HINTS := {
 	Tool.NONE: "",
