@@ -94,6 +94,9 @@ func mark_ground_dirty() -> void:
 ## new one once it settles.
 func _on_ground_changed() -> void:
 	_ground_wait = GROUND_SETTLE_SECONDS
+	# Building flattens the ground under it, so the next rebuild, even one
+	# for the building, must not reuse the old ground.
+	_ground_dirty = true
 
 
 ## The walking graph, rebuilt first if anything has changed.

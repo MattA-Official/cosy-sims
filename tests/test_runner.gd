@@ -1249,6 +1249,8 @@ func _test_path_network() -> void:
 	_check(under.b != bridge.b and raised.segments.size() == 2, "a ground path doesn't join a bridge in mid-air")
 	var up := raised.add_segment(Vector2(3, 6), Vector2(3, 0.2), null, &"", true, NAN, 2.0)
 	_check(raised.segments.size() == 4 and raised.segments_at(up.b).size() == 3, "one built up to it does")
+	_check(is_equal_approx(raised.snap_height(Vector2(7, 0.2)), 2.0) and is_nan(raised.snap_height(Vector2(5, 6))),
+			"an end snapped onto a bridge takes its height, so the path tool joins it")
 	# A curve crossing a path twice makes two junctions.
 	var twice := PathNetwork.new()
 	twice.add_segment(Vector2(0.5, 5.5), Vector2(10.5, 5.5))

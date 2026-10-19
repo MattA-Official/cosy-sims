@@ -28,6 +28,8 @@ const PATH_STEP := 1.0
 ## apply on top. Working this out is most of the cost of a rebuild.
 class GroundLayer:
 	var land: Array[Rect2i] = []
+	var terrain: Terrain
+	var paths: PathNetwork
 	## Each dry tile's walking point and weight (cheaper on ground paths).
 	var points: Dictionary[Vector2i, Vector3] = {}
 	var weights: Dictionary[Vector2i, float] = {}
@@ -50,15 +52,17 @@ var _levels: Dictionary[int, int] = {} ## Point id: its level.
 
 
 ## Builds the graph. Pass the last graph's `ground_layer` to reuse it when
-## only the building has changed; it is worked out afresh if the land has
-## grown.
+## only the building has changed: the caller must know the terrain, water
+## and paths haven't. It is worked out afresh if the land has grown or the
+## terrain or paths are different ones.
 static func build(building: Building, paths: PathNetwork = null, terrain: Terrain = null,
 		ground: GroundLayer = null) -> NavGraph:
 	var graph := NavGraph.new()
 	graph._building = building
 	graph._paths = paths
 	graph._terrain = terrain
-	if ground == null or ground.land != building.ground().land:
+	if ground == null or ground.land != building.ground().land or ground.terrain != terrain \
+			or ground.paths != paths:
 		ground = graph._work_out_ground()
 	graph.ground_layer = ground
 	for n: int in building.levels:
@@ -214,6 +218,8 @@ func _work_out_ground() -> GroundLayer:
 	var layer := GroundLayer.new()
 	var map := _building.ground()
 	layer.land = map.land.duplicate()
+	layer.terrain = _terrain
+	layer.paths = _paths
 	var pathed := _path_cells()
 	for rect in map.land:
 		for cell in BuildingMap.cells_in(rect):

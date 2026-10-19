@@ -134,9 +134,8 @@ func press(point: Vector2, erase := false) -> PathNetwork.Segment:
 	var needed := 2 if mode == Mode.STRAIGHT else 3
 	if _placed.is_empty():
 		var start := snap(point, true)
-		var node := network.node_near(start, 0.01)
 		_placed.append(start)
-		_start_height = network.heights.get(node, NAN) if node != -1 else NAN
+		_start_height = network.snap_height(start)
 		if not is_nan(_start_height):
 			built = true
 		return null
@@ -184,11 +183,8 @@ func snap(point: Vector2, is_end := true) -> Vector2:
 ## chosen.
 func end_heights(curve: Array) -> Array[float]:
 	var from := _start_height
-	var to := NAN
-	var node := network.node_near(curve[2], 0.01)
-	if node != -1:
-		to = network.heights.get(node, NAN)
-	elif _is_built(curve) and raise_steps > 0:
+	var to := network.snap_height(curve[2])
+	if is_nan(to) and network.node_near(curve[2], 0.01) == -1 and _is_built(curve) and raise_steps > 0:
 		to = _ground(curve[2]) + raise_steps * Staircase.RISE
 	return [from, to]
 
@@ -303,11 +299,7 @@ func _overlaps(curve: Array, heights: Array[float]) -> bool:
 func _is_built(curve: Array) -> bool:
 	if built:
 		return true
-	var heights := [_start_height, NAN]
-	var node := network.node_near(curve[2], 0.01)
-	if node != -1:
-		heights[1] = network.heights.get(node, NAN)
-	return not is_nan(heights[0]) or not is_nan(heights[1])
+	return not is_nan(_start_height) or not is_nan(network.snap_height(curve[2]))
 
 
 ## Draws the path a click would add, tinted to show if it is allowed, plus

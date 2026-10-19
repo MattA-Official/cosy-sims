@@ -351,7 +351,7 @@ func door_has_steps(edge: Vector3i) -> bool:
 func unusable_doors() -> Array[Vector3i]:
 	var out: Array[Vector3i] = []
 	for edge: Vector3i in walls:
-		if walls[edge] == Wall.DOOR and door_rise(edge) > MAX_STEP + EPSILON and not door_has_steps(edge):
+		if walls[edge] == Wall.DOOR and not can_put_door(edge):
 			out.append(edge)
 	return out
 

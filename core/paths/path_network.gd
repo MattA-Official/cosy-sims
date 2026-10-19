@@ -67,6 +67,21 @@ func segments_at(node: int) -> Array[Segment]:
 	return out
 
 
+## The height of whatever an end at `position` snaps onto, or NAN if that
+## is the ground. An end snapped onto the middle of a bridge takes the
+## bridge's height there, so it joins the bridge rather than passing under.
+func snap_height(position: Vector2) -> float:
+	var node := node_near(position)
+	if node != -1:
+		return heights.get(node, NAN)
+	var hit := closest(position)
+	if hit.is_empty() or hit[2] > SNAP_DISTANCE or hit[1] <= 0.0 or hit[1] >= 1.0:
+		return NAN
+	var height := height_on(hit[0], hit[1])
+	var ground := terrain.height_at(position) if terrain != null else 0.0
+	return height if absf(height - ground) >= PASS_UNDER else NAN
+
+
 ## Where an end dropped at `position` would go: onto a nearby node, onto a
 ## nearby segment, or where it is.
 func snap(position: Vector2) -> Vector2:

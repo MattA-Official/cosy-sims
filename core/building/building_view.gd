@@ -104,6 +104,9 @@ var _glass_mesh := MeshInstance3D.new()
 var _objects := Node3D.new()
 var _stairs_material := MeshShapes.vertex_colour_material()
 var _labels := Node3D.new()
+## What the labels were last decluttered for (camera, screen size and the
+## labels themselves), so it only happens again when one of them changes.
+var _declutter_key: Array = []
 var _material := MeshShapes.vertex_colour_material()
 var _glass_material := _make_glass_material()
 var _object_materials := {} # Color -> StandardMaterial3D
@@ -584,6 +587,7 @@ func _add_door_steps(edge: Vector3i, low: Vector2i) -> void:
 
 
 func _build_labels() -> void:
+	_declutter_key.clear()
 	for child in _labels.get_children():
 		child.queue_free()
 	if not show_labels:
@@ -640,6 +644,11 @@ func _declutter_labels() -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
 		return
+	var key := [camera.global_transform, camera.fov, camera.size, get_viewport().get_visible_rect().size,
+			global_transform]
+	if key == _declutter_key:
+		return
+	_declutter_key = key
 	var scale := get_viewport().get_visible_rect().size.y / 900.0
 	var labels: Array[Label3D] = []
 	for child in _labels.get_children():
