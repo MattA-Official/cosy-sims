@@ -5,6 +5,11 @@ extends RefCounted
 
 var id := 0
 var cells: Array[Vector2i] = []
+## Every piece of floor in the room, as Vector3i(cell x, cell z, piece index).
+## Cells cut by angled walls can have pieces in more than one room.
+var pieces: Array[Vector3i] = []
+## Floor area in tiles.
+var area := 0.0
 ## True when walls or doors close off every side of the floor.
 var enclosed := true
 ## True when enclosed by indoor walls only. Fences leave a room outdoors.

@@ -135,6 +135,14 @@ func _describe_cell(cell: Vector2i) -> PackedStringArray:
 		lines.append("Floor: %s%s at %.2f m" % [def.display_name if def != null else floor_id,
 				" (outdoor style)" if def != null and def.outdoor else "", map.floor_height(cell)])
 
+	var cut := map.pieces(cell)
+	if cut.size() > 1:
+		var shares: PackedStringArray = []
+		for piece: TilePiece in cut:
+			var piece_room := map.room_at_point(piece.centre())
+			shares.append("%.2f %s" % [piece.area(), ("room %d" % piece_room.id) if piece_room != null
+					else "no floor"])
+		lines.append("Cut by angled walls: %s" % ", ".join(shares))
 	var room := map.room_at(cell)
 	if room != null:
 		var type := _room_type(room.type)
@@ -197,13 +205,14 @@ func _describe_totals() -> PackedStringArray:
 		else:
 			open += 1
 	var counts := {}
-	for kind: int in map.walls.values():
+	for kind: int in map.walls.values() + map.slants.values():
 		counts[kind] = counts.get(kind, 0) + 1
 	var lines: PackedStringArray = []
 	lines.append("Rooms: %d indoors, %d enclosed outdoors, %d not enclosed" % [indoor, outdoor, open])
 	lines.append("Floor tiles: %d    Walls: %d    Doors: %d    Windows: %d" % [map.floors.size(),
 			counts.get(BuildingMap.Wall.WALL, 0), counts.get(BuildingMap.Wall.DOOR, 0),
 			counts.get(BuildingMap.Wall.WINDOW, 0)])
+	lines.append("Angled wall pieces: %d" % map.slants.size())
 	lines.append("Objects: %d    Plants: %d    Ponds and lakes: %d" % [map.objects.size(),
 			foliage.plants.size() if foliage != null else 0,
 			terrain.water.bodies.size() if terrain != null and terrain.water != null else 0])

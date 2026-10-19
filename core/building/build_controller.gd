@@ -24,7 +24,7 @@ const HINTS := {
 	Tool.NONE: "",
 	Tool.ROOM: "Drag to build a walled room.",
 	Tool.FLOOR: "Drag to lay or restyle floor. Hold Ctrl to remove floor.",
-	Tool.WALL: "Drag between corners to build or restyle walls. Hold Ctrl to remove them.",
+	Tool.WALL: "Drag between corners to build or restyle walls. Hold Alt for any angle, Ctrl to remove.",
 	Tool.OPENING: "Click a wall to put in a door or window. Click it again to fill it in.",
 	Tool.OBJECT: "Click to place. R rotates. Hold Alt to place freely.",
 	Tool.ROOM_TYPE: "Click a room to mark it.",
@@ -137,7 +137,9 @@ var _hover_point := Vector2.ZERO ## Mouse position on the ground, in cell units.
 var _has_hover := false
 var _preview_mesh := ImmediateMesh.new()
 var _preview_material := MeshShapes.vertex_colour_material(true)
-var _preview_boxes: Array[Array] = [] ## [centre, half extents, colour] per box.
+## [centre, half extents, colour] per box, or [centre, half along, colour,
+## half across, half height] for a box at an angle.
+var _preview_boxes: Array[Array] = []
 var _path_preview := MeshInstance3D.new()
 var _brushing := false
 var _flatten_target := 0.0
@@ -224,6 +226,13 @@ func _on_press() -> void:
 			_dragging = true
 			_drag_start_corner = _hover_corner()
 		Tool.OPENING:
+			var slant := _hover_slant()
+			if slant != NO_SLANT:
+				if _has_chosen_slant_opening(slant):
+					map.set_slant_opening(slant, BuildingMap.Wall.WALL)
+				else:
+					map.set_slant_opening(slant, opening, window_kind)
+				return
 			var edge := _hover_edge()
 			if _has_chosen_opening(edge):
 				map.set_opening(edge, BuildingMap.Wall.WALL)
@@ -233,7 +242,7 @@ func _on_press() -> void:
 			if object_def != null and _can_place(_object_position()):
 				map.place_object(object_def, _object_position(), object_rotation)
 		Tool.ROOM_TYPE:
-			var room := map.room_at(_hover_cell())
+			var room := map.room_at_point(_hover_point)
 			if room != null:
 				map.set_room_type(room, room_type.id if room_type != null else &"")
 		Tool.PATH:
@@ -272,6 +281,10 @@ func _on_release() -> void:
 				map.add_ramp(ramp.rect, ramp.rise, ramp.low, ramp.high)
 		Tool.FLOOR when floor_mode != FloorMode.LAY:
 			nudge_floors(rect, NUDGE_STEP if floor_mode == FloorMode.RAISE else -NUDGE_STEP)
+		Tool.FLOOR when rect.size == Vector2i.ONE and map.pieces(rect.position).size() > 1:
+			# One tile cut by an angled wall: lay or lift just the piece clicked.
+			if not map.set_piece_floor(_hover_point, not erase) and not erase:
+				map.fill_floor(rect, floor_style, build_height(rect))
 		Tool.FLOOR:
 			if erase:
 				map.clear_floor(rect)
@@ -279,11 +292,15 @@ func _on_release() -> void:
 				map.fill_floor(rect, floor_style, build_height(rect))
 				settle_ground(rect)
 		Tool.WALL:
-			var edges := BuildingMap.edges_on_line(_drag_start_corner, _wall_end_corner())
+			var end := _wall_end_corner()
+			var edges := BuildingMap.edges_on_line(_drag_start_corner, end)
+			var keys := BuildingMap.slants_on_line(_drag_start_corner, end)
 			if erase:
 				map.remove_walls(edges)
+				map.remove_slants(keys)
 			else:
 				map.build_walls(edges, wall_style)
+				map.build_slants(keys, wall_style)
 		Tool.DEMOLISH:
 			if rect.size != Vector2i.ONE:
 				map.demolish(rect)
@@ -291,8 +308,11 @@ func _on_release() -> void:
 			# A click takes the most specific thing under the mouse.
 			var placed := map.object_at(_hover_point)
 			var edge := _hover_edge()
+			var slant := _hover_slant()
 			if placed != null:
 				map.remove_object(placed.id)
+			elif slant != NO_SLANT:
+				map.remove_slants([slant])
 			elif map.wall_at(edge) != BuildingMap.Wall.NONE and _edge_distance() < 0.25:
 				map.remove_walls([edge])
 			else:
@@ -550,12 +570,47 @@ func _object_position() -> Vector2:
 
 
 ## Walls go in straight lines, so snap to whichever axis the drag follows most.
+## Where a wall being dragged ends: straight along X or Z or at 45°, or at
+## any angle while Alt is held.
 func _wall_end_corner() -> Vector2i:
 	var corner := _hover_corner()
+	if Input.is_action_pressed("build_free_place"):
+		return corner
 	var delta := corner - _drag_start_corner
-	if absi(delta.x) >= absi(delta.y):
-		return Vector2i(corner.x, _drag_start_corner.y)
-	return Vector2i(_drag_start_corner.x, corner.y)
+	var size := maxi(absi(delta.x), absi(delta.y))
+	var best := _drag_start_corner
+	for dir: Vector2i in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, -1)]:
+		for sign in [1, -1]:
+			var reach := mini(size, roundi(Vector2(delta).dot(Vector2(dir * sign)) / Vector2(dir).length_squared()))
+			var candidate: Vector2i = _drag_start_corner + dir * sign * maxi(reach, 0)
+			if Vector2(candidate).distance_to(corner) < Vector2(best).distance_to(corner):
+				best = candidate
+	return best
+
+
+const NO_SLANT := Vector4i(-1, -1, -1, -1)
+
+## The angled wall nearest the mouse, if one is close enough to pick.
+func _hover_slant() -> Vector4i:
+	var best := NO_SLANT
+	var best_distance := 0.3
+	var cell := _hover_cell()
+	for offset in BuildingMap.cells_in(Rect2i(cell - Vector2i.ONE, Vector2i(3, 3))):
+		for key: Vector4i in map.slants_through(offset):
+			var ends := BuildingMap.slant_ends(key)
+			var closest := Geometry2D.get_closest_point_to_segment(_hover_point, Vector2(ends[0]),
+					Vector2(ends[1]))
+			var distance := closest.distance_to(_hover_point)
+			if distance < best_distance:
+				best = key
+				best_distance = distance
+	return best
+
+
+func _has_chosen_slant_opening(key: Vector4i) -> bool:
+	if map.slant_at(key) != opening:
+		return false
+	return opening != BuildingMap.Wall.WINDOW or map.slant_window_kind(key) == window_kind
 
 #endregion
 
@@ -605,6 +660,8 @@ func _draw_preview() -> void:
 				_preview_cells(BuildingMap.cells_in(_drag_rect()), demolish_colour)
 			elif placed != null:
 				_preview_rect(placed.rect, demolish_colour, placed.def.height + 0.05)
+			elif _hover_slant() != NO_SLANT:
+				_preview_slant(_hover_slant(), demolish_colour)
 			elif map.wall_at(_hover_edge()) != BuildingMap.Wall.NONE and _edge_distance() < 0.25:
 				_preview_edge(_hover_edge(), demolish_colour)
 			else:
@@ -616,8 +673,17 @@ func _draw_preview() -> void:
 						_preview_edge(edge, demolish_colour)
 					else:
 						_preview_edge(edge, ok_colour if map.can_build_wall(edge) else bad_colour)
+				for key in BuildingMap.slants_on_line(_drag_start_corner, _wall_end_corner()):
+					if _erasing():
+						_preview_slant(key, demolish_colour)
+					else:
+						_preview_slant(key, ok_colour if map.can_build_slant(key) else bad_colour)
 			else:
 				_preview_corner(_hover_corner(), ok_colour)
+		Tool.OPENING when _hover_slant() != NO_SLANT:
+			var key := _hover_slant()
+			var ok := not (opening == BuildingMap.Wall.WINDOW and map.is_outdoor_slant(key))
+			_preview_slant(key, ok_colour if ok else bad_colour)
 		Tool.OPENING:
 			var edge := _hover_edge()
 			var ok := map.wall_at(edge) != BuildingMap.Wall.NONE
@@ -631,7 +697,7 @@ func _draw_preview() -> void:
 				_preview_rect(BuildingMap.object_rect(object_def, position, object_rotation),
 						ok_colour if ok else bad_colour, object_def.height)
 		Tool.ROOM_TYPE:
-			var room := map.room_at(_hover_cell())
+			var room := map.room_at_point(_hover_point)
 			if room != null:
 				var colour := room_type.colour if room_type != null else Color.WHITE
 				colour.a = 0.45
@@ -640,7 +706,10 @@ func _draw_preview() -> void:
 		return
 	_preview_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES, _preview_material)
 	for box in _preview_boxes:
-		MeshShapes.add_box_immediate(_preview_mesh, box[0], box[1], box[2])
+		if box.size() > 3:
+			MeshShapes.add_oriented_box_immediate(_preview_mesh, box[0], box[1], box[3], box[4], box[2])
+		else:
+			MeshShapes.add_box_immediate(_preview_mesh, box[0], box[1], box[2])
 	_preview_mesh.surface_end()
 
 
@@ -740,6 +809,20 @@ func _preview_rect(rect: Rect2, colour: Color, height: float) -> void:
 ## A wall preview. `base` sets the height it stands at; by default it
 ## stands on the floor or ground beside it. Kept below full wall height so
 ## a big drag does not hide what is behind it.
+func _preview_slant(key: Vector4i, colour: Color) -> void:
+	var cs := grid.cell_size
+	var ends := BuildingMap.slant_ends(key)
+	var a := Vector2(ends[0])
+	var b := Vector2(ends[1])
+	var height := view.low_wall_height if view.walls_low else preview_wall_height
+	var ground := _ground_at((a + b) * 0.5)
+	var flat := (b - a).normalized()
+	var middle := (a + b) * 0.5 * cs
+	_preview_boxes.append([Vector3(middle.x, ground + height * 0.5, middle.y),
+			Vector3(flat.x, 0.0, flat.y) * a.distance_to(b) * cs * 0.5, colour,
+			Vector3(-flat.y, 0.0, flat.x) * 0.1, height * 0.5])
+
+
 func _preview_edge(edge: Vector3i, colour: Color, base := NAN) -> void:
 	if not map.edge_in_bounds(edge):
 		return

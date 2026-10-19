@@ -22,6 +22,7 @@ func _process(_delta: float) -> bool:
 	_test_path_network()
 	_test_building_levels()
 	_test_ramps()
+	_test_angled_walls()
 	_test_path_profile()
 	_test_foliage()
 	_test_main_scene_loads()
@@ -541,6 +542,65 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	controller.floor_mode = BuildController.FloorMode.LAY
 	building.active = 0
 
+	# Angled walls: 45° snaps by default, Alt allows any angle.
+	controller.tool = BuildController.Tool.ROOM
+	hover.call(10.5, 38.5)
+	controller._on_press()
+	hover.call(15.5, 43.5)
+	controller._on_release()
+	var square := map.room_at(cell.call(12, 40))
+	_check(square != null and square.cells.size() == 36, "a room for angled walls")
+	controller.tool = BuildController.Tool.WALL
+	hover.call(10.0, 38.0)
+	controller._on_press()
+	hover.call(16.2, 43.4)
+	controller._draw_preview()
+	controller._on_release()
+	var start := Vector2i(cell.call(10, 38))
+	_check(map.slants.has(BuildingMap.slant_key(start, start + Vector2i(1, 1)))
+			and map.slants.size() == 6 and map.room_at_point(base + Vector2(12.8, 40.2))
+			!= map.room_at_point(base + Vector2(12.2, 40.8)), "a near-diagonal drag snaps to 45°")
+	controller.force_erase = true
+	hover.call(10.0, 38.0)
+	controller._on_press()
+	hover.call(16.0, 44.0)
+	controller._on_release()
+	controller.force_erase = false
+	_check(map.slants.is_empty(), "Ctrl removes angled walls")
+	Input.action_press("build_free_place")
+	hover.call(10.0, 38.0)
+	controller._on_press()
+	hover.call(16.0, 41.0)
+	controller._draw_preview()
+	controller._on_release()
+	Input.action_release("build_free_place")
+	_check(map.slants.size() == 3 and map.slants.has(BuildingMap.slant_key(start, start + Vector2i(2, 1))),
+			"Alt draws a wall at any angle")
+	controller.tool = BuildController.Tool.OPENING
+	controller.opening = BuildingMap.Wall.DOOR
+	hover.call(13.05, 39.4)
+	controller._on_press()
+	var middle_key := BuildingMap.slant_key(start + Vector2i(2, 1), start + Vector2i(4, 2))
+	_check(map.slant_at(middle_key) == BuildingMap.Wall.DOOR, "a door goes in an angled wall")
+	controller.tool = BuildController.Tool.FLOOR
+	controller.force_erase = true
+	hover.call(11.8, 38.2)
+	controller._on_press()
+	controller._on_release()
+	controller.force_erase = false
+	_check(map.floors.has(cell.call(11, 38)) and not map.piece_has_floor(map.piece_at(base + Vector2(11.8, 38.2)))
+			and map.piece_has_floor(map.piece_at(base + Vector2(11.2, 38.8))), "Ctrl-click lifts half a cut tile")
+	hover.call(11.8, 38.2)
+	controller._on_press()
+	controller._on_release()
+	_check(map.piece_has_floor(map.piece_at(base + Vector2(11.8, 38.2))), "a click puts it back")
+	controller.tool = BuildController.Tool.DEMOLISH
+	hover.call(13.05, 39.4)
+	controller._on_press()
+	controller._on_release()
+	_check(not map.slants.has(middle_key) and map.slants.size() == 2, "demolish removes one angled wall")
+	controller.tool = BuildController.Tool.NONE
+
 
 func _test_windows() -> void:
 	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
@@ -720,6 +780,43 @@ func _test_ramps() -> void:
 	map.add_ramp(Rect2i(1, 0, 3, 2), Vector2i.RIGHT, 0.0, 1.0)
 	map.clear_floor(Rect2i(1, 0, 1, 1))
 	_check(map.ramps.is_empty(), "clearing floor under a ramp removes it")
+
+
+func _test_angled_walls() -> void:
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
+	map.register_styles(PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	map.build_room(Rect2i(0, 0, 4, 4), &"wood", &"plaster")
+	_check(BuildingMap.slants_on_line(Vector2i(0, 0), Vector2i(4, 2))
+			== [Vector4i(0, 0, 2, 1), Vector4i(2, 1, 4, 2)], "a 1:2 line is two wall pieces")
+	_check(BuildingMap.slants_on_line(Vector2i(0, 0), Vector2i(0, 4)).is_empty(),
+			"straight lines are left to ordinary walls")
+	map.build_slants(BuildingMap.slants_on_line(Vector2i(0, 0), Vector2i(4, 4)), &"plaster")
+	_check(map.slants.size() == 4 and map.pieces(Vector2i(2, 2)).size() == 2
+			and map.pieces(Vector2i(2, 1)).size() == 1, "a diagonal wall cuts the tiles it crosses")
+	var rooms := map.rooms()
+	_check(rooms.size() == 2 and is_equal_approx(rooms[0].area, 8.0) and is_equal_approx(rooms[1].area, 8.0)
+			and rooms[0].indoor and rooms[1].indoor, "a diagonal wall splits a room in two")
+	_check(map.room_at_point(Vector2(2.8, 2.2)) != map.room_at_point(Vector2(2.2, 2.8)),
+			"each half of a cut tile belongs to its own side")
+	_check(map.place_object(load("res://games/prison/catalogue/bed.tres"), Vector2(1, 1), 0) == 0,
+			"objects cannot straddle an angled wall")
+	_check(map.set_piece_floor(Vector2(3.8, 3.2), false) and not map.room_at_point(Vector2(3.5, 2.5)).enclosed
+			and is_equal_approx(map.room_at_point(Vector2(3.5, 2.5)).area, 7.5),
+			"taking up half a tile leaves a gap in the room")
+	map.set_piece_floor(Vector2(3.8, 3.2), true)
+	map.set_slant_opening(Vector4i(1, 1, 2, 2), BuildingMap.Wall.DOOR)
+	_check(map.slant_at(Vector4i(1, 1, 2, 2)) == BuildingMap.Wall.DOOR and map.rooms().size() == 2,
+			"a door in an angled wall still splits rooms")
+	map.remove_slants(map.slants.keys())
+	_check(map.rooms().size() == 1 and is_equal_approx(map.rooms()[0].area, 16.0),
+			"removing the angled wall joins the room again")
+	map.build_slants(BuildingMap.slants_on_line(Vector2i(0, 0), Vector2i(4, 2)), &"plaster")
+	var total := 0.0
+	for room in map.rooms():
+		total += room.area
+	_check(map.rooms().size() == 2 and is_equal_approx(total, 16.0), "a shallow angle splits the room too")
+	map.demolish(Rect2i(0, 0, 4, 4))
+	_check(map.slants.is_empty(), "demolishing takes angled walls with it")
 
 
 func _test_path_network() -> void:

@@ -110,7 +110,8 @@ func _build_floors() -> void:
 	var cs := grid.cell_size
 	for room in map.rooms():
 		var type := room_type(room.type)
-		for cell in room.cells:
+		for id in room.pieces:
+			var cell := Vector2i(id.x, id.y)
 			var def := map.floor_def(map.floors[cell])
 			var colour := def.colour if def != null else floor_colour
 			if type != null:
@@ -123,6 +124,10 @@ func _build_floors() -> void:
 			var centre := Vector3(cell.x + 0.5, 0.0, cell.y + 0.5) * cs
 			# The top face takes the floor colour; the sides show as foundations
 			# reaching down into the ground.
+			var piece: TilePiece = map.pieces(cell)[id.z]
+			if not piece.is_whole():
+				_add_floor_piece(st, piece, top_y, bottom, colour * shade)
+				continue
 			var ramp := map.ramp_at(cell)
 			if ramp != null:
 				_add_ramp_tile(st, cell, ramp, bottom, colour * shade)
@@ -162,6 +167,24 @@ func _add_split_steps(st: SurfaceTool, cell: Vector2i, top_y: float, colour: Col
 				colour)
 
 
+## Part of a tile cut by an angled wall: its outline as a flat top, with
+## sides reaching down to `bottom`.
+func _add_floor_piece(st: SurfaceTool, piece: TilePiece, top_y: float, bottom: float,
+		colour: Color) -> void:
+	var cs := grid.cell_size
+	var top: Array[Vector3] = []
+	for point in piece.polygon:
+		top.append(Vector3(point.x * cs, top_y, point.y * cs))
+	MeshShapes.add_polygon(st, top, Vector3.UP, colour)
+	var centre := piece.centre()
+	for i in top.size():
+		var a := top[i]
+		var b := top[(i + 1) % top.size()]
+		var outward := Vector3((a.x + b.x) * 0.5 - centre.x * cs, 0.0, (a.z + b.z) * 0.5 - centre.y * cs)
+		MeshShapes.add_quad(st, a, b, Vector3(b.x, bottom, b.z), Vector3(a.x, bottom, a.z),
+				outward.normalized(), foundation_colour)
+
+
 ## One tile of a ramp: a sloped top over sides reaching down to `bottom`.
 func _add_ramp_tile(st: SurfaceTool, cell: Vector2i, ramp: BuildingMap.Ramp, bottom: float,
 		colour: Color) -> void:
@@ -171,29 +194,14 @@ func _add_ramp_tile(st: SurfaceTool, cell: Vector2i, ramp: BuildingMap.Ramp, bot
 		var point := Vector2(cell) + offset
 		corners.append(Vector3(point.x * cs, ramp.height_at(point) + 0.03, point.y * cs))
 	var centre := (Vector3(cell.x + 0.5, 0.0, cell.y + 0.5) * cs)
-	_add_quad(st, corners[0], corners[1], corners[2], corners[3], Vector3.UP, colour)
+	MeshShapes.add_quad(st, corners[0], corners[1], corners[2], corners[3], Vector3.UP, colour)
 	for i in 4:
 		var a := corners[i]
 		var b := corners[(i + 1) % 4]
 		var outward := ((a + b) * 0.5 - centre)
 		outward.y = 0.0
-		_add_quad(st, a, b, Vector3(b.x, bottom, b.z), Vector3(a.x, bottom, a.z), outward.normalized(),
+		MeshShapes.add_quad(st, a, b, Vector3(b.x, bottom, b.z), Vector3(a.x, bottom, a.z), outward.normalized(),
 				foundation_colour)
-
-
-## A four-sided face, wound to face `outward`.
-func _add_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, outward: Vector3,
-		colour: Color) -> void:
-	var normal := (b - a).cross(c - a).normalized()
-	if normal.dot(outward) < 0.0:
-		normal = -normal
-	st.set_normal(normal)
-	st.set_color(colour)
-	var order: Array[Vector3] = [a, b, c, a, c, d]
-	if (b - a).cross(c - a).dot(outward) >= 0.0:
-		order = [a, c, b, a, d, c]
-	for vertex in order:
-		st.add_vertex(vertex)
 
 
 ## A low kerb around the land you own, so you can see where you may build.
@@ -218,60 +226,87 @@ func _build_walls() -> void:
 	var glass := SurfaceTool.new()
 	glass.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var has_glass := false
-	var cs := grid.cell_size
 	for edge: Vector3i in map.walls:
-		var def := map.wall_def(map.wall_style(edge))
-		var full_height := def.height if def != null else wall_height
-		var height := minf(low_wall_height, full_height) if walls_low else full_height
-		var thickness := def.thickness if def != null else wall_thickness
-		var colour := def.colour if def != null else wall_colour
-		var top := def.top_colour if def != null else wall_top_colour
-		var along := Vector3.RIGHT if edge.z == BuildingMap.EDGE_X else Vector3.BACK
-		var across := Vector3.BACK if edge.z == BuildingMap.EDGE_X else Vector3.RIGHT
-		var middle := Vector3(edge.x, 0.0, edge.y) * cs + along * cs * 0.5
-		middle.y = _wall_base(edge)
-		# Foundations reach below the lowest ground at either end.
 		var start := Vector2(edge.x, edge.y)
-		var end := start + Vector2(along.x, along.z)
-		var drop := middle.y - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
-				if level == 0 else middle.y - _lowest_floor_beside(edge) + 0.05
-		# Stretch each piece by half a thickness so corners join up.
-		var half_len := along * (cs + thickness) * 0.5
-		var half_across := across * thickness * 0.5
-		if map.wall_at(edge) == BuildingMap.Wall.DOOR:
-			_add_door(st, middle, half_len, half_across, height, full_height, colour, top)
-		elif map.wall_at(edge) == BuildingMap.Wall.WINDOW:
-			var kind := map.window_kind(edge)
-			_add_window(st, middle, along, half_len, half_across, height, full_height, cs, kind,
-					drop, colour, top)
-			if kind == BuildingMap.WINDOW_GLASS and not walls_low:
-				_add_slab(glass, middle, along * cs * 0.5 + half_across * 0.25, window_sill,
-						window_head, glass_colour, glass_colour)
-				has_glass = true
-		elif def != null and def.see_through and not walls_low:
-			_add_fence(st, middle, along, half_across, height, cs, drop, colour, top)
-		else:
-			_add_slab(st, middle, half_len + half_across, -drop, height, colour, top)
-	_wall_mesh.mesh = st.commit() if not map.walls.is_empty() else null
+		var end := start + (Vector2.RIGHT if edge.z == BuildingMap.EDGE_X else Vector2.DOWN)
+		var base := _wall_base(edge)
+		# Foundations reach below the lowest ground at either end.
+		var drop := base - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
+				if level == 0 else base - _lowest_floor_beside(edge) + 0.05
+		has_glass = _add_wall_piece(st, glass, start, end, base, drop, map.wall_at(edge),
+				map.wall_def(map.wall_style(edge)), map.window_kind(edge)) or has_glass
+	for key: Vector4i in map.slants:
+		var ends := BuildingMap.slant_ends(key)
+		var start := Vector2(ends[0])
+		var end := Vector2(ends[1])
+		var highest := -INF
+		var lowest := INF
+		for cell in BuildingMap.slant_crossings(key):
+			if map.has_floor(cell):
+				highest = maxf(highest, map.floor_height(cell))
+				lowest = minf(lowest, map.floor_height(cell))
+		var base := highest if highest > -INF else _height_at((start + end) * 0.5)
+		var drop := base - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
+				if level == 0 else base - (lowest if lowest < INF else base) + 0.05
+		has_glass = _add_wall_piece(st, glass, start, end, base, drop, map.slant_at(key),
+				map.wall_def(map.slant_style(key)), map.slant_window_kind(key)) or has_glass
+	var empty := map.walls.is_empty() and map.slants.is_empty()
+	_wall_mesh.mesh = st.commit() if not empty else null
 	_glass_mesh.mesh = glass.commit() if has_glass else null
 
 
-## A box standing on the ground (or starting at bottom) up to top_y.
-func _add_slab(st: SurfaceTool, middle: Vector3, half_flat: Vector3, bottom: float,
-		top_y: float, colour: Color, top_colour: Color) -> void:
+## One stretch of wall between two corners, as a plain wall, door, window or
+## fence. Returns whether it added any glass.
+func _add_wall_piece(st: SurfaceTool, glass: SurfaceTool, start: Vector2, end: Vector2,
+		base: float, drop: float, kind: int, def: WallDef, window: StringName) -> bool:
+	var cs := grid.cell_size
+	var full_height := def.height if def != null else wall_height
+	var height := minf(low_wall_height, full_height) if walls_low else full_height
+	var thickness := def.thickness if def != null else wall_thickness
+	var colour := def.colour if def != null else wall_colour
+	var top := def.top_colour if def != null else wall_top_colour
+	var length := start.distance_to(end) * cs
+	var flat := (end - start).normalized()
+	var along := Vector3(flat.x, 0.0, flat.y)
+	var across := Vector3(-flat.y, 0.0, flat.x)
+	var middle := Vector3((start.x + end.x) * 0.5, 0.0, (start.y + end.y) * 0.5) * cs
+	middle.y = base
+	# Stretch each piece by half a thickness so corners join up.
+	var half_len := along * (length + thickness) * 0.5
+	var half_across := across * thickness * 0.5
+	if kind == BuildingMap.Wall.DOOR:
+		_add_door(st, middle, half_len, half_across, height, full_height, colour, top)
+	elif kind == BuildingMap.Wall.WINDOW:
+		_add_window(st, middle, along, half_len, half_across, height, full_height, length, window,
+				drop, colour, top)
+		if window == BuildingMap.WINDOW_GLASS and not walls_low:
+			_add_slab(glass, middle, along * length * 0.5, half_across * 0.25, window_sill,
+					window_head, glass_colour, glass_colour)
+			return true
+	elif def != null and def.see_through and not walls_low:
+		_add_fence(st, middle, along, half_across, height, length, drop, colour, top)
+	else:
+		_add_slab(st, middle, half_len, half_across, -drop, height, colour, top)
+	return false
+
+
+## A box from `bottom` up to `top_y`, `half_len` along the wall and
+## `half_across` through it, so walls at any angle work.
+func _add_slab(st: SurfaceTool, middle: Vector3, half_len: Vector3, half_across: Vector3,
+		bottom: float, top_y: float, colour: Color, top_colour: Color) -> void:
 	var half_height := (top_y - bottom) * 0.5
-	MeshShapes.add_box(st, middle + Vector3.UP * (bottom + half_height),
-			half_flat + Vector3.UP * half_height, colour, top_colour)
+	MeshShapes.add_oriented_box(st, middle + Vector3.UP * (bottom + half_height), half_len,
+			half_across, half_height, colour, top_colour)
 
 
 func _add_door(st: SurfaceTool, middle: Vector3, half_len: Vector3, half_across: Vector3,
 		height: float, full_height: float, colour: Color, top: Color) -> void:
 	if walls_low or full_height <= door_height:
-		_add_slab(st, middle, half_len + half_across, 0.0, minf(height, low_wall_height) * 0.5,
+		_add_slab(st, middle, half_len, half_across, 0.0, minf(height, low_wall_height) * 0.5,
 				door_colour, door_colour)
 		return
-	_add_slab(st, middle, half_len + half_across, door_height, full_height, colour, top)
-	_add_slab(st, middle, half_len * 0.8 + half_across * 0.4, 0.0, door_height, door_colour,
+	_add_slab(st, middle, half_len, half_across, door_height, full_height, colour, top)
+	_add_slab(st, middle, half_len * 0.8, half_across * 0.4, 0.0, door_height, door_colour,
 			door_colour)
 
 
@@ -279,27 +314,25 @@ func _add_door(st: SurfaceTool, middle: Vector3, half_len: Vector3, half_across:
 ## Cut-away walls show the window as a coloured top so it is still easy
 ## to spot.
 func _add_window(st: SurfaceTool, middle: Vector3, along: Vector3, half_len: Vector3,
-		half_across: Vector3, height: float, full_height: float, cs: float, kind: StringName,
+		half_across: Vector3, height: float, full_height: float, length: float, kind: StringName,
 		drop: float, colour: Color, top: Color) -> void:
 	var accent := bars_colour if kind == BuildingMap.WINDOW_BARS else glass_colour
 	accent.a = 1.0
 	if walls_low or full_height <= window_head:
-		_add_slab(st, middle, half_len + half_across, -drop, height, colour, accent)
+		_add_slab(st, middle, half_len, half_across, -drop, height, colour, accent)
 		return
-	_add_slab(st, middle, half_len + half_across, -drop, window_sill, colour, top)
-	_add_slab(st, middle, half_len + half_across, window_head, full_height, colour, top)
+	_add_slab(st, middle, half_len, half_across, -drop, window_sill, colour, top)
+	_add_slab(st, middle, half_len, half_across, window_head, full_height, colour, top)
 	# Narrow pillars at each end make a frame and keep corners solid.
-	var pillar := along * 0.1 + half_across
 	for end in [-0.5, 0.5]:
-		_add_slab(st, middle + along * (cs * end + (0.05 if end < 0 else -0.05)), pillar,
-				window_sill, window_head, colour, top)
+		_add_slab(st, middle + along * (length * end + (0.05 if end < 0 else -0.05)), along * 0.1,
+				half_across, window_sill, window_head, colour, top)
 	if kind == BuildingMap.WINDOW_BARS:
-		var bar := along * 0.025 + half_across.normalized() * 0.025
-		var count := 6
+		var count := maxi(roundi(6 * length), 2)
 		for i in count:
 			var offset := (float(i) + 0.5) / count - 0.5
-			_add_slab(st, middle + along * cs * offset * 0.8, bar, window_sill, window_head,
-					bars_colour, bars_colour)
+			_add_slab(st, middle + along * length * offset * 0.8, along * 0.025,
+					half_across.normalized() * 0.025, window_sill, window_head, bars_colour, bars_colour)
 
 
 static func _make_glass_material() -> StandardMaterial3D:
@@ -311,13 +344,13 @@ static func _make_glass_material() -> StandardMaterial3D:
 
 ## Posts at each end and two rails between them.
 func _add_fence(st: SurfaceTool, middle: Vector3, along: Vector3, half_across: Vector3,
-		height: float, cs: float, drop: float, colour: Color, top: Color) -> void:
-	var post := along * 0.06 + half_across.normalized() * 0.06
+		height: float, length: float, drop: float, colour: Color, top: Color) -> void:
 	for end in [-0.5, 0.5]:
-		_add_slab(st, middle + along * cs * end, post, -drop, height, colour, top)
+		_add_slab(st, middle + along * length * end, along * 0.06, half_across.normalized() * 0.06,
+				-drop, height, colour, top)
 	for rail_y in [height * 0.45, height * 0.85]:
-		_add_slab(st, middle, along * cs * 0.5 + half_across * 0.6, rail_y - 0.05, rail_y + 0.05,
-				colour, top)
+		_add_slab(st, middle, along * length * 0.5, half_across * 0.6, rail_y - 0.05,
+				rail_y + 0.05, colour, top)
 
 
 func _build_objects() -> void:

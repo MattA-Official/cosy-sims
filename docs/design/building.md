@@ -98,8 +98,8 @@ links between areas. The tile grid stays the authority for rooms and
 building.
 
 ### Agreed order
-Debug view and windows, water bodies, spline paths and storeys are done.
-Next come walls at any angle (with floors rethought), then people.
+Debug view and windows, water bodies, spline paths, storeys and angled
+walls are done. Next come people and pathfinding.
 
 ### Storeys (built)
 - Fixed 1.75 m storeys, stepped through with Page Up and Page Down. Each
@@ -122,9 +122,20 @@ Next come walls at any angle (with floors rethought), then people.
   end. Nothing can be placed on a ramp, and nudging any of it flattens it
   back to tiles.
 
-### Wall shapes (decided, not built yet)
-- Straight walls at any angle, not just along tile edges or 45°. Floors
-  will need rethinking so they can be cut along such walls.
+### Wall shapes (angled walls built)
+- Walls run from tile corner to tile corner at any angle ("Corner to
+  corner", chosen 2026-10-19). The wall tool snaps to straight or 45°
+  lines; holding Alt allows any angle, such as 1:2 or 1:3.
+- An angled wall is stored as pieces between the corners its line passes
+  through exactly, so a 45° wall has one piece per tile and doors and
+  windows go in one piece each.
+- Tiles an angled wall crosses are cut into pieces along it. Rooms are
+  worked out from pieces, so each side of a cut tile can belong to a
+  different room. Floor stays per tile, but one piece of a cut tile can be
+  taken up on its own (Ctrl-click with the floor tool) to trim floor
+  outside an angled wall.
+- Objects cannot straddle an angled wall. People and pathfinding will use
+  the pieces too.
 - Idea for later: curved walls, perhaps reusing the path curves.
 
 ## Open questions
