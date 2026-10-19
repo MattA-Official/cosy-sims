@@ -15,9 +15,20 @@ enum Snap {
 @export var size := Vector2.ONE
 ## How placement snaps. Holding Alt places freely whatever this says.
 @export var snap := Snap.TILE
+## Stairs and lifts link a level with the one above.
+enum Connects {
+	NONE,
+	STAIRS, ## Rises one storey along its length and cuts a hole in the floor above.
+	LIFT, ## Links with a lift in the same spot on the next level up.
+}
+
 ## Placeholder box height in metres.
 @export var height := 0.6
 @export var colour := Color.WHITE
 ## What the object is good for, such as "bed" or "toilet". Room types and,
 ## later, people's needs look objects up by tag rather than by id.
 @export var tags: Array[StringName] = []
+## Whether this links to the level above, and how.
+@export var connects := Connects.NONE
+## Only staff may use it, such as a staff lift.
+@export var staff_only := false

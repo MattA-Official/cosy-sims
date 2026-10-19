@@ -30,7 +30,19 @@ var active := 0:
 		level(value)
 		active_changed.emit(value)
 
+## A way between two levels: the tile you set off from and the tile you
+## arrive on.
+class Link:
+	var kind: ObjectDef.Connects
+	var from_level: int
+	var from_cell: Vector2i
+	var to_level: int
+	var to_cell: Vector2i
+	var staff_only := false
+
+
 var _floor_defs: Array[FloorDef] = []
+var _syncing := false
 var _wall_defs: Array[WallDef] = []
 
 
@@ -50,7 +62,7 @@ func level(n: int) -> BuildingMap:
 	for rect in land.slice(1):
 		map.land.append(rect)
 	map.register_styles(_floor_defs, _wall_defs)
-	map.changed.connect(changed.emit)
+	map.changed.connect(_on_level_changed)
 	levels[n] = map
 	level_added.emit(n, map)
 	return map
@@ -111,6 +123,33 @@ func corner_in_use(corner: Vector2i) -> bool:
 	return false
 
 
+## Can an object go on a level? Stairs need a level above them.
+func can_place(n: int, def: ObjectDef, position: Vector2, rotation: int) -> bool:
+	if def.connects == ObjectDef.Connects.STAIRS and n >= MAX_LEVEL:
+		return false
+	return level(n).can_place(def, position, rotation)
+
+
+## Every stair and lift link, both ways for stairs and lifts alike.
+func links() -> Array[Link]:
+	var out: Array[Link] = []
+	for n: int in levels:
+		for placed: BuildingMap.PlacedObject in levels[n].objects.values():
+			match placed.def.connects:
+				ObjectDef.Connects.STAIRS:
+					var ends := BuildingMap.stair_ends(placed)
+					var dir := BuildingMap.rise_direction(placed.rotation)
+					_add_link(out, placed.def, n, ends[0] - dir, n + 1, ends[1] + dir)
+				ObjectDef.Connects.LIFT:
+					var above := _lift_above(n, placed)
+					if above != null:
+						var cell := Vector2i(placed.rect.get_center().floor())
+						var link := _add_link(out, placed.def, n, cell, n + 1, cell)
+						link.staff_only = link.staff_only or above.def.staff_only
+						out[-2].staff_only = link.staff_only
+	return out
+
+
 ## A friendly name for a level.
 static func level_name(n: int) -> String:
 	if n == 0:
@@ -118,3 +157,52 @@ static func level_name(n: int) -> String:
 	if n < 0:
 		return "Basement %d" % -n
 	return "Floor %d" % n
+
+
+func _add_link(out: Array[Link], def: ObjectDef, from_level: int, from_cell: Vector2i,
+		to_level: int, to_cell: Vector2i) -> Link:
+	for way in 2:
+		var link := Link.new()
+		link.kind = def.connects
+		link.staff_only = def.staff_only
+		link.from_level = from_level if way == 0 else to_level
+		link.from_cell = from_cell if way == 0 else to_cell
+		link.to_level = to_level if way == 0 else from_level
+		link.to_cell = to_cell if way == 0 else from_cell
+		out.append(link)
+	return out[-1]
+
+
+func _lift_above(n: int, lift: BuildingMap.PlacedObject) -> BuildingMap.PlacedObject:
+	if not levels.has(n + 1):
+		return null
+	for placed: BuildingMap.PlacedObject in levels[n + 1].objects.values():
+		if placed.def.connects == ObjectDef.Connects.LIFT and placed.rect.is_equal_approx(lift.rect):
+			return placed
+	return null
+
+
+func _on_level_changed() -> void:
+	if not _syncing:
+		_sync_holes()
+	changed.emit()
+
+
+## Cuts the floor above every flight of stairs. Where stairs have gone, the
+## tiles above are free for floor again.
+func _sync_holes() -> void:
+	_syncing = true
+	var holes: Dictionary[int, Dictionary] = {}
+	for n: int in levels.keys():
+		for placed: BuildingMap.PlacedObject in levels[n].objects.values():
+			if placed.def.connects == ObjectDef.Connects.STAIRS and n < MAX_LEVEL:
+				var cells: Dictionary = holes.get_or_add(n + 1, {})
+				for cell in BuildingMap.cells_under(placed.rect):
+					cells[cell] = true
+	for n: int in holes:
+		level(n)
+	for n: int in levels.keys():
+		var cells: Dictionary[Vector2i, bool] = {}
+		cells.assign(holes.get(n, {}))
+		levels[n].set_holes(cells)
+	_syncing = false

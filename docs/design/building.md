@@ -102,7 +102,7 @@ Debug view and windows, water bodies and spline paths are done. Next come
 storeys (manual floor heights, stairs, ramps, staff-only lifts, basements,
 angled and curved walls), then people.
 
-### Storeys (levels and nudges built; stairs, lifts and ramps next)
+### Storeys (levels, nudges, stairs and lifts built; ramps next)
 - Fixed 1.75 m storeys, stepped through with Page Up and Page Down. Each
   floor can be nudged up or down in quarter-metre steps within its storey
   for split levels. Basements are storeys below ground.
@@ -111,9 +111,13 @@ angled and curved walls), then people.
   furniture is low and chunky. People will be about 0.9 m tall, so a
   quarter-metre split is a step they can take and anything taller needs a
   ramp or stairs.
-- Getting between levels: ready-made stair and lift objects (they cut the
-  hole in the floor above; lifts can be staff only), plus drawn ramps for
-  split levels and odd heights.
+- Getting between levels: ready-made stair and lift objects, plus drawn
+  ramps for split levels and odd heights. Stairs are 1 by 3 tiles and
+  climb one storey; they cut a hole in the floor above, and the floor can
+  go back once they are removed. A stairwell stays part of the room around
+  it. Lifts link with a lift in the same spot on the next level up; a
+  staff lift makes the link staff only. `Building.links()` lists every way
+  between levels, ready for pathfinding.
 
 ### Wall shapes (decided, not built yet)
 - Straight walls at any angle, not just along tile edges or 45°. Floors

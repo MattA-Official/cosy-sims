@@ -664,6 +664,32 @@ func _test_building_levels() -> void:
 	building.add_land(Rect2i(20, 0, 5, 5))
 	_check(building.level(1).owns(Vector2i(21, 1)), "new land reaches every level")
 
+	# Stairs cut the floor above; lifts link with a lift above them.
+	var stairs: ObjectDef = load("res://games/prison/catalogue/stairs.tres")
+	var lift: ObjectDef = load("res://games/prison/catalogue/lift.tres")
+	var staff_lift: ObjectDef = load("res://games/prison/catalogue/lift_staff.tres")
+	var upstairs := building.level(1)
+	upstairs.fill_floor(Rect2i(2, 2, 4, 4), &"wood", 0.5 + Building.STOREY)
+	var flight := ground.place_object(stairs, Vector2(3, 2), 0)
+	_check(flight != 0 and not upstairs.has_floor(Vector2i(3, 3)) and upstairs.holes.has(Vector2i(3, 4))
+			and upstairs.has_floor(Vector2i(4, 3)), "stairs cut a hole in the floor above")
+	_check(upstairs.fill_floor(Rect2i(3, 2, 1, 3), &"wood", 0.5 + Building.STOREY) == 0,
+			"no floor goes over a stairwell")
+	var links := building.links()
+	_check(links.size() == 2 and links[0].from_cell == Vector2i(3, 1) and links[0].to_level == 1
+			and links[0].to_cell == Vector2i(3, 5), "stairs link the foot to the landing above")
+	ground.remove_object(flight)
+	_check(upstairs.holes.is_empty() and upstairs.fill_floor(Rect2i(3, 2, 1, 3), &"wood", 2.25) == 3,
+			"removing stairs lets floor back in")
+	_check(not building.can_place(Building.MAX_LEVEL, stairs, Vector2(3, 2), 0),
+			"no stairs on the top level")
+	ground.place_object(lift, Vector2(4, 4), 0)
+	_check(building.links().is_empty(), "a lift alone goes nowhere")
+	upstairs.place_object(staff_lift, Vector2(4, 4), 0)
+	links = building.links()
+	_check(links.size() == 2 and links[0].kind == ObjectDef.Connects.LIFT and links[0].staff_only
+			and links[1].staff_only, "lifts stacked up link, and staff lifts are staff only")
+
 
 func _test_path_network() -> void:
 	var paths := PathNetwork.new()

@@ -229,7 +229,7 @@ func _on_press() -> void:
 			else:
 				map.set_opening(edge, opening, window_kind)
 		Tool.OBJECT:
-			if object_def != null:
+			if object_def != null and _can_place(_object_position()):
 				map.place_object(object_def, _object_position(), object_rotation)
 		Tool.ROOM_TYPE:
 			var room := map.room_at(_hover_cell())
@@ -384,6 +384,12 @@ func can_build_floor(rect: Rect2i) -> bool:
 			if map.owns(cell) and not building.is_supported(_level(), cell):
 				return false
 	return true
+
+
+func _can_place(position: Vector2) -> bool:
+	if building != null:
+		return building.can_place(_level(), object_def, position, object_rotation)
+	return map.can_place(object_def, position, object_rotation)
 
 
 ## The level being built on: 0 without a building.
@@ -582,7 +588,7 @@ func _draw_preview() -> void:
 		Tool.OBJECT:
 			if object_def != null:
 				var position := _object_position()
-				var ok := map.can_place(object_def, position, object_rotation)
+				var ok := _can_place(position)
 				_preview_rect(BuildingMap.object_rect(object_def, position, object_rotation),
 						ok_colour if ok else bad_colour, object_def.height)
 		Tool.ROOM_TYPE:

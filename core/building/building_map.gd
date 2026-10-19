@@ -60,6 +60,8 @@ var walls: Dictionary[Vector3i, int] = {} ## Values are Wall.WALL, DOOR or WINDO
 var wall_styles: Dictionary[Vector3i, StringName] = {}
 var window_kinds: Dictionary[Vector3i, StringName] = {} ## For Wall.WINDOW edges only.
 var objects: Dictionary[int, PlacedObject] = {}
+## Tiles open to stairs coming up from the level below. No floor goes here.
+var holes: Dictionary[Vector2i, bool] = {}
 
 ## Room types are stored per cell, so they survive rooms being split, merged
 ## or extended: each room takes the type most of its cells carry.
@@ -187,6 +189,26 @@ static func cells_under(rect: Rect2) -> Array[Vector2i]:
 
 
 ## The smallest rectangle covering both cells.
+## The way stairs climb for a rotation: along their length, away from the
+## foot.
+static func rise_direction(rotation: int) -> Vector2i:
+	return [Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 0)][posmod(rotation, 4)]
+
+
+## The tiles at the bottom and top of a flight of stairs, inside its footprint.
+static func stair_ends(placed: PlacedObject) -> Array[Vector2i]:
+	var dir := rise_direction(placed.rotation)
+	var cells := cells_under(placed.rect)
+	var low := cells[0]
+	var high := cells[0]
+	for cell in cells:
+		if Vector2(cell).dot(dir) < Vector2(low).dot(dir):
+			low = cell
+		if Vector2(cell).dot(dir) > Vector2(high).dot(dir):
+			high = cell
+	return [low, high]
+
+
 static func rect_between(a: Vector2i, b: Vector2i) -> Rect2i:
 	return Rect2i(a.min(b), (a - b).abs() + Vector2i.ONE)
 
@@ -409,6 +431,17 @@ func place_object(def: ObjectDef, position: Vector2, rotation: int) -> int:
 	return placed.id
 
 
+## Opens the floor for stairs below, clearing whatever was on those tiles.
+## Tiles no longer above stairs can take floor again.
+func set_holes(cells: Dictionary[Vector2i, bool]) -> void:
+	if cells == holes:
+		return
+	holes = cells
+	for cell: Vector2i in cells:
+		_clear_floor(Rect2i(cell, Vector2i.ONE))
+	_changed()
+
+
 func remove_object(id: int) -> bool:
 	if not objects.erase(id):
 		return false
@@ -490,7 +523,7 @@ func demolish(rect: Rect2i) -> void:
 func _fill_floor(rect: Rect2i, type: StringName, height: float) -> int:
 	var count := 0
 	for cell in cells_in(rect):
-		if owns(cell) and floors.get(cell) != type:
+		if owns(cell) and not holes.has(cell) and floors.get(cell) != type:
 			if not floors.has(cell):
 				floor_heights[cell] = height
 			floors[cell] = type
@@ -558,14 +591,16 @@ func _update_rooms() -> void:
 		var fenced := false
 		while not stack.is_empty():
 			var cell: Vector2i = stack.pop_back()
-			room.cells.append(cell)
+			# A stairwell belongs to the room around it without being floor.
+			if floors.has(cell):
+				room.cells.append(cell)
 			for step in DIRECTIONS:
 				var next := cell + step
 				var edge := edge_between(cell, next)
 				if wall_at(edge) != Wall.NONE:
 					fenced = fenced or is_outdoor_wall(edge)
 					continue
-				if not floors.has(next):
+				if not floors.has(next) and not holes.has(next):
 					room.enclosed = false
 				elif not _room_lookup.has(next):
 					_room_lookup[next] = room

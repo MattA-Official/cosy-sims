@@ -86,6 +86,7 @@ func _add_level_view(level: int, level_map: BuildingMap) -> void:
 	level_view.terrain = terrain
 	level_view.level = level
 	level_view.room_types = PrisonCatalogue.ROOM_TYPES
+	level_view.visible = building == null or level <= building.active
 	grid.add_child(level_view)
 	level_view.map = level_map
 	views[level] = level_view

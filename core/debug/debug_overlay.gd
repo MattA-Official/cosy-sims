@@ -126,7 +126,9 @@ func _describe_cell(cell: Vector2i) -> PackedStringArray:
 		else:
 			lines.append("Water: none")
 	var floor_id: StringName = map.floors.get(cell, &"")
-	if floor_id.is_empty():
+	if map.holes.has(cell):
+		lines.append("Floor: open to stairs below")
+	elif floor_id.is_empty():
 		lines.append("Floor: none")
 	else:
 		var def := map.floor_def(floor_id)
@@ -147,6 +149,10 @@ func _describe_cell(cell: Vector2i) -> PackedStringArray:
 		for placed in map.objects_in_room(room):
 			names.append(placed.def.display_name)
 		lines.append("  Objects: %s" % (", ".join(names) if not names.is_empty() else "none"))
+	var under := map.object_at(Vector2(cell) + Vector2(0.5, 0.5))
+	if under != null and under.def.connects != ObjectDef.Connects.NONE:
+		lines.append("%s: goes up a level%s" % [under.def.display_name,
+				", staff only" if under.def.staff_only else ""])
 
 	lines.append("Edges:")
 	for side: Array in [["North (-Z)", Vector2i.UP], ["South (+Z)", Vector2i.DOWN],

@@ -60,6 +60,7 @@ var _floor_mesh := MeshInstance3D.new()
 var _wall_mesh := MeshInstance3D.new()
 var _glass_mesh := MeshInstance3D.new()
 var _objects := Node3D.new()
+var _stairs_material := MeshShapes.vertex_colour_material()
 var _labels := Node3D.new()
 var _material := MeshShapes.vertex_colour_material()
 var _glass_material := _make_glass_material()
@@ -285,6 +286,9 @@ func _build_objects() -> void:
 		child.queue_free()
 	var cs := grid.cell_size
 	for placed: BuildingMap.PlacedObject in map.objects.values():
+		if placed.def.connects == ObjectDef.Connects.STAIRS:
+			_add_stairs(placed)
+			continue
 		# Shrink a touch so neighbours and walls do not look fused together.
 		var margin := minf(0.1, minf(placed.rect.size.x, placed.rect.size.y) * 0.1)
 		var box := BoxMesh.new()
@@ -297,6 +301,37 @@ func _build_objects() -> void:
 		var ground := map.floor_height(Vector2i(placed.rect.get_center().floor()))
 		instance.position = Vector3(centre.x, ground + 0.03 + placed.def.height * 0.5, centre.y)
 		_objects.add_child(instance)
+
+
+## A flight of stairs climbing one storey along its length.
+func _add_stairs(placed: BuildingMap.PlacedObject) -> void:
+	var cs := grid.cell_size
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var ends := BuildingMap.stair_ends(placed)
+	var dir := BuildingMap.rise_direction(placed.rotation)
+	var along := Vector3(dir.x, 0.0, dir.y)
+	var across := Vector3(absf(dir.y), 0.0, absf(dir.x))
+	var base := map.floor_height(ends[0]) + 0.03
+	var length := absf(placed.rect.size.dot(Vector2(dir)))
+	var width := absf(placed.rect.size.dot(Vector2(absf(dir.y), absf(dir.x))))
+	var steps := maxi(roundi(length * 2.5), 2)
+	var tread := length / steps
+	var rise := Building.STOREY / steps
+	var start := Vector3(placed.rect.get_center().x, 0.0, placed.rect.get_center().y) * cs \
+			- along * length * 0.5 * cs
+	var colour := placed.def.colour
+	for i in steps:
+		var top := base + rise * (i + 1)
+		var centre := start + along * (tread * (i + 0.5)) * cs
+		MeshShapes.add_box(st, centre + Vector3.UP * (base + top) * 0.5,
+				across * (width * 0.5 - 0.06) * cs + along * tread * 0.5 * cs
+				+ Vector3.UP * (top - base) * 0.5,
+				colour.darkened(0.2), colour.lightened(0.05 * (i % 2)))
+	var instance := MeshInstance3D.new()
+	instance.mesh = st.commit()
+	instance.material_override = _stairs_material
+	_objects.add_child(instance)
 
 
 func _build_labels() -> void:
