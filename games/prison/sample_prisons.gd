@@ -204,6 +204,7 @@ static func _long_way_round(site: Site) -> void:
 				&"brick")
 		ground.set_door(Vector3i(x + 1 + i * 3, z + 3, BuildingMap.EDGE_X), true)
 		ground.place_object(PrisonCatalogue.object(&"bed"), Vector2(x + i * 3, z), 0)
+		ground.place_object(PrisonCatalogue.object(&"toilet"), Vector2(x + i * 3 + 2.5, z), 0)
 		ground.set_room_type(ground.room_at(Vector2i(x + i * 3, z)), &"cell")
 	ground.set_door(Vector3i(x, z + 6, BuildingMap.EDGE_X), true)
 	ground.set_door(Vector3i(x + 14, z + 9, BuildingMap.EDGE_X), true)
