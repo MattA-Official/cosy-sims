@@ -398,7 +398,8 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	controller._draw_preview()
 	controller._on_press()
 	var pond := water.body_at(cell.call(8, 30))
-	_check(pond != null, "terrain tool fills a dug hollow with water")
+	_check(pond != null and pond.level < 0.0 and pond.cells.size() < 60,
+			"terrain tool fills a hole dug in flat land to the brim")
 	_check(not controller._is_dry(Rect2i(cell.call(7, 29), Vector2i(2, 2))), "you can't build in a pond")
 	controller.water_mode = BuildController.WaterMode.REMOVE
 	controller._draw_preview()

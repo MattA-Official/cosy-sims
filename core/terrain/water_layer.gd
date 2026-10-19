@@ -112,7 +112,9 @@ func refill() -> void:
 ## Works out how a hollow would fill from one tile, without adding it.
 ## Water rises from the lowest tile, spreading to the lowest neighbour first;
 ## the moment the next tile is lower than the water, it would spill there,
-## so that height is the rim.
+## so that height is the rim. Reaching flat ground at the water's height
+## counts as the rim too, so a hole dug in a plain fills to the brim
+## instead of flooding the plain.
 func find_basin(seed: Vector2i) -> Body:
 	if terrain == null or not _on_map(seed) or is_blocked.call(seed):
 		return null
@@ -127,6 +129,8 @@ func find_basin(seed: Vector2i) -> Body:
 		var cell: Vector2i = heap.pop()
 		if height < level:
 			break # Downhill from here: the water spills at `level`.
+		if level > start and is_equal_approx(height, level) and _is_flat(cell):
+			break # A flat ledge or plain at the rim: fill to the brim and stop.
 		level = height
 		visited += 1
 		if visited > MAX_CELLS:
@@ -183,6 +187,13 @@ func _on_map(cell: Vector2i) -> bool:
 func _low(cell: Vector2i) -> float:
 	return minf(minf(terrain.corner_height(cell), terrain.corner_height(cell + Vector2i(1, 0))),
 			minf(terrain.corner_height(cell + Vector2i(0, 1)), terrain.corner_height(cell + Vector2i.ONE)))
+
+
+func _is_flat(cell: Vector2i) -> bool:
+	var h := terrain.corner_height(cell)
+	return is_equal_approx(h, terrain.corner_height(cell + Vector2i(1, 0))) \
+			and is_equal_approx(h, terrain.corner_height(cell + Vector2i(0, 1))) \
+			and is_equal_approx(h, terrain.corner_height(cell + Vector2i.ONE))
 
 
 func _changed() -> void:
