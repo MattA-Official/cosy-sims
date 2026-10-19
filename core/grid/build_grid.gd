@@ -16,6 +16,8 @@ signal size_changed
 		size_changed.emit()
 @export var cell_size := 1.0
 @export var ground_material: Material
+## Turn off when a Terrain draws the ground instead of this flat plane.
+@export var draw_ground := true
 
 var _ground: MeshInstance3D
 
@@ -51,6 +53,8 @@ func world_rect() -> Rect2:
 
 
 func _build_ground() -> void:
+	if not draw_ground:
+		return
 	if _ground == null:
 		_ground = MeshInstance3D.new()
 		_ground.name = "Ground"

@@ -8,6 +8,8 @@ signal cell_clicked(cell: Vector2i, button: MouseButton)
 
 @export var grid: BuildGrid
 @export var camera_rig: CameraRig
+## Optional: lifts the highlight onto the terrain.
+@export var terrain: Terrain
 @export var colour := Color(1.0, 1.0, 1.0, 0.35)
 
 const NO_CELL := Vector2i(-1_000_000, -1_000_000)
@@ -44,7 +46,8 @@ func _process(_delta: float) -> void:
 	hovered_cell = cell
 	_highlight.visible = cell != NO_CELL
 	if _highlight.visible:
-		_highlight.global_position = grid.cell_to_world(cell) + Vector3.UP * 0.01
+		var lift := terrain.cell_height(cell) if terrain != null else 0.0
+		_highlight.global_position = grid.cell_to_world(cell) + Vector3.UP * (lift + 0.04)
 	cell_hovered.emit(cell)
 
 

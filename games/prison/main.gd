@@ -7,6 +7,8 @@ extends Node3D
 @onready var grid: BuildGrid = $BuildGrid
 @onready var view: BuildingView = $BuildGrid/BuildingView
 @onready var controller: BuildController = $BuildGrid/BuildController
+@onready var terrain: Terrain = $BuildGrid/Terrain
+@onready var foliage: FoliageLayer = $BuildGrid/Foliage
 @onready var camera_rig: CameraRig = $CameraRig
 @onready var cursor: GridCursor = $GridCursor
 @onready var cell_label: Label = $HUD/CellLabel
@@ -22,8 +24,18 @@ func _ready() -> void:
 	view.room_types = PrisonCatalogue.ROOM_TYPES
 	view.map = map
 	controller.map = map
+
+	# Hills and a pond around the land, and ground under buildings stays put.
+	terrain.is_locked = map.corner_in_use
+	var ground: ShaderMaterial = terrain.ground_material
+	ground.set_shader_parameter("water_level", terrain.water_level)
+	var pond := Vector2(land.end.x + 9, land.get_center().y + 6)
+	StartingLandscape.shape(terrain, land, pond)
+
+	var layout_origin := land.get_center() - Vector2i(8, 7)
 	if build_sample_layout:
-		SampleLayout.build(map, land.get_center() - Vector2i(8, 7))
+		SampleLayout.build(map, layout_origin)
+	StartingLandscape.plant(foliage, terrain, map, layout_origin)
 
 	camera_rig.bounds = grid.world_rect()
 	camera_rig.position = grid.centre()

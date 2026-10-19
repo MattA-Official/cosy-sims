@@ -6,6 +6,8 @@ extends Node3D
 ## prototype sizes.
 
 @export var grid: BuildGrid
+## Optional: buildings sit on the terrain's height instead of y = 0.
+@export var terrain: Terrain
 @export var room_types: Array[RoomTypeDef] = []
 
 @export_group("Walls")
@@ -26,6 +28,11 @@ extends Node3D
 @export var door_colour := Color(0.45, 0.65, 0.88)
 @export var problem_colour := Color(1.0, 0.55, 0.45)
 @export var land_edge_colour := Color(0.36, 0.5, 0.3)
+@export var foundation_colour := Color(0.62, 0.6, 0.57)
+
+## How far floors and walls reach down into the ground, so they never
+## float above a slope.
+const FOUNDATION_DEPTH := 0.6
 
 var map: BuildingMap:
 	set(value):
@@ -51,6 +58,8 @@ func _ready() -> void:
 	_floor_mesh.material_override = _material
 	_wall_mesh.material_override = _material
 	_floor_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if terrain != null:
+		terrain.changed.connect(queue_rebuild)
 
 
 func queue_rebuild() -> void:
@@ -90,9 +99,12 @@ func _build_floors() -> void:
 				colour = colour.lerp(type.colour, 0.35)
 			# A faint checkerboard makes floors read as tiles.
 			var shade := 1.0 if (cell.x + cell.y) % 2 == 0 else 0.95
+			var ground := _height_at(Vector2(cell) + Vector2(0.5, 0.5))
 			var centre := Vector3(cell.x + 0.5, 0.0, cell.y + 0.5) * cs
-			MeshShapes.add_box(st, centre + Vector3.UP * 0.015, Vector3(0.5 * cs, 0.015, 0.5 * cs),
-					colour * shade)
+			# The top face takes the floor colour; the sides show as foundations.
+			var depth := FOUNDATION_DEPTH + 0.03
+			MeshShapes.add_box(st, centre + Vector3.UP * (ground + 0.03 - depth * 0.5),
+					Vector3(0.5 * cs, depth * 0.5, 0.5 * cs), foundation_colour, colour * shade)
 	_add_land_edge(st)
 	_floor_mesh.mesh = st.commit()
 
@@ -108,6 +120,7 @@ func _add_land_edge(st: SurfaceTool) -> void:
 		var along := Vector3.RIGHT if edge.z == BuildingMap.EDGE_X else Vector3.BACK
 		var across := Vector3.BACK if edge.z == BuildingMap.EDGE_X else Vector3.RIGHT
 		var middle := Vector3(edge.x, 0.0, edge.y) * cs + along * cs * 0.5
+		middle.y = _height_at(Vector2(middle.x, middle.z) / cs)
 		MeshShapes.add_box(st, middle + Vector3.UP * 0.03,
 				along * cs * 0.5 + across * 0.06 + Vector3.UP * 0.03, land_edge_colour)
 
@@ -126,6 +139,7 @@ func _build_walls() -> void:
 		var along := Vector3.RIGHT if edge.z == BuildingMap.EDGE_X else Vector3.BACK
 		var across := Vector3.BACK if edge.z == BuildingMap.EDGE_X else Vector3.RIGHT
 		var middle := Vector3(edge.x, 0.0, edge.y) * cs + along * cs * 0.5
+		middle.y = _wall_base(edge)
 		# Stretch each piece by half a thickness so corners join up.
 		var half_len := along * (cs + thickness) * 0.5
 		var half_across := across * thickness * 0.5
@@ -134,7 +148,7 @@ func _build_walls() -> void:
 		elif def != null and def.see_through and not walls_low:
 			_add_fence(st, middle, along, half_across, height, cs, colour, top)
 		else:
-			_add_slab(st, middle, half_len + half_across, 0.0, height, colour, top)
+			_add_slab(st, middle, half_len + half_across, -FOUNDATION_DEPTH, height, colour, top)
 	_wall_mesh.mesh = st.commit() if not map.walls.is_empty() else null
 
 
@@ -162,7 +176,7 @@ func _add_fence(st: SurfaceTool, middle: Vector3, along: Vector3, half_across: V
 		height: float, cs: float, colour: Color, top: Color) -> void:
 	var post := along * 0.06 + half_across.normalized() * 0.06
 	for end in [-0.5, 0.5]:
-		_add_slab(st, middle + along * cs * end, post, 0.0, height, colour, top)
+		_add_slab(st, middle + along * cs * end, post, -FOUNDATION_DEPTH, height, colour, top)
 	for rail_y in [height * 0.45, height * 0.85]:
 		_add_slab(st, middle, along * cs * 0.5 + half_across * 0.6, rail_y - 0.05, rail_y + 0.05,
 				colour, top)
@@ -182,7 +196,8 @@ func _build_objects() -> void:
 		instance.mesh = box
 		instance.material_override = _object_material(placed.def.colour)
 		var centre := placed.rect.get_center() * cs
-		instance.position = Vector3(centre.x, placed.def.height * 0.5, centre.y)
+		var ground := _height_at(placed.rect.get_center())
+		instance.position = Vector3(centre.x, ground + 0.03 + placed.def.height * 0.5, centre.y)
 		_objects.add_child(instance)
 
 
@@ -208,8 +223,27 @@ func _build_labels() -> void:
 		label.outline_size = 10
 		var centre := room.centre() * cs
 		var lift := low_wall_height + 0.6 if walls_low else wall_height + 0.6
+		lift += _height_at(room.centre())
 		label.position = Vector3(centre.x, lift, centre.y)
 		_labels.add_child(label)
+
+
+## Ground height at a point in tile units.
+func _height_at(point: Vector2) -> float:
+	return terrain.height_at(point) if terrain != null else 0.0
+
+
+## Walls stand on the floor beside them, or on the lower end of the ground.
+func _wall_base(edge: Vector3i) -> float:
+	var best := -INF
+	for cell in BuildingMap.edge_cells(edge):
+		if map.has_floor(cell):
+			best = maxf(best, _height_at(Vector2(cell) + Vector2(0.5, 0.5)))
+	if best > -INF:
+		return best
+	var start := Vector2(edge.x, edge.y)
+	var end := start + (Vector2.RIGHT if edge.z == BuildingMap.EDGE_X else Vector2.DOWN)
+	return minf(_height_at(start), _height_at(end))
 
 
 func _object_material(colour: Color) -> StandardMaterial3D:

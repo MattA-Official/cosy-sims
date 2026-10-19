@@ -6,7 +6,7 @@ its systems, Parkitect for its camera and style, and The Sims / Software Inc.
 for flexible building. Later games might include a hospital, an airport, a
 school and a museum.
 
-![The sample prison with its fenced yard](docs/images/step2.png)
+![The sample prison on its plot, with hills, woods and a pond around it](docs/images/terrain.png)
 
 All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/).
 
@@ -37,6 +37,9 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | 5 Objects | Click to place; R rotates; hold Alt to place freely |
 | 6 Room type | Click a room to mark it as a cell, canteen and so on |
 | 7 Demolish | Click an object or wall to remove it, or drag to clear an area |
+| 8 Terrain | Hold to raise, lower, flatten or smooth the ground |
+| 9 Plants | Hold to plant trees, bushes or flowers; hold Ctrl to clear them |
+| [ / ] | Brush size, for terrain and plants |
 | Tab | Walls up or cut away |
 | Esc | Put the tool away |
 
@@ -46,7 +49,10 @@ by walls is indoors, but one bounded by a fence stays outdoors. Rooms are
 worked out from the walls automatically. Once a room has a type, a label
 floats over it saying what it still needs, such as a toilet.
 
-You can only build inside the land you own, which is marked by a low kerb.
+You can only build, sculpt and plant inside the land you own, which is
+marked by a low kerb. Building a room or floor flattens the ground under it
+and clears any plants, and the ground under buildings can't be sculpted.
+Lower the ground below the water level to dig a pond.
 See [docs/design/building.md](docs/design/building.md) for the design
 decisions behind all this.
 
@@ -54,7 +60,7 @@ decisions behind all this.
 
 | Path | What |
 | --- | --- |
-| `core/` | Parts every game will share: camera, grid, input. Kept free of prison-specific code. |
+| `core/` | Parts every game will share: camera, grid, input, building, terrain. Kept free of prison-specific code. |
 | `games/prison/` | The prison game. Anything specific to prisons lives here. |
 | `tests/` | Headless checks (see below). |
 | `tools/` | Developer helpers, such as the screenshot script. |

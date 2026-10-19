@@ -1,7 +1,7 @@
 extends VBoxContainer
 ## The build toolbar along the bottom of the screen: a row of tools, a row of
 ## choices for the current tool (which object, which room type), and a hint.
-## Number keys 1 to 7 pick tools.
+## Number keys 1 to 9 pick tools.
 
 @export var controller: BuildController
 
@@ -13,6 +13,15 @@ const TOOLS := [
 	[BuildController.Tool.OBJECT, "Objects"],
 	[BuildController.Tool.ROOM_TYPE, "Room type"],
 	[BuildController.Tool.DEMOLISH, "Demolish"],
+	[BuildController.Tool.TERRAIN, "Terrain"],
+	[BuildController.Tool.PLANTS, "Plants"],
+]
+
+const BRUSHES := [
+	[Terrain.Brush.RAISE, "Raise"],
+	[Terrain.Brush.LOWER, "Lower"],
+	[Terrain.Brush.FLATTEN, "Flatten"],
+	[Terrain.Brush.SMOOTH, "Smooth"],
 ]
 
 var _hint := Label.new()
@@ -96,6 +105,11 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 		BuildController.Tool.ROOM_TYPE:
 			_add_choices(PrisonCatalogue.ROOM_TYPES, controller.room_type,
 					func(def: Resource) -> void: controller.room_type = def, "Clear")
+		BuildController.Tool.TERRAIN:
+			_add_brush_choices()
+		BuildController.Tool.PLANTS:
+			_add_choices(PrisonCatalogue.PLANTS, controller.plant_def,
+					func(def: Resource) -> void: controller.plant_def = def)
 
 
 ## Floor or wall style buttons, with outdoor styles marked.
@@ -114,6 +128,18 @@ func _add_style_choices(defs: Array, floors: bool) -> void:
 				controller.floor_style = id
 			else:
 				controller.wall_style = id)
+		_options.add_child(button)
+
+
+func _add_brush_choices() -> void:
+	var group := ButtonGroup.new()
+	for entry: Array in BRUSHES:
+		var brush: Terrain.Brush = entry[0]
+		var button := _make_button(entry[1], group)
+		button.button_pressed = controller.terrain_brush == brush
+		button.toggled.connect(func(on: bool) -> void:
+			if on:
+				controller.terrain_brush = brush)
 		_options.add_child(button)
 
 

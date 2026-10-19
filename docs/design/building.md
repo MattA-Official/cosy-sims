@@ -37,7 +37,7 @@ decisions are listed first within each section.
   if a neighbouring room still uses them.
 - Hold Ctrl with the wall or floor tool to remove walls or floor only.
 
-## Agreed direction, not built yet
+## Agreed direction
 
 ### Paths and roads: off the grid
 Paths and roads will **not** be tile floors. They'll work like Cities:
@@ -51,14 +51,24 @@ other, to doors and to buildings rather than to the grid. In practice:
 - Paths are outdoor-only. Grid floors stay for building interiors and
   patios.
 
-### Terrain, water and foliage
-- **Terrain is a heightmap** that you sculpt with raise, lower, flatten and
-  smooth brushes. Placing a building flattens the ground under its tiles.
-- **Water** starts as a flat water level: anything below it is underwater.
-  Ponds and rivers can be carved later.
-- **Foliage** comes in two kinds. Grass and flowers are painted on and drawn
-  with MultiMesh. Trees and bushes are free-placed objects, and building
-  over them clears them.
+### Terrain, water and foliage (basics built)
+- **Terrain is a heightmap** (`core/terrain/terrain.gd`), one height per
+  tile corner, that you sculpt with raise, lower, flatten and smooth
+  brushes. You can only sculpt your own land, and the ground under
+  buildings is locked.
+- **Building flattens the ground.** A new room or floor levels its tiles to
+  the height of any floor already beside it, or else to the tile where the
+  drag started. Floors sit on foundations that reach into the slope, so
+  nothing floats. You can't build where that height is under water.
+- **Water** is a flat water level for now: anything below it is underwater,
+  and you can dig a pond by lowering the ground. Rivers can come later.
+- **Foliage** (`core/terrain/foliage_layer.gd`): trees, bushes and flowers
+  are free-placed (not on the grid), painted with a brush, and drawn with
+  MultiMesh. Plants keep their distance from each other, won't grow on
+  floors or under water, and building over them clears them.
+- The world outside your land has gentle hills, a pond and woodland,
+  generated from a seed (`games/prison/starting_landscape.gd`). Your land
+  starts flat.
 
 ### What this means for people (step 3)
 Since paths are curves and the ground can slope, people won't walk on the

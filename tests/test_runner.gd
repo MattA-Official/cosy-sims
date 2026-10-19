@@ -16,6 +16,8 @@ func _process(_delta: float) -> bool:
 	_test_styles_and_indoors()
 	_test_land()
 	_test_demolish()
+	_test_terrain()
+	_test_foliage()
 	_test_main_scene_loads()
 	if _failures == 0:
 		print("All tests passed.")
@@ -191,8 +193,11 @@ func _test_main_scene_loads() -> void:
 		return
 	var main := scene.instantiate()
 	root.add_child(main)
-	_check(main.get_node("BuildGrid/Ground") != null, "grid builds its ground")
 	var map: BuildingMap = main.map
+	var terrain: Terrain = main.terrain
+	_check(terrain.get_child_count() > 0, "terrain builds its mesh")
+	_check(is_zero_approx(terrain.cell_height(map.land_bounds().get_center())), "owned land starts flat")
+	_check(main.foliage.plants.size() > 50, "the world starts with some plants")
 	_check(map.rooms().size() == 6, "sample layout has six rooms")
 	var view: BuildingView = main.get_node("BuildGrid/BuildingView")
 	view.rebuild()
@@ -275,3 +280,129 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	hover.call(5.5, 4.5)
 	controller._on_release()
 	_check(map.rooms().size() == rooms_before, "demolish drag clears the area")
+
+	# Terrain: raising a patch of open land, then building on it flattens it.
+	var terrain := controller.terrain
+	controller.tool = BuildController.Tool.TERRAIN
+	controller.terrain_brush = Terrain.Brush.RAISE
+	controller.brush_radius = 3.0
+	var outside_before := terrain.corner_height(cell.call(-1, -1))
+	hover.call(10.0, 10.0)
+	controller._on_press()
+	controller._draw_preview()
+	controller._apply_brush(0.5)
+	controller._brushing = false
+	var peak := terrain.corner_height(cell.call(10, 10))
+	_check(peak > 0.5, "terrain tool raises the ground")
+	hover.call(0.0, 0.0)
+	controller._apply_brush(0.5)
+	_check(terrain.corner_height(cell.call(-1, -1)) == outside_before
+			and terrain.corner_height(cell.call(1, 1)) > 0.0, "sculpting stays on owned land")
+	controller.tool = BuildController.Tool.ROOM
+	hover.call(10.5, 10.5)
+	controller._on_press()
+	hover.call(12.5, 12.5)
+	controller._on_release()
+	var floor_height := terrain.cell_height(cell.call(10, 10))
+	_check(is_equal_approx(terrain.cell_height(cell.call(12, 12)), floor_height)
+			and map.has_floor(cell.call(12, 12)), "a new room flattens the ground under it")
+	controller.tool = BuildController.Tool.TERRAIN
+	controller.terrain_brush = Terrain.Brush.LOWER
+	hover.call(11.0, 11.0)
+	controller._on_press()
+	controller._apply_brush(0.5)
+	controller._brushing = false
+	_check(is_equal_approx(terrain.cell_height(cell.call(11, 11)), floor_height),
+			"sculpting leaves ground under buildings alone")
+
+	# Plants grow on open land but not on floors, and Ctrl clears them.
+	var foliage := controller.foliage
+	controller.tool = BuildController.Tool.PLANTS
+	controller.plant_def = PrisonCatalogue.PLANTS[3]
+	var before := foliage.plants.size()
+	hover.call(20.0, 20.0)
+	controller._on_press()
+	for i in 5:
+		controller._apply_brush(0.1)
+	_check(foliage.plants.size() > before, "plant tool plants")
+	hover.call(11.5, 11.5)
+	controller.brush_radius = 1.0
+	before = foliage.plants.size()
+	controller._apply_brush(0.1)
+	_check(foliage.plants.size() == before, "plants do not grow on floors")
+	hover.call(20.0, 20.0)
+	controller.brush_radius = 4.0
+	controller.force_erase = true
+	controller._apply_brush(0.1)
+	controller.force_erase = false
+	controller._brushing = false
+	var left := foliage.plants.filter(func(p: FoliageLayer.Plant) -> bool:
+		return p.position.distance_to(base + Vector2(20, 20)) < 4.0)
+	_check(left.is_empty(), "Ctrl clears plants")
+
+
+func _test_terrain() -> void:
+	var terrain := Terrain.new()
+	terrain.size = Vector2i(16, 16)
+	_check(terrain.height_at(Vector2(3.5, 3.5)) == 0.0, "terrain starts flat")
+	terrain.sculpt(Terrain.Brush.RAISE, Vector2(8, 8), 3.0, 1.0)
+	_check(is_equal_approx(terrain.corner_height(Vector2i(8, 8)), 1.0), "raise lifts the middle fully")
+	_check(terrain.corner_height(Vector2i(10, 8)) > 0.0 and terrain.corner_height(Vector2i(10, 8)) < 1.0,
+			"raise falls off towards the rim")
+	_check(terrain.corner_height(Vector2i(12, 8)) == 0.0, "raise leaves outside the brush alone")
+	_check(is_equal_approx(terrain.height_at(Vector2(8.5, 8)),
+			(terrain.corner_height(Vector2i(8, 8)) + terrain.corner_height(Vector2i(9, 8))) * 0.5),
+			"heights blend between corners")
+
+	terrain.is_locked = func(corner: Vector2i) -> bool: return corner == Vector2i(8, 8)
+	terrain.sculpt(Terrain.Brush.LOWER, Vector2(8, 8), 3.0, 1.0)
+	_check(is_equal_approx(terrain.corner_height(Vector2i(8, 8)), 1.0), "locked corners do not move")
+	terrain.is_locked = func(_corner: Vector2i) -> bool: return false
+
+	terrain.sculpt(Terrain.Brush.FLATTEN, Vector2(8, 8), 4.0, 1.0, 0.5)
+	_check(is_equal_approx(terrain.corner_height(Vector2i(8, 8)), 0.5), "flatten pulls towards the target")
+	terrain.sculpt(Terrain.Brush.RAISE, Vector2(8, 8), 2.0, 100.0)
+	_check(terrain.corner_height(Vector2i(8, 8)) == Terrain.MAX_HEIGHT, "heights are clamped")
+	terrain.flatten_cells(BuildingMap.cells_in(Rect2i(5, 5, 6, 6)), 0.0)
+	terrain.set_corner_height(Vector2i(8, 8), 3.0)
+	var spike := terrain.corner_height(Vector2i(8, 8))
+	terrain.sculpt(Terrain.Brush.SMOOTH, Vector2(8, 8), 2.0, 1.0)
+	_check(terrain.corner_height(Vector2i(8, 8)) < spike, "smooth lowers a spike")
+
+	terrain.flatten_cells([Vector2i(2, 2), Vector2i(3, 2)], 2.0)
+	_check(terrain.cell_height(Vector2i(2, 2)) == 2.0 and terrain.cell_height(Vector2i(3, 2)) == 2.0,
+			"flatten_cells levels whole tiles")
+	_check(terrain.is_underwater(Vector2(14, 14)) == (0.0 < terrain.water_level), "water level check")
+	terrain.flatten_cells([Vector2i(14, 14)], -2.0)
+	_check(terrain.is_underwater(Vector2(14.5, 14.5)), "low ground is under water")
+
+	# A ray straight down lands on the ground, or on the water where it is lower.
+	var hit: Variant = terrain.intersect_ray(Vector3(2.5, 20, 2.5), Vector3.DOWN)
+	_check(hit != null and absf(hit.y - 2.0) < 0.01, "ray hits raised ground")
+	hit = terrain.intersect_ray(Vector3(14.5, 20, 14.5), Vector3.DOWN)
+	_check(hit != null and absf(hit.y - terrain.water_level) < 0.01, "ray stops at the water")
+	hit = terrain.intersect_ray(Vector3(5.5, 20, 5.5), Vector3(1, -1, 0))
+	_check(hit != null and absf(hit.y - terrain.height_at(Vector2(hit.x, hit.z))) < 0.01,
+			"slanted ray lands on the surface")
+	terrain.free()
+
+
+func _test_foliage() -> void:
+	var foliage := FoliageLayer.new()
+	var tree: FoliageDef = PrisonCatalogue.PLANTS[0]
+	var flower: FoliageDef = PrisonCatalogue.PLANTS[3]
+	_check(foliage.add(tree, Vector2(5, 5)), "first tree goes in")
+	_check(not foliage.add(tree, Vector2(5.5, 5)), "trees keep their spacing")
+	_check(foliage.add(tree, Vector2(5 + tree.spacing + 0.1, 5)), "a tree further away goes in")
+	_check(not foliage.add(flower, Vector2(5.1, 5)), "nothing grows right on top of a tree")
+	_check(foliage.add(flower, Vector2(5.5, 5.2)), "flowers can grow near a tree")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1
+	var added := foliage.paint(flower, Vector2(20, 20), 3.0, 50, rng,
+			func(p: Vector2) -> bool: return p.x < 20.0)
+	_check(added > 0 and foliage.plants.all(func(p: FoliageLayer.Plant) -> bool:
+		return p.position.x < 20.0 or p.def == tree), "painting respects can_grow")
+	_check(foliage.remove_in_rect(Rect2(4, 4, 2, 2)) == 2, "remove_in_rect clears an area")
+	var count := foliage.plants.size()
+	_check(foliage.remove_in_circle(Vector2(20, 20), 3.5) == count - 1, "remove_in_circle clears the rest")
+	foliage.free()

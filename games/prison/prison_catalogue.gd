@@ -24,6 +24,14 @@ const WALLS: Array[WallDef] = [
 	preload("res://games/prison/catalogue/wall_hedge.tres"),
 ]
 
+const PLANTS: Array[FoliageDef] = [
+	preload("res://games/prison/catalogue/plant_oak.tres"),
+	preload("res://games/prison/catalogue/plant_blossom.tres"),
+	preload("res://games/prison/catalogue/plant_bush.tres"),
+	preload("res://games/prison/catalogue/plant_daffodil.tres"),
+	preload("res://games/prison/catalogue/plant_tulip.tres"),
+]
+
 const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_cell.tres"),
 	preload("res://games/prison/catalogue/room_canteen.tres"),

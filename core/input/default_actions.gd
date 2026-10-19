@@ -19,6 +19,8 @@ const KEY_ACTIONS := {
 	"build_toggle_walls": [KEY_TAB],
 	"build_free_place": [KEY_ALT],
 	"build_erase": [KEY_CTRL],
+	"build_brush_smaller": [KEY_BRACKETLEFT],
+	"build_brush_bigger": [KEY_BRACKETRIGHT],
 }
 
 

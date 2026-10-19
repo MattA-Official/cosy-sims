@@ -244,6 +244,18 @@ func wall_at(edge: Vector3i) -> int:
 	return walls.get(edge, Wall.NONE)
 
 
+## Is anything built at this corner? Used to stop sculpting under buildings.
+func corner_in_use(corner: Vector2i) -> bool:
+	for offset: Vector2i in [Vector2i.ZERO, Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]:
+		if floors.has(corner + offset):
+			return true
+	for edge: Vector3i in [Vector3i(corner.x, corner.y, EDGE_X), Vector3i(corner.x - 1, corner.y, EDGE_X),
+			Vector3i(corner.x, corner.y, EDGE_Z), Vector3i(corner.x, corner.y - 1, EDGE_Z)]:
+		if walls.has(edge):
+			return true
+	return false
+
+
 func wall_style(edge: Vector3i) -> StringName:
 	return wall_styles.get(edge, &"")
 

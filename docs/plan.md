@@ -29,3 +29,6 @@ Deliberately left until after step 4: money, guards and staff, events.
 - After review, added per-object snapping, growable land, floor and wall
   styles (indoor and outdoor), and better demolition. Paths, roads and
   terrain are agreed to be off-grid; see `docs/design/building.md`.
+- Terrain basics added before step 3: sculpting, a water level, plants,
+  and buildings that flatten the ground. Next: spline paths and roads,
+  then people on a navmesh.

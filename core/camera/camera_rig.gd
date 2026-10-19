@@ -32,6 +32,10 @@ extends Node3D
 @export var start_pitch_deg := 40.0
 @export var start_distance := 24.0
 
+## When set, the camera picks points on the terrain and keeps its focus at
+## ground level. Otherwise it uses the flat plane y = 0.
+@export var terrain: Terrain
+
 @export_group("Feel")
 @export var smoothing := 10.0 ## Higher is snappier.
 
@@ -99,6 +103,9 @@ func _process(delta: float) -> void:
 	if Input.is_action_pressed("camera_zoom_out"):
 		zoom_by(1.0 + delta * 2.0)
 
+	if terrain != null:
+		var local := terrain.to_local(_target_position) / terrain.cell_size
+		_target_position.y = maxf(terrain.height_at(Vector2(local.x, local.z)), terrain.water_level)
 	var t := 1.0 - exp(-smoothing * delta)
 	position = position.lerp(_target_position, t)
 	_yaw = lerpf(_yaw, _target_yaw, t)
@@ -127,11 +134,15 @@ func focus_on(world_position: Vector3) -> void:
 	pan_by(Vector2.ZERO) # Re-applies the bounds.
 
 
-## Returns where a screen position hits the ground plane (y = 0), or null if
-## the ray points at the sky.
+## Returns where a screen position hits the ground (the terrain if there is
+## one, else the plane y = 0), or null if the ray points at the sky.
 func ground_point_at(screen_position: Vector2) -> Variant:
 	var origin := camera.project_ray_origin(screen_position)
 	var direction := camera.project_ray_normal(screen_position)
+	if terrain != null:
+		var to_local := terrain.global_transform.affine_inverse()
+		var hit: Variant = terrain.intersect_ray(to_local * origin, to_local.basis * direction)
+		return terrain.to_global(hit) if hit != null else null
 	return Plane(Vector3.UP, 0.0).intersects_ray(origin, direction)
 
 

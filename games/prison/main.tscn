@@ -8,6 +8,8 @@
 [ext_resource type="Script" path="res://core/building/building_view.gd" id="6_view"]
 [ext_resource type="Script" path="res://core/building/build_controller.gd" id="7_build"]
 [ext_resource type="Script" path="res://games/prison/build_toolbar.gd" id="8_toolbar"]
+[ext_resource type="Script" path="res://core/terrain/terrain.gd" id="9_terrain"]
+[ext_resource type="Script" path="res://core/terrain/foliage_layer.gd" id="10_foliage"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ground"]
 render_priority = 0
@@ -53,24 +55,38 @@ directional_shadow_max_distance = 120.0
 [node name="BuildGrid" type="Node3D" parent="."]
 script = ExtResource("2_grid")
 size = Vector2i(96, 96)
+draw_ground = false
+
+[node name="Terrain" type="Node3D" parent="BuildGrid"]
+script = ExtResource("9_terrain")
+size = Vector2i(96, 96)
 ground_material = SubResource("ShaderMaterial_ground")
 
-[node name="BuildingView" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid")]
+[node name="Foliage" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("terrain")]
+script = ExtResource("10_foliage")
+terrain = NodePath("../Terrain")
+
+[node name="BuildingView" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid", "terrain")]
 script = ExtResource("6_view")
 grid = NodePath("..")
+terrain = NodePath("../Terrain")
 
-[node name="BuildController" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid", "camera_rig", "view")]
+[node name="BuildController" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid", "camera_rig", "view", "terrain", "foliage")]
 script = ExtResource("7_build")
 grid = NodePath("..")
 camera_rig = NodePath("../../CameraRig")
 view = NodePath("../BuildingView")
+terrain = NodePath("../Terrain")
+foliage = NodePath("../Foliage")
 
-[node name="CameraRig" parent="." instance=ExtResource("4_rig")]
+[node name="CameraRig" parent="." node_paths=PackedStringArray("terrain") instance=ExtResource("4_rig")]
+terrain = NodePath("../BuildGrid/Terrain")
 
-[node name="GridCursor" type="Node3D" parent="." node_paths=PackedStringArray("grid", "camera_rig")]
+[node name="GridCursor" type="Node3D" parent="." node_paths=PackedStringArray("grid", "camera_rig", "terrain")]
 script = ExtResource("5_cursor")
 grid = NodePath("../BuildGrid")
 camera_rig = NodePath("../CameraRig")
+terrain = NodePath("../BuildGrid/Terrain")
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
@@ -88,7 +104,7 @@ offset_top = 40.0
 offset_right = 900.0
 offset_bottom = 92.0
 text = "WASD / arrows: pan    Q / E: rotate    Wheel or + / -: zoom    Shift: faster
-Right-drag: pan    Middle-drag: rotate and tilt    Esc: put the tool away"
+Right-drag: pan    Middle-drag: rotate and tilt    Esc: put the tool away    [ / ]: brush size"
 label_settings = SubResource("LabelSettings_hud")
 
 [node name="BuildToolbar" type="VBoxContainer" parent="HUD" node_paths=PackedStringArray("controller")]
