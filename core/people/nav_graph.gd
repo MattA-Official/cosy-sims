@@ -147,13 +147,15 @@ func _clear_between(a: int, b: int) -> bool:
 		if here == -1:
 			return false
 		if here != previous:
-			if not astar.are_points_connected(previous, here):
+			if _stepped.has(here) or not astar.are_points_connected(previous, here):
 				return false
 			previous = here
 	return previous == b
 
 
 var _surface: Dictionary[int, bool] = {} ## Floor and ground points.
+## Points on tiles with door steps, which routes must not cut past.
+var _stepped: Dictionary[int, bool] = {}
 
 
 func _is_surface(id: int) -> bool:
@@ -226,8 +228,18 @@ func _join_floors(n: int) -> void:
 						_join(id, _ids.get(Vector4i(n, cell.x, cell.y, other.index), -1))
 				continue
 			var next_cell: Vector2i = cell + BuildingMap.DIRECTIONS[tag]
-			var kind := map.wall_at(BuildingMap.edge_between(cell, next_cell))
+			var edge := BuildingMap.edge_between(cell, next_cell)
+			var kind := map.wall_at(edge)
 			if kind != BuildingMap.Wall.NONE and kind != BuildingMap.Wall.DOOR:
+				continue
+			if map.door_has_steps(edge):
+				# Door steps make up the difference; the low side's tile is
+				# kept as a corner of every route so people climb them there.
+				var across: int = _ids.get(Vector4i(n, next_cell.x, next_cell.y, 0), -1)
+				if across != -1 and piece.is_whole():
+					_join(id, across)
+					var low := cell if map.floor_height(cell) < map.floor_height(next_cell) else next_cell
+					_stepped[_ids.get(Vector4i(n, low.x, low.y, 0), -1)] = true
 				continue
 			for next: TilePiece in map.pieces(next_cell):
 				if not next.sides_tagged(tag ^ 1).any(

@@ -164,6 +164,7 @@ var _free_rotating := false
 var _rotate_anchor := Vector2.ZERO
 var _path_preview := MeshInstance3D.new()
 var _path_status := ""
+var _door_status_shown := ""
 var _brushing := false
 var _flatten_target := 0.0
 var _plant_cooldown := 0.0
@@ -201,6 +202,10 @@ func _process(delta: float) -> void:
 		if status != _path_status:
 			_path_status = status
 			hint_changed.emit()
+	var door_status := _door_status() if tool == Tool.OPENING and _has_hover else ""
+	if door_status != _door_status_shown:
+		_door_status_shown = door_status
+		hint_changed.emit()
 	_draw_preview()
 
 
@@ -410,7 +415,27 @@ func hint() -> String:
 		return (PATH_HINTS[path_tool.mode] + "\n" + _path_status).strip_edges()
 	if tool == Tool.OBJECT:
 		return HINTS[tool] % String.num(rotation_step)
+	if tool == Tool.OPENING:
+		return (HINTS[tool] + "\n" + _door_status_shown).strip_edges()
 	return HINTS[tool]
+
+
+## What a door in the wall under the mouse would mean, when the floors
+## either side are at different heights.
+func _door_status() -> String:
+	if opening != BuildingMap.Wall.DOOR or _hover_slant() != NO_SLANT:
+		return ""
+	var edge := _hover_edge()
+	if map.wall_at(edge) == BuildingMap.Wall.NONE:
+		return ""
+	var rise := map.door_rise(edge)
+	if rise <= BuildingMap.MAX_STEP + BuildingMap.EPSILON:
+		return ""
+	if not Building.door_steps:
+		return "The floors either side are %s m apart, too big a step for a door." % String.num(rise, 2)
+	if rise > BuildingMap.DOOR_STEPS_MAX + BuildingMap.EPSILON:
+		return "The floors either side are %s m apart, too far even for steps." % String.num(rise, 2)
+	return "The floors either side are %s m apart, so the door gets steps." % String.num(rise, 2)
 
 
 ## Fits the ground to the floor just laid in a rectangle, and clears plants.
@@ -870,6 +895,8 @@ func _draw_preview() -> void:
 			var edge := _hover_edge()
 			var ok := map.wall_at(edge) != BuildingMap.Wall.NONE
 			if opening == BuildingMap.Wall.WINDOW and map.is_outdoor_wall(edge):
+				ok = false
+			if opening == BuildingMap.Wall.DOOR and not map.can_put_door(edge):
 				ok = false
 			_preview_edge(edge, ok_colour if ok else bad_colour)
 		Tool.OBJECT:

@@ -24,6 +24,7 @@ func _process(_delta: float) -> bool:
 	_test_ramps()
 	_test_stair_builder()
 	_test_nav_graph()
+	_test_door_steps()
 	_test_people()
 	_test_angled_walls()
 	_test_path_profile()
@@ -933,6 +934,34 @@ func _test_people() -> void:
 	_check(people._dirty, "but does once the ground settles")
 	ground.free()
 	people.free()
+
+
+func _test_door_steps() -> void:
+	var building := Building.new(Rect2i(0, 0, 20, 12), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var map := building.ground()
+	map.build_room(Rect2i(2, 2, 4, 4), &"concrete", &"brick", 0.0)
+	map.build_room(Rect2i(6, 2, 4, 4), &"concrete", &"brick", 0.75)
+	var edge := BuildingMap.edge_between(Vector2i(5, 3), Vector2i(6, 3))
+	_check(is_equal_approx(map.door_rise(edge), 0.75), "the floors either side of a wall can differ")
+	_check(not map.set_door(edge, true), "with door steps off, a door between them is refused")
+	Building.door_steps = true
+	_check(map.set_door(edge, true), "with door steps on, the door goes in")
+	_check(map.door_steps() == {edge: Vector2i(5, 3)}, "and gets steps on the low side")
+	_check(not map.can_place_at(PrisonCatalogue.object(&"toilet"), Vector2(5.5, 3.5), 0.0),
+			"nothing can stand on door steps")
+	var graph := NavGraph.build(building)
+	var walk := graph.find_path(0, Vector2(2.5, 4.5), 0, Vector2(8.5, 3.5))
+	_check(not walk.is_empty(), "people can climb door steps")
+	var climbs_at_door := false
+	for point in walk:
+		if Vector2(point.x, point.z).distance_to(Vector2(5.5, 3.5)) < 0.1:
+			climbs_at_door = true
+	_check(climbs_at_door, "and their route goes by the steps")
+	var far := BuildingMap.edge_between(Vector2i(5, 5), Vector2i(6, 5))
+	map.set_floor_heights({Vector2i(6, 5): 1.5})
+	_check(not map.set_door(far, true), "steps only make up a metre")
+	Building.door_steps = false
+	_check(map.door_steps().is_empty(), "turning door steps off removes them")
 
 
 func _test_nav_graph() -> void:

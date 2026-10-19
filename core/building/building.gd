@@ -21,6 +21,11 @@ const STOREY := 1.75
 ## sits a whole storey above the one below. Turn it on from the Main node
 ## (Split Levels) or by setting this.
 static var split_levels := false
+## Door steps: a door between floors at different heights (up to
+## BuildingMap.DOOR_STEPS_MAX apart) gets a small set of steps on the low
+## side. Off for now, so such doors are refused instead. Turn it on from
+## the Main node (Door Steps) or by setting this.
+static var door_steps := false
 const MIN_LEVEL := -2
 const MAX_LEVEL := 4
 

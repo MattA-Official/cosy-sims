@@ -42,6 +42,8 @@ const DEFAULT_WALL := &"plaster"
 ## Neighbouring floors further apart in height than this need a ramp or
 ## stairs between them; closer ones are a step people can take.
 const MAX_STEP := 0.25
+## The tallest difference door steps can make up, with door steps on.
+const DOOR_STEPS_MAX := 1.0
 
 enum Wall { NONE, WALL, DOOR, WINDOW }
 
@@ -417,7 +419,8 @@ func can_walk_between(a: Vector2i, b: Vector2i) -> bool:
 	if kind != Wall.NONE and kind != Wall.DOOR:
 		return false
 	if floors.has(a) and floors.has(b):
-		return absf(edge_height(a, b - a) - edge_height(b, a - b)) <= MAX_STEP + EPSILON
+		return absf(edge_height(a, b - a) - edge_height(b, a - b)) <= MAX_STEP + EPSILON \
+				or door_has_steps(edge)
 	return true
 
 
@@ -460,6 +463,43 @@ func remove_walls(edges: Array[Vector3i]) -> int:
 	return count
 
 
+## How far apart the floors either side of an edge are, or 0 unless both
+## sides have floor.
+func door_rise(edge: Vector3i) -> float:
+	var sides := edge_cells(edge)
+	if not floors.has(sides[0]) or not floors.has(sides[1]):
+		return 0.0
+	return absf(edge_height(sides[0], sides[1] - sides[0]) - edge_height(sides[1], sides[0] - sides[1]))
+
+
+## Can a door go in this wall? Not between floors more than a step apart,
+## unless door steps are on and the gap is small enough for them.
+func can_put_door(edge: Vector3i) -> bool:
+	var rise := door_rise(edge)
+	return rise <= MAX_STEP + EPSILON or (Building.door_steps and rise <= DOOR_STEPS_MAX + EPSILON)
+
+
+## Does this door have steps up to it? Only with door steps on.
+func door_has_steps(edge: Vector3i) -> bool:
+	if not Building.door_steps or wall_at(edge) != Wall.DOOR:
+		return false
+	var rise := door_rise(edge)
+	return rise > MAX_STEP + EPSILON and rise <= DOOR_STEPS_MAX + EPSILON
+
+
+## Every door with steps, as edge to the low-side tile the steps stand on.
+func door_steps() -> Dictionary[Vector3i, Vector2i]:
+	var found: Dictionary[Vector3i, Vector2i] = {}
+	if not Building.door_steps:
+		return found
+	for edge: Vector3i in walls:
+		if door_has_steps(edge):
+			var sides := edge_cells(edge)
+			var low := sides[0] if floor_height(sides[0]) < floor_height(sides[1]) else sides[1]
+			found[edge] = low
+	return found
+
+
 ## Turns a wall into a door, or a door back into a wall.
 func set_door(edge: Vector3i, is_door: bool) -> bool:
 	return set_opening(edge, Wall.DOOR if is_door else Wall.WALL)
@@ -471,6 +511,8 @@ func set_opening(edge: Vector3i, kind: Wall, window: StringName = WINDOW_GLASS) 
 	if wall_at(edge) == Wall.NONE or kind == Wall.NONE:
 		return false
 	if kind == Wall.WINDOW and is_outdoor_wall(edge):
+		return false
+	if kind == Wall.DOOR and not can_put_door(edge):
 		return false
 	if walls[edge] == kind and (kind != Wall.WINDOW or window_kind(edge) == window):
 		return false
@@ -780,12 +822,13 @@ func can_place_at(def: ObjectDef, centre: Vector2, angle: float) -> bool:
 	if shrunk.is_empty():
 		return false
 	var inner: PackedVector2Array = shrunk[0]
+	var stepped := door_steps().values()
 	for cell in cells_under(rect):
 		var square := PackedVector2Array([Vector2(cell), Vector2(cell) + Vector2(1, 0),
 				Vector2(cell) + Vector2.ONE, Vector2(cell) + Vector2(0, 1)])
 		if Geometry2D.intersect_polygons(inner, square).is_empty():
 			continue
-		if not has_floor(cell) or ramp_at(cell) != null or stairs_at(cell) != null:
+		if not has_floor(cell) or ramp_at(cell) != null or stairs_at(cell) != null or stepped.has(cell):
 			return false
 	for placed: PlacedObject in objects.values():
 		if placed.rect.grow(-EPSILON).intersects(rect) \

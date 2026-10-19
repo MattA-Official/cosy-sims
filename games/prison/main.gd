@@ -6,6 +6,9 @@ extends Node3D
 ## Split levels: floors nudged within their storey, and ramps between
 ## them. Off keeps every floor a whole storey above the one below.
 @export var split_levels := false
+## Door steps: a door between floors up to a metre apart gets a few steps
+## on the low side. Off refuses doors between floors more than a step apart.
+@export var door_steps := false
 
 @onready var grid: BuildGrid = $BuildGrid
 @onready var view: BuildingView = $BuildGrid/BuildingView
@@ -34,6 +37,7 @@ var views: Dictionary[int, BuildingView] = {}
 
 func _ready() -> void:
 	Building.split_levels = split_levels
+	Building.door_steps = door_steps
 	# The grid is the whole world; you start owning the middle of it.
 	var land := Rect2i(grid.size / 4, grid.size / 2)
 	building = Building.new(land, PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)

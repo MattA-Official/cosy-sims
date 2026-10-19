@@ -376,6 +376,9 @@ func _build_objects() -> void:
 	var cs := grid.cell_size
 	for flight: Staircase in map.stairs.values():
 		_add_stairs(flight)
+	var stepped := map.door_steps()
+	for edge: Vector3i in stepped:
+		_add_door_steps(edge, stepped[edge])
 	for placed: BuildingMap.PlacedObject in map.objects.values():
 		# Shrink a touch so neighbours and walls do not look fused together.
 		var size := placed.def.size
@@ -411,6 +414,37 @@ func _add_stairs(flight: Staircase) -> void:
 		var top: float = base + 0.03 + treads[i][1]
 		MeshShapes.add_prism(st, scaled, base, top, colour.darkened(0.25),
 				colour.lightened(0.06 * (i % 2)))
+	var instance := MeshInstance3D.new()
+	instance.mesh = st.commit()
+	instance.material_override = _stairs_material
+	_objects.add_child(instance)
+
+
+## A few steps on the low side of a door, climbing to the floor beyond it.
+## Each riser is at most a quarter of a metre; the treads share the tile.
+func _add_door_steps(edge: Vector3i, low: Vector2i) -> void:
+	var cs := grid.cell_size
+	var sides := BuildingMap.edge_cells(edge)
+	var high := sides[0] if sides[1] == low else sides[1]
+	var d := Vector2(high - low)
+	var across := Vector2(-d.y, d.x)
+	var base := map.floor_height(low)
+	var rise := map.door_rise(edge)
+	var count := ceili(rise / BuildingMap.MAX_STEP - BuildingMap.EPSILON)
+	var def := map.floor_def(map.floors[low])
+	var colour := def.colour if def != null else stairs_colour
+	var centre := Vector2(low) + Vector2(0.5, 0.5)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Tread k of count - 1, highest against the door.
+	for k in range(1, count):
+		var near := float(count - 1 - k) / count
+		var far := float(count - k) / count
+		var outline := PackedVector2Array()
+		for corner: Vector2 in [Vector2(near, 0.1), Vector2(far, 0.1), Vector2(far, 0.9), Vector2(near, 0.9)]:
+			outline.append((centre + d * (0.5 - corner.x) + across * (corner.y - 0.5)) * cs)
+		MeshShapes.add_prism(st, outline, base, base + 0.03 + rise * k / count,
+				colour.darkened(0.25), colour.lightened(0.06 * (k % 2)))
 	var instance := MeshInstance3D.new()
 	instance.mesh = st.commit()
 	instance.material_override = _stairs_material
