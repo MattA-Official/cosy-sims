@@ -35,6 +35,7 @@ func _ready() -> void:
 	building.level_added.connect(_add_level_view)
 	building.active_changed.connect(_on_level_changed)
 	controller.building = building
+	paths.terrain = terrain
 	controller.paths = paths
 	path_view.styles = PrisonCatalogue.PATHS
 	path_view.network = paths

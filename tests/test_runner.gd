@@ -471,6 +471,43 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	map.set_door(Vector3i(cell.call(31, 5).x, cell.call(31, 5).y, BuildingMap.EDGE_X), true)
 	var door: Vector2 = controller.path_tool.door_points()[0]
 	_check(controller.path_tool.snap(door + Vector2(0.3, 0.3)) == door, "path ends snap to doors")
+	var free_spot := base + Vector2(20.3, 20.8)
+	_check(controller.path_tool.snap(free_spot) == base + Vector2(20.5, 20.5), "path ends snap to the middle of tiles")
+	_check(controller.path_tool.snap(free_spot, false) == free_spot, "bends do not snap")
+	controller.path_tool.free_held = true
+	_check(controller.path_tool.snap(free_spot) == free_spot and controller.path_tool.snap(free_spot, false)
+			== base + Vector2(20.5, 20.5), "Alt swaps snapping for the point being placed")
+	controller.path_tool.free_held = false
+	controller.path_tool.raise()
+	controller.path_tool.raise()
+	_check(controller.path_tool.built and controller.path_tool.raise_steps == 1,
+			"Page Up builds the stretch, then raises its end")
+	controller.path_tool.lower()
+	controller.path_tool.lower()
+	_check(not controller.path_tool.built, "Page Down goes back to the ground")
+	# A path running along another is refused; one crossing it is fine.
+	controller.path_tool.cancel()
+	controller.path_tool.mode = PathTool.Mode.STRAIGHT
+	hover.call(26.0, 38.0)
+	controller._on_press()
+	hover.call(34.0, 38.0)
+	controller._on_press()
+	controller.path_tool.cancel()
+	var segments_now := paths.segments.size()
+	hover.call(27.0, 38.4)
+	controller._on_press()
+	hover.call(33.0, 38.4)
+	_check(controller.path_tool.status(controller._hover_point).contains("another path"),
+			"the hint says why a path cannot go there")
+	controller._on_press()
+	_check(paths.segments.size() == segments_now, "a path cannot run along another")
+	controller.path_tool.cancel()
+	hover.call(30.0, 35.0)
+	controller._on_press()
+	hover.call(30.0, 41.0)
+	controller._on_press()
+	_check(paths.segments.size() == segments_now + 3, "a path can cross another, making a junction")
+	controller.path_tool.cancel()
 	controller.force_erase = true
 	controller.path_tool.mode = PathTool.Mode.STRAIGHT
 	hover.call(6.0, 44.1)
@@ -929,6 +966,19 @@ func _test_path_network() -> void:
 	_check(paths.remove_segment(curved.id) and not paths.nodes.has(curved.a), "removing a segment drops lonely nodes")
 	_check(paths.remove_in_rect(Rect2(4, -7, 2, 5)) == 1, "remove_in_rect removes paths running through it")
 
+	# Crossing paths meet at a new junction; a path well above passes over.
+	var grid := PathNetwork.new()
+	grid.add_segment(Vector2(0, 5), Vector2(10, 5))
+	var across := grid.add_segment(Vector2(5, 0), Vector2(5, 10))
+	var middle := grid.node_near(Vector2(5, 5), 0.1)
+	_check(middle != -1 and grid.segments_at(middle).size() == 4 and across.b == middle,
+			"a path crossing another makes a junction")
+	var before := grid.segments.size()
+	grid.add_segment(Vector2(2, 0), Vector2(2, 10), null, &"", true, 2.0, 2.0)
+	_check(grid.segments.size() == before + 1, "a bridge passes over a path without joining it")
+	_check(is_equal_approx(grid.node_height(grid.node_near(Vector2(2, 0), 0.1)), 2.0),
+			"built ends keep their height")
+
 
 func _test_path_profile() -> void:
 	var terrain := Terrain.new()
@@ -947,15 +997,25 @@ func _test_path_profile() -> void:
 	var flat := PathProfile.build(PathNetwork.sample_curve(Vector2(1, 5), Vector2(2, 5), Vector2(4, 5)), terrain)
 	_check(not flat.has_kind(PathProfile.Kind.STEPS) and not flat.has_kind(PathProfile.Kind.BRIDGE),
 			"a flat path stays on the ground")
-	var over := PathProfile.build(PathNetwork.sample_curve(Vector2(3, 5), Vector2(8, 5), Vector2(13, 5)), terrain)
-	_check(over.has_kind(PathProfile.Kind.BRIDGE), "a path over the pond becomes a bridge")
+	var pond_curve := PathNetwork.sample_curve(Vector2(3, 5), Vector2(8, 5), Vector2(13, 5))
+	_check(not PathProfile.build(pond_curve, terrain).problem.is_empty(), "a ground path cannot go through a pond")
+	_check(not PathProfile.build(pond_curve, terrain, true).problem.is_empty(),
+			"a bridge level with the banks is too low over the water")
+	var over := PathProfile.build(pond_curve, terrain, true, 1.5, 1.5)
+	_check(over.has_kind(PathProfile.Kind.BRIDGE) and over.problem.is_empty(),
+			"a built path over the pond is a bridge")
 	var lowest := INF
 	for i in over.points.size():
 		if over.points[i].x > 6.5 and over.points[i].x < 9.5:
 			lowest = minf(lowest, over.heights[i])
 	_check(lowest >= water.bodies[0].level + PathProfile.BRIDGE_CLEARANCE - 0.01, "the bridge stays above the water")
-	var up := PathProfile.build(PathNetwork.sample_curve(Vector2(17, 2), Vector2(19.5, 2), Vector2(22, 2)), terrain)
-	_check(up.has_kind(PathProfile.Kind.STEPS), "a steep path becomes steps")
+	var steep := PathNetwork.sample_curve(Vector2(17, 2), Vector2(19.5, 2), Vector2(22, 2))
+	_check(not PathProfile.build(steep, terrain).problem.is_empty(), "a steep ground path is too steep")
+	var up := PathProfile.build(steep, terrain, true)
+	_check(up.has_kind(PathProfile.Kind.STEPS) and up.steps == 8, "built, it is stairs with steps like indoors")
+	var cliff := PathNetwork.sample_curve(Vector2(19.8, 2), Vector2(20, 2), Vector2(20.2, 2))
+	_check(not PathProfile.build(cliff, terrain, true, NAN, 3.0 + 2.0).problem.is_empty(),
+			"stairs cannot be steeper than their treads allow")
 	water.free()
 	terrain.free()
 

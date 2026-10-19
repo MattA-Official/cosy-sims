@@ -39,25 +39,39 @@ decisions are listed first within each section.
 
 ## Agreed direction
 
-### Paths and roads: off the grid (built)
+### Paths and roads: curves that snap to the grid (built)
 Paths and roads are **not** tile floors. They work like Cities: Skylines
-2 (`core/paths/`):
+2 (`core/paths/`), but snap to the grid like floors do:
 - A `PathNetwork` of nodes and quadratic Bézier segments, each with a
   style (`PathStyleDef`: gravel, paving, road) and a width.
 - The path tool has straight, curved (start, bend, end) and freehand
   modes. Each path carries on from the last until Esc. Ends snap to
-  nodes, to the middle of segments (splitting them into a junction) and to
-  outside doors. Junctions and bends get a round pad.
-- `PathProfile` fits a path to the land: gentle slopes follow the ground,
-  stretches steeper than 0.35 rise per tile become steps, and stretches
-  over water become bridges running straight from bank to bank, at least
-  0.4 m above the water.
+  nodes, to the middle of segments (splitting them into a junction), to
+  outside doors, and otherwise to the middle of a tile; a curve's bend
+  point does not snap. Holding Alt while placing a point swaps that for
+  the one point, and the toolbar turns the grid off altogether.
+- Paths may cross but not run along or over each other. A crossing at
+  about the same height makes a new junction; one at least 1 m above
+  another passes over it. Where paths meet, the inside corners between
+  them are filled with a smooth curve and the outside of a bend is
+  rounded off (no more round pads).
+- Ground paths follow the land and that is all: too steep (over 0.35
+  rise per tile) or through water and they cannot be built, and the hint
+  says so. Stairs, ramps and bridges are a choice: Page Up or Down while
+  placing makes the stretch built, running straight from one end's height
+  to the other's. The first press keeps the far end on the ground; more
+  presses raise it a step (0.25 m) at a time, and Page Down undoes them.
+  A built stretch steeper than a ground path may be is stairs, with steps
+  the same 0.25 m as stairs indoors spread evenly along it; a gentle one
+  is a ramp, and a bridge on piers where it is well off the ground or over
+  water (at least 0.15 m above it). Ends off the ground keep their height,
+  so a walkway can carry on from one.
 - Paths are outdoor-only, stay on owned land, and can't cross floors
   except right by their ends (to reach a door). Building over a path
   removes it. Grid floors stay for interiors and patios; floors will
   count as walkable paths when people arrive, with one-way paths later.
 - Not yet: rivers as downhill splines, paths across land you don't own,
-  and road junction shapes beyond round pads.
+  and road markings at junctions.
 
 ### Terrain, water and foliage (basics built)
 - **Terrain is a heightmap** (`core/terrain/terrain.gd`), one height per

@@ -37,8 +37,8 @@ const HINTS := {
 }
 
 const PATH_HINTS := {
-	PathTool.Mode.STRAIGHT: "Click to start a path and click again to end it. Esc stops. Ctrl-click removes a path.",
-	PathTool.Mode.CURVED: "Click the start, then a bend point, then the end. Esc stops. Ctrl-click removes a path.",
+	PathTool.Mode.STRAIGHT: "Click to start a path and click again to end it. Page Up or Down for stairs or a bridge, Alt to place off the grid. Esc stops, Ctrl-click removes.",
+	PathTool.Mode.CURVED: "Click the start, a bend point, then the end. Page Up or Down for stairs or a bridge, Alt to snap or free a point. Esc stops, Ctrl-click removes.",
 	PathTool.Mode.FREEHAND: "Drag to draw a path; it is smoothed when you let go. Ctrl-click removes a path.",
 }
 
@@ -159,6 +159,7 @@ var _drag_start_point := Vector2.ZERO
 var _free_rotating := false
 var _rotate_anchor := Vector2.ZERO
 var _path_preview := MeshInstance3D.new()
+var _path_status := ""
 var _brushing := false
 var _flatten_target := 0.0
 var _plant_cooldown := 0.0
@@ -190,7 +191,12 @@ func _process(delta: float) -> void:
 	if _brushing and _has_hover:
 		_apply_brush(delta)
 	if tool == Tool.PATH and _has_hover:
+		path_tool.free_held = Input.is_action_pressed("build_free_place")
 		path_tool.extend_trail(_hover_point)
+		var status := path_tool.status(_hover_point)
+		if status != _path_status:
+			_path_status = status
+			hint_changed.emit()
 	_draw_preview()
 
 
@@ -217,6 +223,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			pass
 		else:
 			tool = Tool.NONE
+		get_viewport().set_input_as_handled()
+	elif tool == Tool.PATH and path_tool.is_drawing() and (event.is_action_pressed("level_up")
+			or event.is_action_pressed("level_down")):
+		# While placing a path, Page Up and Down choose stairs or a bridge
+		# rather than changing floor.
+		if event.is_action_pressed("level_up"):
+			path_tool.raise()
+		else:
+			path_tool.lower()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_rotate") and tool == Tool.OBJECT:
 		object_angle = wrapf(snappedf(object_angle + deg_to_rad(rotation_step), deg_to_rad(rotation_step)),
@@ -388,7 +403,7 @@ func hint() -> String:
 	if tool == Tool.TERRAIN and water_mode != WaterMode.NONE:
 		return WATER_HINTS[water_mode]
 	if tool == Tool.PATH:
-		return PATH_HINTS[path_tool.mode]
+		return (PATH_HINTS[path_tool.mode] + "\n" + _path_status).strip_edges()
 	if tool == Tool.OBJECT:
 		return HINTS[tool] % String.num(rotation_step)
 	return HINTS[tool]

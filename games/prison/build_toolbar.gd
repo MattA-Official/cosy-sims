@@ -220,6 +220,11 @@ func _add_path_choices() -> void:
 				_hint.text = controller.hint())
 		_options.add_child(button)
 	_options.add_child(VSeparator.new())
+	var grid := _make_button("Snap to grid")
+	grid.button_pressed = controller.path_tool.snap_to_grid
+	grid.toggled.connect(func(on: bool) -> void: controller.path_tool.snap_to_grid = on)
+	_options.add_child(grid)
+	_options.add_child(VSeparator.new())
 	if controller.path_tool.style.is_empty():
 		controller.path_tool.style = PrisonCatalogue.PATHS[0].id
 	var styles := ButtonGroup.new()
