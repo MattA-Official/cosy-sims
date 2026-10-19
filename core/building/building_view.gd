@@ -347,9 +347,11 @@ func _build_walls() -> void:
 		var end := start + (Vector2.RIGHT if edge.z == BuildingMap.EDGE_X else Vector2.DOWN)
 		var base := _wall_base(edge)
 		_piece_low = walls_low or (cutaway and _cut_away(start, end))
-		# Foundations reach below the lowest ground at either end.
+		# Foundations reach below the lowest ground at either end; upstairs
+		# walls reach the underside of the floor slab, so they look whole from
+		# a stairwell.
 		var drop := base - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
-				if level == 0 else base - _lowest_floor_beside(edge) + 0.05
+				if level == 0 else base - _lowest_floor_beside(edge) + slab_depth
 		has_glass = _add_wall_piece(st, glass, start, end, base, drop, map.wall_at(edge),
 				map.wall_def(map.wall_style(edge)), map.window_kind(edge)) or has_glass
 	for key: Vector4i in map.slants:
@@ -365,7 +367,7 @@ func _build_walls() -> void:
 		var base := highest if highest > -INF else _height_at((start + end) * 0.5)
 		_piece_low = walls_low or (cutaway and _cut_away(start, end))
 		var drop := base - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
-				if level == 0 else base - (lowest if lowest < INF else base) + 0.05
+				if level == 0 else base - (lowest if lowest < INF else base) + slab_depth
 		has_glass = _add_wall_piece(st, glass, start, end, base, drop, map.slant_at(key),
 				map.wall_def(map.slant_style(key)), map.slant_window_kind(key)) or has_glass
 	var empty := map.walls.is_empty() and map.slants.is_empty()
@@ -589,23 +591,82 @@ func _build_labels() -> void:
 		var def := room_type(room.type)
 		if def == null:
 			continue
-		var label := Label3D.new()
 		var problems := def.problems(room, map)
-		label.text = def.display_name
+		var label := _label(def.display_name)
 		if not problems.is_empty():
 			label.text += "\n" + "\n".join(problems)
 			label.modulate = problem_colour
-		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		label.no_depth_test = true
-		label.fixed_size = true
-		label.pixel_size = 0.0012
-		label.font_size = 22
-		label.outline_size = 10
 		var centre := room.centre() * cs
 		var lift := low_wall_height + 0.6 if walls_low else wall_height + 0.6
 		lift += map.floor_height(room.cells[0])
 		label.position = Vector3(centre.x, lift, centre.y)
+		# Rooms with problems win when labels crowd, then bigger rooms.
+		label.set_meta(&"priority", (1000 if not problems.is_empty() else 0) + room.cells.size())
 		_labels.add_child(label)
+	# Doors whose floors no longer line up say so, above the doorway.
+	for edge in map.unusable_doors():
+		var label := _label("Can't use this door:\nfloors %s m apart" % String.num(map.door_rise(edge), 2))
+		label.modulate = problem_colour
+		var middle := Vector2(edge.x, edge.y) + (Vector2(0.5, 0) if edge.z == BuildingMap.EDGE_X else Vector2(0, 0.5))
+		label.position = Vector3(middle.x * cs, _wall_base(edge) + door_height + 0.3, middle.y * cs)
+		label.set_meta(&"priority", 2000)
+		_labels.add_child(label)
+
+
+func _label(text: String) -> Label3D:
+	var label := Label3D.new()
+	label.text = text
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.fixed_size = true
+	label.pixel_size = 0.0012
+	label.font_size = 22
+	label.outline_size = 10
+	return label
+
+
+func _process(_delta: float) -> void:
+	if show_labels and _labels.get_child_count() > 1:
+		_declutter_labels()
+
+
+## Hides labels that would overlap one already shown, most important first,
+## so crowded rooms show one clear label each; zoom in and the rest return.
+func _declutter_labels() -> void:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return
+	var scale := get_viewport().get_visible_rect().size.y / 900.0
+	var labels: Array[Label3D] = []
+	for child in _labels.get_children():
+		if child is Label3D and not child.is_queued_for_deletion():
+			labels.append(child)
+	labels.sort_custom(func(a: Label3D, b: Label3D) -> bool:
+		return int(a.get_meta(&"priority", 0)) > int(b.get_meta(&"priority", 0)))
+	var taken: Array[Rect2] = []
+	for label in labels:
+		var at := label.global_position
+		if camera.is_position_behind(at):
+			label.visible = false
+			continue
+		var lines := label.text.split("\n")
+		var widest := 0
+		for line in lines:
+			widest = maxi(widest, line.length())
+		var size := Vector2(widest * 19.0, lines.size() * 40.0) * scale
+		var rect := Rect2(camera.unproject_position(at) - size * 0.5, size)
+		label.visible = not taken.any(func(other: Rect2) -> bool: return other.intersects(rect))
+		if label.visible:
+			taken.append(rect)
+
+
+## Labels shown and hidden right now, for tests.
+func visible_labels() -> int:
+	var count := 0
+	for child in _labels.get_children():
+		if child is Label3D and child.visible and not child.is_queued_for_deletion():
+			count += 1
+	return count
 
 
 ## Ground height at a point in tile units.

@@ -487,6 +487,16 @@ func door_has_steps(edge: Vector3i) -> bool:
 	return rise > MAX_STEP + EPSILON and rise <= DOOR_STEPS_MAX + EPSILON
 
 
+## Doors nobody can walk through because the floors either side drifted
+## more than a step apart after the door went in (and no steps make it up).
+func unusable_doors() -> Array[Vector3i]:
+	var out: Array[Vector3i] = []
+	for edge: Vector3i in walls:
+		if walls[edge] == Wall.DOOR and door_rise(edge) > MAX_STEP + EPSILON and not door_has_steps(edge):
+			out.append(edge)
+	return out
+
+
 ## Every door with steps, as edge to the low-side tile the steps stand on.
 func door_steps() -> Dictionary[Vector3i, Vector2i]:
 	var found: Dictionary[Vector3i, Vector2i] = {}

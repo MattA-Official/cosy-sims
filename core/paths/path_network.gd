@@ -89,8 +89,8 @@ func add_segment(from: Vector2, to: Vector2, control: Variant = null,
 		style: StringName = &"", built := false, from_height := NAN, to_height := NAN) -> Segment:
 	var bend: Vector2 = control if control != null else (from + to) * 0.5
 	var crossed := crossings(from, bend, to, built, from_height, to_height)
-	var a := _node_at(from)
-	var b := _node_at(to)
+	var a := _node_at(from, from_height)
+	var b := _node_at(to, to_height)
 	if a == b:
 		return null
 	for pair: Array in [[a, from_height], [b, to_height]]:
@@ -321,12 +321,19 @@ func closest(position: Vector2) -> Array:
 
 
 ## The node for an end at `position`: an existing node, a new junction on a
-## segment, or a new node.
-func _node_at(position: Vector2) -> int:
+## segment, or a new node. An end only splits a path partway at about its
+## own height (`height`, or the ground when NAN): a path on the ground
+## ending under a bridge stays on the ground rather than joining it in
+## mid-air. Ends on an existing node join it unless given a height well
+## away from the node's.
+func _node_at(position: Vector2, height := NAN) -> int:
 	var node := node_near(position)
-	if node != -1:
+	if node != -1 and (is_nan(height) or absf(node_height(node) - height) < PASS_UNDER):
 		return node
+	if is_nan(height):
+		height = terrain.height_at(position) if terrain != null else 0.0
 	var hit := closest(position)
-	if not hit.is_empty() and hit[2] <= SNAP_DISTANCE and hit[1] > 0.0 and hit[1] < 1.0:
+	if not hit.is_empty() and hit[2] <= SNAP_DISTANCE and hit[1] > 0.0 and hit[1] < 1.0 \
+			and absf(height_on(hit[0], hit[1]) - height) < PASS_UNDER:
 		return split(hit[0], hit[1])
 	return add_node(position)

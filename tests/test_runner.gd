@@ -1008,9 +1008,12 @@ func _test_people() -> void:
 			"people can't be sent through walls")
 	map.set_door(BuildingMap.edge_between(Vector2i(5, 6), Vector2i(5, 7)), true)
 	_check(people.send(sleepy, 0, Vector2(15.5, 15.5)), "but can go out of a door")
+	# Once there they may wander off again, so watch for them getting close.
+	var nearest := INF
 	for i in 200:
 		people.step(0.1)
-	_check(sleepy.flat().distance_to(Vector2(15.5, 15.5)) < 6.5, "and walk out over the ground")
+		nearest = minf(nearest, sleepy.flat().distance_to(Vector2(15.5, 15.5)))
+	_check(nearest < 1.0, "and walk out over the ground")
 	people.remove_person(sleepy)
 	_check(people.people.size() == 1, "people can be removed")
 	var ground := Terrain.new()
@@ -1054,6 +1057,7 @@ func _test_door_steps() -> void:
 	_check(not map.set_door(far, true), "steps only make up a metre")
 	Building.door_steps = false
 	_check(map.door_steps().is_empty(), "turning door steps off removes them")
+	_check(map.unusable_doors() == ([edge] as Array[Vector3i]), "and the door is flagged as one nobody can use")
 
 
 func _test_nav_graph() -> void:
@@ -1224,6 +1228,24 @@ func _test_angled_walls() -> void:
 
 
 func _test_path_network() -> void:
+	# A ground path ending under a raised bridge stays on the ground; one
+	# raised to the bridge's height joins it.
+	var raised := PathNetwork.new()
+	var bridge := raised.add_segment(Vector2(0, 0), Vector2(10, 0), null, &"", true, 2.0, 2.0)
+	var under := raised.add_segment(Vector2(5, 6), Vector2(5, 0.2))
+	_check(under.b != bridge.b and raised.segments.size() == 2, "a ground path doesn't join a bridge in mid-air")
+	var up := raised.add_segment(Vector2(3, 6), Vector2(3, 0.2), null, &"", true, NAN, 2.0)
+	_check(raised.segments.size() == 4 and raised.segments_at(up.b).size() == 3, "one built up to it does")
+	# A curve crossing a path twice makes two junctions.
+	var twice := PathNetwork.new()
+	twice.add_segment(Vector2(0.5, 5.5), Vector2(10.5, 5.5))
+	twice.add_segment(Vector2(2.5, 2.5), Vector2(8.5, 2.5), Vector2(5.5, 12.5))
+	var junctions := 0
+	for node: int in twice.nodes:
+		if twice.segments_at(node).size() == 4:
+			junctions += 1
+	_check(junctions == 2 and twice.segments.size() == 6, "a curve crossing a path twice joins it twice")
+
 	var paths := PathNetwork.new()
 	var first := paths.add_segment(Vector2(0, 0), Vector2(10, 0))
 	_check(paths.nodes.size() == 2 and paths.segments.size() == 1, "a segment adds two nodes")
