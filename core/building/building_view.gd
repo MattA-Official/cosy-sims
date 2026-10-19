@@ -108,6 +108,8 @@ var _material := MeshShapes.vertex_colour_material()
 var _glass_material := _make_glass_material()
 var _object_materials := {} # Color -> StandardMaterial3D
 var _rebuild_queued := false
+## Shared by every level's labels.
+static var _label_font := CosyTheme.bold_font()
 ## Whether the wall piece being drawn is cut low.
 var _piece_low := false
 
@@ -622,6 +624,8 @@ func _label(text: String) -> Label3D:
 	label.pixel_size = 0.0012
 	label.font_size = 22
 	label.outline_size = 10
+	label.font = _label_font
+	label.outline_modulate = CosyTheme.WORLD_OUTLINE
 	return label
 
 

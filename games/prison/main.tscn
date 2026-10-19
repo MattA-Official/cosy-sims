@@ -37,11 +37,6 @@ tonemap_mode = 2
 ssao_enabled = true
 glow_enabled = false
 
-[sub_resource type="LabelSettings" id="LabelSettings_hud"]
-font_size = 18
-outline_size = 4
-outline_color = Color(0, 0, 0, 0.6)
-
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
 
@@ -117,7 +112,7 @@ offset_top = 12.0
 offset_right = 900.0
 offset_bottom = 40.0
 text = "Cell: none"
-label_settings = SubResource("LabelSettings_hud")
+theme_type_variation = &"HudLabel"
 
 [node name="HelpLabel" type="Label" parent="HUD"]
 offset_left = 16.0
@@ -126,7 +121,7 @@ offset_right = 900.0
 offset_bottom = 92.0
 text = "WASD / arrows: pan    Q / E: rotate    Wheel or + / -: zoom    Shift: faster    Page Up / Down: change floor
 Right-drag: pan    Middle-drag: rotate and tilt    Esc: put the tool away    [ / ]: brush size    F3: debug view"
-label_settings = SubResource("LabelSettings_hud")
+theme_type_variation = &"HudLabel"
 
 [node name="BuildToolbar" type="VBoxContainer" parent="HUD" node_paths=PackedStringArray("controller")]
 anchors_preset = 12

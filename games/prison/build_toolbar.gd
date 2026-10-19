@@ -52,6 +52,7 @@ const BRUSHES := [
 
 var _hint := Label.new()
 var _options := HBoxContainer.new()
+var _options_bar := PanelContainer.new()
 var _tool_buttons := {} # Tool -> Button
 var _tool_group := ButtonGroup.new()
 var _walls_button: Button
@@ -65,19 +66,22 @@ func _ready() -> void:
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_options.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint.add_theme_constant_override("outline_size", 4)
-	_hint.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	_hint.theme_type_variation = &"HudLabel"
 	add_child(_hint)
-	_options.alignment = BoxContainer.ALIGNMENT_CENTER
-	add_child(_options)
+	_options_bar.theme_type_variation = &"HudBar"
+	_options_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_options_bar.add_child(_options)
+	add_child(_options_bar)
 
+	var tools_bar := PanelContainer.new()
+	tools_bar.theme_type_variation = &"HudBar"
+	tools_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	add_child(tools_bar)
 	var tools := HBoxContainer.new()
-	tools.alignment = BoxContainer.ALIGNMENT_CENTER
-	tools.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(tools)
+	tools_bar.add_child(tools)
 	for i in TOOLS.size():
 		var tool: BuildController.Tool = TOOLS[i][0]
-		var button := _make_button("%d  %s" % [(i + 1) % 10, TOOLS[i][1]], _tool_group)
+		var button := _make_tool_button(str((i + 1) % 10), TOOLS[i][1], _tool_group)
 		button.toggled.connect(func(on: bool) -> void:
 			if on:
 				controller.tool = tool
@@ -85,7 +89,8 @@ func _ready() -> void:
 				controller.tool = BuildController.Tool.NONE)
 		tools.add_child(button)
 		_tool_buttons[tool] = button
-	_walls_button = _make_button("")
+	tools.add_child(VSeparator.new())
+	_walls_button = _make_tool_button("Tab", "")
 	_walls_button.toggle_mode = false
 	_walls_button.tooltip_text = "Tab loops through walls up, cutaway, walls down and roofs on."
 	_walls_button.pressed.connect(controller.next_wall_view)
@@ -100,7 +105,8 @@ func _ready() -> void:
 
 
 func _show_wall_view(mode: BuildController.WallView) -> void:
-	_walls_button.text = "Tab  " + BuildController.WALL_VIEW_NAMES[mode]
+	_walls_button.get_meta(&"label").text = BuildController.WALL_VIEW_NAMES[mode]
+	_fit_tool_button(_walls_button)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -117,6 +123,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _on_tool_changed(tool: BuildController.Tool) -> void:
 	for t: BuildController.Tool in _tool_buttons:
 		_tool_buttons[t].set_pressed_no_signal(t == tool)
+		_paint_tool_button(_tool_buttons[t])
 	_hint.text = controller.hint()
 	for child in _options.get_children():
 		child.queue_free()
@@ -151,6 +158,9 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 		BuildController.Tool.PLANTS:
 			_add_choices(PrisonCatalogue.PLANTS, controller.plant_def,
 					func(def: Resource) -> void: controller.plant_def = def)
+
+	_options_bar.visible = _options.get_children().any(func(c: Node) -> bool:
+		return not c.is_queued_for_deletion())
 
 
 ## Floor or wall style buttons, with outdoor styles marked.
@@ -313,5 +323,48 @@ func _make_button(text: String, group: ButtonGroup = null) -> Button:
 	button.toggle_mode = true
 	button.button_group = group
 	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(0, 36)
 	return button
+
+
+## A big tool button with its shortcut on a keycap before the name.
+func _make_tool_button(key: String, text: String, group: ButtonGroup = null) -> Button:
+	var button := _make_button("", group)
+	button.theme_type_variation = &"ToolButton"
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 6)
+	button.add_child(row)
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# Sits a little high, above the button's thick bottom edge.
+	row.offset_bottom = -2
+	var keycap := Label.new()
+	keycap.text = key
+	keycap.theme_type_variation = &"KeyLabel"
+	keycap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(keycap)
+	var label := Label.new()
+	label.text = text
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(label)
+	button.set_meta(&"label", label)
+	button.toggled.connect(func(_on: bool) -> void: _paint_tool_button(button))
+	# The theme only reaches the button once it is in the tree.
+	button.ready.connect(func() -> void:
+		_paint_tool_button(button)
+		_fit_tool_button(button))
+	return button
+
+
+## Gives a tool button's label the button's font and its colour for the
+## button's state, which a plain Label inside a Button doesn't pick up.
+func _paint_tool_button(button: Button) -> void:
+	var label: Label = button.get_meta(&"label")
+	label.add_theme_font_override("font", button.get_theme_font("font"))
+	label.add_theme_color_override("font_color", button.get_theme_color(
+			"font_pressed_color" if button.button_pressed else "font_color"))
+
+
+func _fit_tool_button(button: Button) -> void:
+	var row: Control = button.get_meta(&"label").get_parent()
+	button.custom_minimum_size = Vector2(row.get_combined_minimum_size().x + 26, 44)

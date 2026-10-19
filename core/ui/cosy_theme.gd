@@ -37,7 +37,7 @@ const LIGHT := {
 	"track": Color("e0d6bf"),
 	"shadow": Color(0.16, 0.2, 0.18, 0.22),
 	"hud_text": Color("fbf7ee"),
-	"hud_outline": Color(0.13, 0.18, 0.16, 0.7),
+	"hud_outline": WORLD_OUTLINE,
 }
 
 ## Slate-green cards with cream ink, for comparison.
@@ -61,9 +61,11 @@ const DARK := {
 	"track": Color("26352f"),
 	"shadow": Color(0.05, 0.08, 0.07, 0.35),
 	"hud_text": Color("fbf7ee"),
-	"hud_outline": Color(0.13, 0.18, 0.16, 0.7),
+	"hud_outline": WORLD_OUTLINE,
 }
 
+## Outline for text drawn over the world (HUD labels and room labels).
+const WORLD_OUTLINE := Color(0.13, 0.18, 0.16, 0.7)
 const RADIUS := 12
 const BUTTON_RADIUS := 10
 const FONT_SIZE := 16
@@ -85,6 +87,14 @@ static func build(palette := LIGHT, accent := Color(0, 0, 0, 0)) -> Theme:
 	return builder._build()
 
 
+## The theme's bold font, for Label3Ds in the world, which themes don't reach.
+static func bold_font() -> FontVariation:
+	var font := FontVariation.new()
+	font.base_font = load(FONT_PATH)
+	font.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): 800}
+	return font
+
+
 func _build() -> Theme:
 	_fonts()
 	_labels()
@@ -102,7 +112,7 @@ func _build() -> Theme:
 func _fonts() -> void:
 	var base: FontFile = load(FONT_PATH)
 	_regular = _weight(base, 560)
-	_bold = _weight(base, 800)
+	_bold = bold_font()
 	theme.default_font = _regular
 	theme.default_font_size = FONT_SIZE
 
@@ -140,10 +150,10 @@ func _labels() -> void:
 	theme.set_stylebox("normal", "KeyLabel", key)
 	# Text straight over the world, like the build hint.
 	_variation("HudLabel", "Label")
-	theme.set_font("font", "HudLabel", _bold)
+	theme.set_font("font", "HudLabel", _weight(load(FONT_PATH), 700))
 	theme.set_color("font_color", "HudLabel", p.hud_text)
 	theme.set_color("font_outline_color", "HudLabel", p.hud_outline)
-	theme.set_constant("outline_size", "HudLabel", 6)
+	theme.set_constant("outline_size", "HudLabel", 5)
 
 
 func _panels() -> void:

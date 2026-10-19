@@ -32,6 +32,7 @@ var _layer := CanvasLayer.new()
 var _panel := PanelContainer.new()
 var _text := Label.new()
 var _dirty := true
+var _label_font := CosyTheme.bold_font()
 
 
 func _ready() -> void:
@@ -49,11 +50,6 @@ func _ready() -> void:
 	_panel.offset_right = -12.0
 	_panel.offset_top = 12.0
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.09, 0.12, 0.82)
-	style.set_corner_radius_all(6)
-	style.set_content_margin_all(10)
-	_panel.add_theme_stylebox_override("panel", style)
 	_text.add_theme_font_size_override("font_size", 14)
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_panel.add_child(_text)
@@ -256,6 +252,8 @@ func _draw_rooms() -> void:
 		label.font_size = 40
 		label.pixel_size = 0.008
 		label.outline_size = 8
+		label.font = _label_font
+		label.outline_modulate = CosyTheme.WORLD_OUTLINE
 		label.modulate = Color.WHITE
 		label.text = "Room %d: %s" % [room.id, "indoors" if room.indoor
 				else ("outdoors, enclosed" if room.enclosed else "not enclosed")]

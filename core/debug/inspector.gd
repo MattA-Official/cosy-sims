@@ -47,12 +47,6 @@ func _ready() -> void:
 	_panel.offset_left = 12.0
 	_panel.offset_top = 120.0
 	_panel.custom_minimum_size = Vector2(330, 0)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.09, 0.12, 0.88)
-	style.set_corner_radius_all(6)
-	style.set_content_margin_all(10)
-	_panel.add_theme_stylebox_override("panel", style)
-	_box.add_theme_constant_override("separation", 6)
 	_panel.add_child(_box)
 	_layer.add_child(_panel)
 	if cursor != null:
@@ -312,14 +306,15 @@ func _draw_person(person: Person) -> void:
 
 func _heading(text: String) -> void:
 	var label := _text(text)
-	label.add_theme_font_size_override("font_size", 17)
+	label.theme_type_variation = &"HeaderLabel"
+	label.remove_theme_font_size_override("font_size")
 
 
 func _text(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_font_size_override("font_size", 15)
 	_box.add_child(label)
 	return label
 
