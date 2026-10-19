@@ -8,11 +8,11 @@ school and a museum.
 
 ![Step 1: the grid and camera](docs/images/step1.png)
 
-All art is placeholder for now. Built with [Godot 4.5](https://godotengine.org/).
+All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/).
 
 ## Getting started
 
-1. Install Godot 4.5 (the standard build, not .NET).
+1. Install Godot 4.7 (the standard build, not .NET).
 2. Open Godot, choose **Import**, and pick this folder's `project.godot`.
 3. Press **F5** to run. You should see a grassy grid you can fly around.
 
