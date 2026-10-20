@@ -65,6 +65,8 @@ var intake := Intake.new()
 var office := Office.new()
 ## The grade, grant goals and the daily report.
 var standing := Standing.new()
+## Ctrl+Z and Ctrl+Y for building and landscaping.
+var undo := UndoHistory.new()
 ## Open jobs and stock, with the debug view.
 var jobs_panel := JobsPanel.new()
 ## Game time. Everything that happens over time listens to it.
@@ -345,6 +347,14 @@ func _ready() -> void:
 	intake.arrived.connect(func(came: Array[Person]) -> void:
 		Toasts.post("The bus is here", "%d new %s on the way to reception." % [came.size(),
 				"prisoner is" if came.size() == 1 else "prisoners are"]))
+	undo.name = "Undo"
+	undo.capture = capture_world
+	undo.restore = func(state: Dictionary) -> void:
+		build_costs.refund_all = true
+		restore_world(state)
+		build_costs.refund_all = false
+	add_child(undo)
+	undo.start([building.changed, terrain.changed, water.changed, foliage.changed, paths.changed] as Array[Signal])
 	jobs_panel.name = "JobsPanel"
 	jobs_panel.debug_overlay = debug_overlay
 	jobs_panel.jobs = jobs
@@ -563,6 +573,29 @@ func _process(_delta: float) -> void:
 	var count := "%d people" % people.people.size()
 	if status.item_text(&"people") != count:
 		status.set_item(&"people", count, &"SubtleLabel")
+
+
+## The build and the land as plain data, for undo and saving.
+func capture_world() -> Dictionary:
+	return {
+		"building": building.to_data(),
+		"terrain": terrain.to_data(),
+		"water": water.to_data(),
+		"foliage": foliage.to_data(),
+		"paths": paths.to_data(),
+	}
+
+
+func restore_world(state: Dictionary) -> void:
+	terrain.load_data(state.get("terrain", {}))
+	water.load_data(state.get("water", {}))
+	foliage.load_data(state.get("foliage", {}), func(id: StringName) -> FoliageDef:
+		for def in PrisonCatalogue.PLANTS:
+			if def.id == id:
+				return def
+		return null)
+	paths.load_data(state.get("paths", {}))
+	building.load_data(state.get("building", {}), PrisonCatalogue.object)
 
 
 ## A typical floor height for a level, for picking: the middle of the land

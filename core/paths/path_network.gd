@@ -43,6 +43,33 @@ var _next_node := 1
 var _next_segment := 1
 
 
+## Every node and segment, for saving and undo.
+func to_data() -> Dictionary:
+	var out: Array = []
+	for segment: Segment in segments.values():
+		out.append([segment.id, segment.a, segment.b, segment.control, segment.style, segment.built])
+	return {"nodes": nodes.duplicate(), "heights": heights.duplicate(), "segments": out,
+			"next_node": _next_node, "next_segment": _next_segment}
+
+
+func load_data(data: Dictionary) -> void:
+	nodes.assign(data.get("nodes", {}))
+	heights.assign(data.get("heights", {}))
+	segments.clear()
+	for entry: Array in data.get("segments", []):
+		var segment := Segment.new()
+		segment.id = entry[0]
+		segment.a = entry[1]
+		segment.b = entry[2]
+		segment.control = entry[3]
+		segment.style = entry[4]
+		segment.built = entry[5]
+		segments[segment.id] = segment
+	_next_node = data.get("next_node", 1)
+	_next_segment = data.get("next_segment", 1)
+	changed.emit()
+
+
 func node_position(node: int) -> Vector2:
 	return nodes[node]
 

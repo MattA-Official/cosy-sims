@@ -1016,6 +1016,101 @@ func _mark_cells(marks: Dictionary[Vector2i, StringName], room: Room, value: Str
 
 #endregion
 
+#region Saving
+
+## Everything on this level as plain data (no objects or resources), for
+## saving and undo. Objects are stored by their def's id.
+func to_data() -> Dictionary:
+	var placed: Array = []
+	for item: PlacedObject in objects.values():
+		placed.append([item.id, item.def.id, item.angle, item.centre])
+	var ramp_list: Array = []
+	for ramp in ramps:
+		ramp_list.append([ramp.rect, ramp.rise, ramp.low, ramp.high])
+	var flights: Array = []
+	for flight: Staircase in stairs.values():
+		flights.append([flight.id, flight.cells.duplicate(), flight.landings.duplicate(), flight.rounded,
+				flight.style])
+	return {
+		"land": land.duplicate(),
+		"floors": floors.duplicate(),
+		"floor_heights": floor_heights.duplicate(),
+		"walls": walls.duplicate(),
+		"wall_styles": wall_styles.duplicate(),
+		"window_kinds": window_kinds.duplicate(),
+		"slants": slants.duplicate(),
+		"slant_styles": slant_styles.duplicate(),
+		"slant_window_kinds": slant_window_kinds.duplicate(),
+		"wall_paints": wall_paints.duplicate(true),
+		"slant_paints": slant_paints.duplicate(true),
+		"piece_styles": piece_styles.duplicate(true),
+		"objects": placed,
+		"ramps": ramp_list,
+		"stairs": flights,
+		"holes": holes.duplicate(),
+		"room_types": _room_types.duplicate(),
+		"room_zones": _room_zones.duplicate(),
+		"door_kinds": door_kinds.duplicate(),
+		"next_object_id": _next_object_id,
+		"next_stairs_id": _next_stairs_id,
+	}
+
+
+## Puts this level back as to_data() left it. `find_object` turns a def id
+## into its ObjectDef; objects whose def is gone are left out.
+func load_data(data: Dictionary, find_object: Callable) -> void:
+	land.assign(data.get("land", land))
+	floors.assign(data.get("floors", {}))
+	floor_heights.assign(data.get("floor_heights", {}))
+	walls.assign(data.get("walls", {}))
+	wall_styles.assign(data.get("wall_styles", {}))
+	window_kinds.assign(data.get("window_kinds", {}))
+	slants.assign(data.get("slants", {}))
+	slant_styles.assign(data.get("slant_styles", {}))
+	slant_window_kinds.assign(data.get("slant_window_kinds", {}))
+	wall_paints.assign(data.get("wall_paints", {}).duplicate(true))
+	slant_paints.assign(data.get("slant_paints", {}).duplicate(true))
+	piece_styles.assign(data.get("piece_styles", {}).duplicate(true))
+	objects.clear()
+	for entry: Array in data.get("objects", []):
+		var def: ObjectDef = find_object.call(entry[1])
+		if def == null:
+			continue
+		var item := PlacedObject.new()
+		item.id = entry[0]
+		item.def = def
+		item.angle = entry[2]
+		item.rotation = posmod(roundi(item.angle / (PI * 0.5)), 4)
+		item.centre = entry[3]
+		item.rect = polygon_bounds(object_polygon(def, item.centre, item.angle))
+		objects[item.id] = item
+	ramps.clear()
+	for entry: Array in data.get("ramps", []):
+		var ramp := Ramp.new()
+		ramp.rect = entry[0]
+		ramp.rise = entry[1]
+		ramp.low = entry[2]
+		ramp.high = entry[3]
+		ramps.append(ramp)
+	stairs.clear()
+	for entry: Array in data.get("stairs", []):
+		var flight := Staircase.new()
+		flight.id = entry[0]
+		flight.cells.assign(entry[1])
+		flight.landings.assign(entry[2])
+		flight.rounded = entry[3]
+		flight.style = entry[4]
+		stairs[flight.id] = flight
+	holes.assign(data.get("holes", {}))
+	_room_types.assign(data.get("room_types", {}))
+	_room_zones.assign(data.get("room_zones", {}))
+	door_kinds.assign(data.get("door_kinds", {}))
+	_next_object_id = data.get("next_object_id", 1)
+	_next_stairs_id = data.get("next_stairs_id", 1)
+	_changed()
+
+#endregion
+
 #region Compound actions
 
 ## Floor plus walls all round, like the room tool in Software Inc.

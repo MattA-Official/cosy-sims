@@ -141,7 +141,7 @@ func _ready() -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if key == null or not key.pressed or key.echo:
+	if key == null or not key.pressed or key.echo or key.ctrl_pressed or key.meta_pressed:
 		return
 	var index := 9 if key.physical_keycode == KEY_0 else key.physical_keycode - KEY_1
 	if key.physical_keycode == KEY_Z:

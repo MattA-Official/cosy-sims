@@ -291,6 +291,18 @@ func _build_sea() -> void:
 	_sea.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+## The ground's heights, for saving and undo.
+func to_data() -> Dictionary:
+	return {"heights": _heights.duplicate()}
+
+
+func load_data(data: Dictionary) -> void:
+	var heights: PackedFloat32Array = data.get("heights", PackedFloat32Array())
+	if heights.size() == _heights.size():
+		_heights = heights.duplicate()
+		_changed(_whole())
+
+
 func _changed(area: Rect2i) -> void:
 	last_changed = area
 	queue_rebuild()

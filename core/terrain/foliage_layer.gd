@@ -118,6 +118,32 @@ func _bucket(position: Vector2) -> Array:
 	return _buckets[key]
 
 
+## Every plant, for saving and undo, with its kind by id.
+func to_data() -> Dictionary:
+	var out: Array = []
+	for plant in plants:
+		out.append([plant.def.id, plant.position, plant.scale, plant.rotation])
+	return {"plants": out}
+
+
+## Puts the plants back. `find_def` turns an id into its FoliageDef.
+func load_data(data: Dictionary, find_def: Callable) -> void:
+	plants.clear()
+	_buckets.clear()
+	for entry: Array in data.get("plants", []):
+		var def: FoliageDef = find_def.call(entry[0])
+		if def == null:
+			continue
+		var plant := Plant.new()
+		plant.def = def
+		plant.position = entry[1]
+		plant.scale = entry[2]
+		plant.rotation = entry[3]
+		plants.append(plant)
+		_bucket(plant.position).append(plant)
+	_changed()
+
+
 func _changed() -> void:
 	queue_rebuild()
 	changed.emit()

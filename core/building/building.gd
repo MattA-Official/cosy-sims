@@ -207,6 +207,29 @@ func _lift_above(n: int, lift: BuildingMap.PlacedObject) -> BuildingMap.PlacedOb
 	return null
 
 
+## Every level as plain data, for saving and undo.
+func to_data() -> Dictionary:
+	var out := {}
+	for n: int in levels:
+		out[n] = levels[n].to_data()
+	return {"land": land.duplicate(), "levels": out}
+
+
+## Puts every level back as to_data() left them. Levels not in the data
+## are emptied.
+func load_data(data: Dictionary, find_object: Callable) -> void:
+	land.assign(data.get("land", land))
+	var saved: Dictionary = data.get("levels", {})
+	_syncing = true
+	for n: int in saved:
+		level(n).load_data(saved[n], find_object)
+	for n: int in levels:
+		if not saved.has(n):
+			levels[n].load_data({"land": land.duplicate()}, find_object)
+	_syncing = false
+	changed.emit()
+
+
 func _on_level_changed() -> void:
 	if not _syncing:
 		_sync_holes()

@@ -196,6 +196,26 @@ func _is_flat(cell: Vector2i) -> bool:
 			and is_equal_approx(h, terrain.corner_height(cell + Vector2i.ONE))
 
 
+## Every body of water, for saving and undo.
+func to_data() -> Dictionary:
+	var out: Array = []
+	for body in bodies:
+		out.append([body.seed, body.level, body.cells.duplicate()])
+	return {"bodies": out}
+
+
+func load_data(data: Dictionary) -> void:
+	bodies.clear()
+	for entry: Array in data.get("bodies", []):
+		var body := Body.new()
+		body.seed = entry[0]
+		body.level = entry[1]
+		body.cells.assign(entry[2])
+		bodies.append(body)
+	_rebuild_lookup()
+	_changed()
+
+
 func _changed() -> void:
 	queue_rebuild()
 	changed.emit()

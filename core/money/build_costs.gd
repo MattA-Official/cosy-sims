@@ -19,6 +19,9 @@ var ledger: Ledger
 var door_kinds: Dictionary[StringName, DoorKindDef] = {}
 ## The line building costs go under.
 var line := "Building"
+## Gives everything back in full rather than REFUND of it, while set: for
+## undo.
+var refund_all := false
 
 var _worth := 0
 
@@ -80,4 +83,4 @@ func _on_changed() -> void:
 	if change > 0:
 		ledger.add(-change, line)
 	elif change < 0:
-		ledger.add(roundi(-change * REFUND), line)
+		ledger.add(roundi(-change * (1.0 if refund_all else REFUND)), line)

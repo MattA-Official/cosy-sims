@@ -52,6 +52,7 @@ func _process(_delta: float) -> bool:
 	_test_money()
 	_test_intake()
 	_test_standing()
+	_test_undo()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1170,6 +1171,35 @@ func _test_standing() -> void:
 	_check(main.intake.max_limit == 2 + standing.grade * 2, "the grade sets the biggest intake")
 	var report := standing.write_report()
 	_check(report.contains("★") and report.contains("Money:"), "and the morning report sums up yesterday")
+	main.queue_free()
+
+
+func _test_undo() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var undo: UndoHistory = main.undo
+	var ledger: Ledger = main.ledger
+	var map: BuildingMap = main.building.ground()
+	_check(not undo.can_undo(), "nothing to undo in a new prison")
+	var before := ledger.balance
+	var walls := map.walls.size()
+	var rect := Rect2i(map.land_bounds().position + Vector2i(1, 1), Vector2i(3, 3))
+	map.build_room(rect)
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(rect.position) + Vector2(1, 1), 0)
+	undo._flush()
+	_check(undo.can_undo() and ledger.balance < before, "building can be undone")
+	undo.undo()
+	_check(map.walls.size() == walls and map.object_at(Vector2(rect.position) + Vector2(1.5, 1.5)) == null,
+			"undo takes the room and the bed away in one step")
+	_check(ledger.balance == before, "and gives all the money back")
+	undo.redo()
+	_check(map.walls.size() == walls + 12 and map.object_at(Vector2(rect.position) + Vector2(1.5, 1.5)) != null,
+			"redo puts them back")
+	main.terrain.set_corners({Vector2i(2, 2): 3.0})
+	undo._flush()
+	undo.undo()
+	_check(not is_equal_approx(main.terrain.corner_height(Vector2i(2, 2)), 3.0), "the land can be undone too")
 	main.queue_free()
 
 
