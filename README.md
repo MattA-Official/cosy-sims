@@ -331,6 +331,14 @@ sits at a guard post nearby, like a security gate; a **Vehicle gate** lets
 staff through but never prisoners. Any gate counts as shut for working out
 what's secure.
 
+**Escapes.** Once there's a perimeter, ground outside it is out of bounds:
+a prisoner there is out of place and gets walked back. A prisoner out of
+place who can walk to the edge of your land without crossing the perimeter
+may make a run for it ("Legging it!"), likelier when unhappy. The nearest
+two guards give chase, a little faster than a prisoner runs. Caught, it's
+an escape attempt on their record and a day in the quiet room; reach the
+edge and they're gone, with a £2,000 fine.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one

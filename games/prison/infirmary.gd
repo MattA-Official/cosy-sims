@@ -115,7 +115,8 @@ func _patient(person: Person, _may_wander: bool) -> bool:
 		person.activity = "Getting better in the infirmary"
 		return true
 	var injury := Health.injury(person.health)
-	if beds.has(person):
+	# The knocked out wait to be carried.
+	if beds.has(person) and injury != Health.Injury.KNOCKED_OUT:
 		var key := beds[person]
 		var placed: BuildingMap.PlacedObject = people.building.object_at(key)
 		if placed == null:

@@ -83,6 +83,8 @@ var wear := Wear.new()
 var misconduct := Misconduct.new()
 ## Ground inside the perimeter fence.
 var secure_area := SecureArea.new()
+## Prisoners making a run for it.
+var escapes := Escapes.new()
 ## What happens after an offence.
 var consequences := Consequences.new()
 ## Fights, and mending afterwards.
@@ -435,6 +437,20 @@ func _ready() -> void:
 	inspector.person_actions.append(["Let them off", "Gives back lost privileges and lets them out of the quiet room.",
 			consequences.let_off,
 			func(person: Person) -> bool: return not person.restrictions.is_empty() or person.quiet_room_hours > 0.0])
+	escapes.name = "Escapes"
+	escapes.people = people
+	escapes.jobs = jobs
+	escapes.secure_area = secure_area
+	escapes.ledger = ledger
+	escapes.clock = clock
+	add_child(escapes)
+	escapes.start()
+	escapes.running.connect(func(person: Person) -> void:
+		Toasts.post("Escape!", "%s is making a run for it. The nearest guards are giving chase." % person.name))
+	escapes.caught.connect(func(person: Person, by: Person) -> void:
+		Toasts.post("Caught", "%s caught %s." % [by.name, person.name]))
+	escapes.got_away.connect(func(person: Person) -> void:
+		Toasts.post("Got away", "%s escaped. The prison is fined %s." % [person.name, Ledger.text(Escapes.FINE)]))
 	contraband.name = "Contraband"
 	contraband.people = people
 	contraband.items = items

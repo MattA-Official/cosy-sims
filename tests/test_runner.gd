@@ -62,6 +62,7 @@ func _process(_delta: float) -> bool:
 	_test_fights()
 	_test_consequences()
 	_test_perimeter()
+	_test_escapes()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3198,4 +3199,64 @@ func _test_perimeter() -> void:
 	_check(secure.is_secure(inner.get_center()), "a gate in it counts as shut")
 	var people: People = main.people
 	_check(not people.access.door_kinds[&"vehicle_gate"].lets_through(&"prisoner"), "prisoners can't use the vehicle gate")
+	main.queue_free()
+
+
+func _test_escapes() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var escapes: Escapes = main.escapes
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	(main.searching as Searching).random_per_day = 0
+	var minutes := 0
+	while not people.people.any(func(p: Person) -> bool: return p.role == &"guard") and minutes < 240:
+		clock.advance(1.0)
+		minutes += 1
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	_check(not escapes.possible(), "nobody walks off before there's a perimeter")
+	var map: BuildingMap = main.building.ground()
+	var land := map.land_bounds()
+	var fence := BuildingMap.rect_perimeter(land.grow(-6))
+	map.build_walls(fence, &"perimeter_fence")
+	_check(escapes.possible(), "with a perimeter, a gap would let them")
+	# Outside the fence is out of bounds.
+	var a: Person = prisoners[0]
+	people.stop(a)
+	a.level = 0
+	a.position = Vector3(land.position.x + 2.5, a.position.y, land.get_center().y + 0.5)
+	clock.advance(1.0)
+	_check(a.out_of_place, "outside the perimeter is out of bounds")
+	# Near the edge they get away.
+	var fined := (main.ledger as Ledger).balance
+	_check(escapes.run(a), "someone outside can make a run for it")
+	minutes = 0
+	while people.people.has(a) and minutes < 30:
+		clock.advance(1.0)
+		minutes += 1
+	_check(not people.people.has(a) and escapes.at_large.size() == 1, "and gets away")
+	_check((main.ledger as Ledger).balance < fined, "which costs a fine")
+	# With a guard on their heels they're caught.
+	var b: Person = prisoners[1]
+	var guard: Person = people.people.filter(func(p: Person) -> bool: return p.role == &"guard")[0]
+	people.stop(b)
+	b.level = 0
+	b.position = Vector3(land.position.x + 3.5, b.position.y, land.position.y + 3.5)
+	people.stop(guard)
+	guard.level = 0
+	guard.position = b.position + Vector3(0.5, 0.0, 0.0)
+	people._buckets_fresh = false
+	var caught := []
+	escapes.caught.connect(func(p: Person, _by: Person) -> void: caught.append(p))
+	escapes.run(b)
+	minutes = 0
+	while caught.is_empty() and people.people.has(b) and minutes < 30:
+		clock.advance(1.0)
+		minutes += 1
+	_check(caught.has(b) and b.record.any(func(e: Array) -> bool: return e[1] == &"escape"),
+			"a guard close behind catches them, and it goes on their record")
+	clock.advance(1.0)
+	_check(b.quiet_room_hours > 0.0 or b.restrictions.size() >= 2, "with a consequence")
 	main.queue_free()
