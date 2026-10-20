@@ -1100,6 +1100,17 @@ func object_at(point: Vector2) -> PlacedObject:
 	return null
 
 
+## A tile in a room with no furniture over its middle, so someone sent
+## there stands inside the room; the middle tile if every one is covered.
+func clear_cell(room: Room) -> Vector2i:
+	var in_room := objects_in_room(room).filter(func(placed: PlacedObject) -> bool: return placed.def.blocks)
+	for cell in room.cells:
+		var middle := Vector2(cell) + Vector2(0.5, 0.5)
+		if not in_room.any(func(placed: PlacedObject) -> bool: return placed.rect.has_point(middle)):
+			return cell
+	return room.cells[room.cells.size() / 2]
+
+
 func objects_in_room(room: Room) -> Array[PlacedObject]:
 	var out: Array[PlacedObject] = []
 	for placed: PlacedObject in objects.values():

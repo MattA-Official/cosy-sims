@@ -21,6 +21,10 @@ const LAST_HOUR := 19
 
 ## Something was found: who it belonged to (or null) and where, in words.
 signal found(owner: Person, item: ItemDef, where: String)
+signal shakedown_started(cells: int)
+
+## Temper everyone in a shaken-down cell gains.
+const SHAKEDOWN_TEMPER := 10.0
 
 var people: People
 var jobs: JobBoard
@@ -31,6 +35,9 @@ var searched_moodlet: StringName = &"searched"
 var random_per_day := 2
 ## Today's tally, for the daily report and the Security window.
 var searches_today := 0
+## Every cell is searched at the next Lockup.
+var shakedown_tonight := false
+var lockup_block: StringName = &"lockup"
 var found_today: Array[String] = []
 var clock: GameClock:
 	set(value):
@@ -49,6 +56,28 @@ func start() -> void:
 	jobs.rebuilders[&"search"] = rebuild
 
 
+## Searches every prisoner's cell, guards taking them in turn, and puts
+## everyone who sleeps in one out. Returns how many cells.
+func shakedown() -> int:
+	shakedown_tonight = false
+	var homes: Array = []
+	for person in people.people:
+		var home := people.home_room(person) if person.group == prisoner_group else []
+		if home.is_empty():
+			continue
+		person.temper = minf(100.0, person.temper + SHAKEDOWN_TEMPER)
+		if not homes.any(func(h: Array) -> bool: return h[1] == home[1]):
+			homes.append(home)
+	var posted := 0
+	for home: Array in homes:
+		var job := search_cell(home[0], home[1])
+		if job != null:
+			job.priority = 4
+			posted += 1
+	shakedown_started.emit(posted)
+	return posted
+
+
 ## Has a guard search the room someone sleeps in. Returns the job, or null
 ## if there's already one.
 func search_cell(level: int, room: Room) -> Job:
@@ -64,7 +93,8 @@ func _cell_job(level: int, room: Room) -> Job:
 	job.title = "Search %s" % _room_words(level, room)
 	job.priority = 3
 	job.set_meta(&"room", room)
-	var tile := room.cells[room.cells.size() / 2]
+	var map: BuildingMap = people.building.levels.get(level)
+	var tile := map.clear_cell(room) if map != null else room.cells[room.cells.size() / 2]
 	var look := Job.on_tile(Job.Do.WORK, level, tile)
 	look.minutes = CELL_MINUTES
 	look.doing = "Searching"
@@ -131,6 +161,9 @@ func _tick() -> void:
 	for person: Person in _held.keys():
 		if not people.people.has(person) or not jobs.jobs.has(_held[person]):
 			_release(person)
+	if shakedown_tonight and people.people.any(func(p: Person) -> bool:
+			return p.group == prisoner_group and p.block != null and p.block.id == lockup_block):
+		shakedown()
 	if random_per_day <= 0 or clock == null:
 		return
 	var minute := clock.minute_of_day()

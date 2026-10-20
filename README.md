@@ -305,6 +305,17 @@ found less often, messy cells more). Guards also search two random cells a
 day. Anything found is taken away and goes on the owner's record, and
 being searched puts people out (tidy prisoners most).
 
+**Tools, trading and metal detectors.** Kitchens and workshops count their
+tools at each shift change (06:00 and 18:00): a rolling pin or screwdriver
+taken since raises a "missing" alert. Biscuits are money: in free time or
+the yard a prisoner spoiling for trouble (fuming, or a hothead) may buy a
+weapon from someone in the same room, out of sight of staff, at its
+biscuit price. A **Metal detector** (Doors, with the gates) is an open
+doorway that beeps at a prisoner carrying a spoon, frying pan or
+screwdriver, and a guard comes to search them. **Shakedown tonight** in
+the Security window has guards search every cell at the next Lockup,
+finding stashes but putting everyone in a temper.
+
 **Fights.** Below mood 15 a prisoner may square up ("Spoiling for a
 fight!") and then pick on the unhappiest prisoner within 3 tiles. A dust
 cloud with stars and bonks appears; everyone in it lands a blow each
@@ -321,7 +332,10 @@ cabinet) and hire a **Nurse** in the staff window. The hurt limp to a free
 bed and lie down; a guard or the nurse carries the knocked out there. In
 bed they mend slowly, and a nurse's visit mends them quickly; they get up
 at 90. Without an infirmary the hurt mend slowly as they go and the knocked
-out come round after an hour. Nobody dies.
+out come round after an hour. Nobody dies, unless you tick **Deaths
+(rare)** in the Security window: then someone knocked out and left lying,
+or beaten right down, can die. A little ghost floats up, a plaque marks
+the spot, and it counts 20 against Safety.
 
 **Consequences.** Each offence scores points (grumbling 0, mischief 1,
 contraband or vandalism 2, a fight 3) that fade by one a day. The first

@@ -228,16 +228,6 @@ func _quiet_room_spot(person: Person) -> Array:
 				return other != person and other.quiet_room_hours > 0.0 and other.level == level \
 						and map.room_at_point(other.flat()) == room)
 			if not taken:
-				return [level, _clear_cell(map, room)]
+				return [level, map.clear_cell(room)]
 	return []
 
-
-## A tile in a room with no furniture over its middle, so whoever walks
-## there stands inside the room.
-static func _clear_cell(map: BuildingMap, room: Room) -> Vector2i:
-	for cell in room.cells:
-		var middle := Vector2(cell) + Vector2(0.5, 0.5)
-		if not map.objects.values().any(func(placed: BuildingMap.PlacedObject) -> bool:
-				return placed.def.blocks and placed.rect.has_point(middle)):
-			return cell
-	return room.cells[room.cells.size() / 2]

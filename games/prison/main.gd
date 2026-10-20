@@ -511,11 +511,8 @@ func _ready() -> void:
 	sit_ins.started.connect(func(sit_in: SitIns.SitIn) -> void:
 		var words := SitIns.words(sit_in, room_name.call(sit_in))
 		Toasts.post("Sit-in!", "%s. To end it, %s, or send someone to talk them round (Security window, K)." % [words, sit_in.hint])
-		security.count(&"sit_in", null, words)
-		if not security.alerts.is_empty():
-			var point := sit_in.room.centre()
-			security.alerts[0][3] = sit_in.level
-			security.alerts[0][4] = point)
+		security.count(&"sit_in", null, "", true)
+		security.alert_at(words, sit_in.level, sit_in.room.centre()))
 	sit_ins.ended.connect(func(sit_in: SitIns.SitIn, how: String) -> void:
 		var endings := {"fixed": "They've stood up: whatever it was is sorted.",
 				"talked": "They've been talked round and gone back to the timetable.",
@@ -532,6 +529,26 @@ func _ready() -> void:
 				if sit_in != null:
 					sit_ins.negotiate(sit_in),
 			func(person: Person) -> bool: return person.sitting])
+	contraband.tool_missing.connect(func(level: int, room: Room, def: ItemDef) -> void:
+		var type := people.room_type(room.type)
+		var words := "A %s is missing from the %s" % [def.display_name.to_lower(),
+				type.display_name.to_lower() if type != null else "room"]
+		security.count(&"missing_tool", null, "", true)
+		security.alert_at(words, level, room.centre())
+		Toasts.post("Tool missing", words + ". A search might turn it up."))
+	contraband.detected.connect(func(person: Person, def: ItemDef) -> void:
+		security.count(&"metal_detector", person, "Set off the metal detector")
+		searching.search_person(person))
+	searching.shakedown_started.connect(func(cells: int) -> void:
+		Toasts.post("Shakedown", "Guards are turning over %d cells. Nobody's happy about it." % cells))
+	infirmary.died.connect(func(person: Person, level: int, point: Vector2) -> void:
+		security.count(&"death", null, "", true)
+		security.alert_at("%s died" % person.name, level, point)
+		Toasts.post("A death", "%s didn't make it. A plaque marks the spot." % person.name)
+		_ghost(level, point)
+		var map: BuildingMap = building.levels.get(level)
+		if map != null:
+			map.place_object_at(PrisonCatalogue.object(&"memorial_plaque"), point, 0.0))
 	coverage_tint.name = "CoverageTint"
 	coverage_tint.cell_size = grid.cell_size
 	coverage_tint.coverage = security.coverage
@@ -735,6 +752,7 @@ func _add_hud() -> void:
 	security_window.escapes = escapes
 	security_window.coverage_tint = coverage_tint
 	security_window.sit_ins = sit_ins
+	security_window.infirmary = infirmary
 	security_window.prisoners = func() -> int:
 		return people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size()
 	security_window.look_pressed.connect(func(level: int, point: Vector2) -> void:
@@ -783,6 +801,26 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("security_toggle"):
 		security_window.toggle()
 		get_viewport().set_input_as_handled()
+
+
+## A little ghost that floats up and fades where someone died.
+func _ghost(level: int, point: Vector2) -> void:
+	var ghost := Label3D.new()
+	ghost.text = "~ o o ~"
+	ghost.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	ghost.font_size = 64
+	ghost.outline_size = 12
+	ghost.pixel_size = 0.006
+	ghost.modulate = Color(1, 1, 1, 0.9)
+	ghost.outline_modulate = Color(0.55, 0.6, 0.75)
+	var at := Vector3(point.x * grid.cell_size, people.nav().height_at(level, point) + 0.6, point.y * grid.cell_size)
+	ghost.position = at
+	grid.add_child(ghost)
+	var tween := ghost.create_tween()
+	tween.set_parallel()
+	tween.tween_property(ghost, "position", at + Vector3.UP * 2.5, 6.0)
+	tween.tween_property(ghost, "modulate:a", 0.0, 6.0)
+	tween.chain().tween_callback(ghost.queue_free)
 
 
 func _add_level_view(level: int, level_map: BuildingMap) -> void:

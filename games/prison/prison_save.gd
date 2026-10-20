@@ -80,12 +80,16 @@ static func capture(main: Node) -> Dictionary:
 			return {"level": sit_in.level, "cell": sit_in.room.cells[0], "cause": sit_in.cause,
 					"demand": sit_in.demand, "hint": sit_in.hint, "minutes": sit_in.minutes, "talked": sit_in.talked,
 					"members": sit_in.members.map(func(p: Person) -> int: return p.id)}),
+		"missing_tools": (main.contraband as Contraband).missing.map(func(entry: Array) -> Array:
+			return [entry[0], (entry[1] as Room).cells[0], (entry[2] as ItemDef).id]),
 		"security": {"today": (main.security as Security).today.duplicate(),
 				"yesterday": (main.security as Security).yesterday.duplicate(),
 				"alerts": (main.security as Security).alerts.duplicate(true)},
 		"policies": {"privilege_days": (main.consequences as Consequences).privilege_days,
 				"quiet_room": (main.consequences as Consequences).quiet_room_on},
+		"deaths": (main.infirmary as Infirmary).deaths,
 		"searching": {"policy": (main.searching as Searching).random_per_day,
+				"shakedown": (main.searching as Searching).shakedown_tonight,
 				"today": (main.searching as Searching).searches_today,
 				"found": (main.searching as Searching).found_today.duplicate()},
 		"timetable": hours,
@@ -217,6 +221,12 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	items.hidden.assign(_items_in(data.get("items_hidden", {})))
 	items.stash_owner.assign(data.get("stash_owner", {}))
 	(main.escapes as Escapes).at_large.assign(data.get("at_large", []))
+	for entry: Array in data.get("missing_tools", []):
+		var tool_map: BuildingMap = (main.building as Building).levels.get(entry[0])
+		var tool_room := tool_map.room_at(entry[1]) if tool_map != null else null
+		var tool := (main.contraband as Contraband).item(entry[2])
+		if tool_room != null and tool != null:
+			(main.contraband as Contraband).missing.append([entry[0], tool_room, tool])
 	var security_data: Dictionary = data.get("security", {})
 	(main.security as Security).today.assign(security_data.get("today", {}))
 	(main.security as Security).yesterday.assign(security_data.get("yesterday", {}))
@@ -226,6 +236,8 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	(main.consequences as Consequences).quiet_room_on = policies.get("quiet_room", true)
 	var searching: Dictionary = data.get("searching", {})
 	(main.searching as Searching).random_per_day = searching.get("policy", 2)
+	(main.searching as Searching).shakedown_tonight = searching.get("shakedown", false)
+	(main.infirmary as Infirmary).deaths = data.get("deaths", false)
 	(main.searching as Searching).searches_today = searching.get("today", 0)
 	(main.searching as Searching).found_today.assign(searching.get("found", []))
 	items.changed.emit()

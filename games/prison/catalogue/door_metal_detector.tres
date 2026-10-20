@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="DoorKindDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/door_kind_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/opening_metal_detector.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"metal_detector"
+display_name = "Metal detector"
+description = "An open doorway that beeps at a prisoner carrying something metal, and a guard comes to search them."
+groups = Array[StringName]([&"prisoner", &"staff", &"visitor"])
+colour = Color(0.55, 0.6, 0.68, 1)
+icon = ExtResource("2_icon")
+price = 600
+detects_metal = true

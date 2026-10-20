@@ -67,6 +67,8 @@ func _process(_delta: float) -> bool:
 	_test_sit_ins()
 	_test_category_timetables()
 	_test_category_zones()
+	_test_trading_and_tools()
+	_test_shakedown_and_deaths()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3471,4 +3473,109 @@ func _test_category_zones() -> void:
 		return not home.is_empty() and home[1].cells.has(wing.cells[0])
 	_check(in_wing.call(high), "high security prisoners get their beds in it")
 	_check(not prisoners.slice(1).any(in_wing), "and nobody else does")
+	main.queue_free()
+
+
+func _test_trading_and_tools() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var contraband: Contraband = main.contraband
+	var security: Security = main.security
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	(main.searching as Searching).random_per_day = 0
+	var map: BuildingMap = main.building.ground()
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	# A rolling pin taken from the kitchen is missed at the shift change.
+	var cooker: BuildingMap.PlacedObject = main.building.object_at(main.building.objects_tagged(
+			Array([&"cooker"], TYPE_STRING_NAME, &"", null))[0])
+	var a: Person = prisoners[0]
+	a.pocket.clear()
+	var pin := contraband.pocket_from(a, cooker)
+	_check(pin != null and contraband.missing.size() == 1, "a tool taken from the kitchen goes missing")
+	var missed := []
+	contraband.tool_missing.connect(func(_l: int, _r: Room, def: ItemDef) -> void: missed.append(def))
+	contraband.count_tools()
+	_check(missed == [pin] and security.alerts[0][2].contains("missing from the kitchen"),
+			"and the shift change count raises an alert")
+	# Biscuits buy a weapon.
+	var buyer: Person = prisoners[1]
+	var seller: Person = prisoners[2]
+	for p: Person in [buyer, seller]:
+		people.stop(p)
+		p.pocket.clear()
+		p.traits.clear()
+	seller.pocket.append(contraband.item(&"rolling_pin"))
+	for i in 6:
+		buyer.pocket.append(contraband.item(&"biscuit"))
+	buyer.temper = 80.0
+	var bought := contraband.try_trade(buyer, seller)
+	_check(bought != null and bought.id == &"rolling_pin" and buyer.pocket.has(bought), "a fuming prisoner buys a rolling pin")
+	_check(not buyer.pocket.any(func(d: ItemDef) -> bool: return d.id == &"biscuit")
+			and seller.pocket.size() == 6, "for six biscuits")
+	_check(contraband.try_trade(buyer, seller) == null, "and can't buy without biscuits")
+	# A metal detector beeps at a spoon.
+	var edge := Vector3i.ZERO
+	for room in map.rooms():
+		if room.type == &"canteen":
+			edge = ScheduleRunner.room_doors(map, room)[0]
+	map.set_door(edge, true, &"metal_detector")
+	var c: Person = prisoners[3]
+	people.stop(c)
+	c.pocket = [contraband.item(&"spoon")]
+	var cells := BuildingMap.edge_cells(edge)
+	var middle := (Vector2(cells[0]) + Vector2(cells[1])) * 0.5 + Vector2(0.5, 0.5)
+	c.level = 0
+	c.position = Vector3(middle.x, c.position.y, middle.y)
+	var beeped := []
+	contraband.detected.connect(func(p: Person, _d: ItemDef) -> void: beeped.append(p))
+	contraband.check_detectors()
+	_check(beeped == [c], "a metal detector beeps at someone with a spoon")
+	_check((main.jobs as JobBoard).of_kind(&"search").any(func(j: Job) -> bool:
+			return j.has_meta(&"prisoner") and j.get_meta(&"prisoner") == c), "and a guard is sent to search them")
+	contraband.check_detectors()
+	_check(beeped.size() == 1, "once, not every minute")
+	main.queue_free()
+
+
+func _test_shakedown_and_deaths() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var searching: Searching = main.searching
+	var infirmary: Infirmary = main.infirmary
+	(main.misconduct as Misconduct).enabled = false
+	searching.random_per_day = 0
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	var cells := {}
+	for p: Person in prisoners:
+		var home := people.home_room(p)
+		if not home.is_empty():
+			cells[home[1]] = true
+	var a: Person = prisoners[0]
+	a.temper = 0.0
+	searching.shakedown_tonight = true
+	var lockup: ActivityDef = people.activities[&"lockup"]
+	for p: Person in prisoners:
+		p.block = lockup
+	searching._tick()
+	_check(not searching.shakedown_tonight and (main.jobs as JobBoard).of_kind(&"search").size() == cells.size(),
+			"a shakedown at lockup searches every cell")
+	_check(a.temper >= Searching.SHAKEDOWN_TEMPER, "and puts everyone in a temper")
+	# Deaths: off, the knocked out never drop below the floor.
+	var b: Person = prisoners[1]
+	b.health = 1.0
+	infirmary.tick(600.0)
+	_check(people.people.has(b) and b.health > 0.0, "with deaths off nobody dies")
+	infirmary.deaths = true
+	var c: Person = prisoners[2]
+	c.health = 0.0
+	var died := []
+	infirmary.died.connect(func(p: Person, _l: int, _pt: Vector2) -> void: died.append(p))
+	infirmary.tick(1.0)
+	_check(died == [c] and not people.people.has(c), "with deaths on, someone beaten to nothing dies")
+	_check((main.security as Security).today.get(&"death", 0) == 1, "which counts heavily against Safety")
 	main.queue_free()

@@ -23,6 +23,13 @@ const BESIDE := 2.5
 ## Back on their feet at this.
 const DISCHARGE := 90.0
 
+## A knocked-out patient left untreated, or hit hard enough, can die.
+## Off (the default), health never drops below FLOOR from neglect and
+## nobody dies.
+var deaths := false
+
+signal died(person: Person, level: int, point: Vector2)
+
 var people: People
 var jobs: JobBoard
 var bed_tag: StringName = &"infirmary_bed"
@@ -53,8 +60,11 @@ func start() -> void:
 
 
 func tick(minutes: float) -> void:
-	for person in people.people:
+	for person in people.people.duplicate():
 		if person.health >= Health.WELL and not beds.has(person):
+			continue
+		if deaths and person.health <= 0.0:
+			die(person)
 			continue
 		var injury := Health.injury(person.health)
 		if beds.has(person) and not person.lying and injury < Health.Injury.HURT:
@@ -71,7 +81,7 @@ func tick(minutes: float) -> void:
 				_post_treat(person)
 		elif injury == Health.Injury.KNOCKED_OUT:
 			_out_for[person] = _out_for.get(person, 0.0) + minutes
-			person.health = maxf(FLOOR, person.health - UNTREATED_LOSS * minutes / 60.0)
+			person.health = maxf(0.0 if deaths else FLOOR, person.health - UNTREATED_LOSS * minutes / 60.0)
 			person.bubble = "Seeing stars"
 			if beds.has(person):
 				if not _being_helped(person):
@@ -84,6 +94,17 @@ func tick(minutes: float) -> void:
 			_out_for.erase(person)
 			if person.bubble == "Seeing stars":
 				person.bubble = ""
+
+
+## Gone: they leave the prison for good.
+func die(person: Person) -> void:
+	var level := person.level
+	var point := person.flat()
+	beds.erase(person)
+	carried.erase(person)
+	_out_for.erase(person)
+	people.remove_person(person)
+	died.emit(person, level, point)
 
 
 ## An infirmary bed nobody has, as (level, object id), or (-1, -1).

@@ -17,6 +17,8 @@ extends Resource
 @export var model: PackedScene
 ## What fitting one costs, when money is on.
 @export var price := 0
+## Beeps at anyone walking through carrying something metal.
+@export var detects_metal := false
 
 
 func lets_through(group: StringName) -> bool:

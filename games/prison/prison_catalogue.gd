@@ -44,6 +44,7 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/guard_desk.tres"),
 	preload("res://games/prison/catalogue/cctv_monitor.tres"),
 	preload("res://games/prison/catalogue/cctv_camera.tres"),
+	preload("res://games/prison/catalogue/memorial_plaque.tres"),
 	preload("res://games/prison/catalogue/goods_shelf.tres"),
 	preload("res://games/prison/catalogue/reception_desk.tres"),
 	preload("res://games/prison/catalogue/bus_stop.tres"),
@@ -160,6 +161,7 @@ const DOOR_KINDS: Array[DoorKindDef] = [
 	preload("res://games/prison/catalogue/door_security_gate.tres"),
 	preload("res://games/prison/catalogue/door_people_gate.tres"),
 	preload("res://games/prison/catalogue/door_vehicle_gate.tres"),
+	preload("res://games/prison/catalogue/door_metal_detector.tres"),
 ]
 
 ## What prisoners need, and what sees to it.

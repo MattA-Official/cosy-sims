@@ -24,6 +24,7 @@ const WEIGHTS: Dictionary[StringName, float] = {
 	&"knocked_out": 3.0,
 	&"escape": 10.0,
 	&"sit_in": 1.0,
+	&"death": 20.0,
 }
 const NAMES: Dictionary[StringName, String] = {
 	&"walk_back": "Walked back",
@@ -33,6 +34,9 @@ const NAMES: Dictionary[StringName, String] = {
 	&"knocked_out": "Knocked out",
 	&"escape": "Escape attempts",
 	&"sit_in": "Sit-in hours",
+	&"missing_tool": "Tools missing",
+	&"metal_detector": "Metal detector beeps",
+	&"death": "Deaths",
 }
 const ALERTS_KEPT := 40
 
@@ -160,6 +164,15 @@ func count(kind: StringName, person: Person = null, words := "", quiet := false)
 		text = "%s: %s" % [person.name, text]
 	var level := person.level if person != null else 0
 	var point := person.flat() if person != null else Vector2.ZERO
+	_alert(text, level, point)
+
+
+## Puts up an alert without counting anything, such as for a room.
+func alert_at(text: String, level: int, point: Vector2) -> void:
+	_alert(text, level, point)
+
+
+func _alert(text: String, level: int, point: Vector2) -> void:
 	alerts.push_front([clock.day() if clock != null else 0, clock.minute_of_day() if clock != null else 0,
 			text, level, point])
 	if alerts.size() > ALERTS_KEPT:

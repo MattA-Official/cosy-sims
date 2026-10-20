@@ -16,6 +16,7 @@ var searching: Searching
 var escapes: Escapes
 var coverage_tint: CoverageTint
 var sit_ins: SitIns
+var infirmary: Infirmary
 var prisoners: Callable
 
 var _show := CheckBox.new()
@@ -26,6 +27,8 @@ var _sit_ins := VBoxContainer.new()
 var _shown_sit_ins: Array = []
 var _wait := 0.0
 var _shown_alerts := -1
+var _shakedown := Button.new()
+var _deaths := CheckBox.new()
 
 
 func _ready() -> void:
@@ -72,6 +75,12 @@ func _ready() -> void:
 	box.add_child(_today)
 	_sit_ins.add_theme_constant_override(&"separation", 4)
 	box.add_child(_sit_ins)
+	_shakedown.focus_mode = FOCUS_NONE
+	_shakedown.tooltip_text = "At the next Lockup, guards search every cell. Finds stashes, but puts everyone in a temper."
+	_shakedown.pressed.connect(func() -> void:
+		searching.shakedown_tonight = not searching.shakedown_tonight
+		refresh())
+	box.add_child(_shakedown)
 	box.add_child(HSeparator.new())
 	var alerts_heading := Label.new()
 	alerts_heading.text = "Alerts"
@@ -79,6 +88,14 @@ func _ready() -> void:
 	box.add_child(alerts_heading)
 	_alerts.add_theme_constant_override(&"separation", 0)
 	box.add_child(_alerts)
+	box.add_child(HSeparator.new())
+	_deaths.text = "Deaths (rare)"
+	_deaths.tooltip_text = "Off, nobody dies. On, someone knocked out and left untreated, or beaten badly, can die."
+	_deaths.focus_mode = FOCUS_NONE
+	_deaths.toggled.connect(func(on: bool) -> void:
+		if infirmary != null:
+			infirmary.deaths = on)
+	box.add_child(_deaths)
 	visible = false
 
 
@@ -103,6 +120,11 @@ func refresh() -> void:
 	_status.text = "\n".join(status_lines())
 	_today.text = "\n".join(today_lines())
 	_show_sit_ins()
+	_shakedown.visible = searching != null
+	if searching != null:
+		_shakedown.text = "Shakedown booked for Lockup (cancel)" if searching.shakedown_tonight else "Shakedown tonight"
+	_deaths.visible = infirmary != null
+	_deaths.set_pressed_no_signal(infirmary != null and infirmary.deaths)
 	if _shown_alerts != security.alerts.size() or (not security.alerts.is_empty() and _alerts.get_child_count() == 0):
 		_show_alerts()
 
