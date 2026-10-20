@@ -39,6 +39,7 @@ colours a real prison would plausibly use.
   wooden_toy, birdhouse. Floor litter: litter_paper, litter_can,
   litter_wrapper.
 - Security: cctv_camera (0.5 x 0.5, 2.2 m post, lens along +z).
+- Memorial: memorial_plaque (0.5 x 0.25, 0.5 m stone stand, brass plate facing +z).
 - Contraband items (same size and origin as other items): biscuit, spoon,
   rolling_pin, frying_pan, screwdriver, mallet, soap_sock.
 - Infirmary: infirmary_bed (1 x 2, head to the front like the cell bed;
@@ -59,7 +60,8 @@ colours a real prison would plausibly use.
   x edge of each tile, so every tile is one bay.
 - Doors: door (in use), cell_door (barred, not used yet), security_gate
   (all bars, for a door kind), people_gate (chain link, for the perimeter
-  fence), vehicle_gate (sliding, with hazard stripes and a no-entry sign).
+  fence), vehicle_gate (sliding, with hazard stripes and a no-entry sign),
+  metal_detector (walk-through arch, green light on top).
 - People: person. Plants: tree, bush, flower.
 - Icons (`core/ui/icons/`): mood_beaming, mood_content, mood_fed_up,
   mood_angry, in the same white line style as the rest. Markers

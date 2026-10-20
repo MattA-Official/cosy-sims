@@ -913,6 +913,46 @@ def people_gate():
     return p
 
 
+def metal_detector():
+    """A walk-through arch filling the same 1 m opening as `people_gate`:
+    two off-white panels on grey feet, a header with a little readout and
+    a green light on top that turns the game's colour when it beeps."""
+    p = Prop("metal_detector")
+    top = DOOR_H + 0.02
+    for x in (-0.45, 0.45):
+        p.box("white", (0.09, 0.42, top), (x, 0, top / 2), 0.03, 3)
+        p.box("steel_dark", (0.13, 0.46, 0.06), (x, 0, 0.03), 0.015, 2)  # foot
+        for k in range(5):  # sensor grooves on the inside face
+            p.box("steel", (0.012, 0.3, 0.02), (x - 0.046 * (1 if x > 0 else -1), 0, 0.25 + k * 0.16), 0.004, 1)
+    p.box("white", (1.0, 0.44, 0.12), (0, 0, top + 0.06), 0.04, 3)  # header
+    for y in (-0.225, 0.225):  # a small readout on both faces
+        p.box("screen", (0.2, 0.012, 0.06), (0, y, top + 0.06), 0.006, 1)
+        p.box("cross", (0.05, 0.014, 0.02), (-0.05, y, top + 0.06), 0.004, 1)
+    p.cyl("steel_dark", 0.05, 0.03, (0, 0, top + 0.135), bevel=0.01, n=18)
+    p.ball("cross", 0.042, (0, 0, top + 0.15), scale=(1, 1, 0.9), u=16, v=10)
+    return p
+
+
+def memorial_plaque():
+    """0.5 x 0.25, 0.5 m: a low stone stand with a sloping brass plate and
+    a small posy at its foot. Gentle rather than grim; faces +z."""
+    p = Prop("memorial_plaque")
+    p.taper("stone", (0.36, 0.17), (0.32, 0.14), 0.32, (0, 0, 0.16), 0.02, 2)
+    tilt = (25, 0, 0)
+    p.box("stone", (0.4, 0.2, 0.08), (0, 0, 0.37), 0.02, 2, rot=tilt)
+    def on_face(d, along=0.0):  # a point d off the sloping face, `along` up it
+        return (0, -0.423 * d + 0.906 * along, 0.37 + 0.906 * d + 0.423 * along)
+    p.box("gold", (0.32, 0.14, 0.008), on_face(0.042), 0.003, 1, rot=tilt)
+    for k, w in enumerate((0.2, 0.24, 0.14)):  # three engraved lines
+        p.box("stone_dark", (w, 0.012, 0.004), on_face(0.047, (1 - k) * 0.035), 0.002, 1, rot=tilt)
+    # A posy of little flowers leaning on the stand.
+    for x, y, z, mat in ((0.19, -0.08, 0.05, "leaf"), (0.23, -0.06, 0.09, "leaf"),
+                         (0.17, -0.09, 0.1, "sheet"), (0.21, -0.1, 0.14, "poster_c"),
+                         (0.25, -0.08, 0.13, "sheet"), (0.2, -0.05, 0.16, "sheet")):
+        p.ball(mat, 0.042 if mat == "leaf" else 0.032, (x, y, z), u=12, v=8)
+    return p
+
+
 def vehicle_gate():
     """A sliding vehicle gate squeezed into one tile: a chunky frame on
     wheels running along a floor track, hazard stripes and a STOP sign."""
@@ -1483,7 +1523,8 @@ def lorry():
     return p
 
 
-MODELS = dict(cctv_camera=cctv_camera, people_gate=people_gate, vehicle_gate=vehicle_gate, biscuit=biscuit, spoon=spoon, rolling_pin=rolling_pin, frying_pan=frying_pan,
+MODELS = dict(metal_detector=metal_detector, memorial_plaque=memorial_plaque,
+              cctv_camera=cctv_camera, people_gate=people_gate, vehicle_gate=vehicle_gate, biscuit=biscuit, spoon=spoon, rolling_pin=rolling_pin, frying_pan=frying_pan,
               screwdriver=screwdriver, mallet=mallet, soap_sock=soap_sock,
               infirmary_bed=infirmary_bed, medicine_cabinet=medicine_cabinet, dust_cloud=dust_cloud,
               tunnel_portal=tunnel_portal, car=car, car_red=lambda: car("car_red", "car_red"),
