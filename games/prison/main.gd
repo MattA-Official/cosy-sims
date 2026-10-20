@@ -38,7 +38,7 @@ var people := People.new()
 var clock := GameClock.new()
 ## The prisoners' timetable, a copy of the catalogue's so edits stay in
 ## this game.
-var schedule: Schedule = PrisonCatalogue.SCHEDULE.duplicate()
+var schedule: Schedule = PrisonCatalogue.SCHEDULE.copy()
 ## Puts everyone in their timetable block and locks cell doors.
 var runner := ScheduleRunner.new()
 var day_night := DayNight.new()
@@ -99,6 +99,8 @@ func _ready() -> void:
 	people.terrain = terrain
 	people.body_model = PrisonCatalogue.PERSON_MODEL
 	people.needs = PrisonCatalogue.NEEDS
+	people.traits = PrisonCatalogue.TRAITS
+	people.moodlet_defs = PrisonCatalogue.moodlets()
 	people.room_types = PrisonCatalogue.ROOM_TYPES
 	people.home_room_types = PrisonCatalogue.HOME_ROOM_TYPES
 	people.building = building

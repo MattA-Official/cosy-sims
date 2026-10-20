@@ -15,7 +15,7 @@ const CHALLENGES: Array[String] = [
 	"The cells are on an island in a moat. One bridge crosses it, and nobody swims.",
 	"A corridor that doubles back on itself, and showers behind an angled wall with a door in it.",
 	"The canteen and showers are in the basement, down stairs that turn at a landing.",
-	"Twenty-four hungry prisoners, sixteen beds, two tables and two showers: they queue, give up and try again.",
+	"Twenty-four hungry prisoners, a dorm of sixteen beds, two tables and two showers: they queue, give up and try again.",
 	"The showers have no door, and the canteen is 0.75 m up. With Door Steps on its door gets steps; with it off, nobody can eat.",
 ]
 
@@ -265,11 +265,15 @@ static func _crowded(site: Site) -> void:
 	var o := site.land().get_center() - Vector2i(12, 6)
 	var ground := site.map()
 	var dorm := Rect2i(o, Vector2i(16, 6))
-	_room(ground, dorm, &"concrete", &"brick", &"cell")
+	_room(ground, dorm, &"concrete", &"brick", &"dorm")
 	var bed := PrisonCatalogue.object(&"bed")
 	for i in 8:
 		ground.place_object(bed, Vector2(o + Vector2i(i * 2, 0)), 0)
 		ground.place_object(bed, Vector2(o + Vector2i(i * 2, 4)), 0)
+	# Toilets and a shower between the beds along the back wall.
+	ground.place_object(PrisonCatalogue.object(&"toilet"), Vector2(o) + Vector2(1.25, 0), 0)
+	ground.place_object(PrisonCatalogue.object(&"toilet"), Vector2(o) + Vector2(9.25, 0), 0)
+	ground.place_object(PrisonCatalogue.object(&"shower"), Vector2(o) + Vector2(5.125, 0), 0)
 	var canteen := Rect2i(o + Vector2i(0, 6), Vector2i(8, 5))
 	var showers := Rect2i(o + Vector2i(8, 6), Vector2i(8, 5))
 	_room(ground, canteen, &"wood", &"brick", &"canteen")
@@ -356,6 +360,7 @@ static func _cell(map: BuildingMap, rect: Rect2i, height := 0.0, door_at_top := 
 	if rect.size.x >= 3:
 		map.place_object(bed, back + Vector2(1, 0), 0)
 	map.place_object(PrisonCatalogue.object(&"toilet"), Vector2(rect.end.x - 0.5, rect.position.y), 0)
+	map.place_object(PrisonCatalogue.object(&"radio"), Vector2(rect.end.x - 1.0, rect.position.y), 0)
 
 
 ## A door in the wall on one side of a tile.

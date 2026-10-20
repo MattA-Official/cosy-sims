@@ -7,6 +7,9 @@ enum State { IDLE, WALKING, USING }
 
 ## No bed of their own.
 const NO_BED := Vector2i(0, -1)
+## `target` when what they are seeing to is a place or company rather
+## than an object.
+const NO_OBJECT := Vector2i(0, -1)
 
 var id := 0
 var name := ""
@@ -24,6 +27,28 @@ var activity := "Standing about"
 ## Walking about with nowhere in particular to be, so a pressing need can
 ## cut it short.
 var wandering := false
+## Why they are doing it, such as "Eat block" or "Bladder is low".
+var reason := ""
+
+## Who they are: two traits, picked when they arrive.
+var traits: Array[TraitDef] = []
+## Anything else the game wants to know about them, such as a prisoner's
+## security category or sentence.
+var profile: Dictionary = {}
+## From 0 (furious) to 100 (beaming), worked out from `mood_parts`.
+var mood := 50.0
+## What makes up their mood, as [words, points] pairs, biggest effect
+## first.
+var mood_parts: Array = []
+## Moodlet ids, with game minutes each has left to run.
+var moodlets: Dictionary[StringName, float] = {}
+## Out in the open air just now, and near people who are up and about.
+var outdoors := false
+var in_company := false
+## Game minutes until they next look around and decide, and until their
+## mood is next worked out.
+var think_wait := 0.0
+var mood_wait := 0.0
 
 ## The timetable block they are in, set by ScheduleRunner. Null leaves
 ## them free.
@@ -43,6 +68,8 @@ var route_levels: Array[int] = []
 var route_on_surface: Array[bool] = []
 ## The object they are heading for or using, as (level, object id), the
 ## tag they wanted it for, and the need it sees to (empty if none does).
+## For a need met by a place or company, `target` is NO_OBJECT and the tag
+## is the need's id.
 var target := Vector2i(0, 0)
 var target_tag: StringName = &""
 var target_need: StringName = &""
@@ -63,6 +90,15 @@ func flat() -> Vector2:
 
 func has_target() -> bool:
 	return target_tag != &""
+
+
+## Whether they are heading for or using an object, rather than a place.
+func has_object() -> bool:
+	return has_target() and target != NO_OBJECT
+
+
+func has_trait(id: StringName) -> bool:
+	return traits.any(func(t: TraitDef) -> bool: return t.id == id)
 
 
 func has_bed() -> bool:

@@ -14,6 +14,14 @@ const HOURS := 24
 @export var hours: Array[ActivityDef] = []
 
 
+## A copy to edit, with its own hours but the same blocks, so painting it
+## leaves the original alone.
+func copy() -> Schedule:
+	var out: Schedule = duplicate()
+	out.hours = hours.duplicate()
+	return out
+
+
 ## The block at an hour of the day.
 func at(hour: int) -> ActivityDef:
 	if hours.is_empty():

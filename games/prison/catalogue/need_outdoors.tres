@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="NeedDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/people/need_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"outdoors"
+display_name = "Outdoors"
+source = 1
+object_tags = Array[StringName]([])
+doing = "Enjoying the fresh air"
+low_text = "Cooped up"
+high_text = "Had fresh air"
+decay_per_hour = 3.0
+asleep_decay_per_hour = 0.0
+use_minutes = 60.0
+sleeping = false
+met_moodlet = &"fresh_air"

@@ -131,6 +131,28 @@ With F3 you can also jump the clock to any hour. The sun follows the
 clock, from dawn about 06:00 to dusk about 20:00; the sun button keeps it
 day while you build.
 
+### Needs and mood
+
+Prisoners have seven needs: sleep, hunger, hygiene, bladder, recreation,
+fresh air and company. The first five send them to objects (a toilet,
+a TV, a bookshelf, the weights); fresh air comes from being outdoors and
+company from being near someone in the same room. The block decides what
+is allowed, so recreation waits for the yard or free time, but a need
+that is nearly empty will break the rules (and borrow a neighbour's
+toilet if it must).
+
+Mood is 50 plus a little for each well-met need, minus more for each low
+one, plus the rooms they sleep and spend time in, plus moodlets such as
+"Had a good meal" or "Woken too early". It shows as a face over anyone
+fed up or angry, and the F3 inspector lists the biggest reasons under
+"Why?". Each prisoner has two traits (Night owl, Bookworm, Hothead and
+so on) that change how fast needs run down, what they like doing and
+how they take things.
+
+Rooms get a quality score from -10 to +10: space per bed, windows, decor
+(rugs, posters, plants), and nicer floors and walls. A dorm sleeps four
+or more but costs a little mood for the lack of privacy.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one
@@ -145,7 +167,7 @@ how prisoners find their way:
 | Island | Cells on an island in a moat, with one bridge |
 | Long way round | A corridor that doubles back, and showers behind an angled wall with a door |
 | Basement | Canteen and showers in the basement, down stairs with a landing |
-| Crowded canteen | 24 prisoners, 16 beds, two tables and two showers |
+| Crowded canteen | 24 prisoners in a dorm with too few beds, toilets and showers: a stress test for mood |
 | Locked out | Showers with no door, and a raised canteen that needs Door Steps |
 
 See [docs/design/building.md](docs/design/building.md) for the design

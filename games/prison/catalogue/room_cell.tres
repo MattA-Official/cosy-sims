@@ -10,3 +10,4 @@ display_name = "Cell"
 colour = Color(1, 0.72, 0.45, 1)
 required_tags = Array[StringName]([&"bed", &"toilet"])
 icon = ExtResource("2_icon")
+ideal_tiles = 6.0

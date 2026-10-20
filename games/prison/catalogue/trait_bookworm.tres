@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/trait_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"bookworm"
+display_name = "Bookworm"
+description = "Happiest with a book: likes desks and bookshelves."
+likes = Dictionary[StringName, float]({
+&"book": 1.6,
+&"desk": 1.4
+})
+room_likes = Dictionary[StringName, float]({
+&"book": 2.0
+})
+room_like_text = "Books to hand"

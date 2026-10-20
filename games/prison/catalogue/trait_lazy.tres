@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/trait_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"lazy"
+display_name = "Lazy"
+description = "Would rather put their feet up in front of the telly."
+opposite = &"grafter"
+need_rates = Dictionary[StringName, float]({
+&"sleep": 1.2
+})
+likes = Dictionary[StringName, float]({
+&"tv": 1.5
+})

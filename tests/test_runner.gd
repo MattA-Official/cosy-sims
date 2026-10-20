@@ -35,6 +35,10 @@ func _process(_delta: float) -> bool:
 	_test_sample_prisons()
 	_test_clock()
 	_test_daily_routine()
+	_test_mood_model()
+	_test_room_quality()
+	_test_traits_and_choices()
+	_test_needs_in_a_day()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -217,15 +221,15 @@ func _test_sample_prisons() -> void:
 			var people: People = main.people
 			_check(people.people.size() >= 4, "%s: prisoners start in it" % name)
 			var reach := _reachable_needs(people)
-			var expected: Array[StringName] = [&"sleep", &"hunger", &"hygiene"]
+			var expected: Array[StringName] = [&"sleep", &"hunger", &"hygiene", &"bladder"]
 			if index == 7:
-				expected.assign([&"sleep", &"hunger"] if steps else [&"sleep"])
+				expected.assign([&"sleep", &"hunger", &"bladder"] if steps else [&"sleep", &"bladder"])
 			_check(reach == expected, "%s: everyone can reach %s (got %s)" % [name, expected, reach])
 			if index == 2 or index == 3:
 				# Without its stairs, ramp or bridge, the cells are cut off.
 				people.graph = NavGraph.build(main.building, PathNetwork.new(), main.terrain)
 				people._dirty = false
-				_check(_reachable_needs(people) == ([&"sleep"] as Array[StringName]),
+				_check(_reachable_needs(people) == ([&"sleep", &"bladder"] as Array[StringName]),
 						"%s: only the built paths lead to the canteen" % name)
 			main.free()
 	Building.door_steps = false
@@ -257,7 +261,7 @@ func _test_clock() -> void:
 	_check(clock.time_text() == "12:00" and clock.day() == 2 and hours.back() == 12, "the clock jumps to an hour")
 	clock.jump_to_hour(6)
 	_check(clock.time_text() == "06:00" and clock.day() == 3, "an hour already gone today means tomorrow")
-	var schedule: Schedule = PrisonCatalogue.SCHEDULE.duplicate()
+	var schedule: Schedule = PrisonCatalogue.SCHEDULE.copy()
 	_check(schedule.at(23).id == &"sleep" and schedule.at(12).id == &"eat", "the default timetable")
 	_check(schedule.block_start(3) == 22, "a block runs on across midnight")
 	clock.free()
@@ -298,10 +302,14 @@ func _test_daily_routine() -> void:
 			"12:15":
 				if not checked.has("lunch"):
 					checked["lunch"] = true
-					_check(people.people.all(func(p: Person) -> bool: return in_room.call(p, &"canteen")),
-							"at 12:15 everyone is in the canteen")
-					_check(not people.people.any(func(p: Person) -> bool: return p.out_of_place),
-							"and nobody is out of place")
+					# Bar anyone nipping out because they're bursting: the last
+					# cell has no toilet of its own.
+					var away := people.people.filter(func(p: Person) -> bool:
+						return not in_room.call(p, &"canteen") and p.target_tag != &"toilet")
+					_check(away.is_empty(), "at 12:15 everyone is in the canteen (not %s)" % [away.map(
+							func(p: Person) -> String: return "%s: %s, %s" % [p.name, p.activity, p.reason])])
+					_check(not people.people.any(func(p: Person) -> bool:
+							return p.out_of_place and p.target_tag != &"toilet"), "and nobody is out of place")
 			"22:00":
 				if not checked.has("night"):
 					checked["night"] = true
@@ -317,7 +325,8 @@ func _test_daily_routine() -> void:
 					_check(people.people.all(func(p: Person) -> bool: return p.activity == "Sleeping"),
 							"in the night everyone is asleep")
 	_check(checked.size() == 4, "the day ran through (checked %s)" % [checked.keys()])
-	_check(not runner.doors.values().has(true), "in the morning the cell doors open again")
+	_check(not runner.doors.values().has(true), "in the morning the cell doors open again (%s at %s: %s)" % [
+			runner.current().id, clock.time_text(), runner.doors])
 	_check(people.people.all(func(p: Person) -> bool: return p.needs[&"hunger"] > 0.0 and p.needs[&"sleep"] > 0.0),
 			"the default day keeps up with hunger and sleep")
 	# Painting the timetable changes the block straight away.
@@ -325,7 +334,8 @@ func _test_daily_routine() -> void:
 	main.timetable.paint(hour) # The first swatch: Sleep.
 	_check(runner.current().id == &"sleep" and people.people.all(func(p: Person) -> bool: return p.block.id == &"sleep"),
 			"painting the current hour puts everyone in the new block")
-	main.schedule.set_hour(hour, PrisonCatalogue.SCHEDULE.at(hour))
+	_check(PrisonCatalogue.SCHEDULE.at(hour).id != &"sleep" or hour < 7 or hour >= 22,
+			"painting the game's timetable leaves the catalogue's alone")
 	# Someone who can't get where they should be is flagged once they're late.
 	main.free()
 	main = load("res://games/prison/main.tscn").instantiate()
@@ -343,16 +353,209 @@ func _test_daily_routine() -> void:
 	main.free()
 
 
-## The needs every person in the build can reach an object for.
+func _test_mood_model() -> void:
+	var model := MoodModel.new()
+	_check(is_equal_approx(model.need_points(100.0), 5.0) and is_zero_approx(model.need_points(55.0)),
+			"a well met need adds a little to mood, a middling one nothing")
+	_check(is_equal_approx(model.need_points(27.5), -5.0) and is_equal_approx(model.need_points(15.0), -10.0)
+			and is_equal_approx(model.need_points(0.0), -20.0), "low needs take off more, run-out ones most")
+	var person := Person.new()
+	person.needs = {&"hunger": 100.0, &"sleep": 10.0}
+	var meal := MoodletDef.new()
+	meal.id = &"meal"
+	meal.display_name = "Had a meal"
+	meal.mood = -6.0
+	person.moodlets[&"meal"] = 60.0
+	var hothead := TraitDef.new()
+	hothead.bad_mood_scale = 1.5
+	person.traits = [hothead]
+	var parts := model.parts(person, PrisonCatalogue.NEEDS, {&"meal": meal}, [["Nice cell", 2.0]])
+	_check(parts[0][0] == "Tired" and parts[1][0] == "Had a meal" and is_equal_approx(parts[1][1], -9.0),
+			"mood parts come biggest first, with bad moodlets worse for a hothead (got %s)" % [parts])
+	var total := model.target(parts)
+	_check(is_equal_approx(total, 50.0 + 5.0 - 13.333333 - 9.0 + 2.0), "mood adds its parts to 50 (got %f)" % total)
+	_check(is_equal_approx(model.follow(50.0, [["Great", 40.0]], 30.0), 70.0), "mood follows its parts gently")
+	_check(model.face(80.0) == MoodModel.Face.BEAMING and model.face(20.0) == MoodModel.Face.ANGRY,
+			"mood shows as a face")
+
+
+func _test_room_quality() -> void:
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
+	map.register_styles(PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	map.build_room(Rect2i(2, 2, 2, 3), &"concrete", &"brick")
+	var cell := PrisonCatalogue.room_type(&"cell")
+	map.set_room_type(map.room_at(Vector2i(2, 2)), &"cell")
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(2, 2), 0)
+	var quality := RoomQuality.assess(map, map.room_at(Vector2i(2, 2)), cell)
+	_check(is_zero_approx(quality.score) and quality.parts.any(func(p: Array) -> bool: return p[0] == "No window"),
+			"a bare cell of the ideal size is plain (got %s)" % [quality.parts])
+	map.set_opening(Vector3i(3, 2, BuildingMap.EDGE_X), BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS)
+	map.place_object(PrisonCatalogue.object(&"poster"), Vector2(3, 2), 0)
+	quality = RoomQuality.assess(map, map.room_at(Vector2i(2, 2)), cell)
+	_check(is_equal_approx(quality.score, 3.0), "a window and a poster make it nicer (got %f)" % quality.score)
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(3, 3), 0)
+	quality = RoomQuality.assess(map, map.room_at(Vector2i(2, 2)), cell)
+	_check(is_equal_approx(quality.score, -1.0) and quality.parts[0][0] == "Cramped",
+			"two beds in it make it cramped (got %s)" % [quality.parts])
+	_check(quality.star_text() == "★★☆☆☆" or quality.stars() == 2.5, "quality shows as stars (got %s)" % quality.star_text())
+	map.build_room(Rect2i(8, 2, 6, 4), &"wood", &"plaster")
+	var dorm := PrisonCatalogue.room_type(&"dorm")
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(8, 2), 0)
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(9, 2), 0)
+	map.place_object(PrisonCatalogue.object(&"toilet"), Vector2(13.5, 2), 0)
+	map.place_object(PrisonCatalogue.object(&"shower"), Vector2(13.25, 5.25), 0)
+	var room := map.room_at(Vector2i(8, 2))
+	_check(dorm.problems(room, map) == PackedStringArray(["Needs 4 beds"]), "a dorm needs four beds (got %s)" % dorm.problems(room, map))
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(10, 2), 0)
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(11, 2), 0)
+	room = map.room_at(Vector2i(8, 2))
+	_check(dorm.problems(room, map).is_empty(), "and then it works")
+	quality = RoomQuality.assess(map, room, dorm)
+	_check(quality.parts.any(func(p: Array) -> bool: return p[0] == "Not much privacy")
+			and quality.parts.any(func(p: Array) -> bool: return p[0] == "Nice floor"),
+			"a dorm lacks privacy, and a wooden floor is nice (got %s)" % [quality.parts])
+
+
+func _test_traits_and_choices() -> void:
+	var building := Building.new(Rect2i(0, 0, 20, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var map := building.ground()
+	map.build_room(Rect2i(2, 2, 8, 6), &"wood", &"plaster")
+	map.place_object(PrisonCatalogue.object(&"radio"), Vector2(2, 2), 0)
+	map.place_object(PrisonCatalogue.object(&"bookshelf"), Vector2(8, 2), 0)
+	var people := People.new()
+	people.needs = PrisonCatalogue.NEEDS
+	people.traits = PrisonCatalogue.TRAITS
+	people.moodlet_defs = PrisonCatalogue.moodlets()
+	people.building = building
+	var everyone_fine := true
+	for i in 40:
+		var person := people.add_person(0, Vector2(14.5, 14.5))
+		var first: TraitDef = person.traits[0]
+		var second: TraitDef = person.traits[1]
+		everyone_fine = everyone_fine and person.traits.size() == 2 and first != second \
+				and first.opposite != second.id and second.opposite != first.id
+	_check(everyone_fine, "everyone gets two traits, never opposites")
+	for person in people.people.duplicate():
+		people.remove_person(person)
+	# A Bookworm picks the bookshelf over a radio just as near.
+	var reader := people.add_person(0, Vector2(5.5, 3.5), "Reader")
+	reader.traits = [PrisonCatalogue.TRAITS.filter(func(t: TraitDef) -> bool: return t.id == &"bookworm")[0]]
+	for need: StringName in reader.needs:
+		reader.needs[need] = 100.0
+	reader.needs[&"recreation"] = 30.0
+	people.step(0.5)
+	_check(reader.target_tag == &"book", "a bookworm reaches for a book (got %s)" % reader.target_tag)
+	# A Gentle soul calms the people near them.
+	var gentle := people.add_person(0, Vector2(4.5, 6.5), "Calm")
+	gentle.traits = [PrisonCatalogue.TRAITS.filter(func(t: TraitDef) -> bool: return t.id == &"gentle")[0]]
+	var other := people.add_person(0, Vector2(5.5, 6.5), "Other")
+	other.traits = []
+	for person: Person in [gentle, other]:
+		for need: StringName in person.needs:
+			person.needs[need] = 100.0
+		person.timer = 100.0 # Standing still rather than wandering off.
+	for i in 2:
+		people.step(0.5)
+	_check(other.moodlets.has(&"calmed") and not gentle.moodlets.has(&"calmed"), "a gentle soul calms those near them")
+	_check(other.in_company, "and is company")
+	# Running out of bladder with no toilet is an accident.
+	other.needs[&"bladder"] = 0.1
+	other.needs[&"hygiene"] = 80.0
+	people.step(1.0)
+	_check(other.moodlets.has(&"had_an_accident") and other.needs[&"bladder"] == 100.0
+			and other.needs[&"hygiene"] < 40.0, "with no toilet, bladder running out is an accident")
+	people.free()
+
+
+## Two days in the starter prison: urgent needs, moodlets, the yard and
+## the mood they all add up to.
+func _test_needs_in_a_day() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 0
+	root.add_child(main)
+	var clock: GameClock = main.clock
+	var people: People = main.people
+	clock.speed_index = 0
+	var checked := {}
+	var bursting: Person = people.people[0]
+	var hungry: Person = people.people[1]
+	var lowest_mood := 100.0
+	var in_canteen := func(person: Person) -> bool:
+		var here := people.room_of(person)
+		return not here.is_empty() and here[1].type == &"canteen"
+	for i in 38 * 60 * 2:
+		clock.advance(0.5)
+		if clock.day() == 1:
+			continue
+		for person in people.people:
+			lowest_mood = minf(lowest_mood, person.mood)
+		match clock.time_text():
+			"12:20":
+				if not checked.has("bursting"):
+					checked["bursting"] = true
+					_check(in_canteen.call(bursting), "lunch starts in the canteen")
+					bursting.needs[&"bladder"] = 10.0
+			"12:30":
+				if not checked.has("toilet"):
+					checked["toilet"] = true
+					_check(not in_canteen.call(bursting) or bursting.target_tag == &"toilet"
+							or bursting.needs[&"bladder"] > 90.0,
+							"a prisoner who is bursting leaves lunch for a toilet (%s)" % bursting.activity)
+			"12:55":
+				if not checked.has("meal"):
+					checked["meal"] = true
+					_check(people.people.filter(func(p: Person) -> bool:
+							return p.moodlets.has(&"good_meal") or p.moodlets.has(&"lovely_meal")).size() >= 4,
+							"most people enjoyed their lunch")
+			"14:00":
+				if not checked.has("yard"):
+					checked["yard"] = true
+					_check(people.people.filter(func(p: Person) -> bool: return p.outdoors).size() >= 5,
+							"in the yard, people are outdoors")
+					_check(people.people.all(func(p: Person) -> bool: return p.needs[&"social"] > 60.0),
+							"and in good company")
+					_check(people.people.all(func(p: Person) -> bool: return p.needs[&"outdoors"] > 80.0),
+							"and get their fresh air")
+			"19:55":
+				if not checked.has("hungry"):
+					checked["hungry"] = true
+					hungry.needs[&"hunger"] = 20.0
+			"20:05":
+				if not checked.has("locked up hungry"):
+					checked["locked up hungry"] = true
+					_check(hungry.moodlets.has(&"locked_up_hungry"), "locked up hungry is a moodlet")
+					var cell_part := func(p: Person) -> bool:
+						return p.mood_parts.any(func(part: Array) -> bool: return part[0] == "Nice cell to sleep in")
+					_check(people.people.any(cell_part), "a cell with a window is nice to sleep in")
+	_check(checked.size() == 6, "the day ran through (checked %s)" % [checked.keys()])
+	var average := 0.0
+	for person in people.people:
+		average += person.mood / people.people.size()
+	_check(average > 45.0 and average < 95.0, "the starter prison keeps people fairly happy (%d)" % average)
+	_check(lowest_mood > 15.0, "nobody gets furious in it (lowest %d)" % lowest_mood)
+	# The inspector explains a person and a room.
+	var inspector: Inspector = main.inspector
+	inspector.select(bursting)
+	inspector._refresh_person(bursting)
+	_check(inspector._mood_text.text.contains("Why?"), "the inspector says why someone feels as they do")
+	var home: Array = people.home_room(bursting)
+	inspector.select(home[1], home[0])
+	main.free()
+
+
+## The basic needs (sleep, hunger, hygiene and bladder) every person in
+## the build can reach an object for.
 func _reachable_needs(people: People) -> Array[StringName]:
 	var out: Array[StringName] = []
 	for def in people.needs:
+		if not def.id in [&"sleep", &"hunger", &"hygiene", &"bladder"]:
+			continue
 		var everyone := true
 		for person in people.people:
 			var found := false
 			for n: int in people.building.levels:
 				for placed: BuildingMap.PlacedObject in people.building.levels[n].objects.values():
-					if found or not def.object_tag in placed.def.tags:
+					if found or not placed.def.tags.any(def.met_by):
 						continue
 					for spot in people._spots_beside(n, placed, person.flat()):
 						if not people.nav().find_path(person.level, person.flat(), n, spot).is_empty():
@@ -1215,12 +1418,12 @@ func _test_people() -> void:
 	people.needs = PrisonCatalogue.NEEDS
 	people.building = building
 	var sleepy := people.add_person(0, Vector2(3.5, 5.5), "Test Person")
-	_check(sleepy != null and sleepy.needs.size() == 3, "people start with every need")
+	_check(sleepy != null and sleepy.needs.size() == PrisonCatalogue.NEEDS.size(), "people start with every need")
 	_check(people.add_person(0, Vector2(15.5, 15.5)) != null, "people can stand on open ground")
+	for need: StringName in sleepy.needs:
+		sleepy.needs[need] = 100.0
 	sleepy.needs[&"sleep"] = 10.0
-	sleepy.needs[&"hunger"] = 100.0
-	sleepy.needs[&"hygiene"] = 100.0
-	people.step(0.1)
+	people.step(0.5)
 	_check(sleepy.state == Person.State.WALKING and sleepy.activity.contains("bed"), "a sleepy person heads for a bed")
 	for i in 100:
 		people.step(0.1)
@@ -1229,10 +1432,12 @@ func _test_people() -> void:
 	for i in 480:
 		people.step(1.0)
 	_check(sleepy.state != Person.State.USING and sleepy.needs[&"sleep"] > 90.0, "and gets up rested")
-	sleepy.needs[&"hunger"] = 5.0
+	for need: StringName in sleepy.needs:
+		sleepy.needs[need] = 100.0
+	sleepy.needs[&"hunger"] = 30.0
 	sleepy.gave_up.clear()
-	people.step(0.1)
-	_check(sleepy.activity == "Can't find a free table", "with no table, they say so")
+	people.step(0.5)
+	_check(sleepy.reason == "Can't find a free table", "with no table, they say so")
 	_check(people.send(sleepy, 0, Vector2(15.5, 15.5)) == false and sleepy.activity == "Can't get there",
 			"people can't be sent through walls")
 	map.set_door(BuildingMap.edge_between(Vector2i(5, 6), Vector2i(5, 7)), true)
