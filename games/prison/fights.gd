@@ -25,6 +25,7 @@ const WITNESS_DISTANCE := 5.0
 ## Who starts one picks someone within this many tiles.
 const REACH := 3.0
 const BONKS: Array[String] = ["Bonk!", "Biff!", "Pow!", "Thwack!"]
+const CLOUD := preload("res://games/prison/art/models/dust_cloud.glb")
 
 
 class Fight:
@@ -245,31 +246,19 @@ func _process(_delta: float) -> void:
 	for fight in fights:
 		if fight.cloud == null:
 			continue
-		var i := 0
-		for puff in fight.cloud.get_children():
-			if puff is MeshInstance3D:
-				puff.position.y = 0.45 + sin(t * 9.0 + i * 1.7) * 0.08
-				puff.scale = Vector3.ONE * (1.0 + sin(t * 7.0 + i) * 0.12)
-				i += 1
+		var puff := fight.cloud.get_node("Puff") as Node3D
+		puff.scale = Vector3.ONE * cell_size * (1.0 + sin(t * 8.0) * 0.06)
+		puff.position.y = absf(sin(t * 6.0)) * 0.05
 		fight.cloud.rotation.y = t * 1.5
 
 
 ## A puff of dust, stars and a "Bonk!".
 func _cloud() -> Node3D:
 	var cloud := Node3D.new()
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.93, 0.9, 0.84)
-	material.roughness = 1.0
-	for i in 7:
-		var puff := MeshInstance3D.new()
-		var sphere := SphereMesh.new()
-		sphere.radius = 0.32 * cell_size
-		sphere.height = 0.56 * cell_size
-		puff.mesh = sphere
-		puff.material_override = material
-		var angle := TAU * i / 7.0
-		puff.position = Vector3(cos(angle) * 0.35, 0.45, sin(angle) * 0.35) * cell_size
-		cloud.add_child(puff)
+	var puff := CLOUD.instantiate() as Node3D
+	puff.name = "Puff"
+	puff.scale = Vector3.ONE * cell_size
+	cloud.add_child(puff)
 	var stars := Label3D.new()
 	stars.name = "Stars"
 	stars.text = "★ ★ ★"
@@ -292,6 +281,6 @@ func _cloud() -> Node3D:
 	bonk.outline_modulate = Color(0.6, 0.2, 0.15)
 	bonk.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	bonk.no_depth_test = true
-	bonk.position = Vector3(0.5, 1.45, 0.0)
+	bonk.position = Vector3(0.6, 1.75, 0.0)
 	cloud.add_child(bonk)
 	return cloud
