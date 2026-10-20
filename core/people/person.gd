@@ -123,6 +123,8 @@ var pace := 1.0
 var health := 100.0
 ## Lying down where they are, such as in an infirmary bed.
 var lying := false
+## Sat on the floor where they are, such as in a sit-in.
+var sitting := false
 ## Privileges lost for now (see PrivilegeDef): id to game days left.
 var restrictions: Dictionary[StringName, float] = {}
 ## Points from offences on their record, fading a little each day.

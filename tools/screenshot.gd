@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
@@ -11,7 +11,8 @@ extends SceneTree
 ## "debug" turns on the debug view (F3); "route" opens the patrol route
 ## tool; loop=X,Z,X,Z,... draws a patrol route with a guard on it;
 ## break=TAG breaks the first object with that tag; "security" opens the
-## Security window and shows what's being watched;
+## Security window and shows what's being watched; "sitin" sits six
+## prisoners down in the canteen over a missed meal;
 ## at=X,Z points the camera at a tile, and zoom=F scales its distance.
 
 const FRAMES_TO_WAIT := 90
@@ -99,6 +100,23 @@ func _process(_delta: float) -> bool:
 				else:
 					misconduct.act(person, rung)
 			misconduct.act(prisoners[0], misconduct.rung(&"vandalism"))
+		if args.has("sitin"):
+			var map: BuildingMap = _main.building.ground()
+			var canteen: Room = map.rooms().filter(func(r: Room) -> bool: return r.type == &"canteen")[0]
+			var crowd: Array = _main.people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").slice(0, 6)
+			for i in crowd.size():
+				var person: Person = crowd[i]
+				_main.people.stop(person)
+				person.traits.clear()
+				person.level = 0
+				var cell: Vector2i = canteen.cells[(i * 5 + 3) % canteen.cells.size()]
+				person.position = Vector3(cell.x + 0.5, map.floor_height(cell), cell.y + 0.5)
+				person.moodlets[&"missed_meal"] = 6.0
+				person.mood = 10.0
+				person.mood_parts = [["Missed a meal", -8.0]]
+			var sit_in: SitIns.SitIn = _main.sit_ins.try_start(0, canteen, crowd)
+			var centre := canteen.centre()
+			_main.camera_rig.focus_on(Vector3(centre.x, 0.0, centre.y) * _main.grid.cell_size)
 		if args.has("security"):
 			_main.coverage_tint.shown = true
 			_main.security_window.toggle()

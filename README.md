@@ -350,9 +350,20 @@ tints it blue. The window also lists cameras, guards on duty, the
 perimeter, today's incidents and searches, anyone at large, and the latest
 alerts; click an alert to look there.
 
+**Sit-ins.** Once an hour, if a room holds 6 or more prisoners and most
+of them (60%) are very unhappy (mood under 25) about the same thing, they
+sit down on the floor with placards ("Proper dinners!") and won't budge.
+Unhappy prisoners who wander in may join; gentle souls don't, and put
+others off. Fix what they're upset about and they stand up within ten
+minutes; or press **Talk them round** (Security window, or the inspector)
+and a guard hears them out for 20 minutes (the warden takes 10), which
+leaves them feeling listened to. Left six hours, the angriest two come to
+blows. Each hour of a sit-in counts against Safety, and it goes on the
+sitters' records.
+
 **Safety.** Each midnight Safety is graded on the day's incidents, weighted
 (walked back 0.2, contraband found 0.5, vandalism or a fight 1, someone
-knocked out 3, an escape attempt 10) and counted per 10 prisoners: 0.2 or
+knocked out 3, an escape attempt 10, each hour of a sit-in 1) and counted per 10 prisoners: 0.2 or
 less is five stars, then 0.5, 1 and 2, and worse is one star. The morning
 report lists yesterday's incidents.
 

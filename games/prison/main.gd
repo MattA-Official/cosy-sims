@@ -94,6 +94,7 @@ var infirmary := Infirmary.new()
 var contraband := Contraband.new()
 var searching := Searching.new()
 var security := Security.new()
+var sit_ins := SitIns.new()
 var coverage_tint := CoverageTint.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
@@ -497,6 +498,40 @@ func _ready() -> void:
 		security.count(&"knocked_out", person, "Knocked out in a fight"))
 	escapes.running.connect(func(person: Person) -> void:
 		security.count(&"escape", person, "Making a run for it"))
+	sit_ins.name = "SitIns"
+	sit_ins.people = people
+	sit_ins.jobs = jobs
+	sit_ins.fights = fights
+	sit_ins.clock = clock
+	add_child(sit_ins)
+	sit_ins.start()
+	var room_name := func(sit_in: SitIns.SitIn) -> String:
+		var type := people.room_type(sit_in.room.type)
+		return type.display_name.to_lower() if type != null else "room"
+	sit_ins.started.connect(func(sit_in: SitIns.SitIn) -> void:
+		var words := SitIns.words(sit_in, room_name.call(sit_in))
+		Toasts.post("Sit-in!", "%s. To end it, %s, or send someone to talk them round (Security window, K)." % [words, sit_in.hint])
+		security.count(&"sit_in", null, words)
+		if not security.alerts.is_empty():
+			var point := sit_in.room.centre()
+			security.alerts[0][3] = sit_in.level
+			security.alerts[0][4] = point)
+	sit_ins.ended.connect(func(sit_in: SitIns.SitIn, how: String) -> void:
+		var endings := {"fixed": "They've stood up: whatever it was is sorted.",
+				"talked": "They've been talked round and gone back to the timetable.",
+				"boiled": "Nobody came, and it's ended in a scrap.",
+				"fizzled": "It's fizzled out."}
+		Toasts.post("Sit-in over", endings.get(how, "")))
+	clock.hour_changed.connect(func(_hour: int) -> void:
+		for sit_in in sit_ins.sit_ins:
+			if sit_in.minutes >= 1.0:
+				security.count(&"sit_in", null, "", true))
+	inspector.person_actions.append(["Talk them round", "Sends a guard, or the warden, to hear them out and end the sit-in.",
+			func(person: Person) -> void:
+				var sit_in := sit_ins.sit_in_of(person)
+				if sit_in != null:
+					sit_ins.negotiate(sit_in),
+			func(person: Person) -> bool: return person.sitting])
 	coverage_tint.name = "CoverageTint"
 	coverage_tint.cell_size = grid.cell_size
 	coverage_tint.coverage = security.coverage
@@ -697,6 +732,7 @@ func _add_hud() -> void:
 	security_window.searching = searching
 	security_window.escapes = escapes
 	security_window.coverage_tint = coverage_tint
+	security_window.sit_ins = sit_ins
 	security_window.prisoners = func() -> int:
 		return people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size()
 	security_window.look_pressed.connect(func(level: int, point: Vector2) -> void:

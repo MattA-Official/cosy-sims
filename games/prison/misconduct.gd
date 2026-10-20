@@ -60,7 +60,7 @@ func tick(minutes: float) -> void:
 		if person.group != prisoner_group:
 			continue
 		_count_down(person, minutes)
-		if not enabled or person.led or person.going_home:
+		if not enabled or person.led or person.going_home or person.sitting:
 			continue
 		person.temper = model.temper_after(person.temper, person.mood, minutes / 60.0, _temper_scale(person))
 		for def in rungs:

@@ -23,6 +23,7 @@ const WEIGHTS: Dictionary[StringName, float] = {
 	&"fight": 1.0,
 	&"knocked_out": 3.0,
 	&"escape": 10.0,
+	&"sit_in": 1.0,
 }
 const NAMES: Dictionary[StringName, String] = {
 	&"walk_back": "Walked back",
@@ -31,6 +32,7 @@ const NAMES: Dictionary[StringName, String] = {
 	&"fight": "Fights",
 	&"knocked_out": "Knocked out",
 	&"escape": "Escape attempts",
+	&"sit_in": "Sit-in hours",
 }
 const ALERTS_KEPT := 40
 
@@ -120,10 +122,10 @@ func watched(level: int, point: Vector2) -> bool:
 	return coverage.seen_at(level, point) > 0.5
 
 
-## Counts an incident, and raises an alert for it.
-func count(kind: StringName, person: Person = null, words := "") -> void:
+## Counts an incident, and raises an alert for it unless `quiet`.
+func count(kind: StringName, person: Person = null, words := "", quiet := false) -> void:
 	today[kind] = today.get(kind, 0) + 1
-	if kind == &"walk_back":
+	if kind == &"walk_back" or quiet:
 		return
 	var text: String = words if not words.is_empty() else NAMES.get(kind, String(kind))
 	if person != null and not words.contains(person.name):

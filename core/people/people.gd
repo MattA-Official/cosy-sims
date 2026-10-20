@@ -42,6 +42,8 @@ const URGENT_LINE := 15.0
 const NEARBY := 3.0
 ## Game minutes between each person looking around and deciding.
 const THINK_MINUTES := 0.5
+## How far down someone sat on the floor sits.
+const SIT_DROP := 0.2
 ## Game minutes between working out each person's mood.
 const MOOD_MINUTES := 2.0
 ## Added to the distance to a choice when scoring it, in tiles, so nearby
@@ -1862,6 +1864,7 @@ func _update_bodies() -> void:
 				body.rotation.y = atan2(-ahead.x, -ahead.y)
 		_pose(person, body, cs)
 		_lie_down(person, body)
+		_sit_down(person, body)
 		body.get_node("Flag").visible = person.out_of_place and person.bubble.is_empty()
 		var bubble := body.get_node("Bubble") as Label3D
 		bubble.visible = not person.bubble.is_empty()
@@ -1927,6 +1930,17 @@ func _lie_down(person: Person, body: Node3D) -> void:
 			elif part.has_meta(&"standing"):
 				part.transform = part.get_meta(&"standing")
 				part.remove_meta(&"standing")
+
+
+## Sat on the floor, legs out in front.
+func _sit_down(person: Person, body: Node3D) -> void:
+	if person.sitting and not person.lying and not body.has_meta(&"posed"):
+		body.position.y -= SIT_DROP
+		PersonPoses._swing(body, &"legs", PI * 0.5)
+		body.set_meta(&"sat", true)
+	elif body.has_meta(&"sat"):
+		body.remove_meta(&"sat")
+		PersonPoses._swing(body, &"legs", 0.0)
 
 
 ## People above the level being looked at are hidden, like the floors.

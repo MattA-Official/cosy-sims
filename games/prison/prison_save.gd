@@ -71,6 +71,10 @@ static func capture(main: Node) -> Dictionary:
 		"items_hidden": _items_out((main.items as ItemStore).hidden),
 		"stash_owner": (main.items as ItemStore).stash_owner.duplicate(),
 		"at_large": (main.escapes as Escapes).at_large.duplicate(true),
+		"sit_ins": (main.sit_ins as SitIns).sit_ins.map(func(sit_in: SitIns.SitIn) -> Dictionary:
+			return {"level": sit_in.level, "cell": sit_in.room.cells[0], "cause": sit_in.cause,
+					"demand": sit_in.demand, "hint": sit_in.hint, "minutes": sit_in.minutes, "talked": sit_in.talked,
+					"members": sit_in.members.map(func(p: Person) -> int: return p.id)}),
 		"security": {"today": (main.security as Security).today.duplicate(),
 				"yesterday": (main.security as Security).yesterday.duplicate(),
 				"alerts": (main.security as Security).alerts.duplicate(true)},
@@ -237,6 +241,25 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 		if person != null:
 			people.resume_doing(person, entry.get("doing", {}))
 			(main.jobs as JobBoard).resume_work(person, entry.get("work", {}))
+	for entry: Dictionary in data.get("sit_ins", []):
+		var map: BuildingMap = (main.building as Building).levels.get(entry["level"])
+		var room := map.room_at(entry["cell"]) if map != null else null
+		if room == null:
+			continue
+		var sit_in := SitIns.SitIn.new()
+		sit_in.level = entry["level"]
+		sit_in.room = room
+		sit_in.cause = entry["cause"]
+		sit_in.demand = entry["demand"]
+		sit_in.hint = entry["hint"]
+		sit_in.minutes = entry["minutes"]
+		sit_in.talked = entry["talked"]
+		for id: int in entry["members"]:
+			var member: Person = by_id.get(id)
+			if member != null:
+				member.sitting = true
+				sit_in.members.append(member)
+		(main.sit_ins as SitIns).sit_ins.append(sit_in)
 
 
 static func write(slot: String, data: Dictionary) -> Error:

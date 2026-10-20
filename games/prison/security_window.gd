@@ -15,12 +15,15 @@ var secure_area: SecureArea
 var searching: Searching
 var escapes: Escapes
 var coverage_tint: CoverageTint
+var sit_ins: SitIns
 var prisoners: Callable
 
 var _show := CheckBox.new()
 var _status := Label.new()
 var _today := Label.new()
 var _alerts := VBoxContainer.new()
+var _sit_ins := VBoxContainer.new()
+var _shown_sit_ins: Array = []
 var _wait := 0.0
 var _shown_alerts := -1
 
@@ -67,6 +70,8 @@ func _ready() -> void:
 	box.add_child(today_heading)
 	_today.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_today)
+	_sit_ins.add_theme_constant_override(&"separation", 4)
+	box.add_child(_sit_ins)
 	box.add_child(HSeparator.new())
 	var alerts_heading := Label.new()
 	alerts_heading.text = "Alerts"
@@ -97,6 +102,7 @@ func refresh() -> void:
 	_show.set_pressed_no_signal(coverage_tint != null and coverage_tint.shown)
 	_status.text = "\n".join(status_lines())
 	_today.text = "\n".join(today_lines())
+	_show_sit_ins()
 	if _shown_alerts != security.alerts.size() or (not security.alerts.is_empty() and _alerts.get_child_count() == 0):
 		_show_alerts()
 
@@ -143,6 +149,38 @@ func today_lines() -> PackedStringArray:
 			names.append(entry[0])
 		lines.append("At large: %s." % ", ".join(names))
 	return lines
+
+
+## Each sit-in going on, with what would end it and a button to talk.
+func _show_sit_ins() -> void:
+	var now: Array = sit_ins.sit_ins.duplicate() if sit_ins != null else []
+	var talking := now.map(func(s: SitIns.SitIn) -> bool: return s.job != null)
+	if now == _shown_sit_ins.slice(0, now.size()) and _shown_sit_ins.slice(now.size()) == talking \
+			and _shown_sit_ins.size() == now.size() * 2:
+		return
+	_shown_sit_ins = now + talking
+	for child in _sit_ins.get_children():
+		_sit_ins.remove_child(child)
+		child.queue_free()
+	for sit_in: SitIns.SitIn in now:
+		var row := HBoxContainer.new()
+		var words := Label.new()
+		words.text = "Sit-in: \"%s\" (%d sitting, over %s). To fix it, %s." % [sit_in.demand,
+				sit_in.members.size(), sit_in.cause.to_lower(), sit_in.hint]
+		words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		words.size_flags_horizontal = SIZE_EXPAND_FILL
+		words.custom_minimum_size = Vector2(300, 0)
+		row.add_child(words)
+		var talk := Button.new()
+		talk.text = "Someone's on the way" if sit_in.job != null else "Talk them round"
+		talk.disabled = sit_in.job != null
+		talk.focus_mode = FOCUS_NONE
+		talk.tooltip_text = "A guard (or the warden, twice as fast) hears them out for 20 minutes."
+		talk.pressed.connect(func() -> void:
+			sit_ins.negotiate(sit_in)
+			refresh())
+		row.add_child(talk)
+		_sit_ins.add_child(row)
 
 
 func _show_alerts() -> void:

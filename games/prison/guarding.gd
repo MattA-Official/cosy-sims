@@ -230,7 +230,7 @@ func _spot_out_of_place() -> void:
 		asked[job.get_meta(&"prisoner")] = true
 	for guard: Person in guards:
 		for person in people.nearby(guard, WATCH_DISTANCE):
-			if person.group != prisoner_group or not person.out_of_place or asked.has(person) \
+			if person.group != prisoner_group or not person.out_of_place or asked.has(person) or person.sitting \
 					or _led.has(person) or clock.total_minutes - _walked_back.get(person, -INF) < ESCORT_COOLDOWN:
 				continue
 			var to := _place_tile(person)

@@ -11,7 +11,7 @@ extends Node
 
 ## Points each kind of offence scores, by record id.
 const POINTS: Dictionary[StringName, float] = {
-	&"grumble": 0.0, &"mischief": 1.0, &"contraband": 2.0, &"vandalism": 2.0, &"fight": 3.0, &"escape": 5.0,
+	&"grumble": 0.0, &"mischief": 1.0, &"contraband": 2.0, &"vandalism": 2.0, &"fight": 3.0, &"escape": 5.0, &"sit_in": 1.0,
 }
 ## Offences that mean the quiet room.
 const SERIOUS: Array[StringName] = [&"fight", &"escape"]

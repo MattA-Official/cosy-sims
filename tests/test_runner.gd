@@ -64,6 +64,7 @@ func _process(_delta: float) -> bool:
 	_test_perimeter()
 	_test_escapes()
 	_test_security()
+	_test_sit_ins()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3321,4 +3322,80 @@ func _test_security() -> void:
 	(main.security_window as SecurityWindow).toggle()
 	_check(Array((main.security_window as SecurityWindow).status_lines())[0].contains("watched from the monitor"),
 			"the Security window says the cameras are watched")
+	main.queue_free()
+
+
+func _test_sit_ins() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var sit_ins: SitIns = main.sit_ins
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	(main.searching as Searching).random_per_day = 0
+	sit_ins.enabled = false
+	var minutes := 0
+	while not people.people.any(func(p: Person) -> bool: return p.role == &"guard") and minutes < 240:
+		clock.advance(1.0)
+		minutes += 1
+	var map: BuildingMap = main.building.ground()
+	var canteen: Room = map.rooms().filter(func(r: Room) -> bool: return r.type == &"canteen")[0]
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	_check(prisoners.size() >= 6, "enough prisoners for a sit-in")
+	var crowd: Array = prisoners.slice(0, 6)
+	var put_in_canteen := func() -> void:
+		for i in crowd.size():
+			var person: Person = crowd[i]
+			people.stop(person)
+			person.traits.clear()
+			person.level = 0
+			var cell: Vector2i = canteen.cells[(i * 3 + 7) % canteen.cells.size()]
+			person.position = Vector3(cell.x + 0.5, map.floor_height(cell), cell.y + 0.5)
+			person.moodlets[&"missed_meal"] = 6.0
+			person.mood = 10.0
+			person.mood_parts = [["Missed a meal", -8.0]]
+	put_in_canteen.call()
+	_check(sit_ins.try_start(0, canteen, crowd.slice(0, 5)) == null, "five is too few for a sit-in")
+	var sit_in := sit_ins.try_start(0, canteen, crowd)
+	_check(sit_in != null and sit_in.members.size() == 6 and sit_in.demand == "Proper dinners!",
+			"six unhappy about missing meals sit in for proper dinners")
+	_check(crowd.all(func(p: Person) -> bool: return p.sitting), "and sit down")
+	var spot: Vector3 = (crowd[0] as Person).position
+	clock.advance(5.0)
+	_check((crowd[0] as Person).position.distance_to(spot) < 0.1 and (crowd[0] as Person).bubble == "Proper dinners!",
+			"they stay put with a placard")
+	# Talked round by a guard.
+	var how := []
+	sit_ins.ended.connect(func(_s: SitIns.SitIn, h: String) -> void: how.append(h))
+	sit_ins.negotiate(sit_in)
+	minutes = 0
+	while how.is_empty() and minutes < 120:
+		for person: Person in crowd:
+			person.mood_parts = [["Missed a meal", -8.0]]
+		clock.advance(1.0)
+		minutes += 1
+	_check(how == ["talked"], "a guard talks them round")
+	_check(crowd.all(func(p: Person) -> bool: return not p.sitting and p.moodlets.has(&"listened_to")),
+			"and they stand up feeling listened to")
+	_check((crowd[0] as Person).record.any(func(e: Array) -> bool: return e[1] == &"sit_in"), "it goes on their record")
+	# Fixed: the complaint goes away.
+	put_in_canteen.call()
+	sit_in = sit_ins.try_start(0, canteen, crowd)
+	how.clear()
+	minutes = 0
+	while how.is_empty() and minutes < 30:
+		for person: Person in crowd:
+			person.moodlets.erase(&"missed_meal")
+			person.mood_parts = [["Bored", -2.0]]
+		clock.advance(1.0)
+		minutes += 1
+	_check(how == ["fixed"], "fixing what upset them stands them up")
+	# Left too long, it ends in a scrap.
+	put_in_canteen.call()
+	sit_in = sit_ins.try_start(0, canteen, crowd)
+	sit_in.minutes = SitIns.BOIL_MINUTES
+	how.clear()
+	sit_ins.tick()
+	_check(how == ["boiled"] and (main.fights as Fights).fights.size() == 1, "left for hours it boils over into a fight")
 	main.queue_free()
