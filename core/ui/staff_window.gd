@@ -15,6 +15,9 @@ var programmes: Array[WorkProgrammeDef] = []
 var people: People
 ## Who works which shift.
 var shifts: Shifts
+## Patrol routes, to put guards on. Optional.
+var routes: PatrolRoutes
+var route_icon: Texture2D
 ## Whose needs the Staff needs box switches on and off.
 var staff_group: StringName = &"staff"
 ## Who goes on work programmes.
@@ -24,6 +27,8 @@ var programme_group: StringName = &"prisoner"
 var _counts: Dictionary[StringName, Dictionary] = {}
 var _programme_counts: Dictionary[StringName, Label] = {}
 var _free_text := Label.new()
+var _route_box := VBoxContainer.new()
+var _route_counts: Dictionary[PatrolRoutes.Route, Label] = {}
 var _wait := 0.0
 
 
@@ -96,6 +101,17 @@ func _ready() -> void:
 			people.needs_off.append(staff_group))
 	box.add_child(staff_needs)
 
+	if routes != null:
+		box.add_child(HSeparator.new())
+		var heading_routes := Label.new()
+		heading_routes.text = "Patrol routes"
+		heading_routes.theme_type_variation = &"HeaderLabel"
+		box.add_child(heading_routes)
+		_route_box.add_theme_constant_override(&"separation", 8)
+		box.add_child(_route_box)
+		routes.changed.connect(_list_routes)
+		_list_routes()
+
 	if not programmes.is_empty():
 		box.add_child(HSeparator.new())
 		var work := Label.new()
@@ -139,6 +155,8 @@ func refresh() -> void:
 			var here := shifts.on_site(role, shift).size()
 			label.text = str(want)
 			label.tooltip_text = "%d wanted, %d on site now" % [want, here]
+	for route: PatrolRoutes.Route in _route_counts:
+		_route_counts[route].text = str(route.guards)
 	for programme: StringName in _programme_counts:
 		_programme_counts[programme].text = str(_with(func(p: Person) -> bool:
 				return p.programme == programme).size())
@@ -146,6 +164,27 @@ func refresh() -> void:
 		var free := _free().size()
 		_free_text.text = "Prisoners on a programme work in work blocks. %d %s on none." % [
 				free, "prisoner is" if free == 1 else "prisoners are"]
+
+
+## A row for each patrol route with how many guards walk it.
+func _list_routes() -> void:
+	for child in _route_box.get_children():
+		child.queue_free()
+	_route_counts.clear()
+	if routes.routes.is_empty():
+		var none := Label.new()
+		none.text = "None yet. Draw one with the route tool (X); guards with no route patrol where the prisoners are."
+		none.theme_type_variation = &"SubtleLabel"
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_route_box.add_child(none)
+		return
+	for route in routes.routes:
+		var row := _row(route_icon, route.name, "%d points. Guards on it walk round the loop." % route.points.size())
+		_route_counts[route] = _stepper(row,
+				func() -> void: routes.set_guards(route, route.guards + 1),
+				func() -> void: routes.set_guards(route, route.guards - 1))
+		_route_box.add_child(row)
+	refresh()
 
 
 ## A row with an icon and a name, for steppers to go on the end of.

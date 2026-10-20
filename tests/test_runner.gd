@@ -957,8 +957,11 @@ func _test_guards() -> void:
 	prisoner.level = guard.level
 	people.stop(prisoner)
 	people._buckets_fresh = false
+	guarding._walked_back.erase(prisoner)
+	prisoner.moodlets.erase(&"walked_back")
 	guarding._spot_out_of_place()
-	_check(jobs.of_kind(&"escort").size() == 1, "a guard who sees a prisoner out of place goes to walk them back")
+	_check(jobs.of_kind(&"escort").any(func(j: Job) -> bool: return j.get_meta(&"prisoner") == prisoner),
+			"a guard who sees a prisoner out of place goes to walk them back")
 	var led := false
 	minutes = 0
 	while not prisoner.moodlets.has(&"walked_back") and minutes < 60:
@@ -967,6 +970,34 @@ func _test_guards() -> void:
 		led = led or guarding.is_led(prisoner)
 	_check(led and prisoner.moodlets.has(&"walked_back") and not prisoner.led,
 			"and walks them back, which they don't enjoy")
+
+	# Patrol routes: drawn as a loop, and walked by the guards put on them.
+	var routes: PatrolRoutes = main.routes
+	var yard := Vector2(cells[1])
+	main.controller.tool = BuildController.Tool.ROUTE
+	routes.click(0, yard + Vector2(0.2, 1.3))
+	routes.click(0, yard + Vector2(4.5, 1.5))
+	routes.click(0, yard + Vector2(4.5, 3.5))
+	routes.click(0, yard + Vector2(0.6, 1.4))
+	_check(routes.routes.size() == 1 and routes.drawing == null and routes.routes[0].points.size() == 3
+			and routes.routes[0].points[0] == yard + Vector2(0.5, 1.5),
+			"the route tool draws a loop, closed by clicking the first point")
+	var route: PatrolRoutes.Route = routes.routes[0]
+	routes.set_guards(route, 1)
+	var walking := false
+	minutes = 0
+	while not walking and minutes < 120:
+		clock.advance(1.0)
+		minutes += 1
+		walking = jobs.of_kind(&"patrol").any(func(j: Job) -> bool:
+			return j.has_meta(&"route") and j.worker != null and j.stage > 0)
+	_check(walking, "a guard put on it walks round it")
+	main.staff_window.refresh()
+	_check(main.staff_window._route_counts[route].text == "1", "the Staff window lists it with its guard")
+	routes.click(0, yard + Vector2(2.5, 1.5), true)
+	clock.advance(1.0)
+	_check(routes.routes.is_empty() and not jobs.of_kind(&"patrol").any(func(j: Job) -> bool:
+			return j.has_meta(&"route")), "Ctrl-click removes it, and the guard stops")
 	main.queue_free()
 
 

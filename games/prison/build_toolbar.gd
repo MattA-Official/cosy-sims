@@ -3,7 +3,8 @@ extends VBoxContainer
 ## bar of choices for the current tool above it, and a hint. Choices from the
 ## catalogue (objects, floors, walls, rooms, plants, paths) are picture tiles
 ## with their name on hover, so new entries slot in without new code.
-## Number keys 1 to 9, then 0, pick tools, and Z the zones tool.
+## Number keys 1 to 9, then 0, pick tools, Z the zones tool and X the
+## patrol route tool.
 
 @export var controller: BuildController
 
@@ -22,12 +23,13 @@ const TOOLS := [
 	[BuildController.Tool.TERRAIN, "Terrain", "Shape the ground, or add and drain water.", "tool_terrain"],
 	[BuildController.Tool.DEMOLISH, "Demolish", "Remove objects and walls, or clear an area.", "tool_demolish"],
 	[BuildController.Tool.ZONE, "Zones", "Say who may go where, and lock doors by hand.", "tool_zones"],
+	[BuildController.Tool.ROUTE, "Patrol routes", "Draw loops for guards to walk; put guards on them in the Staff window (P).", "tool_route"],
 ]
 ## A divider goes before each of these tools, grouping building, grounds,
 ## demolish and running the prison.
 const GROUP_STARTS: Array[int] = [6, 9, 10]
 ## Keys for tools past the tenth, which have no number.
-const EXTRA_KEYS: Array[String] = ["Z"]
+const EXTRA_KEYS: Array[String] = ["Z", "X"]
 
 const ICONS := "res://core/ui/icons/%s.svg"
 
@@ -144,6 +146,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var index := 9 if key.physical_keycode == KEY_0 else key.physical_keycode - KEY_1
 	if key.physical_keycode == KEY_Z:
 		index = 10
+	elif key.physical_keycode == KEY_X:
+		index = 11
 	elif index > 9:
 		index = -1
 	if index >= 0 and index < TOOLS.size():

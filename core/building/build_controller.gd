@@ -17,6 +17,9 @@ signal wall_view_changed(mode: WallView)
 ## The zones tool clicked a door, to lock or unlock it by hand; with `pin`
 ## (Shift held) it stays that way past the block.
 signal door_lock_clicked(level: int, edge: Vector3i, pin: bool)
+## The route tool clicked a point (in tile units) on a level; with `erase`
+## (Ctrl held), to remove the route there.
+signal route_clicked(level: int, point: Vector2, erase: bool)
 
 ## What Tab loops through, like The Sims: walls up; cutaway (walls in front
 ## of rooms drop, as the camera looks); every wall down; and roofs on, for
@@ -31,7 +34,7 @@ var wall_view := WallView.UP:
 		wall_view = value
 		wall_view_changed.emit(value)
 
-enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE }
+enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE, ROUTE }
 enum WaterMode { NONE, ADD, REMOVE }
 ## What the floor tool does: lay floor, or nudge existing floor up or down.
 enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS }
@@ -59,6 +62,7 @@ const HINTS := {
 	Tool.PLANTS: "Hold the mouse to plant, or click to place one at the smallest size. Hold Ctrl to clear. [ and ] change the size.",
 	Tool.PATH: "",
 	Tool.ZONE: "Click a room to say who may be in it. Click a door to lock or unlock it until the next block; Shift-click to keep it so.",
+	Tool.ROUTE: "Click to add points to a patrol route; click the first point or press Enter to close the loop. Esc stops drawing; Ctrl-click a route to remove it.",
 }
 
 const PATH_HINTS := {
@@ -359,6 +363,8 @@ func _on_press() -> void:
 			var room := map.room_at_point(_hover_point)
 			if room != null:
 				map.set_room_type(room, room_type.id if room_type != null else &"")
+		Tool.ROUTE:
+			route_clicked.emit(_level(), _hover_point, _erasing())
 		Tool.ZONE:
 			if _hover_door() != NO_DOOR:
 				door_lock_clicked.emit(_level(), _hover_door(), Input.is_action_pressed("build_whole_room"))
@@ -484,6 +490,12 @@ func next_wall_view() -> void:
 
 
 ## What the current tool does, for the toolbar.
+## Where the mouse is on the level being built on, in tile units, or
+## null when it is off the map.
+func hover_point() -> Variant:
+	return _hover_point if _has_hover else null
+
+
 func hint() -> String:
 	if tool == Tool.FLOOR and floor_mode != FloorMode.LAY:
 		return FLOOR_HINTS[floor_mode]

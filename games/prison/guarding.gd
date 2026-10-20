@@ -5,7 +5,8 @@ extends Node
 ## a post, its gates stay locked to anyone without keys. Guards with
 ## nothing else to do patrol where the prisoners are. A guard who spots a
 ## prisoner out of place has a word and walks them back where the
-## timetable wants them.
+## timetable wants them. Guards put on a patrol route walk round it
+## instead.
 
 ## Guard post desks: a guard at one opens the gates near it.
 const DESKS: Array[StringName] = [&"guard_desk"]
@@ -20,6 +21,8 @@ const POST_MINUTES := 240.0
 const GATE_GRACE := 5.0
 ## Game minutes a guard keeps an eye on one spot while patrolling.
 const PATROL_MINUTES := 5.0
+## Game minutes a guard pauses at each point of a patrol route.
+const ROUTE_PAUSE := 0.5
 ## Tiles a guard can see a prisoner out of place from.
 const WATCH_DISTANCE := 3.0
 ## Game minutes before the same prisoner is walked back again.
@@ -36,6 +39,8 @@ var clock: GameClock:
 	set(value):
 		clock = value
 		clock.minute_passed.connect(func(_minute: int) -> void: look())
+## Routes guards walk, with how many on each. Optional.
+var routes: PatrolRoutes
 ## Who is a prisoner, and the moodlet for being walked back.
 var prisoner_group: StringName = &"prisoner"
 var walked_back_moodlet: StringName = &"walked_back"
@@ -56,6 +61,7 @@ func look() -> void:
 	for key in manned_desks():
 		_last_manned[key] = clock.total_minutes
 	_man_posts()
+	_walk_routes()
 	_patrol()
 	_spot_out_of_place()
 	_lead()
@@ -125,6 +131,35 @@ func _man_posts() -> void:
 		jobs.post(job)
 
 
+## Keeps a job on the board for each guard a patrol route wants: once
+## round the loop, then it comes round again.
+func _walk_routes() -> void:
+	var on: Dictionary[PatrolRoutes.Route, int] = {}
+	for job in jobs.of_kind(&"patrol"):
+		if not job.has_meta(&"route"):
+			continue
+		var route: PatrolRoutes.Route = job.get_meta(&"route")
+		if routes == null or not routes.routes.has(route) or on.get(route, 0) >= route.guards:
+			jobs.cancel(job)
+		else:
+			on[route] = on.get(route, 0) + 1
+	if routes == null:
+		return
+	for route in routes.routes:
+		for i in route.guards - on.get(route, 0):
+			var job := Job.new()
+			job.kind = &"patrol"
+			job.title = "Walk %s" % route.name.to_lower()
+			job.priority = 2
+			job.set_meta(&"route", route)
+			for point in route.points:
+				var stop := Job.on_tile(Job.Do.WORK, route.level, Vector2i(point.floor()))
+				stop.minutes = ROUTE_PAUSE
+				stop.doing = "Walking %s" % route.name.to_lower()
+				job.stages.append(stop)
+			jobs.post(job)
+
+
 ## A patrol job for every guard with nothing to do, keeping an eye on
 ## wherever the most prisoners are.
 func _patrol() -> void:
@@ -132,7 +167,11 @@ func _patrol() -> void:
 	for person in people.people:
 		if _is_guard(person) and person.job == null and not person.going_home:
 			idle += 1
-	var waiting := jobs.of_kind(&"patrol").filter(func(job: Job) -> bool: return job.worker == null).size()
+	var waiting := jobs.of_kind(&"patrol").filter(func(job: Job) -> bool:
+		return job.worker == null and not job.has_meta(&"route")).size()
+	# Routes still wanting a guard take some of them.
+	waiting += jobs.of_kind(&"patrol").filter(func(job: Job) -> bool:
+		return job.worker == null and job.has_meta(&"route")).size()
 	for i in idle - waiting:
 		var spot: Variant = _busy_spot()
 		if spot == null:

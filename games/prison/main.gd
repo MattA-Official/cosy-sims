@@ -48,6 +48,8 @@ var laundry := Laundry.new()
 var workshop := Workshop.new()
 ## Guard posts and gates, patrols, and walking prisoners back.
 var guarding := Guarding.new()
+## Loops drawn for guards to walk.
+var routes := PatrolRoutes.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
 ## Open jobs and stock, with the debug view.
@@ -246,6 +248,13 @@ func _ready() -> void:
 	guarding.jobs = jobs
 	guarding.building = building
 	guarding.clock = clock
+	routes.name = "PatrolRoutes"
+	routes.controller = controller
+	routes.debug_overlay = debug_overlay
+	routes.cell_size = grid.cell_size
+	routes.height_at = func(level: int, point: Vector2) -> float: return people.nav().height_at(level, point)
+	grid.add_child(routes)
+	guarding.routes = routes
 	add_child(guarding)
 	runner.other_locks = guarding.gate_locks
 	runner.refresh()
@@ -302,6 +311,8 @@ func _add_hud() -> void:
 	staff_window.programmes = PrisonCatalogue.PROGRAMMES
 	staff_window.people = people
 	staff_window.shifts = shifts
+	staff_window.routes = routes
+	staff_window.route_icon = load("res://core/ui/icons/tool_route.svg")
 	hud.add_child(staff_window)
 
 func _unhandled_input(event: InputEvent) -> void:
