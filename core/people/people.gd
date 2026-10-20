@@ -1735,7 +1735,9 @@ func _make_body(person: Person) -> Node3D:
 			# Parts for one group or role only, like the staff badge (named
 			# *_staff) or a guard's cap (*_guard). Legs and arms are for
 			# posing and always show.
-			var only := StringName(mesh.name.get_slice("_", 1))
+			# get_slice gives the whole name when there is no "_", so plain
+			# parts (outfit, skin) need checking for one first.
+			var only := StringName(mesh.name.get_slice("_", 1)) if mesh.name.contains("_") else &""
 			if access.groups.has(only):
 				mesh.visible = only == person.group
 			elif only not in [&"", &"legs", &"arms"]:

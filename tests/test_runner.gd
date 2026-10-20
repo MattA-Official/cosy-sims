@@ -923,6 +923,22 @@ func _test_guards() -> void:
 			"two guards by day and one by night")
 	var gates := guarding.gate_locks()
 	_check(gates.size() == 1 and gates.values()[0], "the security gate is locked with nobody at the post")
+	# Bodies show their outfit and skin, and hats only for their role.
+	var shown := func(person: Person) -> Array[String]:
+		var body := people._make_body(person)
+		var out: Array[String] = []
+		for mesh: MeshInstance3D in body.find_children("*", "MeshInstance3D", true, false):
+			if mesh.visible:
+				out.append(String(mesh.name))
+		body.free()
+		return out
+	var a_guard: Person = people.people.filter(func(p: Person) -> bool: return p.role == &"guard")[0]
+	var a_prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	var guard_parts: Array[String] = shown.call(a_guard)
+	var prisoner_parts: Array[String] = shown.call(a_prisoner)
+	_check(prisoner_parts.has("outfit") and prisoner_parts.has("skin") and not prisoner_parts.has("navy_guard"),
+			"a prisoner's body shows, without a guard's cap: %s" % [prisoner_parts])
+	_check(guard_parts.has("outfit") and guard_parts.has("navy_guard"), "a guard's body shows with their cap: %s" % [guard_parts])
 	var key: Vector4i = gates.keys()[0]
 	var edge := Vector3i(key.y, key.z, key.w)
 	var cells := BuildingMap.edge_cells(edge)
