@@ -9,6 +9,8 @@ extends Resource
 @export var edge_colour := Color(0.58, 0.53, 0.45)
 ## Full width in tiles.
 @export var width := 1.5
+## Its own surface texture, instead of the one every path shares.
+@export var texture: Texture2D
 ## Road markings: a dashed line down the middle and a line along each side.
 @export var markings := false
 @export var marking_colour := Color(0.95, 0.94, 0.88)

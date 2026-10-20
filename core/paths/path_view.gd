@@ -38,7 +38,6 @@ func _ready() -> void:
 	if texture != null:
 		_material.albedo_texture = texture
 		_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-	_mesh.material_override = _material
 	if terrain != null:
 		terrain.changed.connect(queue_rebuild)
 		if terrain.water != null:
@@ -66,15 +65,47 @@ func rebuild() -> void:
 	if network.segments.is_empty():
 		_mesh.mesh = null
 		return
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# One surface per texture: the shared one, and any style's own.
+	var tools: Dictionary[Texture2D, SurfaceTool] = {}
+	var st := _tool_for(tools, texture)
 	for segment: PathNetwork.Segment in network.segments.values():
 		var def := style(segment.style)
-		add_curve(st, network.sample(segment), def, Color(1, 1, 1, 1), segment.built,
+		var own := def.texture if def != null and def.texture != null else texture
+		add_curve(_tool_for(tools, own), network.sample(segment), def, Color(1, 1, 1, 1), segment.built,
 				network.heights.get(segment.a, NAN), network.heights.get(segment.b, NAN))
 	for node: int in network.nodes:
 		_add_corners(st, node)
-	_mesh.mesh = st.commit()
+	var mesh := ArrayMesh.new()
+	for tex: Texture2D in tools:
+		var arrays := tools[tex].commit_to_arrays()
+		var vertices: Variant = arrays[Mesh.ARRAY_VERTEX]
+		if not vertices is PackedVector3Array or (vertices as PackedVector3Array).is_empty():
+			continue
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		var count := mesh.get_surface_count()
+		if count > 0 and mesh.surface_get_material(count - 1) == null:
+			mesh.surface_set_material(count - 1, _material if tex == texture else _material_for(tex))
+	_mesh.mesh = mesh
+
+
+func _tool_for(tools: Dictionary[Texture2D, SurfaceTool], tex: Texture2D) -> SurfaceTool:
+	if not tools.has(tex):
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		tools[tex] = st
+	return tools[tex]
+
+
+var _materials: Dictionary[Texture2D, Material] = {}
+
+
+## The shared material with another texture, for styles with their own.
+func _material_for(tex: Texture2D) -> Material:
+	if not _materials.has(tex):
+		var material := _material.duplicate() as StandardMaterial3D
+		material.albedo_texture = tex
+		_materials[tex] = material
+	return _materials[tex]
 
 
 ## Adds one curve's geometry. Also used by the drawing tool's preview.

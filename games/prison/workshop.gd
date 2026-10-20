@@ -55,10 +55,19 @@ func collect() -> int:
 	return taken
 
 
-func _make_job() -> Job:
+## A making job again from a save, for whoever was making it.
+func rebuild(work: Dictionary) -> Job:
+	for item in goods:
+		if work["title"] == "Make a %s" % item.display_name.to_lower():
+			return _make_job(item)
+	return null
+
+
+func _make_job(item: ItemDef = null) -> Job:
 	var job := Job.new()
 	job.kind = &"make"
-	var item := goods[_rng.randi() % goods.size()]
+	if item == null:
+		item = goods[_rng.randi() % goods.size()]
 	job.title = "Make a %s" % item.display_name.to_lower()
 	job.priority = 1
 	var make := Job.at_any(Job.Do.WORK, BENCHES)

@@ -22,6 +22,8 @@ extends Node3D
 const LORRY := preload("res://games/prison/art/models/lorry.glb")
 ## The bus's front is towards +X.
 const BUS := preload("res://games/prison/art/models/bus.glb")
+## The mouth faces +Z, with its bank behind.
+const TUNNEL := preload("res://games/prison/art/models/tunnel_portal.glb")
 const CARS: Array[PackedScene] = [preload("res://games/prison/art/models/car_red.glb"),
 		preload("res://games/prison/art/models/car_blue.glb"), preload("res://games/prison/art/models/car_cream.glb")]
 ## Game minutes the lorry waits before driving off.
@@ -283,6 +285,7 @@ func _ready() -> void:
 	laundry.name = "Laundry"
 	laundry.jobs = jobs
 	jobs.rebuilders[&"laundry"] = laundry.rebuild
+	jobs.rebuilders[&"make"] = workshop.rebuild
 	laundry.items = items
 	laundry.building = building
 	laundry.people = people
@@ -318,6 +321,7 @@ func _ready() -> void:
 	tunnels.name = "Tunnels"
 	tunnels.cell_size = grid.cell_size
 	tunnels.ground_at = func(tile: Vector2) -> float: return terrain.height_at(tile)
+	tunnels.model = TUNNEL
 	tunnels.roads = roads
 	grid.add_child(tunnels)
 	_passing_wait = _rng.randf_range(PASSING_CARS.x, PASSING_CARS.y)
@@ -331,6 +335,11 @@ func _ready() -> void:
 	add_child(car_park)
 	if CarPark.enabled:
 		car_park.start()
+	# A loaded prison wants the staff it had, so nobody is sent home.
+	var saved_wanted: Dictionary = saved.get("wanted", {})
+	for role: StringName in saved_wanted:
+		for shift: StringName in saved_wanted[role]:
+			shifts.set_wanted(role, shift, saved_wanted[role][shift], false)
 	shifts.start()
 	if CarPark.enabled:
 		car_park.park_staff_here()
