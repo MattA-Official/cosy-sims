@@ -85,6 +85,8 @@ const WALLS: Array[WallDef] = [
 	preload("res://games/prison/catalogue/wall_grey.tres"),
 	preload("res://games/prison/catalogue/wall_tiles.tres"),
 	preload("res://games/prison/catalogue/wall_fence.tres"),
+	preload("res://games/prison/catalogue/wall_perimeter_fence.tres"),
+	preload("res://games/prison/catalogue/wall_perimeter.tres"),
 	preload("res://games/prison/catalogue/wall_hedge.tres"),
 ]
 
@@ -153,6 +155,8 @@ const PROGRAMMES: Array[WorkProgrammeDef] = [
 const DOOR_KINDS: Array[DoorKindDef] = [
 	preload("res://games/prison/catalogue/door_staff.tres"),
 	preload("res://games/prison/catalogue/door_security_gate.tres"),
+	preload("res://games/prison/catalogue/door_people_gate.tres"),
+	preload("res://games/prison/catalogue/door_vehicle_gate.tres"),
 ]
 
 ## What prisoners need, and what sees to it.

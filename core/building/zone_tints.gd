@@ -2,7 +2,8 @@ class_name ZoneTints
 extends Node3D
 ## While the zones tool is open, tints every room on the level in view by
 ## its zone's colour and names the zone, so the whole plan of who may go
-## where shows at a glance.
+## where shows at a glance. With a perimeter, open ground on the ground
+## floor is tinted too: green inside it, orange outside.
 
 @export var cell_size := 1.0
 ## How far above the floor the tint sits.
@@ -10,6 +11,12 @@ extends Node3D
 @export var alpha := 0.45
 
 var access: Access
+## Optional: secure ground inside a perimeter.
+var secure_area: SecureArea
+var secure_colour := Color(0.55, 0.85, 0.5, 0.4)
+var outside_colour := Color(0.95, 0.6, 0.3, 0.45)
+## (cell: Vector2i) -> float: the ground's height, for the open ground tint.
+var ground_height: Callable
 var controller: BuildController:
 	set(value):
 		controller = value
@@ -44,9 +51,14 @@ func _redraw() -> void:
 	if controller.tool != BuildController.Tool.ZONE:
 		return
 	var map := building.levels.get(building.active) as BuildingMap
-	if map == null or map.rooms().is_empty():
+	if map == null:
+		return
+	var ground := building.active == 0 and secure_area != null and secure_area.has_perimeter
+	if map.rooms().is_empty() and not ground:
 		return
 	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	if ground:
+		_tint_ground(map)
 	for room in map.rooms():
 		var zone := access.zone_of(room)
 		if zone == null:
@@ -73,3 +85,14 @@ func _redraw() -> void:
 		label.position = Vector3(centre.x * cell_size, top + 0.1, centre.y * cell_size)
 		_labels.add_child(label)
 	_mesh.surface_end()
+
+
+## Open ground, inside the perimeter or not.
+func _tint_ground(map: BuildingMap) -> void:
+	for cell in BuildingMap.cells_in(map.land_bounds()):
+		if not map.owns(cell) or map.room_at(cell) != null:
+			continue
+		var colour := secure_colour if secure_area.is_secure(cell) else outside_colour
+		var height: float = ground_height.call(cell) if ground_height.is_valid() else 0.0
+		MeshShapes.add_box_immediate(_mesh, Vector3((cell.x + 0.5) * cell_size, height + lift,
+				(cell.y + 0.5) * cell_size), Vector3(0.48, 0.01, 0.48) * cell_size, colour)

@@ -61,6 +61,7 @@ func _process(_delta: float) -> bool:
 	_test_contraband()
 	_test_fights()
 	_test_consequences()
+	_test_perimeter()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3173,4 +3174,28 @@ func _test_consequences() -> void:
 	d.points = 9.0
 	consequences.new_day()
 	_check(d.category == &"high", "lots of trouble moves them up to high security")
+	main.queue_free()
+
+
+func _test_perimeter() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var secure: SecureArea = main.secure_area
+	var map: BuildingMap = main.building.ground()
+	_check(not secure.has_perimeter and secure.secure.is_empty(), "no perimeter, no secure ground")
+	var land := map.land_bounds()
+	var inner := land.grow(-3)
+	var edges := BuildingMap.rect_perimeter(inner)
+	map.build_walls(edges, &"perimeter_fence")
+	_check(secure.has_perimeter and secure.is_secure(inner.get_center()) and not secure.is_secure(land.position),
+			"a perimeter fence makes the ground inside secure")
+	var gap: Vector3i = edges[edges.size() / 2]
+	map.remove_walls([gap] as Array[Vector3i])
+	_check(not secure.is_secure(inner.get_center()), "a gap lets the outside in")
+	map.build_walls([gap] as Array[Vector3i], &"perimeter_fence")
+	map.set_door(gap, true, &"people_gate")
+	_check(secure.is_secure(inner.get_center()), "a gate in it counts as shut")
+	var people: People = main.people
+	_check(not people.access.door_kinds[&"vehicle_gate"].lets_through(&"prisoner"), "prisoners can't use the vehicle gate")
 	main.queue_free()

@@ -323,6 +323,14 @@ warden's office has the policies: random cell searches (none, 2 or 5 a
 day), how long privileges are lost for (1, 2 or 4 days) and whether fights
 mean the quiet room.
 
+**Perimeter.** The Wall tool has a **Perimeter fence** (see-through, can
+be cut) and a **Perimeter wall**. Ground they enclose is secure; the Zones
+tool tints open ground green inside the perimeter and orange outside. A
+**People gate** in the perimeter opens for prisoners only while a guard
+sits at a guard post nearby, like a security gate; a **Vehicle gate** lets
+staff through but never prisoners. Any gate counts as shut for working out
+what's secure.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one

@@ -81,6 +81,8 @@ var routes := PatrolRoutes.new()
 var wear := Wear.new()
 ## Unhappy prisoners acting up.
 var misconduct := Misconduct.new()
+## Ground inside the perimeter fence.
+var secure_area := SecureArea.new()
 ## What happens after an offence.
 var consequences := Consequences.new()
 ## Fights, and mending afterwards.
@@ -228,6 +230,12 @@ func _ready() -> void:
 	door_lights.door_kinds = people.access.door_kinds
 	grid.add_child(door_lights)
 	controller.door_lock_clicked.connect(runner.toggle_lock)
+	# Secure ground first, so everything redrawn after a change sees it.
+	secure_area.building = building
+	building.changed.connect(secure_area.refresh)
+	secure_area.refresh()
+	zone_tints.secure_area = secure_area
+	zone_tints.ground_height = terrain.cell_height
 	zone_tints.name = "ZoneTints"
 	zone_tints.cell_size = grid.cell_size
 	zone_tints.access = people.access

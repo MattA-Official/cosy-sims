@@ -10,7 +10,8 @@ extends Node
 
 ## Guard post desks: a guard at one opens the gates near it.
 const DESKS: Array[StringName] = [&"guard_desk"]
-const GATE_KIND := &"security_gate"
+## Door kinds a manned guard post opens for prisoners.
+const GATE_KINDS: Array[StringName] = [&"security_gate", &"people_gate"]
 ## Tiles from a desk to the gates it opens.
 const GATE_RANGE := 10.0
 ## Game minutes a guard sits at a post before the job comes round again,
@@ -83,7 +84,7 @@ func gate_locks() -> Dictionary[Vector4i, bool]:
 	for n: int in building.levels:
 		var map: BuildingMap = building.levels[n]
 		for edge: Vector3i in map.door_kinds:
-			if map.door_kind_at(edge) != GATE_KIND:
+			if not GATE_KINDS.has(map.door_kind_at(edge)):
 				continue
 			var cells := BuildingMap.edge_cells(edge)
 			var middle := (Vector2(cells[0]) + Vector2(cells[1])) * 0.5 + Vector2(0.5, 0.5)

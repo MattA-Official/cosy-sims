@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
@@ -62,6 +62,12 @@ func _process(_delta: float) -> bool:
 			_main.controller.tool = BuildController.Tool.TERRAIN
 		if args.has("route"):
 			_main.controller.tool = BuildController.Tool.ROUTE
+		if args.has("perimeter"):
+			# A perimeter fence a little inside the land, with a people gate.
+			var map: BuildingMap = _main.building.ground()
+			var edges := BuildingMap.rect_perimeter(map.land_bounds().grow(-2))
+			map.build_walls(edges, &"perimeter_fence")
+			map.set_door(edges[edges.size() / 2], true, &"people_gate")
 		if args.has("fight"):
 			# Two prisoners scrapping, and one already knocked out beside them.
 			var prisoners: Array = _main.people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")

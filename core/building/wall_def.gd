@@ -24,3 +24,8 @@ extends Resource
 @export var comfort := 0.0
 ## What a tile's length of it costs to build, when money is on.
 @export var price := 0
+## Part of a perimeter: ground it encloses counts as secure (see
+## SecureArea).
+@export var secure := false
+## Can be cut through, such as a wire fence (not a wall).
+@export var cuttable := false
