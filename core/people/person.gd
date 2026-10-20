@@ -82,6 +82,12 @@ var timer := 0.0
 var gave_up: Dictionary[StringName, float] = {}
 ## Game minutes before trying again to reach where the block wants them.
 var place_wait := 0.0
+## The job they are doing from the jobs board, or null.
+var job: Job
+## Their staff role, such as &"cook", or empty for none.
+var role: StringName = &""
+## The work programme a prisoner is on, such as &"kitchen", or empty.
+var programme: StringName = &""
 
 
 func flat() -> Vector2:

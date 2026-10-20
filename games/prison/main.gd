@@ -34,6 +34,10 @@ var building: Building
 var map: BuildingMap
 var paths := PathNetwork.new()
 var people := People.new()
+## Every item about the place, and the work to be done with them.
+var items := ItemStore.new()
+var jobs := JobBoard.new()
+var item_view := ItemView.new()
 ## Game time. Everything that happens over time listens to it.
 var clock := GameClock.new()
 ## The prisoners' timetable, a copy of the catalogue's so edits stay in
@@ -106,6 +110,10 @@ func _ready() -> void:
 	people.room_types = PrisonCatalogue.ROOM_TYPES
 	people.home_room_types = PrisonCatalogue.HOME_ROOM_TYPES
 	people.access = PrisonCatalogue.access()
+	jobs.people = people
+	jobs.items = items
+	jobs.roles = PrisonCatalogue.roles()
+	people.jobs = jobs
 	people.building = building
 	people.paths = paths
 	people.clock = clock
@@ -129,6 +137,12 @@ func _ready() -> void:
 	zone_tints.controller = controller
 	zone_tints.building = building
 	grid.add_child(zone_tints)
+	item_view.name = "Items"
+	item_view.cell_size = grid.cell_size
+	item_view.items = items
+	item_view.people = people
+	item_view.building = building
+	grid.add_child(item_view)
 	day_night.name = "DayNight"
 	day_night.sun = sun
 	day_night.environment = world_environment.environment

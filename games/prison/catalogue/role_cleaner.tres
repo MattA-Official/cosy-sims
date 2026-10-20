@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="StaffRoleDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/jobs/staff_role_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"cleaner"
+display_name = "Cleaner"
+description = "Sweeps up rubbish, empties bins and runs the laundry."
+job_kinds = Array[StringName]([&"clean", &"rubbish", &"laundry"])
+outfit_colour = Color(0.46, 0.56, 0.6, 1)

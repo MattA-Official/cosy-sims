@@ -34,3 +34,8 @@ enum Connects {
 @export var tags: Array[StringName] = []
 ## Whether this links to the level above, and how.
 @export var connects := Connects.NONE
+## Item tags it can hold, such as "ingredient" for a fridge or "meal" for
+## a serving counter. Empty for objects that hold nothing.
+@export var holds: Array[StringName] = []
+## How many items it holds at most.
+@export var capacity := 0

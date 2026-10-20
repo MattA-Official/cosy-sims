@@ -70,6 +70,13 @@ const ZONES: Array[ZoneDef] = [
 ## Rooms nobody has painted, and whose type names no zone.
 const DEFAULT_ZONE := &"shared"
 
+## Kinds of staff, and the jobs each takes.
+const ROLES: Array[StaffRoleDef] = [
+	preload("res://games/prison/catalogue/role_cook.tres"),
+	preload("res://games/prison/catalogue/role_cleaner.tres"),
+	preload("res://games/prison/catalogue/role_handyman.tres"),
+]
+
 const DOOR_KINDS: Array[DoorKindDef] = [
 	preload("res://games/prison/catalogue/door_staff.tres"),
 ]
@@ -175,6 +182,13 @@ static func access() -> Access:
 	for def in ROOM_TYPES:
 		out.room_types[def.id] = def
 	out.default_zone = DEFAULT_ZONE
+	return out
+
+
+static func roles() -> Dictionary[StringName, StaffRoleDef]:
+	var out: Dictionary[StringName, StaffRoleDef] = {}
+	for def in ROLES:
+		out[def.id] = def
 	return out
 
 

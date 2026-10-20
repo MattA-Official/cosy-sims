@@ -8,7 +8,9 @@ extends Node3D
 ## object (a table in Eat); then the best of what the block allows, scored
 ## by how low each need is, what they like, and how far it is; and
 ## otherwise they wander about where they are allowed. With no block they
-## are free.
+## are free. Workers (staff with a role, and prisoners on a work programme
+## in a work block) take jobs from the jobs board once nothing has nearly
+## run out, and leave one part way only for that.
 ##
 ## Every half game minute each person also looks around: whether they are
 ## outdoors and in company (which fill those needs), their moodlets, and
@@ -122,6 +124,8 @@ var graph: NavGraph
 var paused := false
 ## Who may go where: zones, staff doors and locked doors.
 var access := Access.new()
+## The work to be done, for workers. Optional.
+var jobs: JobBoard
 
 var _dirty := true
 ## Whether the ground under the building has changed too (terrain, water or
@@ -229,6 +233,39 @@ func may_enter(person: Person, room: Room) -> bool:
 	return access.may_enter(person.group, room)
 
 
+## Walks someone to a spot for a job, saying what they're off to do.
+## Returns false if they can't get there.
+func walk_to(person: Person, level: int, spot: Vector2, doing: String) -> bool:
+	if not _walk_to(person, level, spot):
+		return false
+	person.activity = doing
+	return true
+
+
+## Keeps someone at a job where they stand for some game minutes.
+func start_working(person: Person, minutes: float, doing: String) -> void:
+	person.stand_spot = person.position
+	person.state = Person.State.USING
+	person.timer = minutes
+	person.activity = doing
+
+
+## Done working where they stand, ready to move on.
+func finish_working(person: Person) -> void:
+	person.state = Person.State.IDLE
+	person.activity = "Standing about"
+
+
+## Drops whatever someone was doing.
+func stop(person: Person) -> void:
+	_stop(person)
+
+
+## Tiles beside an object to stand on to use it, nearest first.
+func spots_beside(level: int, placed: BuildingMap.PlacedObject, from: Vector2) -> Array[Vector2]:
+	return _spots_beside(level, placed, from)
+
+
 ## Adds someone of a group (a prisoner unless told otherwise) standing at
 ## a spot on a level. Returns null if nobody can stand there.
 func add_person(level: int, spot: Vector2, person_name := "", group: StringName = &"prisoner") -> Person:
@@ -255,8 +292,19 @@ func add_person(level: int, spot: Vector2, person_name := "", group: StringName 
 	return person
 
 
+## Gives someone a staff role (or none), dressing them for it.
+func set_role(person: Person, role: StringName) -> void:
+	if person.role == role:
+		return
+	_stop(person)
+	person.role = role
+	if _bodies.has(person):
+		_bodies[person].queue_free()
+		_bodies.erase(person)
+
+
 func remove_person(person: Person) -> void:
-	_release(person)
+	_stop(person)
 	_chatting_with.erase(person)
 	_where.erase(person)
 	_bed_owners.erase(person.bed)
@@ -287,6 +335,8 @@ func step(minutes: float) -> void:
 	if _beds_dirty:
 		assign_beds()
 	_buckets_fresh = false
+	if jobs != null:
+		jobs.step(minutes)
 	for person in people.duplicate():
 		_think(person, minutes)
 
@@ -553,6 +603,14 @@ func _think(person: Person, minutes: float) -> void:
 			if person.wandering and _has_errand(person):
 				_stop(person)
 				_decide(person, false)
+		Person.State.USING when person.job != null:
+			if person.timer <= 0.0:
+				jobs.stage_done(person)
+				if person.state == Person.State.IDLE:
+					_decide(person, false)
+			elif _urgent_need(person) != &"":
+				_stop(person)
+				_decide(person, false)
 		Person.State.USING:
 			if _done_using(person):
 				_finish_using(person)
@@ -764,6 +822,8 @@ func _pick_traits() -> Array[TraitDef]:
 func _has_errand(person: Person) -> bool:
 	if _urgent_need(person) != &"":
 		return true
+	if jobs != null and jobs.has_work_for(person):
+		return true
 	if person.place_wait <= 0.0 and not is_in_place(person) and not place_rooms(person).is_empty():
 		return true
 	return _main_tag(person) != &"" or _pressing_need(person) != &""
@@ -775,8 +835,13 @@ func _decide(person: Person, may_wander: bool) -> void:
 	if _leave_if_kept_out(person):
 		return
 	var urgent := _urgent_need(person)
+	if person.job != null and (urgent != &"" or not jobs.wants_work(person)):
+		jobs.abandon(person)
 	if urgent != &"" and _see_to(person, urgent, true):
 		person.reason = "%s has nearly run out" % need_def(urgent).display_name
+		return
+	if jobs != null and jobs.wants_work(person) and is_in_place(person) and jobs.carry_on(person):
+		person.reason = "Working"
 		return
 	if not is_in_place(person):
 		if person.place_wait <= 0.0 and _go_to_place(person):
@@ -1328,6 +1393,9 @@ func _walk(person: Person, minutes: float) -> void:
 
 
 func _arrive(person: Person) -> void:
+	if person.job != null:
+		jobs.arrived(person)
+		return
 	if person.has_target() and not person.has_object():
 		# Somewhere to be or someone to be with, rather than an object.
 		person.stand_spot = person.position
@@ -1378,7 +1446,10 @@ func _finish_using(person: Person) -> void:
 
 
 ## Drops whatever someone was doing, stepping off any object they were on.
+## A job part done goes back on the board.
 func _stop(person: Person) -> void:
+	if person.job != null:
+		jobs.abandon(person)
 	if person.state == Person.State.USING:
 		person.position = person.stand_spot
 	_release(person)
@@ -1426,6 +1497,11 @@ func _update_bodies() -> void:
 		if face.visible:
 			face.texture = face_textures[mood_face]
 	_update_visibility()
+
+
+## The node drawing someone, or null before it is first drawn.
+func body_of(person: Person) -> Node3D:
+	return _bodies.get(person)
 
 
 ## Lies, sits or showers someone's body while they use an object.
@@ -1523,6 +1599,9 @@ func _add_flag(root: Node3D) -> void:
 ## Shared between everyone of the same colour.
 ## The colour of someone's clothes: their group's, else everyone's.
 func _outfit(person: Person) -> Color:
+	var role: StaffRoleDef = jobs.roles.get(person.role) if jobs != null else null
+	if role != null:
+		return role.outfit_colour
 	var group: GroupDef = access.groups.get(person.group)
 	return group.outfit_colour if group != null else body_colour
 

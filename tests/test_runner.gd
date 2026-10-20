@@ -41,6 +41,7 @@ func _process(_delta: float) -> bool:
 	_test_needs_in_a_day()
 	_test_zones_and_doors()
 	_test_stopped_on_stairs()
+	_test_jobs_and_carrying()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -646,6 +647,86 @@ func _test_zones_and_doors() -> void:
 
 ## Someone who stops part way up the stairs (a block changing mid-climb)
 ## can still find a way off them.
+func _test_jobs_and_carrying() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 8
+	root.add_child(main)
+	var people: People = main.people
+	var jobs: JobBoard = main.jobs
+	var items: ItemStore = main.items
+	var map: BuildingMap = main.map
+	var clock: GameClock = main.clock
+	clock.speed_index = 0
+	var o: Vector2i = main.building.land[0].get_center() - Vector2i(10, 8)
+	var shelf := ObjectDef.new()
+	shelf.id = &"test_shelf"
+	shelf.display_name = "Shelf"
+	shelf.holds = [&"food"]
+	shelf.capacity = 4
+	var crate := ItemDef.new()
+	crate.id = &"crate"
+	crate.tags = [&"food"]
+	var from := map.place_object(shelf, Vector2(o + Vector2i(1, 6)), 0)
+	var to := map.place_object(shelf, Vector2(o + Vector2i(6, 8)), 0)
+	_check(from != -1 and to != -1, "shelves for the jobs test go in the canteen")
+	var cook: Person = people.people[6]
+	for need: StringName in cook.needs:
+		cook.needs[need] = 100.0
+	people.set_role(cook, &"cook")
+	_check(jobs.wants_work(cook) and not jobs.wants_work(people.people[0]),
+			"staff with a role work from the board, prisoners off a programme don't")
+	items.put_in(Vector2i(0, from), map.objects[from], crate, 3)
+	var finished: Array[Job] = []
+	jobs.job_finished.connect(func(job: Job) -> void: finished.append(job))
+	var carry := jobs.post(Job.carry(&"food", 2, Job.at(Job.Do.FETCH, 0, from), Job.at(Job.Do.DELIVER, 0, to)))
+	carry.title = "Carry food"
+	var minutes := 0
+	while not carry.done and minutes < 120:
+		clock.advance(1.0)
+		minutes += 1
+	_check(carry.done and finished.has(carry), "a cook carries food from one shelf to another")
+	_check(items.count_in(Vector2i(0, from), &"food") == 1 and items.count_in(Vector2i(0, to), &"food") == 2,
+			"two crates moved, one left")
+	_check(cook.job == null and jobs.jobs.is_empty(), "the job is off the board once done")
+
+	# Called away mid-carry, what they hold goes down where they are and
+	# the job starts again from there.
+	var second := jobs.post(Job.carry(&"food", 1, Job.at(Job.Do.FETCH, 0, from), Job.at(Job.Do.DELIVER, 0, to)))
+	minutes = 0
+	while items.carrying(cook) == null and minutes < 120:
+		clock.advance(0.5)
+		minutes += 1
+	_check(items.carrying(cook) == crate, "they pick the crate up")
+	people.set_role(cook, &"")
+	_check(items.carrying(cook) == null and not items.floor_spots_of(&"food").is_empty(),
+			"dropped where they were when their role went")
+	_check(second.worker == null and second.current().do == Job.Do.FETCH and not second.current().at_object(),
+			"the job goes back on the board to pick it up off the floor")
+	people.set_role(cook, &"cook")
+	minutes = 0
+	while not second.done and minutes < 120:
+		clock.advance(1.0)
+		minutes += 1
+	_check(second.done and items.count_in(Vector2i(0, to), &"food") == 3 and items.on_floor.is_empty(),
+			"and someone finishes it from the floor")
+
+	# No room where it goes: what doesn't fit is left on the floor and the
+	# job waits with the reason.
+	items.put_in(Vector2i(0, from), map.objects[from], crate, 3)
+	var third := jobs.post(Job.carry(&"food", 3, Job.at(Job.Do.FETCH, 0, from), Job.at(Job.Do.DELIVER, 0, to)))
+	minutes = 0
+	while third.reason.is_empty() and minutes < 120:
+		clock.advance(0.5)
+		minutes += 1
+	_check(third.reason == "No room to put it down" and third.wait > 0.0 and not third.done,
+			"a full shelf stops the job, with a reason")
+	_check(items.count_in(Vector2i(0, to)) == 4 and items.total(&"food") == 6,
+			"one fits, the rest are put down, none lost")
+	jobs.cancel(third)
+	_check(jobs.jobs.is_empty() and cook.job == null, "a cancelled job leaves the board")
+	main.queue_free()
+
+
 func _test_stopped_on_stairs() -> void:
 	var main: Node = load("res://games/prison/main.tscn").instantiate()
 	main.sample = 1
