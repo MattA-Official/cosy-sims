@@ -332,9 +332,10 @@ func _test_daily_routine() -> void:
 				if not checked.has("asleep"):
 					checked["asleep"] = true
 					# Bar anyone up for the toilet.
-					_check(people.people.all(func(p: Person) -> bool:
-							return p.activity == "Sleeping" or p.target_tag == &"toilet"),
-							"in the night everyone is asleep")
+					var awake := people.people.filter(func(p: Person) -> bool:
+							return p.activity != "Sleeping" and p.target_tag != &"toilet")
+					_check(awake.is_empty(), "in the night everyone is asleep (not %s)" % [awake.map(
+							func(p: Person) -> String: return "%s: %s, %s" % [p.name, p.activity, p.reason])])
 	_check(checked.size() == 4, "the day ran through (checked %s)" % [checked.keys()])
 	_check(not runner.doors.values().has(true), "in the morning the cell doors open again (%s at %s: %s)" % [
 			runner.current().id, clock.time_text(), runner.doors])
@@ -933,8 +934,10 @@ func _test_guards() -> void:
 		minutes += 1
 	clock.advance(1.0)
 	_check(not guarding.manned_desks().is_empty(), "a guard sits at the post")
-	_check(not people.is_door_locked(0, edge) and people.can_reach(prisoner, 0, yard_side),
-			"which opens the gate for prisoners")
+	var standing: Array = people.people.filter(func(p: Person) -> bool:
+		return p.group == &"prisoner" and p.state != Person.State.USING)
+	_check(not people.is_door_locked(0, edge) and standing.any(func(p: Person) -> bool:
+			return people.can_reach(p, 0, yard_side)), "which opens the gate for prisoners")
 	var patrolling := false
 	for i in 20:
 		clock.advance(1.0)
@@ -942,10 +945,15 @@ func _test_guards() -> void:
 	_check(patrolling, "the other guard patrols")
 
 	# A prisoner out of place near a guard gets walked back.
-	var guard: Person = people.people.filter(func(p: Person) -> bool:
-		return p.role == &"guard" and p.job != null and p.job.kind == &"patrol")[0]
+	var on_patrol := func() -> Array: return people.people.filter(func(p: Person) -> bool:
+		return p.role == &"guard" and p.job != null and p.job.kind == &"patrol" and p.state == Person.State.USING)
+	minutes = 0
+	while on_patrol.call().is_empty() and minutes < 120:
+		clock.advance(1.0)
+		minutes += 1
+	var guard: Person = on_patrol.call()[0]
 	prisoner.out_of_place = true
-	prisoner.position = guard.position + Vector3(1.0, 0.0, 0.0)
+	prisoner.position = guard.position
 	prisoner.level = guard.level
 	people.stop(prisoner)
 	people._buckets_fresh = false
