@@ -32,6 +32,8 @@ var _selected_level := 0
 var _sending := false
 ## Labels and sliders refreshed every frame for the selected person.
 var _live_text: Label
+var _mood_face: TextureRect
+var _mood_text: Label
 var _need_sliders: Dictionary[StringName, HSlider] = {}
 ## Ready-made layouts the game offers, what each is for, and how to load one.
 var _samples: Array[String] = []
@@ -150,6 +152,8 @@ func _rebuild() -> void:
 		child.queue_free()
 	_need_sliders.clear()
 	_live_text = null
+	_mood_face = null
+	_mood_text = null
 	_heading("Inspector")
 	if _selected is Person:
 		_show_person(_selected)
@@ -213,6 +217,23 @@ func _show_person(person: Person) -> void:
 	name_edit.text_submitted.connect(func(text: String) -> void: person.name = text)
 	name_edit.text_changed.connect(func(text: String) -> void: person.name = text)
 	_box.add_child(name_edit)
+	var traits := PackedStringArray()
+	for t in person.traits:
+		traits.append("%s: %s" % [t.display_name, t.description])
+	if not traits.is_empty():
+		_text("\n".join(traits)).theme_type_variation = &"SubtleLabel"
+	var mood_row := HBoxContainer.new()
+	_mood_face = TextureRect.new()
+	_mood_face.custom_minimum_size = Vector2(32, 32)
+	_mood_face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_mood_face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	mood_row.add_child(_mood_face)
+	_mood_text = Label.new()
+	_mood_text.add_theme_font_size_override("font_size", 15)
+	_mood_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_mood_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mood_row.add_child(_mood_text)
+	_box.add_child(mood_row)
 	_live_text = _text("")
 	for def in people.needs:
 		var row := HBoxContainer.new()
@@ -243,9 +264,17 @@ func _show_person(person: Person) -> void:
 func _refresh_person(person: Person) -> void:
 	if _live_text == null:
 		return
+	var face := people.face(person)
+	_mood_face.texture = people.face_textures[face]
+	var why := PackedStringArray()
+	for part: Array in person.mood_parts.slice(0, 3):
+		why.append("%s %+d" % [part[0], roundi(part[1])])
+	_mood_text.text = "%s, mood %d\nWhy? %s" % [MoodModel.FACE_NAMES[face], roundi(person.mood),
+			", ".join(why) if not why.is_empty() else "nothing much"]
 	var target := people.target_object(person)
 	var lines := PackedStringArray([
 		"Doing: %s" % person.activity,
+		"Because: %s" % (person.reason if not person.reason.is_empty() else "-"),
 		"State: %s" % ["idle", "walking", "using an object"][person.state],
 		"Where: %s, tile %d, %d, %.2f m up" % [Building.level_name(person.level),
 				floori(person.position.x), floori(person.position.z), person.position.y],
@@ -259,14 +288,28 @@ func _refresh_person(person: Person) -> void:
 	var home := people.home_room(person)
 	lines.append("Bed: %s" % ("none of their own" if home.is_empty()
 			else "in a room on the %s" % Building.level_name(home[0]).to_lower()))
-	for need: StringName in person.needs:
-		lines.append("%s: %d%s" % [String(need).capitalize(), roundi(person.needs[need]),
-				"  (below the line)" if person.needs[need] < People.NEED_LINE else ""])
+	lines.append("Here: %s%s" % ["outdoors" if person.outdoors else "indoors",
+			", with company" if person.in_company else ""])
+	for id: StringName in person.moodlets:
+		var def: MoodletDef = people.moodlet_defs.get(id)
+		if def != null:
+			lines.append("%s %+d, %s left" % [def.display_name, roundi(def.mood),
+					_duration(person.moodlets[id])])
+	for part: Array in person.mood_parts.slice(3):
+		lines.append("Mood: %s %+.1f" % part)
 	_live_text.text = "\n".join(lines)
 	for need: StringName in _need_sliders:
 		var slider := _need_sliders[need]
 		if not slider.has_focus():
 			slider.set_value_no_signal(person.needs.get(need, 0.0))
+
+
+## "2 h 30 min", "45 min"
+static func _duration(minutes: float) -> String:
+	var whole := roundi(minutes)
+	if whole < 60:
+		return "%d min" % whole
+	return "%d h %d min" % [whole / 60, whole % 60] if whole % 60 != 0 else "%d h" % (whole / 60)
 
 
 func _show_object(level: int, id: int) -> void:
@@ -303,6 +346,15 @@ func _show_room(room: Room) -> void:
 	_text("Room: %s\n%s\n%d tiles, %s\nObjects: %s" % [type_name, Building.level_name(_selected_level),
 			room.cells.size(), "indoors" if room.indoor else ("outdoors" if room.enclosed else "not closed in"),
 			", ".join(names) if not names.is_empty() else "none"])
+	if people != null:
+		var quality := people.quality(_selected_level, room)
+		var parts := PackedStringArray()
+		for part: Array in quality.parts:
+			parts.append("%s %+.1f" % part)
+		_text("Quality: %s (%+.1f)\n%s" % [quality.star_text(), quality.score, "\n".join(parts)])
+		var sleepers := people.owners_in(_selected_level, room)
+		if not sleepers.is_empty():
+			_text("Sleeps here: %s" % ", ".join(sleepers.map(func(p: Person) -> String: return p.name)))
 	var inside := room.cells[0]
 	_button("Add a prisoner here", func() -> void: _add_prisoner(inside))
 

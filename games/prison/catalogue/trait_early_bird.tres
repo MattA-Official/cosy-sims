@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/trait_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"early_bird"
+display_name = "Early bird"
+description = "Up with the lark, and cheerful about it."
+opposite = &"night_owl"
+wake_before_hour = 8
+wake_moodlet = &"up_with_the_lark"

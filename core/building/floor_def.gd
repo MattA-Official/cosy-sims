@@ -10,3 +10,6 @@ extends Resource
 ## Optional pattern laid over the colour, one repeat a metre: near-white
 ## greyscale, so the colour still decides how it looks.
 @export var texture: Texture2D
+## How nice it is to be on, for room quality: 0 for bare concrete, 1 for
+## wood.
+@export var comfort := 0.0

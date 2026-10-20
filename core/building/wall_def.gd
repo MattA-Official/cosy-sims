@@ -20,3 +20,5 @@ extends Resource
 ## dado in a corridor. Fully transparent for none.
 @export var dado_colour := Color(0, 0, 0, 0)
 @export var dado_height := 0.5
+## How nice it is to have round a room, for room quality.
+@export var comfort := 0.0

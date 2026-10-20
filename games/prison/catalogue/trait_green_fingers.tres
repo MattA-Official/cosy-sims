@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/trait_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"green_fingers"
+display_name = "Green fingers"
+description = "Loves plants and the open air."
+need_rates = Dictionary[StringName, float]({
+&"outdoors": 1.3
+})
+likes = Dictionary[StringName, float]({
+&"outdoors": 1.4
+})
+room_likes = Dictionary[StringName, float]({
+&"plant": 3.0
+})
+room_like_text = "Plants about"

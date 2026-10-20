@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/poster.glb" id="2_ext"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"poster"
+display_name = "Poster"
+size = Vector2(0.75, 0.1)
+snap = 2
+height = 0.9
+colour = Color(0.95, 0.9, 0.75, 1)
+tags = Array[StringName]([&"decor"])
+model = ExtResource("2_ext")

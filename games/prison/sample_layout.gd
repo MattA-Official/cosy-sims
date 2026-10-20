@@ -1,7 +1,8 @@
 class_name SampleLayout
-## A tiny starter prison: six cells (with barred windows) off a corridor, a
-## canteen with glass windows, a shower room and a fenced yard, with one
-## thing left unfinished so the warnings show.
+## A tiny starter prison: six cells (with barred windows and a radio each)
+## off a corridor, a canteen with glass windows and a TV, a shower room and
+## a fenced yard with things to do, with one thing left unfinished so the
+## warnings show.
 
 
 static func build(map: BuildingMap, at: Vector2i) -> void:
@@ -25,6 +26,7 @@ static func build(map: BuildingMap, at: Vector2i) -> void:
 		map.set_opening(Vector3i(origin.x + 1, origin.y, BuildingMap.EDGE_X),
 				BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS)
 		map.place_object(bed, Vector2(origin), 0)
+		map.place_object(PrisonCatalogue.object(&"radio"), Vector2(origin) + Vector2(1, 0), 0)
 		if i < 5:
 			map.place_object(toilet, Vector2(origin) + Vector2(1.5, 0), 0)
 		map.set_room_type(map.room_at(origin), &"cell")
@@ -46,7 +48,17 @@ static func build(map: BuildingMap, at: Vector2i) -> void:
 	for row in 2:
 		map.place_object(table, o + Vector2(1, 6 + row * 2), 0)
 		map.place_object(table, o + Vector2(4, 6 + row * 2), 0)
+	map.place_object(PrisonCatalogue.object(&"tv"), o + Vector2(5.5, 5), 0)
+	map.place_object(PrisonCatalogue.object(&"poster"), o + Vector2(1.5, 5), 0)
+	map.place_object(PrisonCatalogue.object(&"plant_pot"), o + Vector2(0.25, 5.25), 0)
 	map.set_room_type(map.room_at(at + Vector2i(1, 6)), &"canteen")
+
+	# Things to do in the yard.
+	map.place_object(PrisonCatalogue.object(&"bench"), o + Vector2(13, 0), 0)
+	map.place_object(PrisonCatalogue.object(&"bench"), o + Vector2(12.5, 9.5), 2)
+	map.place_object(PrisonCatalogue.object(&"basketball_hoop"), o + Vector2(17.5, 0), 0)
+	map.place_object(PrisonCatalogue.object(&"weights_bench"), o + Vector2(17, 6), 0)
+	map.place_object(PrisonCatalogue.object(&"games_table"), o + Vector2(13, 3.5), 0)
 
 	var shower := PrisonCatalogue.object(&"shower")
 	for x in 4:

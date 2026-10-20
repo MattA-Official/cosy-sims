@@ -14,7 +14,9 @@ evening-sized chunks.
    and a simple daily schedule. This makes it a playable prototype.
    *Done. The daily schedule is milestone M1 of the prison game plan: a
    game clock with speeds, a timetable of blocks (`core/sim/`), cell
-   doors that lock at night, and needs that run per game hour.*
+   doors that lock at night, and needs that run per game hour. M2 added
+   seven needs, traits, mood with moodlets and reasons, room quality and
+   dorms (`core/sim/mood_model.gd`, `core/building/room_quality.gd`).*
 4. **Review and extract the core.** Note what is prison-specific and what is
    generic (camera, grid, building, agents, needs, schedules), then move the
    generic parts into `core/`.

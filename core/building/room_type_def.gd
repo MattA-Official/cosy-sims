@@ -13,6 +13,18 @@ enum Location { INDOORS, OUTDOORS, EITHER }
 @export var location := Location.INDOORS
 ## Each tag needs at least one object carrying it inside the room.
 @export var required_tags: Array[StringName] = []
+## Tags that need more than one, such as 4 beds in a dorm.
+@export var required_counts: Dictionary[StringName, int] = {}
+## Floor tiles each person sleeping in it should have, for room quality.
+## 0 for rooms nobody sleeps in.
+@export var ideal_tiles := 0.0
+## Many people sleep here together rather than in a room of their own,
+## which some mind.
+@export var dorm := false
+## Added to room quality as it is, such as -2 for a dorm's lack of
+## privacy.
+@export var quality_bonus := 0.0
+@export var quality_bonus_text := ""
 
 
 ## What is stopping this room from working, in words. Empty means it is fine.
@@ -25,8 +37,12 @@ func problems(room: Room, map: BuildingMap) -> PackedStringArray:
 	var present := {}
 	for placed in map.objects_in_room(room):
 		for tag in placed.def.tags:
-			present[tag] = true
+			present[tag] = present.get(tag, 0) + 1
 	for tag in required_tags:
 		if not present.has(tag):
 			out.append("Needs a %s" % tag)
+	for tag: StringName in required_counts:
+		var count: int = present.get(tag, 0)
+		if count < required_counts[tag] and not (count == 0 and required_tags.has(tag)):
+			out.append("Needs %d %ss" % [required_counts[tag], tag])
 	return out

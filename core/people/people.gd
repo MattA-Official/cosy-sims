@@ -2,13 +2,19 @@ class_name People
 extends Node3D
 ## Everyone walking about, and what they decide to do. Each person's needs
 ## run down over game time, and each follows the timetable block they are
-## in (see ActivityDef): first they get to where the block wants them,
-## then they use the block's own object (a table in Eat), then they see to
-## any pressing need the block allows, and otherwise they wander about
-## where they are allowed. With no block they are free. The walking graph
-## is rebuilt whenever the build or the paths change, and once the ground
-## has stopped changing for a moment (rebuilding on every frame of
-## sculpting made the brush lag).
+## in (see ActivityDef). Deciding goes: a need that has nearly run out
+## comes first, wherever the block wants them (if they can get out to see
+## to it); then getting to where the block wants them; then the block's own
+## object (a table in Eat); then the best of what the block allows, scored
+## by how low each need is, what they like, and how far it is; and
+## otherwise they wander about where they are allowed. With no block they
+## are free.
+##
+## Every half game minute each person also looks around: whether they are
+## outdoors and in company (which fill those needs), their moodlets, and
+## their mood (see MoodModel). The walking graph is rebuilt whenever the
+## build or the paths change, and once the ground has stopped changing for
+## a moment (rebuilding on every frame of sculpting made the brush lag).
 ##
 ## Time is in game minutes. With a GameClock set, people move as the clock
 ## does; without one, a real second counts as a game minute.
@@ -18,8 +24,27 @@ signal person_removed(person: Person)
 ## A door was locked or unlocked.
 signal doors_changed
 
-## Needs below this send people off to see to them.
+## Needs below this send people off to see to them, cutting short a
+## wander.
 const NEED_LINE := 40.0
+## Needs below this are worth seeing to when there is nothing else to do.
+const WANT_LINE := 70.0
+## Needs below this come before everything, even where the block wants
+## them.
+const URGENT_LINE := 15.0
+## Tiles within which people count as company, or a crowd.
+const NEARBY := 3.0
+## Game minutes between each person looking around and deciding.
+const THINK_MINUTES := 0.5
+## Game minutes between working out each person's mood.
+const MOOD_MINUTES := 2.0
+## Added to the distance to a choice when scoring it, in tiles, so nearby
+## choices don't win by too much.
+const DISTANCE_EASE := 10.0
+## Scores are nudged by up to this much either way, so a crowd doesn't all
+## pick the same table.
+const WOBBLE := 0.1
+const NO_TAGS: Array[StringName] = []
 ## Game minutes before trying again for something that couldn't be found
 ## or reached.
 const RETRY_MINUTES := 8.0
@@ -49,6 +74,12 @@ const SURNAMES: Array[String] = ["Abbott", "Blythe", "Crumb", "Dimble", "Ellery"
 		Color(0.72, 0.52, 0.3), Color(0.9, 0.78, 0.5), Color(0.6, 0.3, 0.18), Color(0.7, 0.7, 0.68),
 		Color(0.16, 0.15, 0.15)]
 @export var flag_colour := Color(1.0, 0.72, 0.2)
+## A face for each MoodModel.Face, shown over people who are fed up or
+## angry.
+@export var face_textures: Array[Texture2D] = [
+	preload("res://core/ui/faces/beaming.svg"), preload("res://core/ui/faces/content.svg"),
+	preload("res://core/ui/faces/fed_up.svg"), preload("res://core/ui/faces/angry.svg"),
+]
 
 var building: Building:
 	set(value):
@@ -72,7 +103,12 @@ var clock: GameClock:
 				if not paused:
 					step(minutes))
 var needs: Array[NeedDef] = []
-## Room types, for naming where people are heading.
+## The traits people can have; everyone gets two that aren't opposites.
+var traits: Array[TraitDef] = []
+## Every moodlet, by id.
+var moodlet_defs: Dictionary[StringName, MoodletDef] = {}
+var mood_model := MoodModel.new()
+## Room types, for naming where people are heading and room quality.
 var room_types: Array[RoomTypeDef] = []
 ## Room types a bed makes someone's own, such as a cell. Beds elsewhere
 ## (an infirmary, say) belong to nobody.
@@ -105,6 +141,24 @@ var _bodies: Dictionary[Person, Node3D] = {}
 var _materials: Dictionary[Color, StandardMaterial3D] = {}
 ## Rooms of the types each block sends people to, worked out once a step.
 var _rooms_for: Dictionary[ActivityDef, Array] = {}
+## Each room's quality, worked out when first wanted after a build change.
+var _qualities: Dictionary[Room, RoomQuality] = {}
+## People by (level, x, z) in squares NEARBY tiles across, for finding
+## who is close, refilled when first wanted each step.
+var _buckets: Dictionary[Vector3i, Array] = {}
+var _buckets_fresh := false
+## Who each person is chatting with, by name.
+var _chatting_with: Dictionary[Person, String] = {}
+## Each person's own room, as from home_room, and who sleeps in each such
+## room, worked out with the beds.
+var _homes: Dictionary[Person, Array] = {}
+var _sleepers: Dictionary[Room, Array] = {}
+var _need_defs: Dictionary[StringName, NeedDef] = {}
+## Every object by tag, as [level, PlacedObject, Room or null] entries,
+## worked out when first wanted after a build change.
+var _by_tag: Dictionary[StringName, Array] = {}
+## The room each person was last found in, and where they stood then.
+var _where: Dictionary[Person, Array] = {}
 
 
 func _ready() -> void:
@@ -128,6 +182,9 @@ func mark_dirty() -> void:
 	_dirty = true
 	_beds_dirty = true
 	_rooms_for.clear()
+	_qualities.clear()
+	_where.clear()
+	_by_tag.clear()
 
 
 ## Like mark_dirty, for changes to the ground itself, which cost more to
@@ -173,6 +230,9 @@ func add_person(level: int, spot: Vector2, person_name := "") -> Person:
 	person.position = Vector3(spot.x, height, spot.y)
 	for def in needs:
 		person.needs[def.id] = _rng.randf_range(55.0, 100.0)
+	person.traits = _pick_traits()
+	person.think_wait = _rng.randf_range(0.0, THINK_MINUTES)
+	person.mood_wait = _rng.randf_range(0.0, MOOD_MINUTES)
 	people.append(person)
 	_beds_dirty = true
 	person_added.emit(person)
@@ -181,6 +241,8 @@ func add_person(level: int, spot: Vector2, person_name := "") -> Person:
 
 func remove_person(person: Person) -> void:
 	_release(person)
+	_chatting_with.erase(person)
+	_where.erase(person)
 	_bed_owners.erase(person.bed)
 	people.erase(person)
 	if _bodies.has(person):
@@ -208,20 +270,22 @@ func step(minutes: float) -> void:
 	_rooms_for.clear()
 	if _beds_dirty:
 		assign_beds()
+	_buckets_fresh = false
 	for person in people.duplicate():
 		_think(person, minutes)
 
 
 func need_def(id: StringName) -> NeedDef:
-	for def in needs:
-		if def.id == id:
-			return def
-	return null
+	if _need_defs.size() != needs.size():
+		_need_defs.clear()
+		for def in needs:
+			_need_defs[def.id] = def
+	return _need_defs.get(id)
 
 
 ## The object someone is heading for or using, or null.
 func target_object(person: Person) -> BuildingMap.PlacedObject:
-	if not person.has_target():
+	if not person.has_object():
 		return null
 	var map := building.levels.get(person.target.x) as BuildingMap
 	return map.objects.get(person.target.y) if map != null else null
@@ -237,6 +301,66 @@ func owner_of(level: int, object_id: int) -> Person:
 	return _bed_owners.get(Vector2i(level, object_id))
 
 
+func room_type(id: StringName) -> RoomTypeDef:
+	for def in room_types:
+		if def.id == id:
+			return def
+	return null
+
+
+## How nice a room is (see RoomQuality).
+func quality(level: int, room: Room) -> RoomQuality:
+	if not _qualities.has(room):
+		_qualities[room] = RoomQuality.assess(building.levels[level], room, room_type(room.type))
+	return _qualities[room]
+
+
+## Whether someone is asleep: using a bed for sleep.
+func is_asleep(person: Person) -> bool:
+	if person.state != Person.State.USING or not person.has_object():
+		return false
+	var def := need_def(person.target_need)
+	return def != null and def.sleeping
+
+
+## Gives someone a moodlet, or starts its timer again if they have it. A
+## trait may swap it for another (a Foodie's lovely meal).
+func add_moodlet(person: Person, id: StringName) -> void:
+	for t in person.traits:
+		id = t.moodlet_swaps.get(id, id)
+	var def: MoodletDef = moodlet_defs.get(id)
+	if def != null:
+		person.moodlets[id] = def.hours * 60.0
+
+
+## People within `distance` (up to NEARBY) of someone on the same level,
+## not counting them.
+func nearby(person: Person, distance := NEARBY) -> Array[Person]:
+	if not _buckets_fresh:
+		_buckets_fresh = true
+		_buckets.clear()
+		for other in people:
+			_buckets.get_or_add(_bucket(other.level, other.flat()), []).append(other)
+	var out: Array[Person] = []
+	var centre := _bucket(person.level, person.flat())
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for other: Person in _buckets.get(centre + Vector3i(0, dx, dz), []):
+				if other != person and other.flat().distance_to(person.flat()) <= distance:
+					out.append(other)
+	return out
+
+
+## The square of people a spot falls in, for `nearby`.
+static func _bucket(level: int, spot: Vector2) -> Vector3i:
+	return Vector3i(level, floori(spot.x / NEARBY), floori(spot.y / NEARBY))
+
+
+## The face for someone's mood (see MoodModel.Face).
+func face(person: Person) -> MoodModel.Face:
+	return mood_model.face(person.mood)
+
+
 #region Timetable
 
 ## Puts someone in a timetable block. Whatever they were doing stops,
@@ -245,6 +369,7 @@ func owner_of(level: int, object_id: int) -> Person:
 func set_block(person: Person, def: ActivityDef) -> void:
 	if person.block == def:
 		return
+	_block_moodlets(person, person.block, def)
 	person.block = def
 	person.done_main = false
 	person.gave_up.clear()
@@ -294,30 +419,32 @@ func place_rooms(person: Person) -> Array:
 
 
 ## The room someone is in, as [level, Room], or [] if they are not in one.
+## Don't change the array: it may be shared.
 func room_of(person: Person) -> Array:
+	var last: Array = _where.get(person, [])
+	if not last.is_empty() and last[0] == person.position and last[1] == person.level:
+		return last[2]
 	var map := building.levels.get(person.level) as BuildingMap
 	var room := map.room_at_point(person.flat()) if map != null else null
-	return [person.level, room] if room != null else []
+	var here := [person.level, room] if room != null else []
+	_where[person] = [person.position, person.level, here]
+	return here
 
 
 ## The room someone's bed is in, as [level, Room], or [] if they have none.
+## Don't change the array: it may be shared.
 func home_room(person: Person) -> Array:
-	if not person.has_bed():
-		return []
-	var map := building.levels.get(person.bed.x) as BuildingMap
-	var placed: BuildingMap.PlacedObject = map.objects.get(person.bed.y) if map != null else null
-	var room := map.room_at_point(placed.centre) if placed != null else null
-	return [person.bed.x, room] if room != null else []
+	if _beds_dirty:
+		assign_beds()
+	return _homes.get(person, [])
 
 
 ## Who sleeps in a room, by their beds in it.
-func owners_in(level: int, room: Room) -> Array[Person]:
+func owners_in(_level: int, room: Room) -> Array[Person]:
+	if _beds_dirty:
+		assign_beds()
 	var out: Array[Person] = []
-	var map := building.levels.get(level) as BuildingMap
-	for placed in map.objects_in_room(room):
-		var owner := owner_of(level, placed.id)
-		if owner != null:
-			out.append(owner)
+	out.assign(_sleepers.get(room, []))
 	return out
 
 
@@ -359,6 +486,15 @@ func assign_beds() -> void:
 		person.bed = free[best]
 		_bed_owners[person.bed] = person
 		free.remove_at(best)
+	_homes.clear()
+	_sleepers.clear()
+	for person in people:
+		if not person.has_bed():
+			continue
+		var map := building.levels[person.bed.x]
+		var room := map.room_at_point(map.objects[person.bed.y].centre)
+		_homes[person] = [person.bed.x, room]
+		_sleepers.get_or_add(room, []).append(person)
 
 
 ## Locks or unlocks a door on a straight wall, for everyone.
@@ -381,52 +517,244 @@ func is_door_locked(level: int, edge: Vector3i) -> bool:
 #endregion
 
 
+## Walking and timers move on every step; everything else (needs, mood,
+## deciding) every half game minute for each person, staggered, so a big
+## prison stays cheap.
 func _think(person: Person, minutes: float) -> void:
-	_run_down_needs(person, minutes)
-	for tag: StringName in person.gave_up.keys():
-		person.gave_up[tag] -= minutes
-		if person.gave_up[tag] <= 0.0:
-			person.gave_up.erase(tag)
-	person.place_wait -= minutes
-	if person.has_target() and target_object(person) == null:
+	if person.state == Person.State.WALKING:
+		_walk(person, minutes)
+	else:
+		person.timer -= minutes
+	person.think_wait -= minutes
+	if person.think_wait > 0.0:
+		return
+	var since := THINK_MINUTES - person.think_wait
+	person.think_wait = THINK_MINUTES
+	_run_down_needs(person, since)
+	_look_around(person, since)
+	for key: StringName in person.gave_up.keys():
+		person.gave_up[key] -= since
+		if person.gave_up[key] <= 0.0:
+			person.gave_up.erase(key)
+	person.place_wait -= since
+	if person.has_object() and target_object(person) == null:
 		_stop(person) # The object went while they were on their way.
 	match person.state:
 		Person.State.WALKING:
 			if person.wandering and _has_errand(person):
 				_stop(person)
 				_decide(person, false)
-			else:
-				_walk(person, minutes)
 		Person.State.USING:
-			person.timer -= minutes
 			if _done_using(person):
 				_finish_using(person)
+				_decide(person, false)
+			elif _should_break_off(person):
+				_stop(person)
+				_decide(person, false)
 		Person.State.IDLE:
-			person.timer -= minutes
 			if _has_errand(person) or person.timer <= 0.0:
 				_decide(person, person.timer <= 0.0)
 
 
-## Needs run down, at the asleep rate while sleeping, except the one being
-## seen to, which fills.
+## Needs run down, at the asleep rate while sleeping and faster or slower
+## for some traits. The one being seen to with an object fills, and so do
+## outdoors and company while someone is out or among people.
 func _run_down_needs(person: Person, minutes: float) -> void:
-	var using := person.state == Person.State.USING
-	var seeing_to := need_def(person.target_need) if using else null
-	var asleep := seeing_to != null and seeing_to.sleeping
+	var seeing_to := need_def(person.target_need) if person.state == Person.State.USING \
+			and person.has_object() else null
+	var asleep := is_asleep(person)
 	for need: StringName in person.needs:
 		var def := need_def(need)
 		if def == null:
 			continue
-		if def == seeing_to:
-			person.needs[need] = minf(100.0, person.needs[need] + 100.0 / maxf(def.use_minutes, 0.1) * minutes)
-		else:
-			var rate := def.asleep_decay_per_hour if asleep else def.decay_per_hour
-			person.needs[need] = maxf(0.0, person.needs[need] - rate / 60.0 * minutes)
+		var before: float = person.needs[need]
+		var fills := def == seeing_to
+		if not asleep:
+			fills = fills or (def.source == NeedDef.Source.OUTDOORS and person.outdoors) \
+					or (def.source == NeedDef.Source.COMPANY and person.in_company)
+		if fills:
+			person.needs[need] = minf(100.0, before + 100.0 / maxf(def.use_minutes, 0.1) * minutes)
+			if before < 99.9 and person.needs[need] >= 99.9 and def.met_moodlet != &"":
+				add_moodlet(person, def.met_moodlet)
+			continue
+		var rate := def.asleep_decay_per_hour if asleep else def.decay_per_hour
+		person.needs[need] = maxf(0.0, before - rate * _need_rate(person, need) / 60.0 * minutes)
+		if person.needs[need] <= 0.0 and def.empty_moodlet != &"":
+			_run_out(person, def)
 
 
-## Something to do other than wander: getting to where the block wants
-## them, its own object, or a pressing need it allows.
+## How much faster someone's traits make a need run down.
+func _need_rate(person: Person, need: StringName) -> float:
+	var rate := 1.0
+	for t in person.traits:
+		rate *= t.need_rates.get(need, 1.0)
+	return rate
+
+
+## A need has run right out (an accident): a moodlet, the need met again,
+## and other needs knocked down.
+func _run_out(person: Person, def: NeedDef) -> void:
+	add_moodlet(person, def.empty_moodlet)
+	person.needs[def.id] = 100.0
+	for other: StringName in def.empty_costs:
+		if person.needs.has(other):
+			person.needs[other] = maxf(0.0, person.needs[other] - def.empty_costs[other])
+	if person.target_need == def.id:
+		_stop(person)
+
+
+## Every half game minute: whether someone is outdoors and in company,
+## moodlets from the people about them, their moodlets running down, and
+## their mood.
+func _look_around(person: Person, minutes: float) -> void:
+	for id: StringName in person.moodlets.keys():
+		person.moodlets[id] -= minutes
+		if person.moodlets[id] <= 0.0:
+			person.moodlets.erase(id)
+	var here := room_of(person)
+	person.outdoors = not here[1].indoor if not here.is_empty() else person.level >= 0
+	var asleep := is_asleep(person)
+	var company := 0
+	for other in nearby(person):
+		if is_asleep(other) or other.state == Person.State.WALKING or not _same_place(here, room_of(other)):
+			continue
+		company += 1
+		if not asleep:
+			for t in other.traits:
+				if t.nearby_moodlet != &"":
+					add_moodlet(person, t.nearby_moodlet)
+	person.in_company = company > 0 and not asleep and person.state != Person.State.WALKING
+	for t in person.traits:
+		if t.crowd_limit > 0 and company > t.crowd_limit and t.crowd_moodlet != &"":
+			add_moodlet(person, t.crowd_moodlet)
+	# Mood moves slowly, so it is worked out less often.
+	person.mood_wait -= minutes
+	if person.mood_wait > 0.0:
+		return
+	var first := person.mood_parts.is_empty()
+	person.mood_parts = mood_model.parts(person, needs, moodlet_defs, _mood_extras(person, here))
+	person.mood = mood_model.target(person.mood_parts) if first \
+			else mood_model.follow(person.mood, person.mood_parts, MOOD_MINUTES - person.mood_wait)
+	person.mood_wait = MOOD_MINUTES
+
+
+## Whether two places from room_of are the same room, or both out of any
+## room.
+static func _same_place(a: Array, b: Array) -> bool:
+	if a.is_empty() or b.is_empty():
+		return a.is_empty() and b.is_empty()
+	return a[0] == b[0] and a[1] == b[1]
+
+
+## The parts of someone's mood that come from where they are and who they
+## are: the room they sleep in and the one they're in, their cellmates,
+## and their traits.
+func _mood_extras(person: Person, here: Array) -> Array:
+	var out: Array = []
+	var home := home_room(person)
+	if home.is_empty():
+		out.append(["Has no bed of their own", -5.0])
+	else:
+		var home_type := room_type(home[1].type)
+		_room_part(out, quality(home[0], home[1]), home_type)
+		var clashes: Array[String] = []
+		var friends: Array[String] = []
+		for mate in owners_in(home[0], home[1]):
+			if mate == person:
+				continue
+			if _clash(person, mate):
+				clashes.append(mate.name.get_slice(" ", 0))
+			elif person.traits.any(func(t: TraitDef) -> bool: return mate.traits.has(t)):
+				friends.append(mate.name.get_slice(" ", 0))
+		# In a dorm it's the number that counts, up to a point.
+		if not clashes.is_empty():
+			out.append(["Doesn't get on with %s" % _who(clashes), -4.0 * mini(clashes.size(), 2)])
+		if not friends.is_empty():
+			out.append(["Gets on with %s" % _who(friends), 3.0 * mini(friends.size(), 2)])
+		if home_type != null and home_type.dorm:
+			for t in person.traits:
+				if not is_zero_approx(t.dorm_mood):
+					out.append(["Sleeps in a dorm", t.dorm_mood])
+	if not here.is_empty() and (home.is_empty() or here[1] != home[1]):
+		var here_quality := quality(here[0], here[1])
+		_room_part(out, here_quality, room_type(here[1].type), true)
+		for t in person.traits:
+			for tag: StringName in t.room_likes:
+				if here_quality.tags.has(tag):
+					out.append([t.room_like_text, t.room_likes[tag]])
+	for t in person.traits:
+		if not is_zero_approx(t.steady_mood):
+			out.append([t.steady_text, t.steady_mood])
+	return out
+
+
+## A room's quality as part of mood, such as "Nice cell" or "Grim canteen".
+func _room_part(out: Array, room_quality: RoomQuality, type: RoomTypeDef, visiting := false) -> void:
+	if absf(room_quality.score) < 0.5:
+		return
+	var type_name := type.display_name.to_lower() if type != null else "room"
+	var text := ("Nice %s" if room_quality.score > 0.0 else "Grim %s") % type_name
+	out.append([text if visiting else "%s to sleep in" % text, room_quality.score])
+
+
+## "Bea", "Bea and Gus", or "4 others".
+static func _who(names: Array[String]) -> String:
+	if names.size() == 1:
+		return names[0]
+	if names.size() == 2:
+		return "%s and %s" % names
+	return "%d others" % names.size()
+
+
+## Whether two people have traits that don't get on.
+func _clash(a: Person, b: Person) -> bool:
+	for t in a.traits:
+		for other in b.traits:
+			if t.clashes_with.has(other.id) or other.clashes_with.has(t.id):
+				return true
+	return false
+
+
+## Moodlets for a change of block: going to bed hungry, or getting up
+## earlier or later than a Night owl or Early bird would like.
+func _block_moodlets(person: Person, old: ActivityDef, new: ActivityDef) -> void:
+	if new == null:
+		return
+	var locks := func(def: ActivityDef) -> bool:
+		return def != null and def.door_rule == ActivityDef.DoorRule.LOCK_OWN_ROOM
+	if locks.call(new) and not locks.call(old):
+		for def in needs:
+			if def.shut_in_moodlet != &"" and person.needs.get(def.id, 100.0) < NEED_LINE:
+				add_moodlet(person, def.shut_in_moodlet)
+	var sleeps := func(def: ActivityDef) -> bool:
+		if def == null or def.main_tag == &"":
+			return false
+		var need := _need_for_tag(def.main_tag)
+		return need != &"" and need_def(need).sleeping
+	if sleeps.call(old) and not sleeps.call(new) and clock != null:
+		for t in person.traits:
+			if t.wake_before_hour >= 0 and clock.hour() < t.wake_before_hour and t.wake_moodlet != &"":
+				add_moodlet(person, t.wake_moodlet)
+
+
+## Two traits that aren't the same or opposites, or none if the game has
+## none.
+func _pick_traits() -> Array[TraitDef]:
+	var out: Array[TraitDef] = []
+	var pool := traits.duplicate()
+	while out.size() < 2 and not pool.is_empty():
+		var pick: TraitDef = pool.pop_at(_rng.randi() % pool.size())
+		if out.any(func(t: TraitDef) -> bool: return t.opposite == pick.id or pick.opposite == t.id):
+			continue
+		out.append(pick)
+	return out
+
+
+## Something to do other than wander: a need running out, getting to where
+## the block wants them, its own object, or a need below the line.
 func _has_errand(person: Person) -> bool:
+	if _urgent_need(person) != &"":
+		return true
 	if person.place_wait <= 0.0 and not is_in_place(person) and not place_rooms(person).is_empty():
 		return true
 	return _main_tag(person) != &"" or _pressing_need(person) != &""
@@ -435,18 +763,30 @@ func _has_errand(person: Person) -> bool:
 ## Works out what someone does next, in the order the class comment gives.
 func _decide(person: Person, may_wander: bool) -> void:
 	var block := person.block
+	var urgent := _urgent_need(person)
+	if urgent != &"" and _see_to(person, urgent, true):
+		person.reason = "%s has nearly run out" % need_def(urgent).display_name
+		return
 	if not is_in_place(person):
 		if person.place_wait <= 0.0 and _go_to_place(person):
+			person.reason = "%s block" % block.display_name
 			return
 		person.place_wait = maxf(person.place_wait, RETRY_MINUTES)
 	var main := _main_tag(person)
-	if main != &"" and _seek(person, main):
+	var main_tags: Array[StringName] = [main]
+	if main != &"" and _seek(person, main_tags):
+		person.reason = "%s block" % block.display_name
 		return
-	var need := _pressing_need(person)
-	if need != &"" and _seek(person, need_def(need).object_tag, need):
-		return
+	person.reason = ""
+	for choice: StringName in _choices(person):
+		if _see_to(person, choice):
+			var low: float = person.needs[choice]
+			person.reason = "%s is %s" % [need_def(choice).display_name, "low" if low < NEED_LINE else "a bit low"]
+			return
 	if may_wander:
 		_wander(person)
+		if person.reason.is_empty():
+			person.reason = "Nothing they need just now"
 	elif block != null and not is_in_place(person) and person.state == Person.State.IDLE:
 		person.activity = _why_not_in_place(person)
 
@@ -459,18 +799,280 @@ func _main_tag(person: Person) -> StringName:
 	return block.main_tag
 
 
-## The lowest need below the line whose objects the block allows, or &"".
+## The lowest need below the line that the block allows, or &"".
 func _pressing_need(person: Person) -> StringName:
+	return _lowest_need(person, NEED_LINE)
+
+
+## The lowest need that has nearly run out and the block allows, other
+## than one being seen to, or &"".
+func _urgent_need(person: Person) -> StringName:
+	return _lowest_need(person, URGENT_LINE)
+
+
+func _lowest_need(person: Person, line: float) -> StringName:
 	var best: StringName = &""
 	for need: StringName in person.needs:
 		var def := need_def(need)
-		if def == null or person.needs[need] >= NEED_LINE or person.gave_up.has(def.object_tag):
+		if def == null or person.needs[need] >= line or person.gave_up.has(need):
 			continue
-		if person.block != null and not person.block.allows(def.object_tag):
+		if not def.allowed_by(person.block) or (person.target_need == need and person.has_target()):
 			continue
 		if best == &"" or person.needs[need] < person.needs[best]:
 			best = need
 	return best
+
+
+## Whether someone should leave off what they're doing: a need running
+## out, or, while only enjoying a place or company, any need below the
+## line.
+func _should_break_off(person: Person) -> bool:
+	if _urgent_need(person) != &"":
+		return true
+	return not person.has_object() and _pressing_need(person) != &""
+
+
+## The needs worth seeing to now that the block allows, best first: each
+## scored by how low it is (squared, so low needs shout), how much they
+## like what meets it, and how far away that is, with a little wobble.
+func _choices(person: Person) -> Array[StringName]:
+	var scored: Array = [] # [score, need]
+	for need: StringName in person.needs:
+		var def := need_def(need)
+		var value: float = person.needs[need]
+		if def == null or value >= minf(def.seek_below, WANT_LINE) or person.gave_up.has(need) \
+				or not def.allowed_by(person.block):
+			continue
+		var best := _best_option(person, def, false)
+		if best.is_empty():
+			if value < NEED_LINE:
+				_give_up(person, def.object_tags, need)
+				person.reason = _nothing_for(def)
+			continue
+		var urgency := pow((100.0 - value) / 100.0, 2.0)
+		var score: float = urgency * _liking(person, need) / (best[0] + DISTANCE_EASE) \
+				* _rng.randf_range(1.0 - WOBBLE, 1.0 + WOBBLE)
+		scored.append([score, need])
+	scored.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0])
+	var out: Array[StringName] = []
+	for entry: Array in scored:
+		out.append(entry[1])
+	return out
+
+
+## How much someone's traits make them like something: an object tag or a
+## need id.
+func _liking(person: Person, key: StringName) -> float:
+	var like := 1.0
+	for t in person.traits:
+		like *= t.likes.get(key, 1.0)
+	return like
+
+
+## The nearest way to see to a need, as [distance in tiles, ...], or []
+## for none. Distances count liked things as nearer.
+func _best_option(person: Person, def: NeedDef, unrestricted: bool) -> Array:
+	match def.source:
+		NeedDef.Source.OUTDOORS:
+			var rooms := _outdoor_rooms(person, unrestricted)
+			return [0.0] if person.outdoors else ([_room_score(person, rooms[0])] if not rooms.is_empty() else [])
+		NeedDef.Source.COMPANY:
+			if person.in_company:
+				return [0.0]
+			var others := _company(person, unrestricted)
+			return [others[0].flat().distance_to(person.flat())] if not others.is_empty() else []
+	var candidates := _candidates(person, def.object_tags, unrestricted)
+	return candidates[0] if not candidates.is_empty() else []
+
+
+## Heads off to see to a need: an object that meets it, the outdoors, or
+## someone to chat with. Returns false, and gives up on it for a while, if
+## there is none to be had.
+func _see_to(person: Person, need: StringName, urgent := false) -> bool:
+	var def := need_def(need)
+	match def.source:
+		NeedDef.Source.OUTDOORS:
+			return _go_outdoors(person, def, urgent)
+		NeedDef.Source.COMPANY:
+			return _find_company(person, def, urgent)
+	return _seek(person, def.object_tags, need, urgent)
+
+
+## Heads for the nearest free object with one of the tags, where the block
+## allows (anywhere it allows the tag, if `unrestricted`). Returns false,
+## and gives up on the tags for a while, if none can be reached.
+func _seek(person: Person, tags: Array[StringName], need: StringName = &"", unrestricted := false) -> bool:
+	if need == &"":
+		need = _need_for_tag(tags[0])
+	var candidates := _candidates(person, tags, unrestricted)
+	for entry: Array in candidates.slice(0, 5):
+		var n: int = entry[1]
+		var placed: BuildingMap.PlacedObject = entry[2]
+		for spot in _spots_beside(n, placed, person.flat()):
+			if _walk_to(person, n, spot):
+				person.target = Vector2i(n, placed.id)
+				person.target_tag = entry[3]
+				person.target_need = need
+				_claimed[person.target] = person
+				var def := need_def(need)
+				person.activity = "Going to a %s" % placed.def.display_name.to_lower() \
+						+ (" for %s" % def.display_name.to_lower() if def != null else "")
+				return true
+	_give_up(person, tags, need)
+	person.activity = ("Can't find a free %s" if candidates.is_empty() else "Can't reach a %s") \
+			% String(tags[0]).replace("_", " ")
+	person.timer = 2.0
+	return false
+
+
+## Why a need can't be seen to now, such as "Can't find a free table".
+func _nothing_for(def: NeedDef) -> String:
+	match def.source:
+		NeedDef.Source.OUTDOORS:
+			return "Nowhere outdoors to go"
+		NeedDef.Source.COMPANY:
+			return "Nobody about to talk to"
+	return "Can't find a free %s" % String(def.object_tags[0]).replace("_", " ")
+
+
+func _give_up(person: Person, tags: Array[StringName], need: StringName) -> void:
+	for tag in tags:
+		person.gave_up[tag] = RETRY_MINUTES
+	if need != &"":
+		person.gave_up[need] = RETRY_MINUTES
+
+
+## Free objects with any of the tags that someone may use now, as
+## [distance, level, object, tag], nearest first. Liked tags count as
+## nearer.
+func _candidates(person: Person, tags: Array[StringName], unrestricted := false) -> Array:
+	var restricted := not unrestricted and _restricted(person)
+	var allowed_rooms := place_rooms(person) if restricted else []
+	var out: Array = []
+	var seen: Dictionary[BuildingMap.PlacedObject, bool] = {}
+	for tag in tags:
+		if person.block != null and not person.block.allows(tag):
+			continue
+		for entry: Array in _objects_tagged(tag):
+			var n: int = entry[0]
+			var placed: BuildingMap.PlacedObject = entry[1]
+			var room: Room = entry[2]
+			if seen.has(placed) or _claimed.has(Vector2i(n, placed.id)) or not _may_use(person, n, placed):
+				continue
+			seen[placed] = true
+			if restricted and not _room_listed(allowed_rooms, n, room):
+				continue
+			# Nearly bursting, they'll nip into someone else's cell if it's open.
+			if room != null and not unrestricted and _someone_elses(person, n, room):
+				continue
+			var distance := placed.centre.distance_to(person.flat()) + absi(n - person.level) * 12.0
+			out.append([distance / _liking(person, tag), n, placed, tag])
+	out.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	return out
+
+
+## Every object with a tag, as [level, PlacedObject, Room or null].
+func _objects_tagged(tag: StringName) -> Array:
+	if _by_tag.is_empty():
+		_by_tag[&""] = []
+		for n: int in building.levels:
+			var map := building.levels[n]
+			for placed: BuildingMap.PlacedObject in map.objects.values():
+				var room := map.room_at_point(placed.centre)
+				for t in placed.def.tags:
+					_by_tag.get_or_add(t, []).append([n, placed, room])
+	return _by_tag.get(tag, [])
+
+
+## Outdoor rooms (a yard) someone may go to now, nearest first, as
+## [level, Room] pairs.
+func _outdoor_rooms(person: Person, unrestricted := false) -> Array:
+	var restricted := not unrestricted and _restricted(person)
+	var out: Array = []
+	for pair: Array in (place_rooms(person) if restricted else _all_rooms()):
+		var room: Room = pair[1]
+		if room.enclosed and not room.indoor and not _someone_elses(person, pair[0], room):
+			out.append(pair)
+	out.sort_custom(func(a: Array, b: Array) -> bool: return _room_score(person, a) < _room_score(person, b))
+	return out
+
+
+func _all_rooms() -> Array:
+	var out: Array = []
+	for n: int in building.levels:
+		for room: Room in building.levels[n].rooms():
+			out.append([n, room])
+	return out
+
+
+## Heads out to an outdoor room to enjoy the fresh air, or stays put if
+## already out.
+func _go_outdoors(person: Person, def: NeedDef, unrestricted: bool) -> bool:
+	if person.outdoors:
+		_enjoy_here(person, def)
+		return true
+	for pair: Array in _outdoor_rooms(person, unrestricted).slice(0, 3):
+		for attempt in 4:
+			var spot: Variant = _spot_in_room(pair[0], pair[1])
+			if spot != null and _walk_to(person, pair[0], spot):
+				_aim_at_place(person, def)
+				person.activity = "Going out for some fresh air"
+				return true
+	_give_up(person, NO_TAGS, def.id)
+	return false
+
+
+## People someone could go and chat with: up and about, not off somewhere,
+## and where they may go too. Nearest first.
+func _company(person: Person, unrestricted := false) -> Array[Person]:
+	var restricted := not unrestricted and _restricted(person)
+	var allowed_rooms := place_rooms(person) if restricted else []
+	var out: Array[Person] = []
+	for other in people:
+		if other == person or other.state == Person.State.WALKING or is_asleep(other):
+			continue
+		var there := room_of(other)
+		if restricted and (there.is_empty() or not _room_listed(allowed_rooms, there[0], there[1])):
+			continue
+		if not there.is_empty() and _someone_elses(person, there[0], there[1]):
+			continue
+		out.append(other)
+	out.sort_custom(func(a: Person, b: Person) -> bool:
+		return a.flat().distance_to(person.flat()) + absi(a.level - person.level) * 12.0 \
+				< b.flat().distance_to(person.flat()) + absi(b.level - person.level) * 12.0)
+	return out
+
+
+## Goes over to someone for a chat, or stays put if already among people.
+func _find_company(person: Person, def: NeedDef, unrestricted: bool) -> bool:
+	if person.in_company:
+		_enjoy_here(person, def)
+		return true
+	for other: Person in _company(person, unrestricted).slice(0, 3):
+		for attempt in 4:
+			var angle := _rng.randf() * TAU
+			var spot := other.flat() + Vector2(cos(angle), sin(angle)) * 0.8
+			if nav().point_at(other.level, spot) != -1 and _walk_to(person, other.level, spot):
+				_aim_at_place(person, def)
+				_chatting_with[person] = other.name.get_slice(" ", 0)
+				person.activity = "Going over to %s" % _chatting_with[person]
+				return true
+	_give_up(person, NO_TAGS, def.id)
+	return false
+
+
+## Marks someone as on their way to see to a need by a place or company.
+func _aim_at_place(person: Person, def: NeedDef) -> void:
+	person.target = Person.NO_OBJECT
+	person.target_tag = def.id
+	person.target_need = def.id
+
+
+## Starts seeing to a need by a place or company right where they are.
+func _enjoy_here(person: Person, def: NeedDef) -> void:
+	_stop(person)
+	_aim_at_place(person, def)
+	_arrive(person)
 
 
 ## Heads for the nearest of the rooms the block wants them in.
@@ -546,46 +1148,6 @@ func _still_allowed(person: Person) -> bool:
 	return person.target_tag != &"" and (person.target_need != &"" or person.target_tag == block.main_tag)
 
 
-## Heads for the nearest free object with a tag, where the block allows.
-## Returns false, and gives up on the tag for a while, if none can be
-## reached.
-func _seek(person: Person, tag: StringName, need: StringName = &"") -> bool:
-	if need == &"":
-		need = _need_for_tag(tag)
-	var restricted := _restricted(person)
-	var allowed_rooms := place_rooms(person) if restricted else []
-	var candidates: Array = [] # [score, level, object]
-	for n: int in building.levels:
-		var map := building.levels[n]
-		for placed: BuildingMap.PlacedObject in map.objects.values():
-			if not tag in placed.def.tags or _claimed.has(Vector2i(n, placed.id)):
-				continue
-			if not _may_use(person, n, placed):
-				continue
-			if restricted and not _room_listed(allowed_rooms, n, map.room_at_point(placed.centre)):
-				continue
-			var score := placed.centre.distance_to(person.flat()) + absi(n - person.level) * 12.0
-			candidates.append([score, n, placed])
-	candidates.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
-	for entry: Array in candidates.slice(0, 5):
-		var n: int = entry[1]
-		var placed: BuildingMap.PlacedObject = entry[2]
-		for spot in _spots_beside(n, placed, person.flat()):
-			if _walk_to(person, n, spot):
-				person.target = Vector2i(n, placed.id)
-				person.target_tag = tag
-				person.target_need = need
-				_claimed[person.target] = person
-				var def := need_def(need)
-				person.activity = "Going to a %s" % placed.def.display_name.to_lower() \
-						+ (" for %s" % def.display_name.to_lower() if def != null else "")
-				return true
-	person.gave_up[tag] = RETRY_MINUTES
-	person.activity = ("Can't find a free %s" if candidates.is_empty() else "Can't reach a %s") % tag
-	person.timer = 2.0
-	return false
-
-
 ## Whether someone's block keeps them to certain rooms just now. Not once
 ## they're free after the block's own object, nor when it wants them in a
 ## room of their own and they have none.
@@ -621,7 +1183,7 @@ func _is_owned_tag_object(placed: BuildingMap.PlacedObject) -> bool:
 
 func _need_for_tag(tag: StringName) -> StringName:
 	for def in needs:
-		if def.object_tag == tag:
+		if def.met_by(tag):
 			return def.id
 	return &""
 
@@ -713,6 +1275,16 @@ func _walk(person: Person, minutes: float) -> void:
 
 
 func _arrive(person: Person) -> void:
+	if person.has_target() and not person.has_object():
+		# Somewhere to be or someone to be with, rather than an object.
+		person.stand_spot = person.position
+		person.state = Person.State.USING
+		person.timer = USE_MINUTES
+		var place_def := need_def(person.target_need)
+		person.activity = place_def.doing
+		if _chatting_with.has(person):
+			person.activity += " with %s" % _chatting_with[person]
+		return
 	var placed := target_object(person)
 	if placed == null:
 		person.state = Person.State.IDLE
@@ -735,9 +1307,11 @@ func _done_using(person: Person) -> bool:
 	var block := person.block
 	if block != null and block.stay_on_main and person.target_tag == block.main_tag:
 		return false
-	if person.target_need != &"":
-		return person.needs.get(person.target_need, 100.0) >= 99.9
-	return person.timer <= 0.0
+	if person.target_need != &"" and person.needs.get(person.target_need, 100.0) >= 99.9:
+		return true
+	# Objects that meet a need keep people until it is met; places and
+	# company, and objects that meet none, only for a while.
+	return person.timer <= 0.0 and not (person.has_object() and person.target_need != &"")
 
 
 func _finish_using(person: Person) -> void:
@@ -764,8 +1338,9 @@ func _stop(person: Person) -> void:
 
 
 func _release(person: Person) -> void:
-	if person.has_target() and _claimed.get(person.target) == person:
+	if person.has_object() and _claimed.get(person.target) == person:
 		_claimed.erase(person.target)
+	_chatting_with.erase(person)
 	person.target_tag = &""
 	person.target_need = &""
 
@@ -790,6 +1365,12 @@ func _update_bodies() -> void:
 			if ahead.length() > 0.01:
 				body.rotation.y = atan2(-ahead.x, -ahead.y)
 		body.get_node("Flag").visible = person.out_of_place
+		var face := body.get_node("Face") as Sprite3D
+		var mood_face := mood_model.face(person.mood)
+		face.visible = not person.out_of_place and mood_face >= MoodModel.Face.FED_UP \
+				and not person.mood_parts.is_empty()
+		if face.visible:
+			face.texture = face_textures[mood_face]
 	_update_visibility()
 
 
@@ -840,8 +1421,17 @@ func _make_body(person: Person) -> Node3D:
 	return root
 
 
-## A "?" over someone's head, shown while they are out of place.
+## A "?" over someone's head, shown while they are out of place, and a
+## face for when they are unhappy.
 func _add_flag(root: Node3D) -> void:
+	var face := Sprite3D.new()
+	face.name = "Face"
+	face.pixel_size = 0.005
+	face.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	face.no_depth_test = true
+	face.position.y = 1.15
+	face.visible = false
+	root.add_child(face)
 	var flag := Label3D.new()
 	flag.name = "Flag"
 	flag.text = "?"

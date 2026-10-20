@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/wall_shelf.glb" id="2_ext"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"wall_shelf"
+display_name = "Wall shelf"
+size = Vector2(1, 0.25)
+snap = 1
+height = 1.2
+colour = Color(0.7, 0.58, 0.45, 1)
+tags = Array[StringName]([&"decor"])
+model = ExtResource("2_ext")

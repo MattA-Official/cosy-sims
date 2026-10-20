@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/trait_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"messy"
+display_name = "Messy"
+description = "Doesn't mind a bit of grime."
+opposite = &"tidy"
+need_rates = Dictionary[StringName, float]({
+&"hygiene": 0.7
+})

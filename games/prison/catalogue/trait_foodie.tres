@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/trait_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"foodie"
+display_name = "Foodie"
+description = "Cares about a good meal, and loves one."
+need_rates = Dictionary[StringName, float]({
+&"hunger": 1.1
+})
+moodlet_swaps = Dictionary[StringName, StringName]({
+&"good_meal": &"lovely_meal"
+})
