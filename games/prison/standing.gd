@@ -89,6 +89,18 @@ func start() -> void:
 	]
 
 
+## Puts back the grade and goals from a save.
+func restore(saved: Dictionary) -> void:
+	grade = saved.get("grade", grade)
+	measures.assign(saved.get("measures", measures))
+	report = saved.get("report", "")
+	_graded = saved.get("graded", false)
+	var done: Array = saved.get("goals_done", [])
+	for goal in goals:
+		goal.done = done.has(goal.title)
+	_apply()
+
+
 ## Goals being worked towards now: the first few not done.
 func current_goals() -> Array[Goal]:
 	var out: Array[Goal] = []

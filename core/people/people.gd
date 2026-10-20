@@ -334,6 +334,16 @@ func add_person(level: int, spot: Vector2, person_name := "", group: StringName 
 	return person
 
 
+## The id the next person added will get.
+func next_id() -> int:
+	return _next_id
+
+
+## Carries on numbering people from an id, such as after loading a save.
+func set_next_id(id: int) -> void:
+	_next_id = maxi(id, _next_id)
+
+
 ## Gives someone a staff role (or none), dressing them for it.
 func set_role(person: Person, role: StringName) -> void:
 	if person.role == role:

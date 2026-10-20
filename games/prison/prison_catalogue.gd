@@ -297,7 +297,7 @@ static func moodlets() -> Dictionary[StringName, MoodletDef]:
 
 
 static func item(id: StringName) -> ItemDef:
-	for def in ITEMS:
+	for def in ITEMS + LITTER:
 		if def.id == id:
 			return def
 	return null

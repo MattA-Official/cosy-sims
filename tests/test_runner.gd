@@ -53,6 +53,7 @@ func _process(_delta: float) -> bool:
 	_test_intake()
 	_test_standing()
 	_test_undo()
+	_test_saving()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1201,6 +1202,48 @@ func _test_undo() -> void:
 	undo.undo()
 	_check(not is_equal_approx(main.terrain.corner_height(Vector2i(2, 2)), 3.0), "the land can be undone too")
 	main.queue_free()
+
+
+func _test_saving() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var clock: GameClock = main.clock
+	clock.speed_index = 0
+	for i in 150:
+		clock.advance(1.0)
+	main.intake.bus()
+	var map: BuildingMap = main.building.ground()
+	map.build_room(Rect2i(map.land_bounds().position + Vector2i(1, 1), Vector2i(3, 3)))
+	main.ledger.sandbox = true
+	main.schedule.hours[3] = PrisonCatalogue.ACTIVITIES[0]
+	var data := PrisonSave.capture(main)
+	_check(PrisonSave.write("test", data) == OK and not PrisonSave.read("test").is_empty(), "a prison saves to a file")
+	var names: Array = main.people.people.filter(func(p: Person) -> bool: return not p.going_home) \
+			.map(func(p: Person) -> String: return p.name)
+	var walls: int = map.walls.size()
+	var minutes: float = clock.total_minutes
+	var balance: int = main.ledger.balance
+	var shelf: int = main.items.total(&"ingredient")
+	main.queue_free()
+
+	PrisonSave.pending = PrisonSave.read("test")
+	var loaded: Node = load("res://games/prison/main.tscn").instantiate()
+	root.add_child(loaded)
+	var again: Array = loaded.people.people.map(func(p: Person) -> String: return p.name)
+	_check(again.size() >= names.size() - 1 and names.all(func(n: String) -> bool: return again.has(n) or n.is_empty()),
+			"everyone comes back by name (%d of %d)" % [again.size(), names.size()])
+	_check(loaded.building.ground().walls.size() == walls, "the build comes back, new room and all")
+	_check(is_equal_approx(loaded.clock.total_minutes, minutes), "and the time")
+	_check(loaded.ledger.balance == balance and loaded.ledger.sandbox, "and the money")
+	_check(loaded.schedule.hours[3] == PrisonCatalogue.ACTIVITIES[0], "and the timetable")
+	_check(loaded.items.total(&"ingredient") == shelf, "and the food on the shelves")
+	_check(loaded.people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").all(
+			func(p: Person) -> bool: return p.category != &""), "and each prisoner's category")
+	_check(loaded.title == "Paying prison", "under its name")
+	_check(PrisonSave.describe(PrisonSave.read("test")).begins_with("Paying prison · Day 1"), "and saves say what's in them")
+	DirAccess.remove_absolute(PrisonSave._path("test"))
+	loaded.queue_free()
 
 
 func _test_staff_window() -> void:

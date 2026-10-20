@@ -6,6 +6,7 @@ extends PanelContainer
 
 signal help_pressed
 signal debug_pressed
+signal saves_pressed
 
 const ICONS := "res://core/ui/icons/%s.svg"
 const VIEW_ICONS: Array[String] = ["view_walls_up", "view_cutaway", "view_walls_down", "view_roofs"]
@@ -59,6 +60,10 @@ func _ready() -> void:
 		_views.append(button)
 	row.add_child(VSeparator.new())
 
+	var saves := _button("Save and load", "Save the prison, or load a save. F2", "save")
+	saves.toggle_mode = false
+	saves.pressed.connect(saves_pressed.emit)
+	row.add_child(saves)
 	var help := _button("Controls", "Every key and mouse control. F1", "help")
 	help.toggle_mode = false
 	help.pressed.connect(help_pressed.emit)

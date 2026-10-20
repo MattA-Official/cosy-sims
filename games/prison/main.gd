@@ -19,6 +19,8 @@ extends Node3D
 ## Spots on the edge of the land tried for the staff entrance, nearest
 ## first.
 const ENTRANCE_TRIES := 60
+## The hour the game saves itself each day.
+const AUTOSAVE_HOUR := 6
 
 @onready var grid: BuildGrid = $BuildGrid
 @onready var view: BuildingView = $BuildGrid/BuildingView
@@ -90,6 +92,10 @@ var staff_window := StaffWindow.new()
 var finance_window := FinanceWindow.new()
 ## Intake, goals and the grade, on O.
 var office_window := OfficeWindow.new()
+## Save slots and the autosave, on F2.
+var saves_window := SavesWindow.new()
+## The prison's name in saves: the sample's, or the save's it was loaded from.
+var title := "My prison"
 ## The F3 inspector for people, objects and rooms.
 var inspector := Inspector.new()
 ## Grid lines at the height of the level being built on, off the ground.
@@ -219,7 +225,15 @@ func _ready() -> void:
 	site.foliage = foliage
 	site.paths = paths
 	site.people = people
-	SamplePrisons.build(sample if build_sample_layout else -1, site)
+	var saved := PrisonSave.pending
+	PrisonSave.pending = {}
+	if saved.is_empty():
+		SamplePrisons.build(sample if build_sample_layout else -1, site)
+		if build_sample_layout and sample >= 0:
+			title = SamplePrisons.NAMES[sample]
+	else:
+		PrisonSave.apply_world(self, saved)
+		title = saved.get("title", title)
 	people.assign_beds()
 	runner.refresh()
 	kitchen.name = "Kitchen"
@@ -347,6 +361,12 @@ func _ready() -> void:
 	intake.arrived.connect(func(came: Array[Person]) -> void:
 		Toasts.post("The bus is here", "%d new %s on the way to reception." % [came.size(),
 				"prisoner is" if came.size() == 1 else "prisoners are"]))
+	if not saved.is_empty():
+		PrisonSave.apply_rest(self, saved)
+		build_costs.start_from_now()
+	clock.hour_changed.connect(func(hour: int) -> void:
+		if hour == AUTOSAVE_HOUR:
+			PrisonSave.write(PrisonSave.AUTOSAVE, PrisonSave.capture(self)))
 	undo.name = "Undo"
 	undo.capture = capture_world
 	undo.restore = func(state: Dictionary) -> void:
@@ -380,7 +400,9 @@ func _ready() -> void:
 	_add_hud()
 	_on_cell_hovered(cursor.hovered_cell)
 	_apply_wall_view()
-	if build_sample_layout:
+	if not saved.is_empty():
+		Toasts.post("Loaded", PrisonSave.describe(saved), 6.0)
+	elif build_sample_layout:
 		Toasts.post(SamplePrisons.NAMES[sample], SamplePrisons.CHALLENGES[sample]
 				+ "\nPress F1 for the controls.", 8.0)
 
@@ -391,6 +413,7 @@ func _add_hud() -> void:
 	view_bar.controller = controller
 	view_bar.help_pressed.connect(func() -> void: help_card.visible = not help_card.visible)
 	view_bar.debug_pressed.connect(func() -> void: debug_overlay.visible = not debug_overlay.visible)
+	view_bar.saves_pressed.connect(saves_window.toggle)
 	debug_overlay.visibility_changed.connect(func() -> void: view_bar.show_debug(debug_overlay.visible))
 	hud.add_child(view_bar)
 	help_card.sections = PrisonHelp.SECTIONS
@@ -424,6 +447,13 @@ func _add_hud() -> void:
 	office_window.intake = intake
 	office_window.standing = standing
 	hud.add_child(office_window)
+	saves_window.save = func(slot: String) -> void:
+		if PrisonSave.write(slot, PrisonSave.capture(self)) == OK:
+			Toasts.post("Saved", PrisonSave.describe(PrisonSave.read(slot)))
+	saves_window.load_slot = func(slot: String) -> void:
+		PrisonSave.pending = PrisonSave.read(slot)
+		get_tree().reload_current_scene()
+	hud.add_child(saves_window)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("level_up"):
@@ -449,6 +479,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("money_toggle"):
 		finance_window.toggle()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("saves_toggle"):
+		saves_window.toggle()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("office_toggle"):
 		office_window.toggle()

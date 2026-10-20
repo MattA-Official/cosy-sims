@@ -32,6 +32,11 @@ func start() -> void:
 	building.changed.connect(_on_changed)
 
 
+## Takes whatever is built now as paid for, such as after loading a save.
+func start_from_now() -> void:
+	_worth = worth()
+
+
 ## What everything built is worth at full price.
 func worth() -> int:
 	var sum := 0
