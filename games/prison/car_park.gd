@@ -9,6 +9,8 @@ extends Node
 ## the lines on the floor sit between the cars.
 
 const BAY_FLOOR := &"car_park"
+## Staff cars and car parks, behind a setting (Main's Staff Cars) for now.
+static var enabled := false
 ## How far from a road, in tiles, a bay can be and still be driven to.
 const ROAD_REACH := 10.0
 

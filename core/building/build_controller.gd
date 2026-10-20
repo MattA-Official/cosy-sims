@@ -87,7 +87,7 @@ const FLOOR_HINTS := {
 
 const WALL_PAINT_HINT := "Click or drag along walls to paint the side you can see. Shift-click paints every wall round the room, Ctrl takes paint off."
 
-const LAND_HINT := "Click a plot next to your land to buy it. Tick flatten to level it with your land, for a fee."
+const LAND_HINT := "Click a strip next to your land to buy it. Tick flatten to level it with your land, for a fee."
 
 const WATER_HINTS := {
 	WaterMode.ADD: "Click a hollow to fill it with water. Digging deeper or cutting the rim moves the water.",
@@ -1269,8 +1269,8 @@ func _preview_land() -> void:
 func _land_status() -> String:
 	var plot := land_plots.plot_at(_hover_cell())
 	if not plot.has_area():
-		return "Point at a plot next to your land."
-	var text := "%d × %d plot: %s" % [plot.size.x, plot.size.y, Ledger.text(land_plots.price(plot))]
+		return "Point at a strip next to your land."
+	var text := "%d × %d strip: %s" % [plot.size.x, plot.size.y, Ledger.text(land_plots.price(plot))]
 	if flatten_land:
 		text += ", plus %s to flatten" % Ledger.text(land_plots.flatten_price(plot))
 	if not land_plots.can_afford(plot, flatten_land):

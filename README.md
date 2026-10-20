@@ -184,9 +184,11 @@ set how many cooks, cleaners, handymen and guards work days (06:00 to
 18:00) and nights (18:00 to 06:00), put guards on patrol routes, and put
 prisoners on or off a work programme (kitchen, laundry, cleaning,
 workshop). Staff arrive at the edge of the land early enough to walk in
-before their shift, and go home when it ends: by car when there is a car
-park (pairs of car park tiles) near the road, otherwise on foot from the
-edge of the land. Each is paid a wage as their shift starts, with nights
+before their shift, and go home when it ends. They come on the staff bus,
+which drops them at the bus stop before each shift; staff going home walk
+back to the stop to catch one. Without a road they walk in from the edge
+of the land. Staff cars and car parks (pairs of car park tiles near the
+road) are behind the **Staff Cars** setting on the Main node for now. Each is paid a wage as their shift starts, with nights
 paying half as much again.
 
 With Staff needs on (the default, in the Staff window), staff get
@@ -229,7 +231,9 @@ to sell, and each new prisoner brings a fee. Out of money, building and
 hiring stop until the balance is back above zero. Tick **Sandbox** in the
 Money window to build for free.
 
-Every map has a road in from its edge. Each morning at 09:00 a bus drives
+Every map has a road running along the inside of your land, with markings
+and the ground smoothed under it, into a tunnel at each end; now and then
+a car drives through. Each morning at 09:00 a bus drives
 in to the bus stop (or the entrance), and the day's arrivals walk to
 reception to be searched, then a guard walks them to a free bed. Nobody
 comes without a reception or a free bed. Hire a warden and give them an
@@ -243,11 +247,13 @@ Press F2 to save into one of three slots, or load one; the game also saves
 itself each morning. A save keeps everyone in the middle of what they
 were doing: walking somewhere, eating, at work.
 
-More land is for sale in plots of 8 × 8 tiles next to your own, in any
-direction (the Terrain tool's **Buy land**). Flat, dry plots cost the most;
-hills and water make them cheaper. Tick **Flatten when bought** to level
-the plot with your land along their shared edge, for a fee by how much
-ground moves. Buying land can't be undone.
+More land is for sale in strips, as in Prison Architect: each runs the
+whole length of one side of your land and 12 tiles out (the Terrain
+tool's **Buy land**), so your land stays a rectangle. Flat, dry land costs
+the most; hills and water make it cheaper. Tick **Flatten when bought** to
+level the strip with your land along their shared edge, for a fee by how
+much ground moves. A road running into the strip carries on to the new
+edge. Buying land can't be undone.
 
 ### Sample prisons
 
@@ -268,7 +274,7 @@ how prisoners find their way:
 | Staff wing | A staff room behind a staff door, and an office zoned staff only |
 | Working prison | The staff wing with a kitchen, laundry and workshop, three staff and prisoners on work programmes |
 | Guarded prison | The working prison with a guard post and a security gate to the yard, two guards by day and one by night |
-| Paying prison | The guarded prison with a warden in an office, a reception, a car park and a bus stop on the road |
+| Paying prison | The guarded prison with a warden in an office, a reception and a bus stop on the road (and a car park with Staff Cars on) |
 
 See [docs/design/building.md](docs/design/building.md) for the design
 decisions behind all this.

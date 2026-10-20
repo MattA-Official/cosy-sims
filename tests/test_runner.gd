@@ -243,7 +243,8 @@ func _test_sample_prisons() -> void:
 			if index == 7:
 				expected.assign([&"sleep", &"hunger", &"bladder"] if steps else [&"sleep", &"bladder"])
 			_check(reach == expected, "%s: everyone can reach %s (got %s)" % [name, expected, reach])
-			if index == 2 or index == 3:
+			# On the hillside the road's eased slope joins the terraces too.
+			if index == 3:
 				# Without its stairs, ramp or bridge, the cells are cut off.
 				people.graph = NavGraph.build(main.building, PathNetwork.new(), main.terrain)
 				people._dirty = false
@@ -1148,7 +1149,6 @@ func _test_intake() -> void:
 				got.assign(people.people.slice(before))
 		return got
 	var parked: int = main.vehicles.get_child_count()
-	_check(parked > 0, "staff cars wait in the car park")
 	var bus_called := intake.bus()
 	_check(bus_called.is_empty() and intake.bus_here() and main.vehicles.get_child_count() == parked + 1,
 			"the bus drives in by road")
@@ -1244,7 +1244,7 @@ func _test_saving() -> void:
 		clock.advance(1.0)
 	main.intake.bus()
 	var map: BuildingMap = main.building.ground()
-	map.build_room(Rect2i(map.land_bounds().position + Vector2i(1, 1), Vector2i(3, 3)))
+	map.build_room(Rect2i(map.land_bounds().position + Vector2i(1, 6), Vector2i(3, 3)))
 	main.ledger.sandbox = true
 	main.schedule.hours[3] = PrisonCatalogue.ACTIVITIES[0]
 	var data := PrisonSave.capture(main)
@@ -1363,9 +1363,10 @@ func _test_buying_land() -> void:
 	var land := building.land[0]
 	var for_sale := plots.plots()
 	_check(not for_sale.is_empty(), "plots next to your land are for sale")
-	_check(for_sale.all(func(p: Rect2i) -> bool: return not p.intersects(land) and p.grow(1).intersects(land)),
-			"plots for sale touch your land without overlapping it")
-	# A bumpy plot to the right of the land.
+	_check(for_sale.size() == 4 and for_sale.all(func(p: Rect2i) -> bool:
+			return not p.intersects(land) and p.grow(1).intersects(land) and maxi(p.size.x, p.size.y) == 48),
+			"a strip the length of each side is for sale")
+	# A bumpy strip to the right of the land.
 	var plot := plots.plot_at(Vector2i(land.end.x + 1, land.position.y + 1))
 	_check(plot.has_area(), "a plot to the side can be bought")
 	var flat_price := plots.price(plot)
@@ -1387,7 +1388,9 @@ func _test_buying_land() -> void:
 	_check(is_equal_approx(terrain.corner_height(plot.get_center()), edge_height),
 			"flattening levels the plot with your land")
 	_check(not plot in plots.plots(), "a bought plot isn't for sale any more")
-	_check(plots.plot_at(Vector2i(plot.end.x + 1, plot.position.y + 1)).has_area(), "the next plot out is for sale now")
+	_check(plots.plot_at(Vector2i(plot.end.x + 1, plot.position.y + 1)).has_area(), "the next strip out is for sale now")
+	_check(plots.plot_at(Vector2i(land.position.x + 1, land.end.y + 1)).end.x == plot.end.x,
+			"and the strips along the other sides run the new length")
 	var bumpy := plots.plot_at(Vector2i(land.position.x - 2, land.position.y + 1))
 	terrain.set_corner_height(bumpy.get_center(), 2.0)
 	_check(plots.buy(bumpy, false) and is_equal_approx(terrain.corner_height(bumpy.get_center()), 2.0),
@@ -1406,11 +1409,55 @@ func _test_roads() -> void:
 	main.sample = 9
 	root.add_child(main)
 	var roads: Roads = main.roads
-	_check(roads.has_roads() and not roads.edge_nodes().is_empty(), "every prison gets a road in from the edge of the map")
+	_check(roads.has_roads() and roads.edge_nodes().size() == 2, "every prison gets a road through, between two tunnels")
+	var land_rect := Rect2((main.map as BuildingMap).land_bounds())
+	var inside := true
+	for p: Vector2 in roads.paths.nodes.values():
+		inside = inside and land_rect.grow(0.01).has_point(p)
+	_check(inside, "the road is inside the land")
+	var vehicles: Vehicles = main.vehicles
+	var through := roads.route_through(RandomNumberGenerator.new())
+	_check(through.size() > 2 and not land_rect.has_point(through[0]) and not land_rect.has_point(through[-1]),
+			"cars can drive right through, out of sight in the tunnels at each end")
+	var passing := vehicles.drive_through(main.CARS[0], through)
+	_check(passing != null and not passing.visible, "a car starts hidden in the tunnel")
+	for i in 120:
+		(main.clock as GameClock).advance(1.0)
+	_check(not is_instance_valid(passing) or passing.is_queued_for_deletion(), "and is gone at the other end")
+	# The ground under the road is smooth.
+	var terrain: Terrain = main.terrain
+	var segment: PathNetwork.Segment = roads.paths.segments.values()[0]
+	var points := roads.paths.sample(segment, 1.0)
+	var worst := 0.0
+	for i in range(1, points.size()):
+		worst = maxf(worst, absf(terrain.height_at(points[i]) - terrain.height_at(points[i - 1])))
+	_check(worst < 0.2, "the road doesn't bump (worst step %.2f m)" % worst)
+	main.queue_free()
+
+	# Staff come on the bus.
+	main = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var bus_shifts: Shifts = main.shifts
+	var bus_people: People = main.people
+	var bus_clock: GameClock = main.clock
+	var count := bus_people.people.size()
+	var wanted := bus_shifts.wanted_for(&"cleaner", &"day")
+	bus_shifts.set_wanted(&"cleaner", &"day", wanted + 1)
+	_check(bus_people.people.size() == count and (main.vehicles as Vehicles).get_child_count() > 0,
+			"a new cleaner comes on the bus")
+	var arrived := false
+	for i in 90:
+		bus_clock.advance(1.0)
+		if bus_people.people.size() > count:
+			arrived = bus_people.people[-1].role == &"cleaner"
+			break
+	_check(arrived, "and gets off at the bus stop")
 	main.queue_free()
 
 	main = load("res://games/prison/main.tscn").instantiate()
 	main.sample = 11
+	main.staff_cars = true
 	root.add_child(main)
 	var car_park: CarPark = main.car_park
 	var shifts: Shifts = main.shifts
@@ -1445,6 +1492,7 @@ func _test_roads() -> void:
 		clock.advance(1.0)
 	_check(not is_instance_valid(car) or car.is_queued_for_deletion(), "and drive off")
 	main.queue_free()
+	CarPark.enabled = false
 
 
 func _test_staff_window() -> void:
@@ -1460,6 +1508,8 @@ func _test_staff_window() -> void:
 			return p.role == &"cook" and not p.going_home)
 	_check(shifts.on_now().id == &"day", "the game starts on the day shift")
 	_check(not shifts.entrance.is_empty(), "staff have an entrance at the edge of the land")
+	# Walking in from the entrance, as when there's no bus.
+	shifts.ride_in = Callable()
 	shifts.set_wanted(&"cook", &"day", 2)
 	var cook: Person = cooks.call().back()
 	_check(cooks.call().size() == 2 and cook.group == &"staff" and cook.shift == &"day",

@@ -119,7 +119,7 @@ func bus_here() -> bool:
 func _step_off(count: int) -> Array[Person]:
 	var came: Array[Person] = []
 	var room := _reception()
-	var at := _arrival_spot()
+	var at := arrival_spot()
 	if room.is_empty() or at.is_empty():
 		return came
 	var choices := _categories()
@@ -244,7 +244,7 @@ func stop_point() -> Vector2:
 
 
 ## Where arrivals step off: beside the bus stop, or at the entrance.
-func _arrival_spot() -> Array:
+func arrival_spot() -> Array:
 	var stops := building.objects_tagged([BUS_STOP])
 	if not stops.is_empty():
 		var placed := building.object_at(stops[0])

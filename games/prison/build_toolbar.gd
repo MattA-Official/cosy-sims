@@ -77,7 +77,7 @@ const WATER_MODES := [
 ]
 
 const LAND_MODES := [
-	[true, "Buy land", "money", "Buy a plot next to your land."],
+	[true, "Buy land", "money", "Buy a strip of land along one side."],
 ]
 
 ## Each is [wall kind, window kind, name, icon, what it does].
@@ -179,7 +179,7 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 			_add_floor_mode_choices()
 			if controller.floor_mode == BuildController.FloorMode.STAIRS:
 				_add_landing_choices()
-			_add_style_choices(PrisonCatalogue.FLOORS, true)
+			_add_style_choices(_floors(), true)
 		BuildController.Tool.WALL:
 			_add_wall_mode_choices()
 			if controller.wall_mode == BuildController.WallMode.PAINT:
@@ -237,7 +237,7 @@ func _add_room_choices() -> void:
 	var group := ButtonGroup.new()
 	var row := _section("Rooms")
 	for wall: WallDef in PrisonCatalogue.WALLS:
-		for floor: FloorDef in PrisonCatalogue.FLOORS:
+		for floor: FloorDef in _floors():
 			if floor.outdoor != wall.outdoor:
 				continue
 			var details := "%s floor, %s walls" % [floor.display_name, wall.display_name.to_lower()]
@@ -283,6 +283,15 @@ func _add_wall_mode_choices() -> void:
 			controller.wall_style = paints[0].id
 		# Painting has its own choices, so lay the row out again.
 		_on_tool_changed.call_deferred(controller.tool)))
+
+
+## The floors in the build menu: car park floor only with staff cars on.
+func _floors() -> Array[FloorDef]:
+	var out: Array[FloorDef] = []
+	for def in PrisonCatalogue.FLOORS:
+		if CarPark.enabled or def.id != CarPark.BAY_FLOOR:
+			out.append(def)
+	return out
 
 
 ## The wall styles a side can be painted in: indoor ones, not fences or

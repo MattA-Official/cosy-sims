@@ -9,3 +9,4 @@ display_name = "Road"
 colour = Color(0.34, 0.34, 0.37, 1)
 edge_colour = Color(0.72, 0.7, 0.66, 1)
 width = 3.0
+markings = true

@@ -457,15 +457,15 @@ static func _road_and_parking(site: Site) -> void:
 	var land := site.land()
 	var ground := site.map()
 	var width := PrisonCatalogue.path(&"road").width
-	var line := land.position.y - 1.0 - width * 0.5
-	# The land sits in the middle of the map, so the map is this big.
-	var size := Vector2(land.position * 2 + land.size)
-	site.foliage.remove_in_rect(Rect2(0, line - width, size.x, width * 2.0))
-	site.paths.add_segment(Vector2(0.5, line), Vector2(size.x - 0.5, line), null, &"road")
-	var bays := Rect2i(land.position + Vector2i(2, 0), Vector2i(6, 2))
-	site.foliage.remove_in_rect(Rect2(bays).grow(1.0))
-	ground.fill_floor(bays, &"car_park")
-	var stop := Vector2(land.position) + Vector2(9, 0)
+	var line := land.position.y + 0.5 + width * 0.5
+	site.foliage.remove_in_rect(Rect2(land.position.x, line - width, land.size.x, width * 2.0))
+	site.paths.add_segment(Vector2(land.position.x, line), Vector2(land.end.x, line), null, &"road")
+	var verge := land.position + Vector2i(0, ceili(width + 0.5))
+	if CarPark.enabled:
+		var bays := Rect2i(verge + Vector2i(2, 0), Vector2i(6, 2))
+		site.foliage.remove_in_rect(Rect2(bays).grow(1.0))
+		ground.fill_floor(bays, &"car_park")
+	var stop := Vector2(verge) + Vector2(9, 0)
 	site.foliage.remove_in_rect(Rect2(stop, Vector2(1, 1)).grow(1.0))
 	ground.fill_floor(Rect2i(Vector2i(stop), Vector2i(2, 1)), &"paving")
 	ground.place_object(PrisonCatalogue.object(&"bus_stop"), stop, 2)

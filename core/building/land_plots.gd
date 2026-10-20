@@ -1,24 +1,28 @@
 class_name LandPlots
 extends RefCounted
-## Buying more land. The map is cut into square plots lined up with the
-## first piece of land you own; any plot touching your land can be bought,
-## which moves your boundary out over it. Flat, dry plots cost the most;
-## hills and water bring the price down. Ticking flatten smooths the new
-## plot to the height of your land along their shared edge, for a fee by how
-## much ground moves.
+## Buying more land, a strip at a time as in Prison Architect: a strip
+## runs the whole length of one side of your land and DEPTH tiles out from
+## it, so your land stays a rectangle and grows in any direction. Flat,
+## dry land costs the most; hills and water bring the price down. Ticking
+## flatten smooths the new strip to the height of your land along their
+## shared edge, for a fee by how much ground moves.
 
-## Plot width and depth in tiles.
-const SIZE := 8
+## How far a strip reaches out from your land, in tiles. Nearer the map's
+## edge than that, the strip takes what's left if it's at least MIN_DEPTH.
+const DEPTH := 12
+const MIN_DEPTH := 4
 ## Price of a flat, dry tile.
-const TILE_PRICE := 60
-## A rough or wet plot costs at least this share of the full price.
+const TILE_PRICE := 25
+## A rough or wet strip costs at least this share of the full price.
 const CHEAPEST := 0.6
 ## Average slope (metres of height between neighbouring corners) at which
-## a plot is as cheap as it gets.
+## a strip is as cheap as it gets.
 const ROUGHEST := 0.5
 ## Flattening, per metre each corner moves.
 const FLATTEN_PRICE := 30
 
+## Just before land is bought, and just after.
+signal buying(plot: Rect2i)
 signal bought(plot: Rect2i)
 
 var building: Building
@@ -29,21 +33,24 @@ var ledger: Ledger
 var line := "Land"
 
 
-## Every plot you could buy now.
+## Every strip you could buy now: up to one on each side.
 func plots() -> Array[Rect2i]:
 	var out: Array[Rect2i] = []
 	if building == null or building.land.is_empty():
 		return out
-	var origin := building.land[0].position
-	var bounds := _bounds()
-	var first := Vector2i(posmod(origin.x - bounds.position.x, SIZE), posmod(origin.y - bounds.position.y, SIZE))
-	first += bounds.position
-	for z in range(first.y, bounds.end.y - SIZE + 1, SIZE):
-		for x in range(first.x, bounds.end.x - SIZE + 1, SIZE):
-			var plot := Rect2i(x, z, SIZE, SIZE)
-			if _owns_any(plot) or not _touches_land(plot):
-				continue
-			out.append(plot)
+	var land := building.ground().land_bounds()
+	var map := _bounds()
+	var room := [land.position.x - map.position.x, map.end.x - land.end.x,
+			land.position.y - map.position.y, map.end.y - land.end.y]
+	for side in 4:
+		var depth := mini(DEPTH, room[side])
+		if depth < MIN_DEPTH:
+			continue
+		match side:
+			0: out.append(Rect2i(land.position.x - depth, land.position.y, depth, land.size.y))
+			1: out.append(Rect2i(land.end.x, land.position.y, depth, land.size.y))
+			2: out.append(Rect2i(land.position.x, land.position.y - depth, land.size.x, depth))
+			3: out.append(Rect2i(land.position.x, land.end.y, land.size.x, depth))
 	return out
 
 
@@ -108,34 +115,14 @@ func buy(plot: Rect2i, flatten: bool) -> bool:
 			ledger.add(-fee, "Groundworks")
 	if ledger != null:
 		ledger.add(-cost, line)
+	buying.emit(plot)
 	building.add_land(plot)
 	bought.emit(plot)
 	return true
 
 
 func _bounds() -> Rect2i:
-	return Rect2i(Vector2i.ZERO, terrain.size) if terrain != null else building.ground().land_bounds().grow(SIZE * 3)
-
-
-func _owns_any(plot: Rect2i) -> bool:
-	for rect in building.land:
-		if rect.intersects(plot):
-			return true
-	return false
-
-
-## Whether the plot shares an edge (not just a corner) with land you own.
-func _touches_land(plot: Rect2i) -> bool:
-	var map := building.ground()
-	for i in plot.size.x:
-		if map.owns(Vector2i(plot.position.x + i, plot.position.y - 1)) \
-				or map.owns(Vector2i(plot.position.x + i, plot.end.y)):
-			return true
-	for i in plot.size.y:
-		if map.owns(Vector2i(plot.position.x - 1, plot.position.y + i)) \
-				or map.owns(Vector2i(plot.end.x, plot.position.y + i)):
-			return true
-	return false
+	return Rect2i(Vector2i.ZERO, terrain.size) if terrain != null else building.ground().land_bounds().grow(DEPTH * 2)
 
 
 func _corners(plot: Rect2i) -> Array[Vector2i]:

@@ -94,6 +94,10 @@ func add_curve(st: SurfaceTool, points: PackedVector2Array, def: PathStyleDef,
 	# Cross-sections square to the curve at each point, shared by the
 	# stretches either side so bends have no gaps or notches.
 	var sides := _sides(points, half)
+	# The top along the middle, for the markings.
+	var tops: Array[float] = []
+	tops.resize(points.size())
+	tops.fill(NAN)
 	for i in profile.kinds.size():
 		var p0 := points[i]
 		var p1 := points[i + 1]
@@ -103,6 +107,8 @@ func add_curve(st: SurfaceTool, points: PackedVector2Array, def: PathStyleDef,
 			PathProfile.Kind.GROUND when not built:
 				var top0 := _hugged(p0, sides[i]) + raised
 				var top1 := _hugged(p1, sides[i + 1]) + raised
+				tops[i] = top0
+				tops[i + 1] = top1
 				_add_section(st, p0 - sides[i], p0 + sides[i], p1 + sides[i + 1], p1 - sides[i + 1],
 						top0, top1, minf(h0, h1) - 0.3, colour, edge)
 			PathProfile.Kind.GROUND:
@@ -111,6 +117,40 @@ func add_curve(st: SurfaceTool, points: PackedVector2Array, def: PathStyleDef,
 						h0 + raised, h1 + raised, low, colour, edge)
 			_:
 				_add_bridge(st, p0, p1, half, h0 + raised, h1 + raised, wood)
+	if def != null and def.markings:
+		_add_markings(st, points, sides, tops, half, def.marking_colour * tint)
+
+
+## A dashed line down the middle of a road and a solid one along each
+## side, a hair above it, wherever it lies on the ground.
+func _add_markings(st: SurfaceTool, points: PackedVector2Array, sides: Array[Vector2], tops: Array[float],
+		half: float, colour: Color) -> void:
+	const DASH := 1.0
+	const LINE := 0.06
+	const SIDE_IN := 0.3
+	var cs := terrain.cell_size if terrain != null else 1.0
+	var along := 0.0
+	for i in points.size() - 1:
+		if is_nan(tops[i]) or is_nan(tops[i + 1]):
+			along += points[i].distance_to(points[i + 1])
+			continue
+		var length := points[i].distance_to(points[i + 1])
+		var out0 := sides[i] / half
+		var out1 := sides[i + 1] / half
+		var y0 := tops[i] + 0.01
+		var y1 := tops[i + 1] + 0.01
+		var strips: Array[float] = [half - SIDE_IN, -(half - SIDE_IN)]
+		# Dashes: on for the first half of every two DASH lengths.
+		if fmod(along + length * 0.5, DASH * 2.0) < DASH:
+			strips.append(0.0)
+		for offset in strips:
+			var a0 := points[i] + out0 * (offset - LINE)
+			var b0 := points[i] + out0 * (offset + LINE)
+			var a1 := points[i + 1] + out1 * (offset - LINE)
+			var b1 := points[i + 1] + out1 * (offset + LINE)
+			_quad(st, Vector3(a0.x * cs, y0, a0.y * cs), Vector3(b0.x * cs, y0, b0.y * cs),
+					Vector3(b1.x * cs, y1, b1.y * cs), Vector3(a1.x * cs, y1, a1.y * cs), colour, Vector3.UP)
+		along += length
 
 
 ## A block whose ends are the cross-sections at p0 and p1 (tile units).

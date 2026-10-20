@@ -15,6 +15,9 @@ extends Node3D
 ## Door steps: a door between floors up to a metre apart gets a few steps
 ## on the low side. Off refuses doors between floors more than a step apart.
 @export var door_steps := false
+## Staff cars: staff with a car park by the road drive in and park. Off,
+## staff come on the staff bus, and car park floor isn't in the build menu.
+@export var staff_cars := false
 
 const LORRY := preload("res://games/prison/art/models/lorry.glb")
 ## The bus's front is towards +X.
@@ -24,7 +27,9 @@ const CARS: Array[PackedScene] = [preload("res://games/prison/art/models/car_red
 ## Game minutes the lorry waits before driving off.
 const LORRY_STAY := 30.0
 ## Tiles between the edge of the land and the side of the generated road.
-const ROAD_GAP := 1.0
+const ROAD_VERGE := 0.5
+## Game minutes between cars passing through, at random in this range.
+const PASSING_CARS := Vector2(20.0, 90.0)
 ## Spots on the edge of the land tried for the staff entrance, nearest
 ## first.
 const ENTRANCE_TRIES := 60
@@ -53,6 +58,10 @@ var paths := PathNetwork.new()
 var roads := Roads.new()
 var vehicles := Vehicles.new()
 var car_park := CarPark.new()
+var staff_bus := StaffBus.new()
+var tunnels := Tunnels.new()
+var _passing_wait := 0.0
+var _rng := RandomNumberGenerator.new()
 var people := People.new()
 ## Every item about the place, and the work to be done with them.
 var items := ItemStore.new()
@@ -129,6 +138,7 @@ var views: Dictionary[int, BuildingView] = {}
 func _ready() -> void:
 	Building.split_levels = split_levels
 	Building.door_steps = door_steps
+	CarPark.enabled = staff_cars
 	# The grid is the whole world; you start owning the middle of it.
 	var land := Rect2i(grid.size / 4, grid.size / 2)
 	building = Building.new(land, PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
@@ -147,7 +157,8 @@ func _ready() -> void:
 	path_view.styles = PrisonCatalogue.PATHS
 	path_view.network = paths
 	roads.paths = paths
-	roads.bounds = Rect2i(Vector2i.ZERO, grid.size)
+	roads.bounds = map.land_bounds()
+	building.changed.connect(func() -> void: roads.bounds = map.land_bounds())
 	debug_overlay.room_types = PrisonCatalogue.ROOM_TYPES
 	debug_overlay.map = map
 
@@ -301,7 +312,16 @@ func _ready() -> void:
 	vehicles.ground_at = func(tile: Vector2) -> float: return terrain.height_at(tile)
 	vehicles.clock = clock
 	vehicles.front_turns[BUS] = -PI * 0.5
+	# Out of sight once inside a tunnel.
+	vehicles.shown_at = func(tile: Vector2) -> bool: return Rect2(map.land_bounds()).grow(0.25).has_point(tile)
 	grid.add_child(vehicles)
+	tunnels.name = "Tunnels"
+	tunnels.cell_size = grid.cell_size
+	tunnels.ground_at = func(tile: Vector2) -> float: return terrain.height_at(tile)
+	tunnels.roads = roads
+	grid.add_child(tunnels)
+	_passing_wait = _rng.randf_range(PASSING_CARS.x, PASSING_CARS.y)
+	clock.advanced.connect(_pass_through)
 	car_park.name = "CarPark"
 	car_park.building = building
 	car_park.vehicles = vehicles
@@ -309,9 +329,11 @@ func _ready() -> void:
 	car_park.shifts = shifts
 	car_park.cars = CARS
 	add_child(car_park)
-	car_park.start()
+	if CarPark.enabled:
+		car_park.start()
 	shifts.start()
-	car_park.park_staff_here()
+	if CarPark.enabled:
+		car_park.park_staff_here()
 	for role: StringName in site.night_staff:
 		shifts.set_wanted(role, &"night", site.night_staff[role], false)
 	guarding.name = "Guarding"
@@ -393,6 +415,15 @@ func _ready() -> void:
 	intake.clock = clock
 	add_child(intake)
 	intake.start()
+	if not CarPark.enabled:
+		staff_bus.name = "StaffBus"
+		staff_bus.vehicles = vehicles
+		staff_bus.intake = intake
+		staff_bus.shifts = shifts
+		staff_bus.bus_model = BUS
+		staff_bus.clock = clock
+		add_child(staff_bus)
+		staff_bus.start()
 	standing.name = "Standing"
 	standing.people = people
 	standing.ledger = ledger
@@ -430,7 +461,14 @@ func _ready() -> void:
 	add_child(undo)
 	undo.start([building.changed, terrain.changed, water.changed, foliage.changed, paths.changed] as Array[Signal])
 	# Land bought stays bought: undo starts again from the new boundary.
-	land_plots.bought.connect(func(_plot: Rect2i) -> void: undo.reset())
+	var tunnel_ends: Array = []
+	land_plots.buying.connect(func(_plot: Rect2i) -> void:
+		tunnel_ends.clear()
+		for node in roads.edge_nodes():
+			tunnel_ends.append([paths.nodes[node], roads.outward(node)]))
+	land_plots.bought.connect(func(_plot: Rect2i) -> void:
+		_extend_roads(tunnel_ends)
+		undo.reset())
 	jobs_panel.name = "JobsPanel"
 	jobs_panel.debug_overlay = debug_overlay
 	jobs_panel.jobs = jobs
@@ -597,29 +635,63 @@ func _apply_wall_view() -> void:
 		v.show_roof = n < level or mode == BuildController.WallView.ROOFS
 
 
-## A road along the side of the land nearest the entrance, from one edge
-## of the map to the other, for the bus and lorry. Not across water: a
-## prison over the water goes without.
+## A road along the inside of the land on the side nearest the entrance,
+## from one edge to the other, into a tunnel at each end, with the ground
+## under it smoothed. Not across water: a prison by the water goes without.
 func _lay_road() -> void:
 	if shifts.entrance.is_empty() or roads.has_roads():
 		return
-	var land := building.land[0]
+	var land := map.land_bounds()
 	var spot: Vector2 = shifts.entrance[1]
 	var gaps: Array[float] = [spot.x - land.position.x, land.end.x - spot.x, spot.y - land.position.y,
 			land.end.y - spot.y]
 	var side := gaps.find(gaps.min())
-	var across := ROAD_GAP + PrisonCatalogue.path(&"road").width * 0.5
-	var line: float = [land.position.x - across, land.end.x + across, land.position.y - across,
-			land.end.y + across][side]
-	var size := Vector2(grid.size)
-	var a := Vector2(line, 0.5) if side < 2 else Vector2(0.5, line)
-	var b := Vector2(line, size.y - 0.5) if side < 2 else Vector2(size.x - 0.5, line)
+	var inset := ROAD_VERGE + PrisonCatalogue.path(&"road").width * 0.5
+	var line: float = [land.position.x + inset, land.end.x - inset, land.position.y + inset,
+			land.end.y - inset][side]
+	var a := Vector2(line, land.position.y) if side < 2 else Vector2(land.position.x, line)
+	var b := Vector2(line, land.end.y) if side < 2 else Vector2(land.end.x, line)
 	for i in 101:
 		var cell := Vector2i(a.lerp(b, i / 100.0).floor())
 		if water.body_at(cell) != null:
 			return
-	foliage.remove_in_rect(Rect2(a, b - a).abs().grow(PrisonCatalogue.path(&"road").width * 0.5 + 0.5))
+	_road_between(a, b)
+
+
+## A straight road from a to b (tiles), with the plants cleared and the
+## ground smoothed under it.
+func _road_between(a: Vector2, b: Vector2) -> void:
+	var half := PrisonCatalogue.path(&"road").width * 0.5
+	foliage.remove_in_rect(Rect2(a, b - a).abs().grow(half + 0.5))
+	Roads.grade(terrain, a, b, half, building.corner_in_use)
 	paths.add_segment(a, b, null, &"road")
+
+
+## Roads that ran into a tunnel where land was just bought carry on to the
+## new edge. `ends` are the tunnel mouths before buying, as [point,
+## outward].
+func _extend_roads(ends: Array) -> void:
+	var land := Rect2(map.land_bounds())
+	for end: Array in ends:
+		var from: Vector2 = end[0]
+		var out: Vector2 = end[1]
+		if not land.grow(-Roads.EDGE).has_point(from):
+			continue
+		var to := from
+		while land.has_point(to + out * 0.5):
+			to += out * 0.5
+		to = to.clamp(land.position, land.end)
+		if water.body_at(Vector2i(((from + to) * 0.5).floor())) == null:
+			_road_between(from, to)
+
+
+## Every so often a car drives through, in one tunnel and out of another.
+func _pass_through(minutes: float) -> void:
+	_passing_wait -= minutes
+	if _passing_wait > 0.0:
+		return
+	_passing_wait = _rng.randf_range(PASSING_CARS.x, PASSING_CARS.y)
+	vehicles.drive_through(CARS[_rng.randi() % CARS.size()], roads.route_through(_rng))
 
 
 ## Where staff come and go: the spot on the edge of the land with the

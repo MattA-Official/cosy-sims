@@ -1,7 +1,7 @@
 class_name Vehicles
 extends Node3D
-## Vehicles on the roads: the intake bus, the delivery lorry, staff cars.
-## Each drives in from the edge of the map to a stop, waits until told to
+## Vehicles on the roads: the intake bus, the delivery lorry, staff cars,
+## and cars just passing through. Each comes out of a tunnel to a stop, waits until told to
 ## go, then turns round and drives back out the way it came. They move
 ## with game time, so they stop when the game is paused.
 
@@ -12,6 +12,9 @@ var roads: Roads
 var cell_size := 1.0
 ## (point: Vector2) -> float: the ground's height at a point in tiles.
 var ground_at: Callable
+## (point: Vector2) -> bool: whether a vehicle there can be seen, not in
+## a tunnel. Optional.
+var shown_at: Callable
 ## Models whose front isn't +Z, with the turn from +Z to their front,
 ## such as -PI / 2 for a front towards +X.
 var front_turns: Dictionary[PackedScene, float] = {}
@@ -66,6 +69,21 @@ func park(model: PackedScene, to: Vector2) -> Node3D:
 	return vehicle
 
 
+## Drives a vehicle along `points` (tiles) and away at the end, such as a
+## car passing through. Returns it, or null.
+func drive_through(model: PackedScene, points: PackedVector2Array) -> Node3D:
+	if points.size() < 2 or model == null:
+		return null
+	var vehicle := model.instantiate() as Node3D
+	vehicle.set_meta(&"turn", front_turns.get(model, 0.0))
+	add_child(vehicle)
+	_trips[vehicle] = [points, 0.0, func(gone: Node3D) -> void:
+		_parked.erase(gone)
+		gone.queue_free()]
+	_place(vehicle, points, 0.0)
+	return vehicle
+
+
 ## Turns a parked vehicle round and drives it back out, then it's gone.
 func drive_out(vehicle: Node3D) -> void:
 	if vehicle == null or not is_instance_valid(vehicle):
@@ -81,7 +99,9 @@ func drive_out(vehicle: Node3D) -> void:
 		vehicle.queue_free()
 		return
 	points.reverse()
-	_trips[vehicle] = [points, 0.0, func(gone: Node3D) -> void: gone.queue_free()]
+	_trips[vehicle] = [points, 0.0, func(gone: Node3D) -> void:
+		_parked.erase(gone)
+		gone.queue_free()]
 
 
 ## Whether a vehicle is still on its way to its stop.
@@ -131,6 +151,7 @@ func _place(vehicle: Node3D, points: PackedVector2Array, along: float) -> void:
 	var at := a.lerp(b, clampf((along - before) / gap, 0.0, 1.0))
 	var height: float = ground_at.call(at) if ground_at.is_valid() else 0.0
 	vehicle.position = Vector3(at.x * cell_size, height, at.y * cell_size)
+	vehicle.visible = not shown_at.is_valid() or shown_at.call(at)
 	if b != a:
 		vehicle.rotation.y = atan2(b.x - a.x, b.y - a.y) + float(vehicle.get_meta(&"turn", 0.0))
 
