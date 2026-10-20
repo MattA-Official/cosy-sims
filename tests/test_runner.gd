@@ -863,18 +863,22 @@ func _test_laundry() -> void:
 		_check(items.total(&"dirty_laundry") + items.total(&"clean_laundry") == 9, "no uniform goes missing")
 	_check(changed[0] > 0 and most_dirty >= mini(changed[0], Laundry.LOAD),
 			"after a shower, prisoners leave their uniform in the basket and take a clean one")
+	# A part load waits in the basket while the shelves have plenty, and
+	# someone may shower again in the meantime.
 	var minutes := 0
-	while items.total(&"dirty_laundry") > 0 and minutes < 600:
+	while items.total(&"dirty_laundry") >= Laundry.LOAD and minutes < 600:
 		clock.advance(1.0)
 		minutes += 1
-	_check(items.total(&"dirty_laundry") == 0, "the cleaner washes it")
+	_check(items.total(&"dirty_laundry") < Laundry.LOAD, "the cleaner washes it")
 	var shelf := main.map.objects.values().filter(func(p: BuildingMap.PlacedObject) -> bool:
 			return p.def.id == &"clothes_shelf")[0] as BuildingMap.PlacedObject
+	var put_away := func() -> bool:
+		return items.count_in(Vector2i(0, shelf.id), &"clean_laundry") + items.total(&"dirty_laundry") == 9
 	minutes = 0
-	while items.count_in(Vector2i(0, shelf.id), &"clean_laundry") < 9 and minutes < 120:
+	while not put_away.call() and minutes < 120:
 		clock.advance(1.0)
 		minutes += 1
-	_check(items.count_in(Vector2i(0, shelf.id), &"clean_laundry") == 9, "irons it and stacks it back on the shelf")
+	_check(put_away.call(), "irons it and stacks it back on the shelf")
 	main.queue_free()
 
 
