@@ -1,8 +1,9 @@
 class_name PrisonSave
 ## Saving and loading a prison. A save keeps the build and the land, the
 ## clock, money, timetable, staff and settings, and everyone in it with
-## their needs, mood, bed and history; on loading they pick up from where
-## they stand, starting whatever comes next. Jobs are posted afresh.
+## their needs, mood, bed and history, in the middle of whatever they were
+## doing: walking somewhere, eating, at work. Jobs are posted afresh by
+## whatever needs them, and workers take theirs up again where they were.
 ##
 ## Saves are files in user://saves: three slots and an autosave written
 ## each morning.
@@ -34,6 +35,7 @@ static func capture(main: Node) -> Dictionary:
 			"position": person.stand_spot if person.state == Person.State.USING else person.position, "needs": person.needs.duplicate(),
 			"mood": person.mood, "moodlets": person.moodlets.duplicate(), "traits": traits,
 			"profile": person.profile.duplicate(true), "bed": person.bed,
+			"doing": people.doing_of(person), "work": (main.jobs as JobBoard).work_of(person),
 		})
 	var hours: Array = []
 	for def in (main.schedule as Schedule).hours:
@@ -69,7 +71,8 @@ static func capture(main: Node) -> Dictionary:
 		"money": {"balance": ledger.balance, "sandbox": ledger.sandbox, "today": ledger.today.duplicate(),
 				"yesterday": ledger.yesterday.duplicate(), "closing": ledger.closing.duplicate()},
 		"sold": (main.workshop as Workshop).sold,
-		"intake": {"limit": (main.intake as Intake).limit, "accepted": (main.intake as Intake).accepted.duplicate()},
+		"intake": {"limit": (main.intake as Intake).limit, "accepted": (main.intake as Intake).accepted.duplicate(),
+				"arriving": (main.intake as Intake).arriving_ids()},
 		"standing": {"grade": standing.grade, "measures": standing.measures.duplicate(), "goals_done": goals_done,
 				"report": standing.report, "graded": standing.measures_known()},
 	}
@@ -108,6 +111,10 @@ static func apply_world(main: Node, data: Dictionary) -> void:
 		person.traits = traits
 		if entry["role"] != &"":
 			people.set_role(person, entry["role"])
+		var block: StringName = entry.get("doing", {}).get("block", &"")
+		for def in PrisonCatalogue.ACTIVITIES:
+			if def.id == block:
+				person.block = def
 	people.set_next_id(data.get("next_person_id", 1))
 	people.needs_off.assign(data.get("needs_off", []))
 	main.clock.total_minutes = data.get("minutes", main.clock.total_minutes)
@@ -162,8 +169,18 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	(main.intake as Intake).accepted.assign(intake.get("accepted", {}))
 	var saved: Dictionary = data.get("standing", {})
 	(main.standing as Standing).restore(saved)
+	(main.intake as Intake).restore_arriving(intake.get("arriving", {}))
 	people.assign_beds()
 	(main.runner as ScheduleRunner).refresh()
+	# Everyone back in the middle of what they were doing.
+	var by_id: Dictionary[int, Person] = {}
+	for person in people.people:
+		by_id[person.id] = person
+	for entry: Dictionary in data.get("people", []):
+		var person: Person = by_id.get(entry["id"])
+		if person != null:
+			people.resume_doing(person, entry.get("doing", {}))
+			(main.jobs as JobBoard).resume_work(person, entry.get("work", {}))
 
 
 static func write(slot: String, data: Dictionary) -> Error:

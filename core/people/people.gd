@@ -322,6 +322,65 @@ func spots_beside(level: int, placed: BuildingMap.PlacedObject, from: Vector2) -
 	return _spots_beside(level, placed, from)
 
 
+## What someone is in the middle of, as plain data for a save: where
+## they're walking, what they're using and for how long. Their job is
+## saved by the JobBoard.
+func doing_of(person: Person) -> Dictionary:
+	return {
+		"position": person.position, "state": person.state, "activity": person.activity,
+		"wandering": person.wandering, "reason": person.reason,
+		"route": person.route.duplicate(), "route_levels": person.route_levels.duplicate(),
+		"route_on_surface": person.route_on_surface.duplicate(),
+		"target": person.target, "target_tag": person.target_tag, "target_need": person.target_need,
+		"fetch_from": person.fetch_from, "stand_spot": person.stand_spot, "seat": person.seat,
+		"timer": person.timer, "gave_up": person.gave_up.duplicate(), "place_wait": person.place_wait,
+		"think_wait": person.think_wait, "mood_wait": person.mood_wait, "done_main": person.done_main,
+		"block": person.block.id if person.block != null else &"",
+	}
+
+
+## Puts someone back in the middle of what doing_of() saved. Anything that
+## no longer makes sense (the object they were using is gone) leaves them
+## standing about to choose again.
+func resume_doing(person: Person, doing: Dictionary) -> void:
+	if doing.is_empty():
+		return
+	_stop(person)
+	person.position = doing["position"]
+	person.activity = doing["activity"]
+	person.reason = doing["reason"]
+	person.gave_up.assign(doing["gave_up"])
+	person.place_wait = doing["place_wait"]
+	person.think_wait = doing["think_wait"]
+	person.mood_wait = doing["mood_wait"]
+	person.done_main = doing["done_main"]
+	person.timer = doing["timer"]
+	person.stand_spot = doing["stand_spot"]
+	person.target = doing["target"]
+	person.target_tag = doing["target_tag"]
+	person.target_need = doing["target_need"]
+	person.fetch_from = doing["fetch_from"]
+	if person.has_object():
+		if building.object_at(person.target) == null or _claimed.has(person.target):
+			_release(person)
+			person.state = Person.State.IDLE
+			person.activity = "Standing about"
+			if doing["state"] == Person.State.USING:
+				person.position = person.stand_spot
+			return
+		_claimed[person.target] = person
+	var seat: Vector2i = doing["seat"]
+	if seat != Person.NO_OBJECT and building.object_at(seat) != null and not _claimed.has(seat):
+		_take_seat(person, seat)
+	person.route.assign(doing["route"])
+	person.route_levels.assign(doing["route_levels"])
+	person.route_on_surface.assign(doing["route_on_surface"])
+	person.wandering = doing["wandering"]
+	person.state = doing["state"]
+	if person.state == Person.State.WALKING and person.route.is_empty():
+		person.state = Person.State.IDLE
+
+
 ## Adds someone of a group (a prisoner unless told otherwise) standing at
 ## a spot on a level. Returns null if nobody can stand there.
 func add_person(level: int, spot: Vector2, person_name := "", group: StringName = &"prisoner") -> Person:

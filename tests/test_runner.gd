@@ -1226,6 +1226,9 @@ func _test_saving() -> void:
 	var minutes: float = clock.total_minutes
 	var balance: int = main.ledger.balance
 	var shelf: int = main.items.total(&"ingredient")
+	var was: Dictionary[String, Array] = {}
+	for p: Person in main.people.people:
+		was[p.name] = [p.state, p.target_tag, p.route.size(), p.job != null, p.position]
 	main.queue_free()
 
 	PrisonSave.pending = PrisonSave.read("test")
@@ -1243,6 +1246,23 @@ func _test_saving() -> void:
 			func(p: Person) -> bool: return p.category != &""), "and each prisoner's category")
 	_check(loaded.title == "Paying prison", "under its name")
 	_check(PrisonSave.describe(PrisonSave.read("test")).begins_with("Paying prison · Day 1"), "and saves say what's in them")
+	var same_doing := 0
+	var workers := 0
+	for p: Person in loaded.people.people:
+		var then: Array = was.get(p.name, [])
+		if then.is_empty():
+			continue
+		if p.state == then[0] and p.target_tag == then[1] and p.route.size() == then[2] \
+				and p.position.is_equal_approx(then[4]):
+			same_doing += 1
+		if then[3]:
+			workers += 1
+	_check(same_doing >= was.size() - 2, "everyone carries on mid-walk or mid-meal (%d of %d)" % [same_doing, was.size()])
+	for i in 3:
+		loaded.clock.advance(1.0)
+	var back_at_work: int = loaded.people.people.filter(func(p: Person) -> bool:
+		return not was.get(p.name, []).is_empty() and was[p.name][3] and p.job != null).size()
+	_check(workers == 0 or back_at_work >= workers - 1, "and workers take up their jobs again (%d of %d)" % [back_at_work, workers])
 	DirAccess.remove_absolute(PrisonSave._path("test"))
 	loaded.queue_free()
 

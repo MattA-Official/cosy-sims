@@ -26,6 +26,48 @@ var roles: Dictionary[StringName, StaffRoleDef] = {}
 var programmes: Dictionary[StringName, WorkProgrammeDef] = {}
 
 
+## Game minutes a loaded worker waits for their job to be posted again
+## before giving it up.
+const RESUME_MINUTES := 10.0
+
+## Workers from a save waiting to pick their job up again: Person to
+## [what it was (see work_of), minutes waited].
+var _resuming: Dictionary[Person, Array] = {}
+## For kinds of job that aren't posted again on their own once someone has
+## started them (the laundry, once the basket is in hand), how to make one
+## again from what work_of() saved: (work: Dictionary) -> Job, or null.
+var rebuilders: Dictionary[StringName, Callable] = {}
+
+
+## What job someone is part way through, as plain data for a save, or empty.
+## Jobs are posted afresh by whatever needs them, so this is enough to find
+## theirs again after loading (see resume_work).
+func work_of(person: Person) -> Dictionary:
+	var job := person.job
+	if job == null:
+		return {}
+	var stage := job.current()
+	var first := job.stages[0]
+	var last := job.stages[-1]
+	var with := {}
+	for key in job.get_meta_list():
+		var value: Variant = job.get_meta(key)
+		if value is Person:
+			with[key] = (value as Person).id
+	return {"kind": job.kind, "title": job.title, "stage": job.stage, "left": job.stages.size() - job.stage,
+			"level": stage.level if stage != null else 0, "object": stage.object if stage != null else -1,
+			"tile": stage.tile if stage != null else Vector2i.ZERO, "timer": person.timer,
+			"working": person.state == Person.State.USING, "with": with,
+			"first": [first.level, first.object, first.tile], "last": [last.level, last.object, last.tile]}
+
+
+## Has someone from a save take their job up again once it's back on the
+## board, at the same stage, before they look for any other work.
+func resume_work(person: Person, work: Dictionary) -> void:
+	if not work.is_empty():
+		_resuming[person] = [work, 0.0]
+
+
 func post(job: Job) -> Job:
 	jobs.append(job)
 	return job
@@ -57,6 +99,49 @@ func clear() -> void:
 func step(minutes: float) -> void:
 	for job in jobs:
 		job.wait -= minutes
+	for person: Person in _resuming.keys():
+		_resume(person, minutes)
+
+
+func _resume(person: Person, minutes: float) -> void:
+	var entry: Array = _resuming[person]
+	var work: Dictionary = entry[0]
+	entry[1] += minutes
+	var best: Job = null
+	for job in jobs:
+		if job.worker != null or job.kind != work["kind"] or job.title != work["title"]:
+			continue
+		var stage: int = job.stages.size() - work["left"]
+		if stage < 0:
+			continue
+		var at := job.stages[stage]
+		var same: bool = at.level == work["level"] and (at.object == work["object"] or at.tile == work["tile"] \
+				and work["object"] == -1)
+		if best == null or same:
+			best = job
+			if same:
+				break
+	# Given a minute for it to be posted again, some kinds are rebuilt.
+	if best == null and entry[1] >= 1.0 and rebuilders.has(work["kind"]):
+		var rebuilt: Variant = rebuilders[work["kind"]].call(work)
+		if rebuilt is Job and (rebuilt as Job).stages.size() >= work["left"]:
+			best = post(rebuilt)
+	if best == null:
+		if entry[1] >= RESUME_MINUTES or not people.people.has(person):
+			_resuming.erase(person)
+		return
+	_resuming.erase(person)
+	if person.job != null or not people.people.has(person):
+		return
+	people.stop(person)
+	best.worker = person
+	person.job = best
+	best.stage = best.stages.size() - work["left"]
+	if not _start_stage(person):
+		return
+	# Back at work where they were, with the time they had left.
+	if work["working"] and person.state == Person.State.USING and best.current().do == Job.Do.WORK:
+		person.timer = minf(person.timer, work["timer"])
 
 
 ## Open jobs of a kind, taken or not.
@@ -70,7 +155,7 @@ func of_kind(kind: StringName) -> Array[Job]:
 
 ## Does someone work from the board just now?
 func wants_work(person: Person) -> bool:
-	if person.going_home or person.led:
+	if person.going_home or person.led or _resuming.has(person):
 		return false
 	if person.role != &"":
 		return true

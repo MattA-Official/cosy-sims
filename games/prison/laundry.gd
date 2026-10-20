@@ -41,6 +41,15 @@ var clean := PrisonCatalogue.item(&"clean_laundry")
 var _washing: Dictionary[Vector2i, Job] = {}
 
 
+## A wash job again for someone loaded part way through one.
+func rebuild(work: Dictionary) -> Job:
+	var basket := Vector2i(work["first"][0], work["first"][1])
+	if building.object_at(basket) == null:
+		return null
+	_washing[basket] = _wash_job(basket)
+	return _washing[basket]
+
+
 ## Stocks the shelves with clean uniforms: one for every prisoner and
 ## half as many again, so there are spares while a load is in the wash.
 func start() -> void:

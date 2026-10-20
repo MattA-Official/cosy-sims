@@ -258,6 +258,19 @@ func escort(person: Person, to: Array, where := "back", moodlet := walked_back_m
 	jobs.post(_escort_job(person, to, where, moodlet))
 
 
+## An escort again for a guard loaded part way through one.
+func rebuild(work: Dictionary) -> Job:
+	var id: int = work["with"].get(&"prisoner", -1)
+	var prisoners := people.people.filter(func(p: Person) -> bool: return p.id == id)
+	if prisoners.is_empty():
+		return null
+	var person: Person = prisoners[0]
+	var title: String = work["title"]
+	var where := title.substr(title.find(" ", 5) + 1)
+	return _escort_job(person, [work["last"][0], work["last"][2]], where,
+			walked_back_moodlet if where == "back" else &"")
+
+
 ## Takes down any job to walk someone somewhere, and lets them go if a
 ## guard has them.
 func cancel_escort(person: Person) -> void:

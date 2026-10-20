@@ -255,6 +255,7 @@ func _ready() -> void:
 	add_child(cleaning)
 	laundry.name = "Laundry"
 	laundry.jobs = jobs
+	jobs.rebuilders[&"laundry"] = laundry.rebuild
 	laundry.items = items
 	laundry.building = building
 	laundry.people = people
@@ -282,6 +283,7 @@ func _ready() -> void:
 	guarding.name = "Guarding"
 	guarding.people = people
 	guarding.jobs = jobs
+	jobs.rebuilders[&"escort"] = guarding.rebuild
 	guarding.building = building
 	guarding.clock = clock
 	routes.name = "PatrolRoutes"

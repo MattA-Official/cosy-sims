@@ -73,6 +73,21 @@ var _bus: Node3D
 var _bus_minutes := 0.0
 
 
+## Arrivals still being signed in, by person id, for a save.
+func arriving_ids() -> Dictionary:
+	var out := {}
+	for person: Person in _arriving:
+		out[person.id] = _arriving[person].duplicate()
+	return out
+
+
+## Puts back arrivals from a save, by person id.
+func restore_arriving(saved: Dictionary) -> void:
+	for person in people.people:
+		if saved.has(person.id):
+			_arriving[person] = (saved[person.id] as Array).duplicate()
+
+
 ## Gives everyone already here a category: medium, unless they have one.
 func start() -> void:
 	for person in people.people:
