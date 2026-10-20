@@ -12,6 +12,6 @@ extends Resource
 @export var gets_bed := false
 ## The colour of their clothes.
 @export var outfit_colour := Color(0.95, 0.55, 0.2)
-## The NeedDef ids they have. Empty means every need, as for prisoners;
-## staff sleep at home, so have no sleep need here.
+## The NeedDef ids they have. Empty means every need. Staff sleep at
+## home, so have energy for their shift rather than sleep.
 @export var needs: Array[StringName] = []

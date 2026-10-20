@@ -15,6 +15,8 @@ const OVERLAP_MINUTES := 15
 ## Game minutes someone going home may take to get out before they simply
 ## go.
 const LEAVE_MINUTES := 60.0
+## Needs are at least this met on arrival.
+const FRESH := 90.0
 ## Tiles from the entrance that count as out.
 const OUT_DISTANCE := 1.0
 
@@ -146,5 +148,8 @@ func _arrive(role: StringName, shift: StringName, at_work: bool) -> Person:
 		return null
 	people.set_role(person, role)
 	person.shift = shift
+	# Fresh from home.
+	for need: StringName in person.needs:
+		person.needs[need] = maxf(person.needs[need], FRESH)
 	changed.emit()
 	return person

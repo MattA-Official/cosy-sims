@@ -15,6 +15,8 @@ var programmes: Array[WorkProgrammeDef] = []
 var people: People
 ## Who works which shift.
 var shifts: Shifts
+## Whose needs the Staff needs box switches on and off.
+var staff_group: StringName = &"staff"
 ## Who goes on work programmes.
 var programme_group: StringName = &"prisoner"
 
@@ -81,6 +83,18 @@ func _ready() -> void:
 					func() -> void: shifts.set_wanted(role_id, shift_id, shifts.wanted_for(role_id, shift_id) + 1),
 					func() -> void: shifts.set_wanted(role_id, shift_id, shifts.wanted_for(role_id, shift_id) - 1))
 		box.add_child(row)
+
+	var staff_needs := CheckButton.new()
+	staff_needs.text = "Staff needs"
+	staff_needs.tooltip_text = "On: staff get hungry and tired, take breaks in the staff room and work slower when worn out.\nOff: they simply work their shift."
+	staff_needs.focus_mode = FOCUS_NONE
+	staff_needs.button_pressed = people != null and not people.needs_off.has(staff_group)
+	staff_needs.toggled.connect(func(on: bool) -> void:
+		if on:
+			people.needs_off.erase(staff_group)
+		elif not people.needs_off.has(staff_group):
+			people.needs_off.append(staff_group))
+	box.add_child(staff_needs)
 
 	if not programmes.is_empty():
 		box.add_child(HSeparator.new())

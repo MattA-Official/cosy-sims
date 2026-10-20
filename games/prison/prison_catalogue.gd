@@ -10,6 +10,7 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/table.tres"),
 	preload("res://games/prison/catalogue/shower.tres"),
 	preload("res://games/prison/catalogue/radio.tres"),
+	preload("res://games/prison/catalogue/coffee_machine.tres"),
 	preload("res://games/prison/catalogue/tv.tres"),
 	preload("res://games/prison/catalogue/bookshelf.tres"),
 	preload("res://games/prison/catalogue/games_table.tres"),
@@ -138,6 +139,7 @@ const NEEDS: Array[NeedDef] = [
 	preload("res://games/prison/catalogue/need_recreation.tres"),
 	preload("res://games/prison/catalogue/need_outdoors.tres"),
 	preload("res://games/prison/catalogue/need_social.tres"),
+	preload("res://games/prison/catalogue/need_energy.tres"),
 ]
 
 ## Who prisoners can be: everyone gets two of these.

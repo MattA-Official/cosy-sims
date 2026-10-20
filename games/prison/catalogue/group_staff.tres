@@ -8,4 +8,4 @@ id = &"staff"
 display_name = "Staff"
 has_keys = true
 outfit_colour = Color(0.27, 0.36, 0.52, 1)
-needs = Array[StringName]([&"hunger", &"bladder", &"recreation", &"social"])
+needs = Array[StringName]([&"energy", &"hunger", &"bladder", &"recreation", &"social"])

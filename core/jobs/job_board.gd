@@ -203,7 +203,7 @@ func _start_stage(person: Person) -> bool:
 
 
 func _work_for(person: Person, minutes: float, doing: String) -> void:
-	people.start_working(person, minutes, doing)
+	people.start_working(person, minutes / people.work_pace(person), doing)
 
 
 func _fetch(stage: Job.Stage) -> Array:

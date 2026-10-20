@@ -940,6 +940,24 @@ func _test_staff_window() -> void:
 		clock.advance(1.0)
 	var on: Array = cooks.call()
 	_check(on.size() == 1 and on[0].shift == &"night", "and the day cook goes home at the end of the shift")
+
+	# Staff needs: energy for the shift, coffee in the staff room, slow
+	# when worn out, and a setting to switch them off.
+	var night_cook: Person = on[0]
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	_check(night_cook.needs.has(&"energy") and not prisoner.needs.has(&"energy"), "staff have energy, prisoners don't")
+	night_cook.needs[&"energy"] = 20.0
+	_check(people.work_pace(night_cook) < 1.0, "worn-out staff work slower")
+	var cuppa := false
+	for i in 90:
+		clock.advance(1.0)
+		cuppa = cuppa or night_cook.activity == "Having a cuppa"
+	_check(cuppa and night_cook.needs[&"energy"] > 50.0, "and go for a coffee in the staff room")
+	people.needs_off.append(&"staff")
+	night_cook.needs[&"hunger"] = 10.0
+	clock.advance(1.0)
+	_check(night_cook.needs.values().all(func(v: float) -> bool: return v == 100.0),
+			"with staff needs off, their needs stay met")
 	window._put_on(&"workshop")
 	_check(people.people.filter(func(p: Person) -> bool: return p.programme == &"workshop").size() == 1,
 			"puts a prisoner on a work programme")

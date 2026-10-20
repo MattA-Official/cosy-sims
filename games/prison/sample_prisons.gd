@@ -365,6 +365,7 @@ static func _staff_wing(site: Site, kitchen := false) -> void:
 	ground.place_object(PrisonCatalogue.object(&"bench"), corner + Vector2(2.5, 4.5), 2)
 	ground.place_object(PrisonCatalogue.object(&"toilet"), corner + Vector2(0, 4.25), 2)
 	ground.place_object(PrisonCatalogue.object(&"plant_pot"), corner, 0)
+	ground.place_object(PrisonCatalogue.object(&"coffee_machine"), corner + Vector2(1.25, 0), 0)
 	ground.set_room_zone(ground.room_at(staff_room.position), &"staff")
 	# An office off the end of the corridor, with a plain door: zoned staff
 	# only, so prisoners keep out all the same.

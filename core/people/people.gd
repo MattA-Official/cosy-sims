@@ -59,6 +59,9 @@ const LITTER_MOST := 3.0
 const RETRY_MINUTES := 8.0
 ## How long people use an object that sees to no need, such as a bench.
 const USE_MINUTES := 20.0
+## Workers with `tired_need` below this work at this pace.
+const TIRED_LINE := 30.0
+const TIRED_PACE := 0.6
 ## Seconds the ground must stay still before the walking graph catches up.
 const GROUND_SETTLE_SECONDS := 0.5
 const FIRST_NAMES: Array[String] = ["Alfie", "Bea", "Cass", "Dot", "Eli", "Fen", "Gus", "Hattie",
@@ -131,6 +134,11 @@ var graph: NavGraph
 var paused := false
 ## Who may go where: zones, staff doors and locked doors.
 var access := Access.new()
+## Groups whose needs are switched off in the settings (staff, say): their
+## needs stay met.
+var needs_off: Array[StringName] = []
+## The need that makes workers slow when it is low.
+var tired_need: StringName = &"energy"
 ## The work to be done, for workers. Optional.
 var jobs: JobBoard
 ## Where items are, for objects that need one in hand first, and litter.
@@ -262,6 +270,11 @@ func walk_to(person: Person, level: int, spot: Vector2, doing: String) -> bool:
 		return false
 	person.activity = doing
 	return true
+
+
+## How fast someone works: slower when worn out.
+func work_pace(person: Person) -> float:
+	return TIRED_PACE if person.needs.get(tired_need, 100.0) < TIRED_LINE else 1.0
 
 
 ## Keeps someone at a job where they stand for some game minutes.
@@ -670,6 +683,10 @@ func _think(person: Person, minutes: float) -> void:
 ## for some traits. The one being seen to with an object fills, and so do
 ## outdoors and company while someone is out or among people.
 func _run_down_needs(person: Person, minutes: float) -> void:
+	if needs_off.has(person.group):
+		for need: StringName in person.needs:
+			person.needs[need] = 100.0
+		return
 	var seeing_to := need_def(person.target_need) if person.state == Person.State.USING \
 			and person.has_object() else null
 	var asleep := is_asleep(person)
