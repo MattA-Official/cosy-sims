@@ -42,6 +42,8 @@ var kitchen := Kitchen.new()
 var cleaning := Cleaning.new()
 var laundry := Laundry.new()
 var workshop := Workshop.new()
+## Open jobs and stock, with the debug view.
+var jobs_panel := JobsPanel.new()
 ## Game time. Everything that happens over time listens to it.
 var clock := GameClock.new()
 ## The prisoners' timetable, a copy of the catalogue's so edits stay in
@@ -219,6 +221,13 @@ func _ready() -> void:
 	workshop.clock = clock
 	add_child(workshop)
 	workshop.look()
+	jobs_panel.name = "JobsPanel"
+	jobs_panel.debug_overlay = debug_overlay
+	jobs_panel.jobs = jobs
+	jobs_panel.items = items
+	jobs_panel.building = building
+	jobs_panel.warnings = func() -> Array[String]: return kitchen.warnings() + laundry.warnings()
+	grid.add_child(jobs_panel)
 	var load_sample := func(index: int) -> void:
 		SamplePrisons.next = index
 		get_tree().reload_current_scene()

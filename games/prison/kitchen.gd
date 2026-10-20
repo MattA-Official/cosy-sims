@@ -145,6 +145,22 @@ func cook() -> int:
 	return maxi(batches, 0)
 
 
+## What's wrong with the food chain, in words, for the jobs panel.
+func warnings() -> Array[String]:
+	var out: Array[String] = []
+	if building.objects_tagged(COUNTERS).is_empty():
+		return out
+	if building.objects_tagged(COOKERS).is_empty():
+		out.append("A serving counter but no cooker: meals will be missed")
+	if building.objects_tagged(PALLETS).is_empty():
+		out.append("No delivery pallet, so no food arrives")
+	elif items.total(&"ingredient") * MEALS_PER_BATCH < _prisoners() * meals_per_day():
+		out.append("Not enough food in for tomorrow's meals")
+	if not people.people.any(func(p: Person) -> bool: return p.role == &"cook" or p.programme == &"kitchen"):
+		out.append("Nobody to cook")
+	return out
+
+
 ## How many meals the prisoners' timetable has in a day.
 func meals_per_day() -> int:
 	var count := 0

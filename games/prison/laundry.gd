@@ -79,6 +79,18 @@ func _on_used(person: Person, placed: BuildingMap.PlacedObject) -> void:
 	items.put_in(basket, building.object_at(basket), dirty, 1)
 
 
+## What's wrong with the laundry, in words, for the jobs panel.
+func warnings() -> Array[String]:
+	var out: Array[String] = []
+	if building.objects_tagged(BASKETS).is_empty():
+		return out
+	if building.objects_tagged(MACHINES).is_empty() or building.objects_tagged(BOARDS).is_empty():
+		out.append("Nowhere to wash and iron the uniforms")
+	if _clean_on_shelves() == 0:
+		out.append("No clean uniforms on the shelves")
+	return out
+
+
 func _wash_job(basket: Vector2i) -> Job:
 	var job := Job.new()
 	job.kind = &"laundry"

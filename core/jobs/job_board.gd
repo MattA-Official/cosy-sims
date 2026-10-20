@@ -185,7 +185,11 @@ func _start_stage(person: Person) -> bool:
 			return false
 		spots = people.spots_beside(stage.level, placed, person.flat())
 	else:
-		spots = [Vector2(stage.tile) + Vector2(0.5, 0.5)]
+		# The tile itself, or from next door if furniture fills its middle.
+		var middle := Vector2(stage.tile) + Vector2(0.5, 0.5)
+		spots = [middle]
+		for side: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+			spots.append(middle + side)
 	for spot in spots:
 		if spot.distance_to(person.flat()) < 0.3 and stage.level == person.level:
 			arrived(person)

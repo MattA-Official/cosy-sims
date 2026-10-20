@@ -62,6 +62,12 @@ func _ready() -> void:
 	_on_visibility_changed()
 
 
+## Where the panel's bottom edge is on screen, so other debug panels can
+## sit below it.
+func panel_bottom() -> float:
+	return _panel.get_global_rect().end.y
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("debug_toggle"):
 		visible = not visible

@@ -897,7 +897,9 @@ func _test_work_programmes() -> void:
 		minutes += 1
 		useful = maker.moodlets.has(&"useful_day") or maker.moodlets.has(&"made_to_work")
 	_check(useful, "a job done makes for a useful day")
-	var made: int = main.items.total(&"goods")
+	var made := 0
+	for key: Vector2i in main.building.objects_tagged(Workshop.SHELVES):
+		made += main.items.count_in(key, &"goods")
 	_check(main.workshop.collect() == made and main.workshop.sold == made, "the lorry takes the goods to sell")
 	main.queue_free()
 
@@ -926,6 +928,19 @@ func _test_staff_window() -> void:
 	_check(people.people.all(func(p: Person) -> bool: return p.programme == &""), "and takes them off")
 	_check(InputMap.has_action("staff_toggle"), "P opens it")
 	main.queue_free()
+
+	# The jobs panel lists jobs, stock and warnings.
+	var working: Node = load("res://games/prison/main.tscn").instantiate()
+	working.sample = 9
+	root.add_child(working)
+	var text: String = working.jobs_panel.describe()
+	_check(text.contains("Put away the food delivery") and text.contains("Crate of food: 6"),
+			"the jobs panel lists open jobs and stock")
+	for placed: BuildingMap.PlacedObject in working.map.objects.values().duplicate():
+		if placed.def.id == &"cooker":
+			working.map.remove_object(placed.id)
+	_check(working.jobs_panel.describe().contains("no cooker"), "and warns when the kitchen can't work")
+	working.queue_free()
 
 
 func _test_stopped_on_stairs() -> void:
