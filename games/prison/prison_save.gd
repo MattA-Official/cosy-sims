@@ -29,7 +29,9 @@ static func capture(main: Node) -> Dictionary:
 		everyone.append({
 			"id": person.id, "name": person.name, "group": person.group, "role": person.role,
 			"shift": person.shift, "programme": person.programme, "category": person.category,
-			"level": person.level, "position": person.position, "needs": person.needs.duplicate(),
+			# Off whatever they were using, where they stood to use it.
+			"level": person.level,
+			"position": person.stand_spot if person.state == Person.State.USING else person.position, "needs": person.needs.duplicate(),
 			"mood": person.mood, "moodlets": person.moodlets.duplicate(), "traits": traits,
 			"profile": person.profile.duplicate(true), "bed": person.bed,
 		})
@@ -80,9 +82,14 @@ static func apply_world(main: Node, data: Dictionary) -> void:
 	for entry: Dictionary in data.get("people", []):
 		var at: Vector3 = entry["position"]
 		var spot := Vector2(at.x, at.z)
-		var person := people.add_person(entry["level"], spot, entry["name"], entry["group"])
-		if person == null:
-			person = people.add_person(entry["level"], spot.floor() + Vector2(0.5, 0.5), entry["name"], entry["group"])
+		var person: Person = null
+		# Where they were, or else the nearest tile they can stand on.
+		for nudge: Vector2 in [Vector2.ZERO, Vector2(0.5, 0.5), Vector2(1.5, 0.5), Vector2(-0.5, 0.5),
+				Vector2(0.5, 1.5), Vector2(0.5, -0.5)]:
+			var try_at := spot if nudge == Vector2.ZERO else spot.floor() + nudge
+			person = people.add_person(entry["level"], try_at, entry["name"], entry["group"])
+			if person != null:
+				break
 		if person == null:
 			continue
 		person.id = entry["id"]

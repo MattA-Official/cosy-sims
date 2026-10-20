@@ -89,9 +89,11 @@ var map: BuildingMap:
 	set(value):
 		if map != null:
 			map.changed.disconnect(queue_rebuild)
+			map.dressing_changed.disconnect(_queue_objects)
 		map = value
 		if map != null:
 			map.changed.connect(queue_rebuild)
+			map.dressing_changed.connect(_queue_objects)
 		queue_rebuild()
 
 ## The level above, if any: roofs leave out tiles it has floor on.
@@ -109,6 +111,7 @@ var _floor_mesh := MeshInstance3D.new()
 var _wall_mesh := MeshInstance3D.new()
 var _glass_mesh := MeshInstance3D.new()
 var _objects := Node3D.new()
+var _objects_queued := false
 var _stairs_material := MeshShapes.vertex_colour_material()
 var _labels := Node3D.new()
 ## What the labels were last decluttered for (camera, screen size and the
@@ -213,6 +216,17 @@ func queue_rebuild() -> void:
 		return
 	_rebuild_queued = true
 	rebuild.call_deferred()
+
+
+## Redraws only the objects, for dressing that changed.
+func _queue_objects() -> void:
+	if _rebuild_queued or _objects_queued:
+		return
+	_objects_queued = true
+	(func() -> void:
+		_objects_queued = false
+		if map != null and is_inside_tree():
+			_build_objects()).call_deferred()
 
 
 func room_type(id: StringName) -> RoomTypeDef:
@@ -783,11 +797,16 @@ func _build_objects() -> void:
 	for placed: BuildingMap.PlacedObject in map.objects.values():
 		var centre := placed.centre * cs
 		var ground := map.floor_height(Vector2i(placed.centre.floor()))
-		if placed.def.model != null:
-			var model := placed.def.model.instantiate() as Node3D
+		var surface: BuildingMap.PlacedObject = map.objects.get(placed.on)
+		if surface != null:
+			ground = map.floor_height(Vector2i(surface.centre.floor())) + surface.def.height
+		var scene := placed.def.model_for(placed.look)
+		if scene != null:
+			var model := scene.instantiate() as Node3D
 			model.position = Vector3(centre.x, ground + 0.03, centre.y)
 			model.rotation.y = -placed.angle
 			_objects.add_child(model)
+			_add_dressing(placed, ground + 0.03)
 			continue
 		# Shrink a touch so neighbours and walls do not look fused together.
 		var size := placed.def.size
@@ -801,6 +820,39 @@ func _build_objects() -> void:
 		# Turning about Y goes the other way to turning a Vector2 on the ground.
 		instance.rotation.y = -placed.angle
 		_objects.add_child(instance)
+		_add_dressing(placed, ground + 0.03)
+
+
+## Things set out on a surface's free spots for whoever has claimed it
+## (see BuildingMap.dressing). Only for show.
+func _add_dressing(placed: BuildingMap.PlacedObject, ground: float) -> void:
+	var dressing: Array = map.dressing.get(placed.id, [])
+	if dressing.is_empty():
+		return
+	var cs := grid.cell_size
+	var free: Array[int] = []
+	for i in placed.def.spots.size():
+		if not map.spot_taken(placed.id, i):
+			free.append(i)
+	for i in mini(free.size(), dressing.size()):
+		var entry: Array = dressing[i]
+		var def: ObjectDef = entry[0]
+		var at := map.spot_point(placed, free[i]) * cs
+		var node: Node3D
+		if def.model != null:
+			node = def.model.instantiate() as Node3D
+		else:
+			var box := BoxMesh.new()
+			box.size = Vector3(def.size.x * cs, def.height, def.size.y * cs)
+			var instance := MeshInstance3D.new()
+			instance.mesh = box
+			instance.material_override = _object_material(def.colour)
+			instance.position.y = def.height * 0.5
+			node = Node3D.new()
+			node.add_child(instance)
+		node.position = Vector3(at.x, ground + placed.def.height, at.y)
+		node.rotation.y = -(placed.angle + float(entry[1]))
+		_objects.add_child(node)
 
 
 ## A staircase as a stepped solid: each tread and landing stands on the

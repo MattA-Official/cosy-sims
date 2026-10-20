@@ -61,6 +61,9 @@ const LITTER_MOST := 3.0
 const RETRY_MINUTES := 8.0
 ## How long people use an object that sees to no need, such as a bench.
 const USE_MINUTES := 20.0
+## How far beyond a surface's edge, in tiles, a chair still counts as
+## beside it.
+const SEAT_REACH := 0.75
 ## Workers with `tired_need` below this work at this pace.
 const TIRED_LINE := 30.0
 const TIRED_PACE := 0.6
@@ -130,6 +133,8 @@ var home_room_types: Array[StringName] = []
 ## Object tags that belong to one person each: they use their own, and
 ## nobody else's.
 var owned_tags: Array[StringName] = [&"bed"]
+## What people sit on to use seated objects (see ObjectDef.seated).
+var seat_tag: StringName = &"chair"
 var people: Array[Person] = []
 var graph: NavGraph
 ## Stops everyone, for looking at things in the inspector.
@@ -290,10 +295,19 @@ func start_working(person: Person, minutes: float, doing: String) -> void:
 	person.state = Person.State.USING
 	person.timer = minutes
 	person.activity = doing
+	# At a desk, they pull up a chair if there's one free.
+	var stage := person.job.current() if person.job != null else null
+	if stage != null and stage.object != -1 and building.levels.has(stage.level):
+		var placed: BuildingMap.PlacedObject = building.levels[stage.level].objects.get(stage.object)
+		if placed != null and placed.def.seated:
+			var chair := free_seat(stage.level, placed, person.flat())
+			if chair != null:
+				_take_seat(person, Vector2i(stage.level, chair.id))
 
 
 ## Done working where they stand, ready to move on.
 func finish_working(person: Person) -> void:
+	_leave_seat(person)
 	person.state = Person.State.IDLE
 	person.activity = "Standing about"
 
@@ -1086,8 +1100,18 @@ func _seek(person: Person, tags: Array[StringName], need: StringName = &"", unre
 			continue
 		var going_to := placed if source == Person.NO_OBJECT \
 				else building.levels[source.x].objects[source.y] as BuildingMap.PlacedObject
-		for spot in _spots_beside(source.x if going_to != placed else n, going_to, person.flat()):
+		var seat: BuildingMap.PlacedObject = null
+		if placed.def.seated:
+			seat = free_seat(n, placed, person.flat())
+			if seat == null:
+				continue
+		var spots := _spots_beside(source.x if going_to != placed else n, going_to, person.flat())
+		if seat != null and going_to == placed:
+			spots = _seat_spots(n, seat, person.flat())
+		for spot in spots:
 			if _walk_to(person, source.x if going_to != placed else n, spot):
+				if seat != null:
+					_take_seat(person, Vector2i(n, seat.id))
 				person.target = Vector2i(n, placed.id)
 				person.target_tag = entry[3]
 				person.target_need = need
@@ -1465,6 +1489,44 @@ func _spots_beside(level: int, placed: BuildingMap.PlacedObject, from: Vector2) 
 	return out.slice(0, 4)
 
 
+## A free chair beside an object, or beside the surface it stands on,
+## nearest `near` first; null if there's none.
+func free_seat(level: int, placed: BuildingMap.PlacedObject, near: Vector2) -> BuildingMap.PlacedObject:
+	var map := building.levels.get(level) as BuildingMap
+	if map == null:
+		return null
+	var surface: BuildingMap.PlacedObject = map.objects.get(placed.on, placed)
+	var best: BuildingMap.PlacedObject = null
+	for entry: Array in _objects_tagged(seat_tag):
+		var chair: BuildingMap.PlacedObject = entry[1]
+		if entry[0] != level or _claimed.has(Vector2i(level, chair.id)) or broken.has(Vector2i(level, chair.id)) \
+				or not surface.rect.grow(SEAT_REACH).has_point(chair.centre):
+			continue
+		if best == null or chair.centre.distance_to(near) < best.centre.distance_to(near):
+			best = chair
+	return best
+
+
+## Where to stand to sit on a chair: on it, as people step between chairs,
+## or else beside it.
+func _seat_spots(level: int, chair: BuildingMap.PlacedObject, from: Vector2) -> Array[Vector2]:
+	if nav().point_at(level, chair.centre) != -1:
+		return [chair.centre]
+	return _spots_beside(level, chair, from)
+
+
+func _take_seat(person: Person, key: Vector2i) -> void:
+	_leave_seat(person)
+	person.seat = key
+	_claimed[key] = person
+
+
+func _leave_seat(person: Person) -> void:
+	if person.seat != Person.NO_OBJECT and _claimed.get(person.seat) == person:
+		_claimed.erase(person.seat)
+	person.seat = Person.NO_OBJECT
+
+
 ## Someone in a room they may not be in (painted staff only while they
 ## were there, say) heads out through the nearest door they can. Returns
 ## whether they are on their way.
@@ -1592,7 +1654,11 @@ func _fetch_item(person: Person) -> void:
 		person.timer = 0.5
 		return
 	items.pick_up(person, got)
-	for spot in _spots_beside(person.target.x, placed, person.flat()):
+	var seat: BuildingMap.PlacedObject = building.levels[person.seat.x].objects.get(person.seat.y) \
+			if person.seat != Person.NO_OBJECT else null
+	var spots := _seat_spots(person.target.x, seat, person.flat()) if seat != null \
+			else _spots_beside(person.target.x, placed, person.flat())
+	for spot in spots:
 		if _walk_to(person, person.target.x, spot):
 			person.activity = "Taking a %s to a %s" % [(got[0] as ItemDef).display_name.to_lower(),
 					placed.def.display_name.to_lower()]
@@ -1658,6 +1724,7 @@ func _stop(person: Person) -> void:
 func _release(person: Person) -> void:
 	if person.has_object() and _claimed.get(person.target) == person:
 		_claimed.erase(person.target)
+	_leave_seat(person)
 	person.fetch_from = Person.NO_OBJECT
 	if items != null and person.job == null:
 		items.put_down(person) # A tray they were taking somewhere.
@@ -1711,6 +1778,11 @@ func _pose(person: Person, body: Node3D, cs: float) -> void:
 		if stage != null and stage.object != -1 and building.levels.has(stage.level):
 			placed = building.levels[stage.level].objects.get(stage.object)
 			level = stage.level
+	if placed != null and placed.def.seated:
+		# On the chair they took, or standing if there was none.
+		var seat: BuildingMap.PlacedObject = building.levels[level].objects.get(person.seat.y) \
+				if person.seat != Person.NO_OBJECT and person.seat.x == level else null
+		placed = seat
 	if placed != null:
 		var map := building.levels[level]
 		var floor_y := map.floor_height(Vector2i(placed.centre.floor()))

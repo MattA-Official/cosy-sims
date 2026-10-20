@@ -60,7 +60,7 @@ const HINTS := {
 	Tool.FLOOR: "Drag to lay or restyle floor on this side of any walls. Shift-click for the whole room, Ctrl to remove.",
 	Tool.WALL: "Drag between corners to build or restyle walls. Hold Alt for any angle, Ctrl to remove.",
 	Tool.OPENING: "Click a wall to put in a door or window. Click it again to fill it in.",
-	Tool.OBJECT: "Click to place. R turns it by %s°; [ and ] change the step. Hold F to turn it freely, Alt to place freely.",
+	Tool.OBJECT: "Click to place. R turns it by %s°; [ and ] change the step. Hold F to turn it freely, Alt to place freely. V changes the look.",
 	Tool.ROOM_TYPE: "Click a room to mark it.",
 	Tool.DEMOLISH: "Click an object or wall to remove it, or drag to clear an area.",
 	Tool.TERRAIN: "Hold the mouse to shape your land. [ and ] change the brush size.",
@@ -157,6 +157,9 @@ var floor_style: StringName = BuildingMap.DEFAULT_FLOOR
 var wall_style: StringName = BuildingMap.DEFAULT_WALL
 ## How far placed objects are turned, in radians.
 var object_angle := 0.0
+## Which look placed objects wear (see ObjectDef.looks); one past the last
+## mixes them at random.
+var object_look := 0
 ## How far R turns an object, in degrees; [ and ] step through ROTATION_STEPS.
 var rotation_step := 45.0
 ## The room type the room type tool applies. Null clears a room's type.
@@ -306,6 +309,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			path_tool.lower()
 		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("build_look") and tool == Tool.OBJECT and object_def != null:
+		object_look = (mini(object_look, object_def.look_count()) + 1) % (object_def.look_count() + 1)
+		if object_def.look_count() == 1:
+			object_look = 0
+		hint_changed.emit()
+		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_rotate") and tool == Tool.OBJECT:
 		object_angle = wrapf(snappedf(object_angle + deg_to_rad(rotation_step), deg_to_rad(rotation_step)),
 				0.0, TAU)
@@ -365,8 +374,15 @@ func _on_press() -> void:
 			else:
 				map.set_opening(edge, opening, window_kind, door_kind)
 		Tool.OBJECT:
-			if object_def != null and _can_place(_object_centre()):
-				map.place_object_at(object_def, _object_centre(), object_angle)
+			if object_def == null:
+				return
+			var target := _surface_target()
+			var centre := _object_centre()
+			if not target.is_empty():
+				map.place_on_surface(object_def, target[0].id, target[1], snappedf(object_angle, PI * 0.5),
+						_look_to_place())
+			elif _can_place(centre, _placing_angle(centre)):
+				map.place_object_at(object_def, centre, _placing_angle(centre), _look_to_place())
 		Tool.ROOM_TYPE:
 			var room := map.room_at_point(_hover_point)
 			if room != null:
@@ -531,7 +547,13 @@ func hint() -> String:
 	if tool == Tool.PATH:
 		return (PATH_HINTS[path_tool.mode] + "\n" + _path_status).strip_edges()
 	if tool == Tool.OBJECT:
-		return HINTS[tool] % String.num(rotation_step)
+		var text: String = HINTS[tool] % String.num(rotation_step)
+		if object_def != null and object_def.look_count() > 1:
+			text += "\nLook: %s" % ("Mixed" if object_look >= object_def.look_count()
+					else object_def.look_name(object_look))
+		if object_def != null and object_def.sits == ObjectDef.Sits.SURFACE:
+			text += "\nGoes on a table, desk or counter top."
+		return text
 	if tool == Tool.OPENING:
 		return (HINTS[tool] + "\n" + _door_status_shown).strip_edges()
 	return HINTS[tool]
@@ -723,10 +745,53 @@ func can_build_floor(rect: Rect2i) -> bool:
 	return true
 
 
-func _can_place(position: Vector2) -> bool:
+func _can_place(position: Vector2, angle := NAN) -> bool:
+	if is_nan(angle):
+		angle = object_angle
+	if object_def.sits == ObjectDef.Sits.SURFACE:
+		return false
 	if building != null:
-		return building.can_place(_level(), object_def, position, object_angle)
-	return map.can_place_at(object_def, position, object_angle)
+		return building.can_place(_level(), object_def, position, angle)
+	return map.can_place_at(object_def, position, angle)
+
+
+## The surface and free spot under the mouse for something that goes on
+## surfaces, as [PlacedObject, spot], or empty.
+func _surface_target() -> Array:
+	if object_def == null or not object_def.goes_on_surfaces():
+		return []
+	var surface := map.surface_at(_hover_point)
+	if surface == null:
+		return []
+	var spot := map.free_spot_near(surface, _hover_point)
+	return [surface, spot] if spot != -1 else []
+
+
+## The look to give the next thing placed.
+func _look_to_place() -> int:
+	if object_look >= object_def.look_count():
+		return randi() % object_def.look_count()
+	return object_look
+
+
+## How to turn the object being placed at a point: as chosen, or, for a
+## chair beside a table or desk, facing the nearest side of it.
+func _placing_angle(centre: Vector2) -> float:
+	if not object_def.faces_surfaces or _free_rotating:
+		return object_angle
+	var best: BuildingMap.PlacedObject = null
+	for placed: BuildingMap.PlacedObject in map.objects.values():
+		if placed.def.is_surface() and placed.rect.grow(0.75).has_point(centre) \
+				and (best == null or placed.centre.distance_to(centre) < best.centre.distance_to(centre)):
+			best = placed
+	if best == null:
+		return object_angle
+	# Which side of it the chair is on, in its own frame.
+	var local := (centre - best.centre).rotated(-best.angle)
+	var half := best.def.size * 0.5
+	var side := Vector2(signf(local.x), 0.0) if absf(local.x) - half.x > absf(local.y) - half.y \
+			else Vector2(0.0, signf(local.y) if local.y != 0.0 else 1.0)
+	return BuildingMap.facing(centre, centre - side.rotated(best.angle))
 
 
 ## The level being built on: 0 without a building.
@@ -1118,9 +1183,16 @@ func _draw_preview() -> void:
 			_shapes.edge(edge, ok_colour if ok else bad_colour)
 		Tool.OBJECT:
 			if object_def != null:
-				var centre := _object_centre()
-				var ok := _can_place(centre)
-				_shapes.object(object_def, object_angle, centre, ok_colour if ok else bad_colour)
+				var target := _surface_target()
+				if not target.is_empty():
+					var surface: BuildingMap.PlacedObject = target[0]
+					_shapes.object(object_def, surface.angle + snappedf(object_angle, PI * 0.5),
+							map.spot_point(surface, target[1]), ok_colour, surface.def.height)
+				else:
+					var centre := _object_centre()
+					var angle := _placing_angle(centre)
+					var ok := _can_place(centre, angle)
+					_shapes.object(object_def, angle, centre, ok_colour if ok else bad_colour)
 		Tool.ROOM_TYPE:
 			var room := map.room_at_point(_hover_point)
 			if room != null:

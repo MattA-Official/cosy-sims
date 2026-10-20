@@ -78,6 +78,9 @@ var target_need: StringName = &""
 var fetch_from := NO_OBJECT
 ## Where they stood before stepping onto the object.
 var stand_spot := Vector3.ZERO
+## The chair they sit on to use a seated object, as (level, object id), or
+## NO_OBJECT.
+var seat := NO_OBJECT
 ## Game minutes left: using an object, or waiting before wandering again.
 var timer := 0.0
 ## Object tags nothing could be found for, with game minutes before trying

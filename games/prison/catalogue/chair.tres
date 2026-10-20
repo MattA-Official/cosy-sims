@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/chair.glb" id="2_ext"]
+[ext_resource type="Script" path="res://core/building/object_look.gd" id="3_look"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/chair_cushioned.glb" id="look_0"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/chair_pine.glb" id="look_1"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/office_chair.glb" id="look_2"]
+
+[sub_resource type="Resource" id="Look_0"]
+script = ExtResource("3_look")
+display_name = "Cushioned"
+model = ExtResource("look_0")
+
+[sub_resource type="Resource" id="Look_1"]
+script = ExtResource("3_look")
+display_name = "Pine"
+model = ExtResource("look_1")
+
+[sub_resource type="Resource" id="Look_2"]
+script = ExtResource("3_look")
+display_name = "Office"
+model = ExtResource("look_2")
+
+[resource]
+script = ExtResource("1_def")
+id = &"chair"
+display_name = "Chair"
+size = Vector2(0.5, 0.5)
+snap = 1
+height = 0.75
+colour = Color(0.55, 0.6, 0.65, 1)
+tags = Array[StringName]([&"chair"])
+model = ExtResource("2_ext")
+price = 30
+blocks = false
+faces_surfaces = true
+looks = Array[ExtResource("3_look")]([SubResource("Look_0"), SubResource("Look_1"), SubResource("Look_2")])

@@ -65,6 +65,8 @@ var finances := Finances.new()
 var intake := Intake.new()
 ## The warden's office.
 var office := Office.new()
+## Desks people have claimed.
+var claims := Claims.new()
 ## The grade, grant goals and the daily report.
 var standing := Standing.new()
 ## Ctrl+Z and Ctrl+Y for building and landscaping.
@@ -322,7 +324,13 @@ func _ready() -> void:
 	finances.workshop = workshop
 	finances.clock = clock
 	add_child(finances)
+	claims.name = "Claims"
+	claims.people = people
+	claims.building = building
+	claims.roles = PrisonCatalogue.roles()
+	add_child(claims)
 	office.name = "Office"
+	office.claims = claims
 	office.people = people
 	office.jobs = jobs
 	office.building = building

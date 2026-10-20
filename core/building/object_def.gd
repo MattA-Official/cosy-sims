@@ -63,3 +63,57 @@ enum Connects {
 ## What it costs to place, when money is on. Demolishing gives most of it
 ## back.
 @export var price := 0
+
+## Where it can stand: on the floor, only on a surface's spot (a chess
+## board on a table), or either (a radio).
+enum Sits {
+	FLOOR,
+	SURFACE,
+	EITHER,
+}
+@export var sits := Sits.FLOOR
+## Spots on its top where small things stand, in tiles from the middle of
+## its footprint before it is turned (front is +y). Empty for anything that
+## isn't a surface. Things stand at `height`, the top.
+@export var spots: Array[Vector2] = []
+## Using it means sitting on a free chair beside it, or beside the surface
+## it stands on. Leisure needs one free; work at it is done standing
+## without.
+@export var seated := false
+## Placed beside a surface, it turns to face it, as chairs do.
+@export var faces_surfaces := false
+## Whether people walk round it. Chairs they can step between.
+@export var blocks := true
+## Set out on a desk, it faces whoever comes to the desk rather than
+## whoever sits at it, as a nameplate does.
+@export var faces_out := false
+## Other looks for the same thing, such as pine or metal desks. The first
+## look is `model` itself; these come after it.
+@export var looks: Array[ObjectLook] = []
+
+
+## How many looks it comes in, counting its own.
+func look_count() -> int:
+	return 1 + looks.size()
+
+
+## The model for a look; 0 is its own.
+func model_for(look: int) -> PackedScene:
+	if look > 0 and look <= looks.size() and looks[look - 1].model != null:
+		return looks[look - 1].model
+	return model
+
+
+func look_name(look: int) -> String:
+	if look > 0 and look <= looks.size():
+		return looks[look - 1].display_name
+	return "Standard"
+
+
+## Whether it can stand on a surface's spot.
+func goes_on_surfaces() -> bool:
+	return sits != Sits.FLOOR
+
+
+func is_surface() -> bool:
+	return not spots.is_empty()

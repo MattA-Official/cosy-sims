@@ -1,7 +1,11 @@
-[gd_resource type="Resource" script_class="StaffRoleDef" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="StaffRoleDef" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://core/jobs/staff_role_def.gd" id="1_def"]
 [ext_resource type="Texture2D" path="res://core/ui/icons/role_warden.svg" id="2_icon"]
+[ext_resource type="Resource" path="res://games/prison/catalogue/nameplate.tres" id="3_name"]
+[ext_resource type="Resource" path="res://games/prison/catalogue/in_tray.tres" id="4_tray"]
+[ext_resource type="Resource" path="res://games/prison/catalogue/desk_plant.tres" id="5_plant"]
+[ext_resource type="Resource" path="res://games/prison/catalogue/mug.tres" id="6_mug"]
 
 [resource]
 script = ExtResource("1_def")
@@ -12,3 +16,5 @@ job_kinds = Array[StringName]([&"office"])
 wage = 150
 outfit_colour = Color(0.3, 0.3, 0.34, 1)
 icon = ExtResource("2_icon")
+claims = &"office_desk"
+dressing = Array[Resource]([ExtResource("4_tray"), ExtResource("3_name"), ExtResource("5_plant"), ExtResource("6_mug")])

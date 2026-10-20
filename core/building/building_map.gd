@@ -30,6 +30,8 @@ extends GridGeometry
 ## grow with add_land().
 
 signal changed
+## The dressing on claimed surfaces changed.
+signal dressing_changed
 
 const DEFAULT_FLOOR := &"concrete"
 const DEFAULT_WALL := &"plaster"
@@ -53,6 +55,12 @@ class PlacedObject:
 	var angle := 0.0 ## The turn in radians; quarter turns are multiples of PI / 2.
 	var centre: Vector2 ## The middle of the footprint, in tile units.
 	var rect: Rect2 ## A box around the footprint, in tile units.
+	var look := 0 ## Which of its def's looks it wears.
+	var on := 0 ## The surface it stands on, or 0 on the floor.
+	var spot := -1 ## Which of that surface's spots.
+
+	func on_surface() -> bool:
+		return on != 0
 
 	## The footprint's four corners, in tile units.
 	func polygon() -> PackedVector2Array:
@@ -96,6 +104,10 @@ var slant_paints: Dictionary[Vector4i, Array] = {}
 ## empty style means that piece has no floor.
 var piece_styles: Dictionary[Vector2i, Array] = {}
 var objects: Dictionary[int, PlacedObject] = {}
+## Things set out for show on surfaces people have claimed, by surface
+## id: [ObjectDef, turn in radians] pairs filling its free spots in order.
+## Not part of the build, so not saved and no change to it.
+var dressing: Dictionary[int, Array] = {}
 var ramps: Array[Ramp] = []
 var stairs: Dictionary[int, Staircase] = {}
 ## Tiles open to stairs coming up from the level below. No floor goes here.
@@ -788,7 +800,10 @@ func can_place_at(def: ObjectDef, centre: Vector2, angle: float) -> bool:
 		if not has_floor(cell) or ramp_at(cell) != null or stairs_at(cell) != null or stepped.has(cell):
 			return false
 	for placed: PlacedObject in objects.values():
-		if placed.rect.grow(-EPSILON).intersects(rect) \
+		# Chairs tuck under tables and desks.
+		if (not def.blocks and placed.def.is_surface()) or (def.is_surface() and not placed.def.blocks):
+			continue
+		if not placed.on_surface() and placed.rect.grow(-EPSILON).intersects(rect) \
 				and not Geometry2D.intersect_polygons(inner, placed.polygon()).is_empty():
 			return false
 	# An object cannot straddle a wall or door.
@@ -811,12 +826,113 @@ func place_object(def: ObjectDef, position: Vector2, rotation: int) -> int:
 
 ## Places an object centred on a point and turned by `angle` radians. Lifts
 ## only take quarter turns. Returns its id, or 0 if it does not fit.
-func place_object_at(def: ObjectDef, centre: Vector2, angle: float) -> int:
+func place_object_at(def: ObjectDef, centre: Vector2, angle: float, look := 0) -> int:
 	if def.connects != ObjectDef.Connects.NONE:
 		angle = snappedf(angle, PI * 0.5)
 	angle = wrapf(angle, 0.0, TAU)
-	if not can_place_at(def, centre, angle):
+	if def.sits == ObjectDef.Sits.SURFACE or not can_place_at(def, centre, angle):
 		return 0
+	return _add_object(def, centre, angle, look, 0, -1)
+
+
+## Stands a small thing on a surface's spot, turned by `angle` radians
+## from the surface. Returns its id, or 0 if it can't go there.
+func place_on_surface(def: ObjectDef, surface_id: int, spot: int, angle := 0.0, look := 0) -> int:
+	var surface: PlacedObject = objects.get(surface_id)
+	if not def.goes_on_surfaces() or surface == null or spot < 0 or spot >= surface.def.spots.size() \
+			or spot_taken(surface_id, spot):
+		return 0
+	return _add_object(def, spot_point(surface, spot), wrapf(surface.angle + angle, 0.0, TAU), look,
+			surface_id, spot)
+
+
+## Places a chair (or anything people sit on) beside a surface, `offset`
+## tiles from its middle in the surface's own frame, turned to face it.
+## Returns its id, or 0 if it doesn't fit.
+func place_beside(def: ObjectDef, surface_id: int, offset: Vector2, look := 0) -> int:
+	var surface: PlacedObject = objects.get(surface_id)
+	if surface == null:
+		return 0
+	var at := surface.centre + offset.rotated(surface.angle)
+	return place_object_at(def, at, facing(at, surface.centre), look)
+
+
+## The turn that faces an object's front (its +y) from one point towards
+## another.
+static func facing(from: Vector2, to: Vector2) -> float:
+	return wrapf((to - from).angle() - PI * 0.5, 0.0, TAU)
+
+
+## Where a surface's spot is, in tile units.
+func spot_point(surface: PlacedObject, spot: int) -> Vector2:
+	return surface.centre + surface.def.spots[spot].rotated(surface.angle)
+
+
+## What stands on a surface.
+func things_on(surface_id: int) -> Array[PlacedObject]:
+	var out: Array[PlacedObject] = []
+	for placed: PlacedObject in objects.values():
+		if placed.on == surface_id:
+			out.append(placed)
+	return out
+
+
+func spot_taken(surface_id: int, spot: int) -> bool:
+	return things_on(surface_id).any(func(p: PlacedObject) -> bool: return p.spot == spot)
+
+
+## The surface under a point, if any.
+func surface_at(point: Vector2) -> PlacedObject:
+	for placed: PlacedObject in objects.values():
+		if placed.def.is_surface() and not placed.on_surface() and placed.rect.has_point(point) \
+				and Geometry2D.is_point_in_polygon(point, placed.polygon()):
+			return placed
+	return null
+
+
+## A surface's free spot nearest a point, or -1 if all are taken.
+func free_spot_near(surface: PlacedObject, point: Vector2) -> int:
+	var best := -1
+	for i in surface.def.spots.size():
+		if spot_taken(surface.id, i):
+			continue
+		if best == -1 or spot_point(surface, i).distance_to(point) < spot_point(surface, best).distance_to(point):
+			best = i
+	return best
+
+
+## Whether people have to walk round whatever is at a point.
+func blocks_at(point: Vector2) -> bool:
+	for placed: PlacedObject in objects.values():
+		if placed.def.blocks and not placed.on_surface() and placed.rect.has_point(point) \
+				and Geometry2D.is_point_in_polygon(point, placed.polygon()):
+			return true
+	return false
+
+
+## Sets out things for show on a surface, or clears them with an empty
+## list.
+func set_dressing(surface_id: int, things: Array) -> void:
+	if dressing.get(surface_id, []) == things:
+		return
+	if things.is_empty():
+		dressing.erase(surface_id)
+	else:
+		dressing[surface_id] = things
+	dressing_changed.emit()
+
+
+## Changes the look of something placed. Returns whether it changed.
+func set_look(id: int, look: int) -> bool:
+	var placed: PlacedObject = objects.get(id)
+	if placed == null or look < 0 or look >= placed.def.look_count() or placed.look == look:
+		return false
+	placed.look = look
+	_changed()
+	return true
+
+
+func _add_object(def: ObjectDef, centre: Vector2, angle: float, look: int, on: int, spot: int) -> int:
 	var placed := PlacedObject.new()
 	placed.id = _next_object_id
 	_next_object_id += 1
@@ -825,9 +941,22 @@ func place_object_at(def: ObjectDef, centre: Vector2, angle: float) -> int:
 	placed.rotation = posmod(roundi(angle / (PI * 0.5)), 4)
 	placed.centre = centre
 	placed.rect = polygon_bounds(object_polygon(def, centre, angle))
+	placed.look = clampi(look, 0, def.look_count() - 1)
+	placed.on = on
+	placed.spot = spot
 	objects[placed.id] = placed
 	_changed()
 	return placed.id
+
+
+## Takes away things left standing on surfaces that are gone.
+func _drop_orphans() -> int:
+	var count := 0
+	for placed: PlacedObject in objects.values():
+		if placed.on_surface() and not objects.has(placed.on):
+			objects.erase(placed.id)
+			count += 1
+	return count
 
 
 #region Ramps
@@ -954,12 +1083,17 @@ func set_holes(cells: Dictionary[Vector2i, bool]) -> void:
 func remove_object(id: int) -> bool:
 	if not objects.erase(id):
 		return false
+	_drop_orphans()
 	_changed()
 	return true
 
 
-## The object covering a point in tile units, if any.
+## The object covering a point in tile units, if any: something small on
+## a surface before the surface itself.
 func object_at(point: Vector2) -> PlacedObject:
+	for placed: PlacedObject in objects.values():
+		if placed.on_surface() and placed.rect.grow(0.05).has_point(point):
+			return placed
 	for placed: PlacedObject in objects.values():
 		if placed.rect.has_point(point) and Geometry2D.is_point_in_polygon(point, placed.polygon()):
 			return placed
@@ -1023,7 +1157,7 @@ func _mark_cells(marks: Dictionary[Vector2i, StringName], room: Room, value: Str
 func to_data() -> Dictionary:
 	var placed: Array = []
 	for item: PlacedObject in objects.values():
-		placed.append([item.id, item.def.id, item.angle, item.centre])
+		placed.append([item.id, item.def.id, item.angle, item.centre, item.look, item.on, item.spot])
 	var ramp_list: Array = []
 	for ramp in ramps:
 		ramp_list.append([ramp.rect, ramp.rise, ramp.low, ramp.high])
@@ -1083,6 +1217,10 @@ func load_data(data: Dictionary, find_object: Callable) -> void:
 		item.rotation = posmod(roundi(item.angle / (PI * 0.5)), 4)
 		item.centre = entry[3]
 		item.rect = polygon_bounds(object_polygon(def, item.centre, item.angle))
+		if entry.size() > 4:
+			item.look = clampi(entry[4], 0, def.look_count() - 1)
+			item.on = entry[5]
+			item.spot = entry[6]
 		objects[item.id] = item
 	ramps.clear()
 	for entry: Array in data.get("ramps", []):
@@ -1181,6 +1319,7 @@ func _clear_floor(rect: Rect2i) -> int:
 		if placed.rect.grow(-EPSILON).intersects(area):
 			objects.erase(placed.id)
 			count += 1
+	count += _drop_orphans()
 	for cell in cells_in(rect):
 		floor_heights.erase(cell)
 		piece_styles.erase(cell)

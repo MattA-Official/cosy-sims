@@ -21,6 +21,7 @@ const KEY_ACTIONS := {
 	"build_erase": [KEY_CTRL],
 	"build_whole_room": [KEY_SHIFT],
 	"build_free_rotate": [KEY_F],
+	"build_look": [KEY_V],
 	"build_brush_smaller": [KEY_BRACKETLEFT],
 	"build_brush_bigger": [KEY_BRACKETRIGHT],
 	"debug_toggle": [KEY_F3],

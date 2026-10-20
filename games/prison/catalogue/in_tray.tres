@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/in_tray.glb" id="2_ext"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"in_tray"
+display_name = "In-tray"
+size = Vector2(0.35, 0.25)
+snap = 1
+height = 0.1
+colour = Color(0.6, 0.6, 0.62, 1)
+tags = Array[StringName]([&"decor"])
+model = ExtResource("2_ext")
+price = 20
+sits = 1

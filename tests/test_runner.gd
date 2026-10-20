@@ -54,6 +54,7 @@ func _process(_delta: float) -> bool:
 	_test_standing()
 	_test_undo()
 	_test_saving()
+	_test_flexible_objects()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1244,6 +1245,58 @@ func _test_saving() -> void:
 	_check(PrisonSave.describe(PrisonSave.read("test")).begins_with("Paying prison · Day 1"), "and saves say what's in them")
 	DirAccess.remove_absolute(PrisonSave._path("test"))
 	loaded.queue_free()
+
+
+func _test_flexible_objects() -> void:
+	var map := BuildingMap.new(Rect2i(0, 0, 8, 8))
+	map.fill_floor(Rect2i(0, 0, 8, 8))
+	var table := map.place_object(PrisonCatalogue.object(&"games_table"), Vector2(2, 2), 0)
+	var board_def := PrisonCatalogue.object(&"chess_board")
+	_check(map.place_object_at(board_def, Vector2(5.5, 5.5), 0.0) == 0, "a chess board won't go on the floor")
+	var board := map.place_on_surface(board_def, table, 0)
+	_check(board != 0 and map.objects[board].centre.is_equal_approx(Vector2(2.5, 2.5)), "it goes on the table's spot")
+	_check(map.place_on_surface(PrisonCatalogue.object(&"mug"), table, 0) == 0, "one thing to a spot")
+	_check(map.object_at(Vector2(2.5, 2.5)).id == board, "clicking the table finds the board first")
+	var chair_def := PrisonCatalogue.object(&"chair")
+	var chair := map.place_beside(chair_def, table, Vector2(0, 0.65))
+	_check(chair != 0 and is_equal_approx(map.objects[chair].angle, PI), "a chair goes beside it, facing it")
+	_check(not map.blocks_at(map.objects[chair].centre), "and people can step between chairs")
+	var radio_def := PrisonCatalogue.object(&"radio")
+	_check(map.place_object(radio_def, Vector2(6, 0), 0) != 0, "a radio still stands on the floor")
+	var desk := map.place_object(PrisonCatalogue.object(&"desk"), Vector2(0, 6), 0)
+	_check(map.place_on_surface(radio_def, desk, 1) != 0, "or on a desk")
+	_check(map.place_beside(chair_def, desk, Vector2(0, 0.5)) != 0, "a chair tucks under the desk")
+	var look := map.place_object(PrisonCatalogue.object(&"desk"), Vector2(4, 0), 0)
+	_check(map.set_look(look, 2) and map.objects[look].def.model_for(2) != map.objects[look].def.model,
+			"a desk can wear another look")
+	var copy := BuildingMap.new(Rect2i(0, 0, 8, 8))
+	copy.load_data(map.to_data(), PrisonCatalogue.object)
+	_check(copy.objects[board].on == table and copy.objects[look].look == 2, "looks and surfaces are saved")
+	map.remove_object(table)
+	_check(not map.objects.has(board) and map.objects.has(chair), "taking the table takes the board, not the chair")
+
+	# The warden claims an office desk, which sets itself out; they sit to work.
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var claims: Claims = main.claims
+	var people: People = main.people
+	claims.refresh()
+	var warden: Person = people.people.filter(func(p: Person) -> bool: return p.role == &"warden")[0]
+	var key := claims.claim_of(warden)
+	var office_map: BuildingMap = main.building.levels[key.x]
+	_check(key != Person.NO_OBJECT and office_map.objects[key.y].def.id == &"office_desk", "the warden claims the office desk")
+	_check(office_map.dressing.get(key.y, []).size() == 4, "and it sets itself out for them")
+	var clock: GameClock = main.clock
+	var minutes := 0
+	while warden.seat == Person.NO_OBJECT and minutes < 120:
+		clock.advance(1.0)
+		minutes += 1
+	_check(warden.seat != Person.NO_OBJECT, "the warden sits on the chair to work")
+	people.remove_person(warden)
+	claims.refresh()
+	_check(not office_map.dressing.has(key.y), "an unclaimed desk is bare")
+	main.queue_free()
 
 
 func _test_staff_window() -> void:

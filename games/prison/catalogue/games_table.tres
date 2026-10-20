@@ -1,7 +1,26 @@
-[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
 [ext_resource type="PackedScene" path="res://games/prison/art/models/games_table.glb" id="2_ext"]
+[ext_resource type="Script" path="res://core/building/object_look.gd" id="3_look"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/games_table_pine.glb" id="look_0"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/games_table_metal.glb" id="look_1"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/games_table_painted.glb" id="look_2"]
+
+[sub_resource type="Resource" id="Look_0"]
+script = ExtResource("3_look")
+display_name = "Pine"
+model = ExtResource("look_0")
+
+[sub_resource type="Resource" id="Look_1"]
+script = ExtResource("3_look")
+display_name = "Metal"
+model = ExtResource("look_1")
+
+[sub_resource type="Resource" id="Look_2"]
+script = ExtResource("3_look")
+display_name = "Painted"
+model = ExtResource("look_2")
 
 [resource]
 script = ExtResource("1_def")
@@ -9,8 +28,10 @@ id = &"games_table"
 display_name = "Games table"
 size = Vector2(1, 1)
 snap = 0
-height = 0.75
+height = 0.725
 colour = Color(0.62, 0.72, 0.6, 1)
-tags = Array[StringName]([&"game"])
+tags = Array[StringName]([])
 model = ExtResource("2_ext")
-price = 150
+price = 80
+spots = Array[Vector2]([Vector2(0, 0)])
+looks = Array[ExtResource("3_look")]([SubResource("Look_0"), SubResource("Look_1"), SubResource("Look_2")])

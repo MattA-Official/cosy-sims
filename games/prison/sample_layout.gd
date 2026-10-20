@@ -58,7 +58,10 @@ static func build(map: BuildingMap, at: Vector2i) -> void:
 	map.place_object(PrisonCatalogue.object(&"bench"), o + Vector2(12.5, 9.5), 2)
 	map.place_object(PrisonCatalogue.object(&"basketball_hoop"), o + Vector2(17.5, 0), 0)
 	map.place_object(PrisonCatalogue.object(&"weights_bench"), o + Vector2(17, 6), 0)
-	map.place_object(PrisonCatalogue.object(&"games_table"), o + Vector2(13, 3.5), 0)
+	var games := map.place_object(PrisonCatalogue.object(&"games_table"), o + Vector2(13, 3.5), 0)
+	map.place_on_surface(PrisonCatalogue.object(&"chess_board"), games, 0)
+	map.place_beside(PrisonCatalogue.object(&"chair"), games, Vector2(0, 0.65), 2)
+	map.place_beside(PrisonCatalogue.object(&"chair"), games, Vector2(0, -0.65), 2)
 
 	var shower := PrisonCatalogue.object(&"shower")
 	for x in 4:

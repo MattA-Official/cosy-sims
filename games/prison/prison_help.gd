@@ -21,6 +21,7 @@ const SECTIONS := [
 		["Ctrl", "Remove instead"],
 		["Alt", "Place freely, or any angle"],
 		["R", "Turn an object"],
+		["V", "Change an object's look"],
 		["[ / ]", "Turn step, or brush size"],
 		["F", "Hold to turn to face the mouse"],
 	]],

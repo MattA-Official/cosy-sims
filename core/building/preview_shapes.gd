@@ -96,11 +96,11 @@ func rect(area: Rect2, colour: Color, height: float) -> void:
 
 
 ## An object being placed, turned as it will go.
-func object(def: ObjectDef, angle: float, centre: Vector2, colour: Color) -> void:
+func object(def: ObjectDef, angle: float, centre: Vector2, colour: Color, lift := 0.0) -> void:
 	var half := def.size * 0.5 * cell_size
 	var along := Vector2(1, 0).rotated(angle)
 	var height := def.height
-	_boxes.append([Vector3(centre.x * cell_size, ground_at.call(centre) + height * 0.5, centre.y * cell_size),
+	_boxes.append([Vector3(centre.x * cell_size, ground_at.call(centre) + lift + height * 0.5, centre.y * cell_size),
 			Vector3(along.x, 0.0, along.y) * half.x, colour,
 			Vector3(-along.y, 0.0, along.x) * half.y, height * 0.5])
 

@@ -500,7 +500,7 @@ func _join(a: int, b: int) -> void:
 
 ## Is a spot taken up by an object people walk round?
 func _blocked(map: BuildingMap, spot: Vector2) -> bool:
-	return map.object_at(spot) != null
+	return map.blocks_at(spot)
 
 
 func _floor_height(map: BuildingMap, spot: Vector2) -> float:

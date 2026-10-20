@@ -5,13 +5,14 @@ extends Node
 ## While on shift the warden sits at the office desk.
 
 const OFFICE := &"office"
-const DESKS: Array[StringName] = [&"desk"]
+const DESKS: Array[StringName] = [&"office_desk"]
 const WARDEN := &"warden"
 ## Game minutes the warden works at the desk before the job comes round
 ## again, when they may take a break.
 const DESK_MINUTES := 120.0
 
 var people: People
+var claims: Claims
 var jobs: JobBoard
 var building: Building
 var shifts: Shifts
@@ -54,9 +55,18 @@ func missing() -> String:
 	return ""
 
 
-## Keeps a job on the board for the warden to work at the office desk.
+## The desk the warden works at: the one they've claimed, or else any
+## office desk.
+func warden_desk() -> Array[Vector2i]:
+	for person in people.people:
+		if person.role == WARDEN and claims != null and claims.claim_of(person) != Person.NO_OBJECT:
+			return [claims.claim_of(person)]
+	return office_desk()
+
+
+## Keeps a job on the board for the warden to work at their desk.
 func _man_desk() -> void:
-	var desk := office_desk()
+	var desk := warden_desk()
 	for job in jobs.of_kind(&"office"):
 		var stage := job.stages[0]
 		if desk.is_empty() or Vector2i(stage.level, stage.object) != desk[0]:
