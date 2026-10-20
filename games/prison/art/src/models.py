@@ -114,6 +114,10 @@ PALETTE = dict(
     painted=("#b9c7b4", 0.5, 0),        # painted wooden furniture, soft sage
     cushion=("#8a9bb5", 0.85, 0),       # chair cushions
     coffee=("#6b4a36", 0.3, 0),
+    car_red=("#c4685a", 0.4, 0.05),     # staff cars: muted, a bit chalky
+    car_blue=("#6f8fb0", 0.4, 0.05),
+    car_cream=("#e8dcc0", 0.4, 0.05),
+    sign_blue=("#4d6f9c", 0.5, 0),
     gold=("#e0b65a", 0.35, 0.6),        # staff badge
     trunk=("#ffffff", 0.9, 0),
     canopy=("#ffffff", 0.9, 0),
@@ -570,6 +574,49 @@ def bus():
         for side in (-1, 1):
             p.cyl("rubber", 0.3, 0.24, (x, side * (W / 2 - 0.1), 0.3), bevel=0.05, segs=3, n=28, rot=(90, 0, 0))
             p.cyl("steel", 0.14, 0.26, (x, side * (W / 2 - 0.1), 0.3), bevel=0.03, n=20, rot=(90, 0, 0))
+    return p
+
+
+def car(name="car", body="car_cream"):
+    """1 x 2 little staff car, front towards Godot's +z (Blender -Y)."""
+    p = Prop(name)
+    p.box(body, (0.9, 1.85, 0.38), (0, 0, 0.38), 0.14, 4)
+    p.box(body, (0.82, 1.0, 0.36), (0, 0.12, 0.68), 0.16, 4)
+    # Windows all round the cabin.
+    p.box("glass", (0.7, 0.06, 0.24), (0, -0.4, 0.7), 0.04, 2, rot=(-25, 0, 0))
+    p.box("glass", (0.68, 0.06, 0.22), (0, 0.63, 0.7), 0.04, 2, rot=(20, 0, 0))
+    for side in (-1, 1):
+        p.box("glass", (0.06, 0.78, 0.22), (side * 0.405, 0.12, 0.7), 0.03, 2)
+        p.cyl("light", 0.06, 0.04, (side * 0.3, -0.92, 0.42), bevel=0.015, n=16, rot=(90, 0, 0))
+        p.cyl("food_c", 0.045, 0.04, (side * 0.32, 0.92, 0.42), bevel=0.012, n=14, rot=(90, 0, 0))
+        p.box("steel_dark", (0.04, 0.08, 0.06), (side * 0.47, -0.3, 0.62), 0.015, 2)
+    p.box("steel_dark", (0.92, 0.1, 0.1), (0, -0.92, 0.24), 0.04, 2)
+    p.box("steel_dark", (0.92, 0.1, 0.1), (0, 0.92, 0.24), 0.04, 2)
+    for y in (-0.58, 0.58):
+        for side in (-1, 1):
+            p.cyl("rubber", 0.17, 0.14, (side * 0.4, y, 0.17), bevel=0.04, segs=3, n=24, rot=(0, 90, 0))
+            p.cyl("steel", 0.08, 0.15, (side * 0.4, y, 0.17), bevel=0.02, n=16, rot=(0, 90, 0))
+    return p
+
+
+def bus_stop():
+    """1 x 0.5 bus stop: a sign on a post and a little bench with a canopy,
+    front (towards the road) at Godot's +z."""
+    p = Prop("bus_stop")
+    # Shelter: two posts at the back, a curved roof leaning forward.
+    for x in (-0.42, 0.42):
+        p.box("paint", (0.05, 0.05, 1.15), (x, 0.18, 0.575), 0.012, 2)
+    p.box("glass", (0.8, 0.02, 0.7), (0, 0.19, 0.6), 0.008, 1)
+    p.box("paint", (0.94, 0.42, 0.04), (0, 0.04, 1.17), 0.015, 2, rot=(-8, 0, 0))
+    p.box("pine", (0.7, 0.18, 0.04), (0, 0.06, 0.3), 0.012, 2)
+    for x in (-0.3, 0.3):
+        p.box("paint", (0.04, 0.14, 0.28), (x, 0.06, 0.14), 0.01, 1)
+    # The sign: a round blue disc on its own post at the front corner.
+    p.tube("steel", [(0.38, -0.18, 0.0), (0.38, -0.18, 1.3)], 0.022, 0, n=10)
+    p.cyl("sign_blue", 0.13, 0.03, (0.38, -0.18, 1.38), bevel=0.01, n=28, rot=(90, 0, 0))
+    p.cyl("sheet", 0.09, 0.034, (0.38, -0.18, 1.38), bevel=0.006, n=28, rot=(90, 0, 0))
+    p.box("sign_blue", (0.1, 0.036, 0.05), (0.38, -0.18, 1.38), 0.01, 1)
+    p.box("sheet", (0.16, 0.02, 0.1), (0.38, -0.18, 1.12), 0.01, 1)  # timetable
     return p
 
 
@@ -1171,7 +1218,10 @@ def lorry():
     return p
 
 
-MODELS = dict(**_looks(desk), **_looks(office_desk), **_looks(games_table),
+MODELS = dict(car=car, car_red=lambda: car("car_red", "car_red"),
+              car_blue=lambda: car("car_blue", "car_blue"),
+              car_cream=lambda: car("car_cream", "car_cream"), bus_stop=bus_stop,
+              **_looks(desk), **_looks(office_desk), **_looks(games_table),
               chair=chair, chair_cushioned=chair_cushioned, chair_pine=chair_pine,
               office_chair=office_chair, chess_board=chess_board, cctv_monitor=cctv_monitor,
               nameplate=nameplate, in_tray=in_tray, desk_plant=desk_plant, mug=mug,

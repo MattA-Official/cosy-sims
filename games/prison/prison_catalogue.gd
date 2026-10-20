@@ -73,6 +73,7 @@ const FLOORS: Array[FloorDef] = [
 	preload("res://games/prison/catalogue/floor_wood.tres"),
 	preload("res://games/prison/catalogue/floor_paving.tres"),
 	preload("res://games/prison/catalogue/floor_lawn.tres"),
+	preload("res://games/prison/catalogue/floor_car_park.tres"),
 ]
 
 const WALLS: Array[WallDef] = [

@@ -39,7 +39,12 @@ colours a real prison would plausibly use.
   wooden_toy, birdhouse. Floor litter: litter_paper, litter_can,
   litter_wrapper.
 - Vehicles: lorry (2 x 5 tiles, cab towards Godot's +z), bus (4 x 1.6 m,
-  front towards Godot's +x, doors on its -z side).
+  front towards Godot's +x, doors on its -z side), car (1 x 2 tiles, front
+  towards +z; looks car_red, car_blue, car_cream).
+- Roadside: bus_stop (1 x 0.5, sign and shelter, front towards the road
+  at +z).
+- Floors also include floor_car_park: tarmac with a white bay line on one
+  x edge of each tile, so every tile is one bay.
 - Doors: door (in use), cell_door (barred, not used yet), security_gate
   (all bars, for a door kind).
 - People: person. Plants: tree, bush, flower.

@@ -91,6 +91,16 @@ def tiles(count, grout=2.0, seed=4):
     return face * (1 - lines) + 0.86 * lines
 
 
+def car_park(seed=15):
+    """Tarmac with a white bay line along one x edge of every metre, so
+    each tile is one bay: the floor colour tints it, and the lines are as
+    bright as the texture gets."""
+    x, _ = grid()
+    out = 0.58 + soft_noise(50, seed=seed) * 0.02 + soft_noise(2.5, seed=seed + 1) * 0.015
+    lines = line_mask(x, SIZE, 7.0) ** 0.35
+    return out * (1 - lines) + 0.98 * lines
+
+
 def mottled(blob, amount, base=0.95, fine=0.0, seed=5):
     out = base + soft_noise(blob, seed=seed) * amount
     if fine:
@@ -137,6 +147,7 @@ TEXTURES = {
     "floor_wood": lambda: planks(5, length_breaks=1),
     "floor_paving": lambda: courses(2, 2, 3.2, offset=0.5, mortar_dark=0.82, face_jitter=0.03, seed=12),
     "floor_lawn": lawn,
+    "floor_car_park": car_park,
     # Outdoor walls
     "wood_fence": lambda: planks(4, mortar=1.2, grain=0.035, seed=13),
     "hedge": leaves,
