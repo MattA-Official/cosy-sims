@@ -22,6 +22,7 @@ enum Pose {
 ## forwards). Tags not listed stand.
 var by_tag := {
 	&"bed": [Pose.LIE, 0.55, 0.0],
+	&"infirmary_bed": [Pose.LIE, 0.585, 0.0],
 	&"table": [Pose.SIT_AT, 0.33, 0.46],
 	&"toilet": [Pose.SIT_ON, 0.31, 0.02],
 	&"bench": [Pose.SIT_ON, 0.45, 0.04],

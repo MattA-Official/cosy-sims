@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="ItemDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ItemDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/items/item_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/spoon.glb" id="2_model"]
 
 [resource]
 script = ExtResource("1_def")
@@ -13,3 +14,4 @@ metal = true
 trade_value = 4
 use = &"dig"
 hit = 3.0
+model = ExtResource("2_model")

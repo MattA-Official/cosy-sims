@@ -38,6 +38,12 @@ colours a real prison would plausibly use.
   food_crate, meal_tray, dirty_laundry, clean_laundry, rubbish_bag,
   wooden_toy, birdhouse. Floor litter: litter_paper, litter_can,
   litter_wrapper.
+- Contraband items (same size and origin as other items): biscuit, spoon,
+  rolling_pin, frying_pan, screwdriver, mallet, soap_sock.
+- Infirmary: infirmary_bed (1 x 2, head to the front like the cell bed;
+  people lie in it), medicine_cabinet (1 x 1, 1.4 m, back to the wall).
+- Effects: dust_cloud (about 1.3 m across, origin on the ground), for
+  fights.
 - Vehicles: lorry (2 x 5 tiles, cab towards Godot's +z), bus (4 x 1.6 m,
   front towards Godot's +x, doors on its -z side), car (1 x 2 tiles, front
   towards +z; looks car_red, car_blue, car_cream).

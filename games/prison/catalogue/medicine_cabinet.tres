@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="ObjectDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/medicine_cabinet.glb" id="2_model"]
 
 [resource]
 script = ExtResource("1_def")
@@ -11,3 +12,4 @@ height = 1.4
 colour = Color(0.94, 0.96, 0.95, 1)
 tags = Array[StringName]([&"medicine_cabinet"])
 price = 250
+model = ExtResource("2_model")

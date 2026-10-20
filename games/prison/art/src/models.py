@@ -122,6 +122,10 @@ PALETTE = dict(
     stone=("#a8a196", 0.9, 0),          # tunnel portal
     stone_dark=("#8d867b", 0.9, 0),
     dark=("#151517", 1.0, 0),           # inside a tunnel
+    biscuit=("#d9a45f", 0.8, 0),
+    hospital=("#eef2f2", 0.5, 0),       # infirmary white
+    cross=("#5fa86f", 0.6, 0),          # first-aid green
+    dust=("#efe8da", 1.0, 0),
     gold=("#e0b65a", 0.35, 0.6),        # staff badge
     trunk=("#ffffff", 0.9, 0),
     canopy=("#ffffff", 0.9, 0),
@@ -664,6 +668,130 @@ def tunnel_portal():
         p.box("grass", (1.5, 6.4, 3.2), (side * 3.0, 3.4, 1.2), 0.7, 4)
         p.box("grass", (1.4, 2.0, 1.4), (side * 3.0, 0.2, 0.25), 0.6, 4)
     p.box("grass", (5.2, 6.0, 1.4), (0, 3.4, 2.9), 0.65, 4)
+    return p
+
+
+# Contraband, carried or hidden: about 0.4 m like the other items (the game
+# shrinks piles), origin at the middle of the bottom.
+
+def biscuit():
+    p = Prop("biscuit")  # a short stack of round biscuits
+    for i, (dx, dy) in enumerate(((0, 0), (0.01, -0.01), (-0.01, 0.005))):
+        p.cyl("biscuit", 0.13, 0.05, (dx, dy, 0.025 + i * 0.055), bevel=0.018, segs=2, n=28)
+    for a in range(6):
+        ang = math.radians(a * 60 + 20)
+        p.ball("crate", 0.012, (math.cos(ang) * 0.07, math.sin(ang) * 0.07, 0.165), u=8, v=6)
+    return p
+
+
+def spoon():
+    p = Prop("spoon")
+    p.box("steel", (0.32, 0.04, 0.018), (-0.06, 0, 0.02), 0.008, 1, rot=(0, -6, 0))
+    p.ball("steel", 0.065, (0.15, 0, 0.035), scale=(1.3, 1, 0.35), u=16, v=8)
+    return p
+
+
+def rolling_pin():
+    p = Prop("rolling_pin")
+    p.cyl("pine", 0.06, 0.28, (0, 0, 0.06), bevel=0.02, n=20, rot=(0, 90, 0))
+    for side in (-1, 1):
+        p.cyl("crate", 0.025, 0.09, (side * 0.185, 0, 0.06), bevel=0.01, n=12, rot=(0, 90, 0))
+    return p
+
+
+def frying_pan():
+    p = Prop("frying_pan")
+    p.cyl("rubber", 0.14, 0.05, (-0.06, 0, 0.025), r2=0.16, bevel=0.015, segs=2, n=28)
+    p.cyl("steel_dark", 0.13, 0.008, (-0.06, 0, 0.047), bevel=0, n=28)
+    p.box("rubber", (0.2, 0.04, 0.025), (0.19, 0, 0.04), 0.01, 2, rot=(0, -8, 0))
+    return p
+
+
+def screwdriver():
+    p = Prop("screwdriver")
+    p.cyl("food_c", 0.035, 0.13, (-0.09, 0, 0.035), bevel=0.014, n=12, rot=(0, 90, 0))
+    p.cyl("steel", 0.01, 0.2, (0.07, 0, 0.035), bevel=0.003, n=8, rot=(0, 90, 0))
+    p.box("steel", (0.02, 0.025, 0.006), (0.17, 0, 0.035), 0.002, 1)
+    return p
+
+
+def mallet():
+    p = Prop("mallet")
+    p.cyl("pine", 0.016, 0.3, (-0.03, 0, 0.065), bevel=0.006, n=10, rot=(0, 90, 0))
+    p.box("crate", (0.09, 0.15, 0.13), (0.15, 0, 0.065), 0.025, 2)
+    return p
+
+
+def soap_sock():
+    p = Prop("soap_sock")  # a sock with a bar of soap knotted in the toe
+    p.ball("sheet", 0.07, (0.1, 0, 0.065), scale=(1.15, 1, 0.9), u=16, v=10)
+    p.capsule("sheet", 0.035, 0.18, (-0.05, 0, 0.035), rot=(0, 90, 0))
+    p.ball("sheet", 0.04, (-0.17, 0, 0.04), scale=(1, 1, 0.8), u=10, v=8)
+    p.box("plastic", (0.05, 0.04, 0.02), (0.13, -0.06, 0.08), 0.01, 1)  # soap peeking out
+    return p
+
+
+def infirmary_bed():
+    """1 x 2 hospital bed, head towards -y like the cell bed (so people
+    lie the same way), on a white frame with side rails."""
+    p = Prop("infirmary_bed")
+    for y, top in ((-0.95, 0.62), (0.95, 0.5)):
+        p.box("hospital", (0.9, 0.05, top - 0.08), (0, y, (top + 0.08) / 2), 0.025, 2)
+    for x in (-0.4, 0.4):
+        for y in (-0.88, 0.88):
+            p.tube("steel", [(x, y, 0.08), (x, y, 0.2)], 0.02, 0, n=8)
+            p.ball("rubber", 0.04, (x, y, 0.045), u=10, v=6)
+    p.box("hospital", (0.86, 1.86, 0.1), (0, 0, 0.24), 0.03, 2)
+    p.box("sheet", (0.8, 1.8, 0.13), (0, 0, 0.35), 0.05, 3)
+    p.box("plastic", (0.84, 1.3, 0.15), (0, 0.24, 0.355), 0.06, 3)  # pale blue blanket
+    p.box("sheet", (0.52, 0.3, 0.1), (0, -0.67, 0.46), 0.045, 3)
+    # Side rails, folded down along the middle.
+    for side in (-1, 1):
+        p.tube("steel", [(side * 0.45, -0.5, 0.3), (side * 0.45, -0.5, 0.5), (side * 0.45, 0.4, 0.5), (side * 0.45, 0.4, 0.3)], 0.015, 0.05, n=8)
+        p.tube("steel", [(side * 0.45, -0.5, 0.4), (side * 0.45, 0.4, 0.4)], 0.012, 0, n=8)
+    # A chart clipped to the foot.
+    p.box("paper", (0.22, 0.02, 0.28), (0, 0.98, 0.36), 0.008, 1)
+    return p
+
+
+def medicine_cabinet():
+    """1 x 1, 1.4 m tall: a white cabinet with a green cross, back to the
+    wall, shelves of bottles behind glass doors on top."""
+    p = Prop("medicine_cabinet")
+    w, d = 0.9, 0.45
+    p.box("hospital", (w, d, 0.62), (0, 0.2, 0.31), 0.03, 2)
+    for x in (-0.22, 0.22):
+        p.box("hospital", (0.42, 0.02, 0.56), (x, -0.035, 0.31), 0.01, 1)
+        p.box("steel", (0.1, 0.02, 0.03), (x - math.copysign(0.12, x), -0.05, 0.12), 0.008, 1)
+    p.box("hospital", (w, 0.3, 0.74), (0, 0.27, 1.02), 0.03, 2)
+    for z in (0.83, 1.07):
+        p.box("steel", (w - 0.08, 0.24, 0.015), (0, 0.27, z), 0.004, 1)
+        for k, x in enumerate((-0.3, -0.15, 0.0, 0.15, 0.3)):
+            p.cyl(("plastic", "food_c", "sheet", "cross", "food_a")[k], 0.035, 0.12 - (k % 2) * 0.03,
+                  (x, 0.25, z + 0.07 - (k % 2) * 0.015), bevel=0.01, n=12)
+    p.box("glass", (w - 0.06, 0.02, 0.66), (0, 0.115, 1.02), 0.01, 1)
+    # The cross on the lower doors.
+    a, b, z = 0.13, 0.042, 0.38
+    plus = [(-b, z + a), (b, z + a), (b, z + b), (a, z + b), (a, z - b), (b, z - b), (b, z - a),
+            (-b, z - a), (-b, z - b), (-a, z - b), (-a, z + b), (-b, z + b)]
+    p.prism("cross", plus, 0.02, y=-0.065, bevel=0.006)
+    return p
+
+
+def dust_cloud():
+    """A soft cartoon scrap cloud, about 1.3 m across, sitting on the
+    ground: one lumpy mesh to replace the separate spheres."""
+    p = Prop("dust_cloud")
+    rng = __import__("random").Random(4)
+    for i in range(9):
+        a = math.tau * i / 9
+        r = 0.42 + rng.uniform(-0.05, 0.06)
+        p.ball("dust", rng.uniform(0.24, 0.32), (math.cos(a) * r, math.sin(a) * r, 0.4 + rng.uniform(-0.08, 0.1)), u=16, v=10)
+    for loc, r in (((0, 0, 0.5), 0.42), ((0.12, -0.1, 0.78), 0.3), ((-0.15, 0.12, 0.74), 0.27)):
+        p.ball("dust", r, loc, u=18, v=12)
+    for i in range(5):
+        a = math.tau * i / 5 + 0.4
+        p.ball("dust", 0.14, (math.cos(a) * 0.72, math.sin(a) * 0.72, 0.14), u=12, v=8)
     return p
 
 
@@ -1265,7 +1393,10 @@ def lorry():
     return p
 
 
-MODELS = dict(tunnel_portal=tunnel_portal, car=car, car_red=lambda: car("car_red", "car_red"),
+MODELS = dict(biscuit=biscuit, spoon=spoon, rolling_pin=rolling_pin, frying_pan=frying_pan,
+              screwdriver=screwdriver, mallet=mallet, soap_sock=soap_sock,
+              infirmary_bed=infirmary_bed, medicine_cabinet=medicine_cabinet, dust_cloud=dust_cloud,
+              tunnel_portal=tunnel_portal, car=car, car_red=lambda: car("car_red", "car_red"),
               car_blue=lambda: car("car_blue", "car_blue"),
               car_cream=lambda: car("car_cream", "car_cream"), bus_stop=bus_stop,
               **_looks(desk), **_looks(office_desk), **_looks(games_table),
