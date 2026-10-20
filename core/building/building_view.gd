@@ -121,16 +121,71 @@ var _object_materials := {} # Color -> StandardMaterial3D
 ## every level.
 static var _textured_materials := {} # Texture2D -> StandardMaterial3D
 var _doors := Node3D.new()
-## The dado on the wall piece being drawn: its colour (transparent for
-## none), how high it reaches, and the wall colour it replaces.
-var _dado := Color(0, 0, 0, 0)
-var _dado_height := 0.0
-var _piece_colour := Color.WHITE
 var _rebuild_queued := false
 ## Shared by every level's labels.
 static var _label_font := CosyTheme.bold_font()
-## Whether the wall piece being drawn is cut low.
-var _piece_low := false
+## While walls are being built: their surfaces by texture, the glass, and
+## the corners that already have a fence post.
+var _surfaces := {} # Texture2D -> SurfaceTool
+var _glass: SurfaceTool
+var _has_glass := false
+var _posts := {} # Vector2i -> true
+
+
+## How one side of a wall looks: its colour, texture and dado.
+class Finish:
+	var colour := Color.WHITE
+	var texture: Texture2D
+	var dado := Color(0, 0, 0, 0)
+	var dado_height := 0.0
+
+
+## One wall piece being drawn. Lengths along it are in metres from `start`,
+## and side 0 is the side `across` points to (see BuildingMap.wall_side).
+class WallRun:
+	var wall: Variant
+	var corners: Array[Vector2i] = []
+	var start := Vector2.ZERO
+	var along := Vector2.RIGHT
+	var across := Vector2.DOWN
+	var length := 1.0
+	var half := 0.075 ## Half the thickness.
+	var def: WallDef
+	var kind := 0
+	var window: StringName
+	var base := 0.0
+	var drop := 0.0
+	var low := false
+	var height := 1.5 ## As drawn: low when cut away.
+	var full_height := 1.5
+	var top_colour := Color.BLACK
+	var own: Finish
+	var finishes: Array[Finish] = []
+	## Where each side's face starts and ends, after joining the walls at
+	## each corner: [side 0, side 1].
+	var side_from: Array[float] = [0.0, 0.0]
+	var side_to: Array[float] = [0.0, 0.0]
+
+	func solid() -> bool:
+		return def == null or not def.see_through
+
+	## The way the wall leaves one of its corners.
+	func leaving(at_start: bool) -> Vector2:
+		return along if at_start else -along
+
+	## Where a side's face stops at one end, as a distance from that corner
+	## going into the wall. `left` is the side to the left going in.
+	func set_end(at_start: bool, left: bool, distance: float) -> void:
+		var side := 0 if left == at_start else 1
+		if at_start:
+			side_from[side] = distance
+		else:
+			side_to[side] = length - distance
+
+	## A point on one side of the wall, `distance` along it. `width` moves
+	## it in towards the middle.
+	func side_point(side: int, distance: float, width := 1.0) -> Vector2:
+		return start + along * distance + across * half * width * (1.0 if side == 0 else -1.0)
 
 
 func _ready() -> void:
@@ -390,42 +445,41 @@ func _add_land_edge(st: SurfaceTool) -> void:
 func _build_walls() -> void:
 	for child in _doors.get_children():
 		child.queue_free()
-	var surfaces := {} # Texture2D -> SurfaceTool
-	var glass := SurfaceTool.new()
-	glass.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var has_glass := false
+	_surfaces = {}
+	_glass = SurfaceTool.new()
+	_glass.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_has_glass = false
+	_posts = {}
+	var runs: Array[WallRun] = []
 	for edge: Vector3i in map.walls:
-		var start := Vector2(edge.x, edge.y)
-		var end := start + (Vector2.RIGHT if edge.z == BuildingMap.EDGE_X else Vector2.DOWN)
+		var ends := BuildingMap.edge_ends(edge)
 		var base := _wall_base(edge)
-		_piece_low = walls_low or (cutaway and _cut_away(start, end))
 		# Foundations reach below the lowest ground at either end; upstairs
 		# walls reach the underside of the floor slab, so they look whole from
 		# a stairwell.
-		var drop := base - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
+		var drop := base - minf(_height_at(ends[0]), _height_at(ends[1])) + FOUNDATION_DEPTH \
 				if level == 0 else base - _lowest_floor_beside(edge) + slab_depth
-		var def := map.wall_def(map.wall_style(edge))
-		has_glass = _add_wall_piece(_surface(surfaces, def.texture if def != null else null), glass,
-				start, end, base, drop, map.wall_at(edge), def, map.window_kind(edge)) or has_glass
+		runs.append(_make_run(edge, base, drop, map.wall_at(edge), map.window_kind(edge)))
 	for key: Vector4i in map.slants:
-		var ends := BuildingMap.slant_ends(key)
-		var start := Vector2(ends[0])
-		var end := Vector2(ends[1])
+		var ends := BuildingMap.wall_ends(key)
 		var highest := -INF
 		var lowest := INF
 		for cell in BuildingMap.slant_crossings(key):
 			if map.has_floor(cell):
 				highest = maxf(highest, map.floor_height(cell))
 				lowest = minf(lowest, map.floor_height(cell))
-		var base := highest if highest > -INF else _height_at((start + end) * 0.5)
-		_piece_low = walls_low or (cutaway and _cut_away(start, end))
-		var drop := base - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
+		var base := highest if highest > -INF else _height_at((ends[0] + ends[1]) * 0.5)
+		var drop := base - minf(_height_at(ends[0]), _height_at(ends[1])) + FOUNDATION_DEPTH \
 				if level == 0 else base - (lowest if lowest < INF else base) + slab_depth
-		var def := map.wall_def(map.slant_style(key))
-		has_glass = _add_wall_piece(_surface(surfaces, def.texture if def != null else null), glass,
-				start, end, base, drop, map.slant_at(key), def, map.slant_window_kind(key)) or has_glass
-	_wall_mesh.mesh = _commit(surfaces)
-	_glass_mesh.mesh = glass.commit() if has_glass else null
+		runs.append(_make_run(key, base, drop, map.slant_at(key), map.slant_window_kind(key)))
+	var hubs := _join_walls(runs)
+	for run in runs:
+		_add_wall_run(run)
+	for hub: Array in hubs:
+		_add_hub(hub[0], hub[1])
+	_wall_mesh.mesh = _commit(_surfaces)
+	_glass_mesh.mesh = _glass.commit() if _has_glass else null
+	_surfaces = {}
 
 
 ## Does a wall stand in front of floor, as the camera looks? Then cutaway
@@ -445,113 +499,249 @@ func is_cut(start: Vector2, end: Vector2) -> bool:
 	return walls_low or (cutaway and _cut_away(start, end))
 
 
-## One stretch of wall between two corners, as a plain wall, door, window or
-## fence. Returns whether it added any glass.
-func _add_wall_piece(st: SurfaceTool, glass: SurfaceTool, start: Vector2, end: Vector2,
-		base: float, drop: float, kind: int, def: WallDef, window: StringName) -> bool:
+func _make_run(wall: Variant, base: float, drop: float, kind: int, window: StringName) -> WallRun:
 	var cs := grid.cell_size
-	var full_height := def.height if def != null else wall_height
-	var height := minf(low_wall_height, full_height) if _piece_low else full_height
-	var thickness := def.thickness if def != null else wall_thickness
-	var colour := def.colour if def != null else wall_colour
-	var top := def.top_colour if def != null else wall_top_colour
-	_piece_colour = colour
-	_dado = def.dado_colour if def != null else Color(0, 0, 0, 0)
-	_dado_height = def.dado_height if def != null else 0.0
-	var length := start.distance_to(end) * cs
-	var flat := (end - start).normalized()
-	var along := Vector3(flat.x, 0.0, flat.y)
-	var across := Vector3(-flat.y, 0.0, flat.x)
-	var middle := Vector3((start.x + end.x) * 0.5, 0.0, (start.y + end.y) * 0.5) * cs
-	middle.y = base
-	# Stretch each piece by half a thickness so corners join up.
-	var half_len := along * (length + thickness) * 0.5
-	var half_across := across * thickness * 0.5
-	var opening := kind == BuildingMap.Wall.DOOR or kind == BuildingMap.Wall.WINDOW
-	if opening and length > cs + 0.01:
+	var ends := BuildingMap.wall_ends(wall)
+	var run := WallRun.new()
+	run.wall = wall
+	run.corners = [Vector2i(ends[0]), Vector2i(ends[1])]
+	run.start = ends[0] * cs
+	run.along = (ends[1] - ends[0]).normalized()
+	run.across = Vector2(-run.along.y, run.along.x)
+	run.length = ends[0].distance_to(ends[1]) * cs
+	run.def = map.wall_def(map.style_of(wall))
+	run.kind = kind
+	run.window = window
+	run.base = base
+	run.drop = drop
+	run.low = walls_low or (cutaway and _cut_away(ends[0], ends[1]))
+	run.full_height = run.def.height if run.def != null else wall_height
+	run.height = minf(low_wall_height, run.full_height) if run.low else run.full_height
+	run.half = (run.def.thickness if run.def != null else wall_thickness) * 0.5
+	run.top_colour = run.def.top_colour if run.def != null else wall_top_colour
+	run.own = _finish(run.def)
+	for side in 2:
+		run.finishes.append(_finish(map.wall_def(map.side_style(wall, side))))
+	run.side_to = [run.length, run.length]
+	return run
+
+
+func _finish(def: WallDef) -> Finish:
+	var finish := Finish.new()
+	if def != null:
+		finish.colour = def.colour
+		finish.texture = def.texture
+		finish.dado = def.dado_colour
+		finish.dado_height = def.dado_height
+	else:
+		finish.colour = wall_colour
+	return finish
+
+
+## Works out where each solid wall's sides start and end, so walls meeting
+## at a corner join at a mitre instead of overlapping (which flickers) or
+## leaving gaps. Lone ends reach half a thickness past their corner.
+## Returns the joins that need a post to fill the middle, such as
+## T-junctions and crossings: [outline, the runs meeting there] for each.
+func _join_walls(runs: Array[WallRun]) -> Array:
+	var at := {} # Vector2i corner -> [[run, starts here], ...]
+	for run in runs:
+		if not run.solid():
+			continue
+		for i in 2:
+			if not at.has(run.corners[i]):
+				at[run.corners[i]] = []
+			at[run.corners[i]].append([run, i == 0])
+	var hubs := []
+	for corner: Vector2i in at:
+		var ends: Array = at[corner]
+		if ends.size() == 1:
+			var run: WallRun = ends[0][0]
+			for side in 2:
+				if ends[0][1]:
+					run.side_from[side] = -run.half
+				else:
+					run.side_to[side] = run.length + run.half
+			continue
+		# Round the corner by the direction each wall leaves it.
+		ends.sort_custom(func(p: Array, q: Array) -> bool:
+			return (p[0] as WallRun).leaving(p[1]).angle() < (q[0] as WallRun).leaving(q[1]).angle())
+		var needs_hub := ends.size() > 2
+		for i in ends.size():
+			var a: WallRun = ends[i][0]
+			var b: WallRun = ends[(i + 1) % ends.size()][0]
+			var da: Vector2 = a.leaving(ends[i][1])
+			var db: Vector2 = b.leaving(ends[(i + 1) % ends.size()][1])
+			var na := Vector2(-da.y, da.x)
+			var nb := Vector2(-db.y, db.x)
+			# Where a's left side meets b's right side, as distances along each.
+			var offset := na * a.half + nb * b.half
+			var turn := da.cross(db)
+			var ta := 0.0
+			var tb := 0.0
+			if absf(turn) > 0.02:
+				ta = (-offset).cross(db) / turn
+				tb = offset.cross(da) / -turn
+			var limit := 5.0 * maxf(a.half, b.half)
+			if absf(ta) > limit or absf(tb) > limit:
+				# Too sharp to mitre neatly: square ends, and a post between.
+				ta = 0.0
+				tb = 0.0
+				needs_hub = true
+			a.set_end(ends[i][1], true, ta)
+			b.set_end(ends[(i + 1) % ends.size()][1], false, tb)
+		if not needs_hub:
+			continue
+		var points := PackedVector2Array([Vector2(corner) * grid.cell_size])
+		var meeting: Array[WallRun] = []
+		for end: Array in ends:
+			var run: WallRun = end[0]
+			meeting.append(run)
+			for side in 2:
+				points.append(run.side_point(side, run.side_from[side] if end[1] else run.side_to[side]))
+		var outline := Geometry2D.convex_hull(points)
+		outline.remove_at(outline.size() - 1)
+		if outline.size() >= 3:
+			hubs.append([outline, meeting])
+	return hubs
+
+
+## The middle of a join: a post as tall as the tallest wall there.
+func _add_hub(outline: PackedVector2Array, meeting: Array[WallRun]) -> void:
+	var tallest := meeting[0]
+	var bottom := INF
+	for run in meeting:
+		if run.base + run.height > tallest.base + tallest.height:
+			tallest = run
+		bottom = minf(bottom, run.base - run.drop)
+	MeshShapes.add_prism(_surface(_surfaces, tallest.own.texture), outline, bottom,
+			tallest.base + tallest.height, tallest.own.colour, tallest.top_colour)
+
+
+## One stretch of wall between two corners, as a plain wall, door, window or
+## fence.
+func _add_wall_run(run: WallRun) -> void:
+	var cs := grid.cell_size
+	var from := 0.0
+	var to := run.length
+	var opening := run.kind == BuildingMap.Wall.DOOR or run.kind == BuildingMap.Wall.WINDOW
+	if opening and run.length > cs + 0.01:
 		# Doors and windows keep their size in long angled walls: plain wall
 		# fills the rest either side.
-		var side := (length - cs) * 0.5
-		for sign in [-1.0, 1.0]:
-			_add_slab(st, middle + along * sign * (cs + side) * 0.5, along * (side + thickness) * 0.5,
-					half_across, -drop, height, colour, top)
-		length = cs
-		half_len = along * cs * 0.5
-	if kind == BuildingMap.Wall.DOOR:
-		_add_door(st, middle, half_len, half_across, height, full_height, colour, top)
-	elif kind == BuildingMap.Wall.WINDOW:
-		_add_window(st, middle, along, half_len, half_across, height, full_height, length, window,
-				drop, colour, top)
-		if window == BuildingMap.WINDOW_GLASS and not _piece_low:
-			_add_slab(glass, middle, along * length * 0.5, half_across * 0.25, window_sill,
-					window_head, glass_colour, glass_colour)
-			return true
-	elif def != null and def.see_through and not _piece_low:
-		_add_fence(st, middle, along, half_across, height, length, drop, colour, top)
+		from = (run.length - cs) * 0.5
+		to = from + cs
+		_add_slab(run, 0.0, from, -run.drop, run.height)
+		_add_slab(run, to, run.length, -run.drop, run.height)
+	if run.kind == BuildingMap.Wall.DOOR:
+		_add_door(run, from, to)
+	elif run.kind == BuildingMap.Wall.WINDOW:
+		_add_window(run, from, to)
+	elif run.def != null and run.def.see_through and not run.low:
+		_add_fence(run)
 	else:
-		_add_slab(st, middle, half_len, half_across, -drop, height, colour, top)
-	return false
+		_add_slab(run, 0.0, run.length, -run.drop, run.height)
 
 
-## A box from `bottom` up to `top_y`, `half_len` along the wall and
-## `half_across` through it, so walls at any angle work.
-func _add_slab(st: SurfaceTool, middle: Vector3, half_len: Vector3, half_across: Vector3,
-		bottom: float, top_y: float, colour: Color, top_colour: Color) -> void:
-	if _dado.a > 0.0 and colour == _piece_colour:
-		# Plain wall gets the dado along its bottom; a slab entirely below
-		# the line (a cut-away wall) is all dado.
-		if top_y <= _dado_height:
-			colour = _dado
-		elif bottom < _dado_height:
-			_add_slab(st, middle, half_len, half_across, bottom, _dado_height, _dado, _dado)
-			bottom = _dado_height
-	var half_height := (top_y - bottom) * 0.5
-	MeshShapes.add_oriented_box(st, middle + Vector3.UP * (bottom + half_height), half_len,
-			half_across, half_height, colour, top_colour)
+## A block of wall from `from` to `to` metres along the run, `bottom` to
+## `top` metres above its base. Without a colour, each side shows its
+## finish (paint, texture and dado) and the ends and top the wall's own;
+## with one, it is that colour all over. `width` is a share of the wall's
+## thickness: full-width blocks at an end of the run follow its mitres.
+func _add_slab(run: WallRun, from: float, to: float, bottom: float, top: float,
+		colour := Color(0, 0, 0, 0), top_colour := Color(0, 0, 0, 0), width := 1.0,
+		st: SurfaceTool = null) -> void:
+	var corners: Array[Vector2] = [] # Side 0 from, side 0 to, side 1 to, side 1 from.
+	for side: int in [0, 1]:
+		# A mitre never reaches past the block's other end.
+		var start := minf(run.side_from[side], to) if from <= 0.0 and width == 1.0 else from
+		var end := maxf(run.side_to[side], from) if to >= run.length and width == 1.0 else to
+		var a := run.side_point(side, start, width)
+		var b := run.side_point(side, end, width)
+		corners.append_array([a, b] if side == 0 else [b, a])
+	var low_y := run.base + bottom
+	var high_y := run.base + top
+	var centre := Vector2.ZERO
+	for p in corners:
+		centre += p * 0.25
+	var plain := colour.a > 0.0
+	var own := _surface(_surfaces, run.own.texture) if st == null else st
+	var cap: Array[Vector3] = []
+	var floor_cap: Array[Vector3] = []
+	for p in corners:
+		cap.append(Vector3(p.x, high_y, p.y))
+		floor_cap.append(Vector3(p.x, low_y, p.y))
+	MeshShapes.add_polygon(own, cap, Vector3.UP, top_colour if top_colour.a > 0.0 else
+			(colour if plain else run.top_colour))
+	MeshShapes.add_polygon(own, floor_cap, Vector3.DOWN, colour if plain else run.own.colour)
+	for i in 4:
+		var a := corners[i]
+		var b := corners[(i + 1) % 4]
+		# Faces 0 and 2 are the wall's sides; 1 and 3 its ends.
+		var finish := run.own if i % 2 == 1 else run.finishes[0 if i == 0 else 1]
+		var face_st := own if plain or st != null else _surface(_surfaces, finish.texture)
+		var outward := (a + b) * 0.5 - centre
+		_add_wall_face(face_st, a, b, low_y, high_y, Vector3(outward.x, 0.0, outward.y),
+				colour if plain else finish.colour, null if plain else finish, run.base)
 
 
-func _add_door(st: SurfaceTool, middle: Vector3, half_len: Vector3, half_across: Vector3,
-		height: float, full_height: float, colour: Color, top: Color) -> void:
-	if _piece_low or full_height <= door_height:
-		_add_slab(st, middle, half_len, half_across, 0.0, minf(height, low_wall_height) * 0.5,
-				door_colour, door_colour)
+## One upright face of a wall block, with its finish's dado along the
+## bottom when it has one.
+func _add_wall_face(st: SurfaceTool, a: Vector2, b: Vector2, low_y: float, high_y: float,
+		outward: Vector3, colour: Color, finish: Finish, base: float) -> void:
+	if finish != null and finish.dado.a > 0.0:
+		var line := base + finish.dado_height
+		if high_y <= line:
+			colour = finish.dado
+		elif low_y < line:
+			_add_wall_face(st, a, b, low_y, line, outward, finish.dado, null, base)
+			low_y = line
+	MeshShapes.add_quad(st, Vector3(a.x, high_y, a.y), Vector3(b.x, high_y, b.y),
+			Vector3(b.x, low_y, b.y), Vector3(a.x, low_y, a.y), outward, colour)
+
+
+func _add_door(run: WallRun, from: float, to: float) -> void:
+	if run.low or run.full_height <= door_height:
+		_add_slab(run, from, to, 0.0, minf(run.height, low_wall_height) * 0.5, door_colour)
 		return
-	_add_slab(st, middle, half_len, half_across, door_height, full_height, colour, top)
+	_add_slab(run, from, to, door_height, run.full_height)
+	var width := to - from
 	if door_model == null:
-		_add_slab(st, middle, half_len * 0.8, half_across * 0.4, 0.0, door_height, door_colour,
-				door_colour)
+		_add_slab(run, from + width * 0.1, to - width * 0.1, 0.0, door_height, door_colour,
+				door_colour, 0.4)
 		return
 	# The model fills a one-metre doorway along its x, facing along z.
 	var door := door_model.instantiate() as Node3D
-	var along := half_len.normalized()
-	door.transform = Transform3D(Basis(along * half_len.length() * 2.0, Vector3.UP,
-			half_across.normalized()), middle)
+	var middle := run.start + run.along * (from + to) * 0.5
+	door.transform = Transform3D(Basis(Vector3(run.along.x, 0.0, run.along.y) * width, Vector3.UP,
+			Vector3(run.across.x, 0.0, run.across.y)), Vector3(middle.x, run.base, middle.y))
 	_doors.add_child(door)
 
 
 ## Wall below the sill and above the head, with glass or bars between.
 ## Cut-away walls show the window as a coloured top so it is still easy
 ## to spot.
-func _add_window(st: SurfaceTool, middle: Vector3, along: Vector3, half_len: Vector3,
-		half_across: Vector3, height: float, full_height: float, length: float, kind: StringName,
-		drop: float, colour: Color, top: Color) -> void:
-	var accent := bars_colour if kind == BuildingMap.WINDOW_BARS else glass_colour
+func _add_window(run: WallRun, from: float, to: float) -> void:
+	var accent := bars_colour if run.window == BuildingMap.WINDOW_BARS else glass_colour
 	accent.a = 1.0
-	if _piece_low or full_height <= window_head:
-		_add_slab(st, middle, half_len, half_across, -drop, height, colour, accent)
+	if run.low or run.full_height <= window_head:
+		_add_slab(run, from, to, -run.drop, run.height, Color(0, 0, 0, 0), accent)
 		return
-	_add_slab(st, middle, half_len, half_across, -drop, window_sill, colour, top)
-	_add_slab(st, middle, half_len, half_across, window_head, full_height, colour, top)
+	_add_slab(run, from, to, -run.drop, window_sill)
+	_add_slab(run, from, to, window_head, run.full_height)
 	# Narrow pillars at each end make a frame and keep corners solid.
-	for end in [-0.5, 0.5]:
-		_add_slab(st, middle + along * (length * end + (0.05 if end < 0 else -0.05)), along * 0.1,
-				half_across, window_sill, window_head, colour, top)
-	if kind == BuildingMap.WINDOW_BARS:
+	_add_slab(run, from, from + 0.15, window_sill, window_head)
+	_add_slab(run, to - 0.15, to, window_sill, window_head)
+	var length := to - from
+	if run.window == BuildingMap.WINDOW_BARS:
 		var count := maxi(roundi(6 * length), 2)
 		for i in count:
-			var offset := (float(i) + 0.5) / count - 0.5
-			_add_slab(st, middle + along * length * offset * 0.8, along * 0.025,
-					half_across.normalized() * 0.025, window_sill, window_head, bars_colour, bars_colour)
+			var middle := from + length * (0.5 + ((float(i) + 0.5) / count - 0.5) * 0.8)
+			_add_slab(run, middle - 0.025, middle + 0.025, window_sill, window_head, bars_colour,
+					bars_colour, 0.025 / run.half)
+	elif run.window == BuildingMap.WINDOW_GLASS:
+		_add_slab(run, from + 0.15, to - 0.15, window_sill, window_head, glass_colour, glass_colour,
+				0.25, _glass)
+		_has_glass = true
 
 
 static func _make_glass_material() -> StandardMaterial3D:
@@ -561,15 +751,19 @@ static func _make_glass_material() -> StandardMaterial3D:
 	return material
 
 
-## Posts at each end and two rails between them.
-func _add_fence(st: SurfaceTool, middle: Vector3, along: Vector3, half_across: Vector3,
-		height: float, length: float, drop: float, colour: Color, top: Color) -> void:
-	for end in [-0.5, 0.5]:
-		_add_slab(st, middle + along * length * end, along * 0.06, half_across.normalized() * 0.06,
-				-drop, height, colour, top)
-	for rail_y in [height * 0.45, height * 0.85]:
-		_add_slab(st, middle, along * length * 0.5, half_across * 0.6, rail_y - 0.05,
-				rail_y + 0.05, colour, top)
+## Posts at each end and two rails between them. Fences meeting at a corner
+## share its post.
+func _add_fence(run: WallRun) -> void:
+	for i in 2:
+		if _posts.has(run.corners[i]):
+			continue
+		_posts[run.corners[i]] = true
+		var at := run.length * i
+		_add_slab(run, at - 0.06, at + 0.06, -run.drop, run.height, Color(0, 0, 0, 0),
+				Color(0, 0, 0, 0), 0.06 / run.half)
+	for rail_y in [run.height * 0.45, run.height * 0.85]:
+		_add_slab(run, 0.0, run.length, rail_y - 0.05, rail_y + 0.05, Color(0, 0, 0, 0),
+				Color(0, 0, 0, 0), 0.6)
 
 
 func _build_objects() -> void:

@@ -21,6 +21,8 @@ const FLOORS: Array[FloorDef] = [
 const WALLS: Array[WallDef] = [
 	preload("res://games/prison/catalogue/wall_plaster.tres"),
 	preload("res://games/prison/catalogue/wall_brick.tres"),
+	preload("res://games/prison/catalogue/wall_grey.tres"),
+	preload("res://games/prison/catalogue/wall_tiles.tres"),
 	preload("res://games/prison/catalogue/wall_fence.tres"),
 	preload("res://games/prison/catalogue/wall_hedge.tres"),
 ]

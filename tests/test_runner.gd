@@ -17,6 +17,8 @@ func _process(_delta: float) -> bool:
 	_test_land()
 	_test_demolish()
 	_test_windows()
+	_test_wall_paint()
+	_test_wall_joins()
 	_test_terrain()
 	_test_water()
 	_test_path_network()
@@ -509,6 +511,28 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	hover.call(3.8, 5.2)
 	controller._on_release()
 
+	# Painting: Shift paints every side facing into the room under the mouse.
+	controller.wall_mode = BuildController.WallMode.PAINT
+	controller.wall_style = &"wall_tiles"
+	hover.call(2.5, 2.5)
+	Input.action_press("build_whole_room")
+	controller._draw_preview()
+	controller._on_press()
+	Input.action_release("build_whole_room")
+	var west := Vector3i(cell.call(2, 2).x, cell.call(2, 2).y, BuildingMap.EDGE_Z)
+	_check(map.side_style(west, BuildingMap.wall_side(west, Vector2(cell.call(2, 2)) + Vector2(0.5, 0.5)))
+			== &"wall_tiles" and map.wall_style(west) != &"wall_tiles", "paint mode paints a room's inner sides")
+	controller._painting = false
+	controller.force_erase = true
+	Input.action_press("build_whole_room")
+	controller._on_press()
+	Input.action_release("build_whole_room")
+	controller.force_erase = false
+	controller._painting = false
+	_check(not map.wall_paints.has(west), "Ctrl takes the paint off again")
+	controller.wall_mode = BuildController.WallMode.BUILD
+	controller.wall_style = BuildingMap.DEFAULT_WALL
+
 	controller.tool = BuildController.Tool.OPENING
 	hover.call(3.9, 3.5)
 	controller._on_press()
@@ -949,6 +973,95 @@ func _test_windows() -> void:
 	map.build_walls([Vector3i(10, 10, BuildingMap.EDGE_X)], &"fence")
 	_check(not map.set_opening(Vector3i(10, 10, BuildingMap.EDGE_X), BuildingMap.Wall.WINDOW),
 			"fences cannot take windows")
+
+
+func _test_wall_paint() -> void:
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
+	map.register_styles(PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	map.build_room(Rect2i(0, 0, 3, 3), &"concrete", &"plaster")
+	var edge := Vector3i(1, 3, BuildingMap.EDGE_X)
+	_check(BuildingMap.wall_side(edge, Vector2(1.5, 3.5)) == 0
+			and BuildingMap.wall_side(edge, Vector2(1.5, 2.5)) == 1, "side 0 of a wall along X is towards +Z")
+	_check(map.paint_side(edge, 1, &"brick"), "one side of a wall takes paint")
+	_check(map.side_style(edge, 1) == &"brick" and map.side_style(edge, 0) == &"plaster"
+			and map.wall_style(edge) == &"plaster", "only that side changes")
+	_check(not map.paint_side(edge, 1, &"brick"), "painting it again changes nothing")
+	_check(map.paint_side(edge, 1, &"plaster") and not map.wall_paints.has(edge),
+			"painting with the wall's own style takes the paint off")
+	_check(not map.paint_side(edge, 0, &"fence") and not map.paint_side(edge, 0, &"hedge"),
+			"fences and hedges are not paints")
+	map.build_walls([Vector3i(10, 10, BuildingMap.EDGE_X)], &"fence")
+	_check(not map.paint_side(Vector3i(10, 10, BuildingMap.EDGE_X), 0, &"brick"), "fences cannot be painted")
+	var inside := map.sides_facing(Vector2(1.5, 1.5))
+	_check(inside.size() == 12 and inside.all(func(entry: Array) -> bool:
+			var ends := BuildingMap.wall_ends(entry[0])
+			var middle: Vector2 = (ends[0] + ends[1]) * 0.5
+			return BuildingMap.wall_side(entry[0], Vector2(1.5, 1.5)) == entry[1] \
+					and Rect2(0, 0, 3, 3).grow(0.01).has_point(middle)), "Shift finds every inner side of a room")
+	_check(map.paint_sides(inside, &"wall_tiles") == 12 and map.side_style(edge, 1) == &"wall_tiles"
+			and map.side_style(edge, 0) == &"plaster", "the whole room's inner sides paint at once")
+	map.build_walls([edge], &"brick")
+	_check(not map.wall_paints.has(edge), "restyling a wall takes its paint off")
+	map.paint_side(edge, 0, &"wall_tiles")
+	map.remove_walls([edge])
+	_check(not map.wall_paints.has(edge), "removing a wall forgets its paint")
+	# Angled walls: both sides, and Shift reaches them from the room.
+	map.build_room(Rect2i(5, 0, 4, 4), &"concrete", &"plaster")
+	var keys := BuildingMap.slants_on_line(Vector2i(5, 0), Vector2i(9, 4))
+	map.build_slants(keys, &"plaster")
+	var key := keys[0]
+	_check(map.paint_side(key, BuildingMap.wall_side(key, Vector2(8, 1)), &"brick")
+			and map.side_style(key, BuildingMap.wall_side(key, Vector2(6, 3))) == &"plaster",
+			"angled walls take paint on one side")
+	var corner := map.sides_facing(Vector2(8.5, 0.5))
+	_check(corner.size() == 4 + 4 + 4 and corner.any(func(entry: Array) -> bool:
+			return entry[0] is Vector4i and entry[0] == key),
+			"the corner room's sides include the angled wall")
+	map.remove_slants([key])
+	_check(not map.slant_paints.has(key), "removing an angled wall forgets its paint")
+
+
+## Walls meeting at a corner join at a mitre rather than overlapping, which
+## flickers where their faces lie in the same plane.
+func _test_wall_joins() -> void:
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
+	map.register_styles(PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var grid := BuildGrid.new()
+	var view := BuildingView.new()
+	view.grid = grid
+	root.add_child(view)
+	var run := func(wall: Variant) -> BuildingView.WallRun:
+		return view._make_run(wall, 0.0, 0.5, BuildingMap.Wall.WALL, &"")
+	view.map = map
+	# An L: along X from (2, 2) and along Z from (2, 2), brick and plaster.
+	map.build_walls([Vector3i(2, 2, BuildingMap.EDGE_X)], &"brick")
+	map.build_walls([Vector3i(2, 2, BuildingMap.EDGE_Z)], &"plaster")
+	var a: BuildingView.WallRun = run.call(Vector3i(2, 2, BuildingMap.EDGE_X))
+	var b: BuildingView.WallRun = run.call(Vector3i(2, 2, BuildingMap.EDGE_Z))
+	var hubs := view._join_walls([a, b])
+	_check(hubs.is_empty(), "an L needs no post")
+	_check(is_equal_approx(a.side_from[0], b.half) and is_equal_approx(a.side_from[1], -b.half)
+			and is_equal_approx(b.side_from[1], a.half) and is_equal_approx(b.side_from[0], -a.half),
+			"an L's sides meet at a mitre, inner side short and outer side long")
+	_check(is_equal_approx(a.side_to[0], a.length + a.half), "a lone end reaches past its corner")
+	# Straight on: two walls end to end must not overlap.
+	var c: BuildingView.WallRun = run.call(Vector3i(3, 2, BuildingMap.EDGE_X))
+	a = run.call(Vector3i(2, 2, BuildingMap.EDGE_X))
+	view._join_walls([a, c])
+	_check(is_equal_approx(a.side_to[0], a.length) and is_equal_approx(a.side_to[1], a.length)
+			and is_zero_approx(c.side_from[0]) and is_zero_approx(c.side_from[1]),
+			"walls in a line meet end to end without overlapping")
+	# A T gets a post in the middle; an angled wall mitres onto a straight one.
+	a = run.call(Vector3i(2, 2, BuildingMap.EDGE_X))
+	b = run.call(Vector3i(2, 2, BuildingMap.EDGE_Z))
+	var d: BuildingView.WallRun = run.call(Vector3i(1, 2, BuildingMap.EDGE_X))
+	_check(view._join_walls([a, b, d]).size() == 1, "a T-junction gets a post")
+	var slant: BuildingView.WallRun = run.call(BuildingMap.slant_key(Vector2i(2, 2), Vector2i(3, 3)))
+	a = run.call(Vector3i(2, 2, BuildingMap.EDGE_X))
+	_check(view._join_walls([a, slant]).is_empty() and a.side_from[0] > 0.0 and slant.side_from[0] < 0.0,
+			"an angled wall joins a straight one at a mitre")
+	view.free()
+	grid.free()
 
 
 func _test_terrain() -> void:

@@ -43,6 +43,11 @@ const LANDINGS := [
 	[true, "Rounded landings", "landing_round", "Landings with a rounded outer corner."],
 ]
 
+const WALL_MODES := [
+	[BuildController.WallMode.BUILD, "Build", "tool_wall", "Build or restyle whole walls."],
+	[BuildController.WallMode.PAINT, "Paint", "mode_paint", "Paint one side of a wall. Shift-click paints round the whole room."],
+]
+
 const WALL_ANGLES := [
 	[false, "Straight and 45°", "angle_45", "Walls snap straight or to 45°."],
 	[true, "Any angle", "angle_any", "Walls run corner to corner at any angle. Or hold Alt."],
@@ -158,8 +163,12 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 				_add_landing_choices()
 			_add_style_choices(PrisonCatalogue.FLOORS, true)
 		BuildController.Tool.WALL:
-			_add_wall_angle_choices()
-			_add_style_choices(PrisonCatalogue.WALLS, false)
+			_add_wall_mode_choices()
+			if controller.wall_mode == BuildController.WallMode.PAINT:
+				_add_style_choices(_paints(), false)
+			else:
+				_add_wall_angle_choices()
+				_add_style_choices(PrisonCatalogue.WALLS, false)
 		BuildController.Tool.OBJECT:
 			_add_choices("Objects", PrisonCatalogue.OBJECTS, controller.object_def,
 					func(def: Resource) -> void: controller.object_def = def)
@@ -240,6 +249,29 @@ func _add_floor_mode_choices() -> void:
 func _add_landing_choices() -> void:
 	_columns("Landings", _mode_buttons(LANDINGS, controller.stair_tool.rounded,
 			func(rounded: bool) -> void: controller.stair_tool.rounded = rounded))
+
+
+func _add_wall_mode_choices() -> void:
+	_columns("Mode", _mode_buttons(WALL_MODES, controller.wall_mode, func(mode: BuildController.WallMode) -> void:
+		if controller.wall_mode == mode:
+			return
+		controller.wall_mode = mode
+		var paints := _paints()
+		if mode == BuildController.WallMode.PAINT and not paints.any(func(def: WallDef) -> bool:
+				return def.id == controller.wall_style):
+			controller.wall_style = paints[0].id
+		# Painting has its own choices, so lay the row out again.
+		_on_tool_changed.call_deferred(controller.tool)))
+
+
+## The wall styles a side can be painted in: indoor ones, not fences or
+## hedges.
+func _paints() -> Array[WallDef]:
+	var out: Array[WallDef] = []
+	for def in PrisonCatalogue.WALLS:
+		if not def.outdoor:
+			out.append(def)
+	return out
 
 
 func _add_wall_angle_choices() -> void:

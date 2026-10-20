@@ -21,7 +21,8 @@ extends GridGeometry
 ## (Vector2, so 2.25 is a quarter of the way into tile 2) and can snap to
 ## tiles, quarter tiles, or nothing.
 ##
-## Floors and walls carry a style id (see FloorDef and WallDef). Whether a
+## Floors and walls carry a style id (see FloorDef and WallDef). Each side
+## of a wall can also be painted in another style's finish. Whether a
 ## room is indoors is decided by its walls: enclosed by indoor walls and
 ## doors means indoors; fences and hedges leave it outdoors.
 ##
@@ -86,6 +87,10 @@ var window_kinds: Dictionary[Vector3i, StringName] = {} ## For Wall.WINDOW edges
 var slants: Dictionary[Vector4i, int] = {}
 var slant_styles: Dictionary[Vector4i, StringName] = {}
 var slant_window_kinds: Dictionary[Vector4i, StringName] = {}
+## Paint on either side of a wall: [side 0 style, side 1 style], empty for
+## the wall's own finish. See paint_side().
+var wall_paints: Dictionary[Vector3i, Array] = {}
+var slant_paints: Dictionary[Vector4i, Array] = {}
 ## Floor styles for single pieces of tiles cut by angled walls, where they
 ## differ from the tile's own: [a point inside the piece, style] pairs. An
 ## empty style means that piece has no floor.
@@ -316,6 +321,7 @@ func remove_walls(edges: Array[Vector3i]) -> int:
 		if walls.erase(edge):
 			wall_styles.erase(edge)
 			window_kinds.erase(edge)
+			wall_paints.erase(edge)
 			count += 1
 	if count > 0:
 		_changed()
@@ -437,6 +443,7 @@ func build_slants(keys: Array[Vector4i], style: StringName = DEFAULT_WALL) -> in
 		elif slant_style(key) == style:
 			continue
 		slant_styles[key] = style
+		slant_paints.erase(key)
 		count += 1
 	if count > 0:
 		_changed()
@@ -449,6 +456,7 @@ func remove_slants(keys: Array[Vector4i]) -> int:
 		if slants.erase(key):
 			slant_styles.erase(key)
 			slant_window_kinds.erase(key)
+			slant_paints.erase(key)
 			count += 1
 	if count > 0:
 		_changed()
@@ -624,6 +632,115 @@ func _update_slants() -> void:
 			lines[key] = [Vector2(ends[0]), Vector2(ends[1])]
 		_pieces[cell] = TilePiece.split(cell, lines)
 
+
+#endregion
+
+#region Wall paint
+
+## A straight wall (its edge, Vector3i) or an angled one (its key, Vector4i).
+## Both work with the functions below.
+
+## The two corners a wall runs between, in tile units.
+static func wall_ends(wall: Variant) -> Array[Vector2]:
+	if wall is Vector3i:
+		return edge_ends(wall)
+	var ends := slant_ends(wall)
+	return [Vector2(ends[0]), Vector2(ends[1])]
+
+
+## Which side of a wall a point is on. Side 0 is the side to the left of
+## the line from the wall's first corner to its second, turning from +X
+## towards +Z (so the side `across` points to in BuildingView); side 1 is
+## the other.
+static func wall_side(wall: Variant, point: Vector2) -> int:
+	var ends := wall_ends(wall)
+	return 0 if (ends[1] - ends[0]).cross(point - ends[0]) > 0.0 else 1
+
+
+func has_wall(wall: Variant) -> bool:
+	return (wall_at(wall) if wall is Vector3i else slant_at(wall)) != Wall.NONE
+
+
+func style_of(wall: Variant) -> StringName:
+	return wall_style(wall) if wall is Vector3i else slant_style(wall)
+
+
+## The style whose finish (colour, texture and dado) a side of a wall shows:
+## its paint, or the wall's own style.
+func side_style(wall: Variant, side: int) -> StringName:
+	var paints: Array = wall_paints.get(wall, []) if wall is Vector3i else slant_paints.get(wall, [])
+	if not paints.is_empty() and not (paints[side] as StringName).is_empty():
+		return paints[side]
+	return style_of(wall)
+
+
+## Can a wall's sides be painted in a style? Paints are indoor finishes, and
+## only indoor walls take them: fences and hedges stay as they are.
+func can_paint(wall: Variant, style: StringName) -> bool:
+	if not has_wall(wall):
+		return false
+	var own := wall_def(style_of(wall))
+	var paint := wall_def(style)
+	return (own == null or not own.outdoor) and (paint == null or not paint.outdoor)
+
+
+## Paints one side of a wall in a style's finish. The wall keeps its own
+## height, thickness and top. Painting with the wall's own style, or an
+## empty one, takes the paint off. Returns whether anything changed.
+func paint_side(wall: Variant, side: int, style: StringName) -> bool:
+	if not _paint_side(wall, side, style):
+		return false
+	_changed()
+	return true
+
+
+## Paints many sides at once: [wall, side] pairs. Returns how many changed.
+func paint_sides(sides: Array, style: StringName) -> int:
+	var count := 0
+	for entry: Array in sides:
+		if _paint_side(entry[0], entry[1], style):
+			count += 1
+	if count > 0:
+		_changed()
+	return count
+
+
+## The wall sides facing into the area around a point, as [wall, side]
+## pairs: every wall bounding the pieces reachable from it without crossing
+## a wall (see pieces_within_walls).
+func sides_facing(point: Vector2, max_pieces := 0) -> Array:
+	var out: Array = []
+	var seen := {}
+	for piece in pieces_within_walls(point, Rect2i(), max_pieces):
+		for i in piece.sides.size():
+			var tag: Variant = piece.sides[i]
+			var wall: Variant = tag
+			if tag is int:
+				wall = edge_between(piece.cell, piece.cell + DIRECTIONS[tag])
+			if not has_wall(wall):
+				continue
+			var entry := [wall, wall_side(wall, piece.centre())]
+			if not seen.has(entry):
+				seen[entry] = true
+				out.append(entry)
+	return out
+
+
+func _paint_side(wall: Variant, side: int, style: StringName) -> bool:
+	if not style.is_empty() and not can_paint(wall, style):
+		return false
+	if style == style_of(wall):
+		style = &""
+	var store: Dictionary = wall_paints if wall is Vector3i else slant_paints
+	var paints: Array = store.get(wall, [&"", &""]).duplicate()
+	if paints[side] == style:
+		return false
+	paints[side] = style
+	if (paints[0] as StringName).is_empty() and (paints[1] as StringName).is_empty():
+		store.erase(wall)
+	else:
+		store[wall] = paints
+	return true
 
 #endregion
 
@@ -891,6 +1008,8 @@ func demolish(rect: Rect2i) -> void:
 		var keep := has_floor(sides[0]) or has_floor(sides[1])
 		if not keep and walls.erase(edge):
 			wall_styles.erase(edge)
+			window_kinds.erase(edge)
+			wall_paints.erase(edge)
 			count += 1
 	# Angled walls go once no floor is left on either side of them.
 	for key: Vector4i in slants.keys():
@@ -901,6 +1020,7 @@ func demolish(rect: Rect2i) -> void:
 			slants.erase(key)
 			slant_styles.erase(key)
 			slant_window_kinds.erase(key)
+			slant_paints.erase(key)
 			count += 1
 	if count > 0:
 		_changed()
@@ -955,6 +1075,7 @@ func _build_walls(edges: Array[Vector3i], style: StringName) -> int:
 		elif wall_style(edge) == style:
 			continue
 		wall_styles[edge] = style
+		wall_paints.erase(edge)
 		count += 1
 	return count
 

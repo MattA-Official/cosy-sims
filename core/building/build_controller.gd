@@ -31,6 +31,8 @@ enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRA
 enum WaterMode { NONE, ADD, REMOVE }
 ## What the floor tool does: lay floor, or nudge existing floor up or down.
 enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS }
+## What the wall tool does: build whole walls, or paint one side of them.
+enum WallMode { BUILD, PAINT }
 
 ## How far one floor nudge moves, in metres.
 const NUDGE_STEP := 0.25
@@ -66,6 +68,8 @@ const FLOOR_HINTS := {
 	FloorMode.RAMP: "Drag over floor from the low side to the high side to lay a ramp between them.",
 	FloorMode.STAIRS: "Click the foot of the stairs and move the way they climb. Click short of the top for a landing, at the top to build. Esc starts again, Ctrl-click removes stairs.",
 }
+
+const WALL_PAINT_HINT := "Click or drag along walls to paint the side you can see. Shift-click paints every wall round the room, Ctrl takes paint off."
 
 const WATER_HINTS := {
 	WaterMode.ADD: "Click a hollow to fill it with water. Digging deeper or cutting the rim moves the water.",
@@ -156,6 +160,10 @@ var floor_mode := FloorMode.LAY:
 			value = FloorMode.LAY
 		floor_mode = value
 		stair_tool.cancel()
+var wall_mode := WallMode.BUILD:
+	set(value):
+		wall_mode = value
+		_painting = false
 ## Walls go at any angle between corners, not just straight or 45°.
 var any_angle := false
 var plant_def: FoliageDef
@@ -183,6 +191,8 @@ var plant_density := 1.0:
 var force_erase := false
 
 var _dragging := false
+## The wall tool is painting sides for as long as the button is held.
+var _painting := false
 var _drag_start_cell := Vector2i.ZERO
 var _drag_start_corner := Vector2i.ZERO
 var _hover_point := Vector2.ZERO ## Mouse position on the ground, in cell units.
@@ -227,6 +237,8 @@ func _process(delta: float) -> void:
 	_update_free_rotate()
 	if _brushing and _has_hover:
 		_apply_brush(delta)
+	if _painting and _has_hover:
+		_paint_walls()
 	if tool == Tool.PATH and _has_hover:
 		path_tool.free_held = Input.is_action_pressed("build_free_place")
 		path_tool.extend_trail(_hover_point)
@@ -246,6 +258,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and not event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
 		_brushing = false
+		_painting = false
 		if _dragging:
 			_on_release()
 		if tool == Tool.PATH and path_tool.mode == PathTool.Mode.FREEHAND and _has_hover:
@@ -310,6 +323,9 @@ func _on_press() -> void:
 			_dragging = true
 			_drag_start_cell = _hover_cell()
 			_drag_start_point = _hover_point
+		Tool.WALL when wall_mode == WallMode.PAINT:
+			_painting = true
+			_paint_walls()
 		Tool.WALL:
 			_dragging = true
 			_drag_start_corner = _hover_corner()
@@ -454,6 +470,8 @@ func next_wall_view() -> void:
 func hint() -> String:
 	if tool == Tool.FLOOR and floor_mode != FloorMode.LAY:
 		return FLOOR_HINTS[floor_mode]
+	if tool == Tool.WALL and wall_mode == WallMode.PAINT:
+		return WALL_PAINT_HINT
 	if _ground_only(tool) and _level() != 0:
 		return "This tool works on the ground floor. Page Down to go back to it."
 	if tool == Tool.TERRAIN and water_mode != WaterMode.NONE:
@@ -855,6 +873,79 @@ func _hover_slant() -> Vector4i:
 	return best
 
 
+## The wall sides a click with the paint mode would paint, as [wall, side]
+## pairs (see BuildingMap.paint_side): the side under the mouse, or with
+## Shift every side facing into the room there.
+func planned_paint() -> Array:
+	if Input.is_action_pressed("build_whole_room"):
+		return map.sides_facing(_hover_point, WHOLE_ROOM_LIMIT)
+	var hit := _wall_side_under_mouse()
+	return [] if hit.is_empty() else [hit]
+
+
+func _paint_walls() -> void:
+	map.paint_sides(planned_paint(), &"" if _erasing() else wall_style)
+
+
+## The wall side the mouse points at, as [wall, side], or empty. Walls stand
+## up, so the mouse is followed up to the face it is over (the side facing
+## the camera) rather than down to the ground behind it. Over the floor it
+## takes the nearest wall on the side the mouse is.
+func _wall_side_under_mouse() -> Array:
+	var cs := grid.cell_size
+	var camera := camera_rig.camera if camera_rig != null else null
+	if camera != null:
+		var mouse := get_viewport().get_mouse_position()
+		var to_grid := grid.global_transform.affine_inverse()
+		var origin := to_grid * camera.project_ray_origin(mouse)
+		var direction := (to_grid.basis * camera.project_ray_normal(mouse)).normalized()
+		var eye := Vector2(origin.x, origin.z) / cs
+		var best: Array = []
+		var nearest := INF
+		var area := Rect2i(_hover_cell() - Vector2i(3, 3), Vector2i(7, 7))
+		var candidates: Array = []
+		for edge in BuildingMap.rect_edges(area):
+			if map.wall_at(edge) != BuildingMap.Wall.NONE:
+				candidates.append(edge)
+		for cell in BuildingMap.cells_in(area):
+			for key: Vector4i in map.slants_through(cell):
+				if not candidates.has(key):
+					candidates.append(key)
+		for wall: Variant in candidates:
+			var def := map.wall_def(map.style_of(wall))
+			if def != null and def.see_through:
+				continue
+			var ends := BuildingMap.wall_ends(wall)
+			var flat := ends[1] - ends[0]
+			var normal := Vector3(-flat.y, 0.0, flat.x).normalized()
+			var facing := direction.dot(normal)
+			if absf(facing) < 0.001:
+				continue
+			var distance := (Vector3(ends[0].x, 0.0, ends[0].y) * cs - origin).dot(normal) / facing
+			if distance <= 0.0 or distance >= nearest:
+				continue
+			var hit := origin + direction * distance
+			var point := Vector2(hit.x, hit.z) / cs
+			var t := (point - ends[0]).dot(flat) / flat.length_squared()
+			var ground := _ground_at(ends[0].lerp(ends[1], clampf(t, 0.0, 1.0)))
+			var height := def.height if def != null else 1.5
+			if view != null and view.is_cut(ends[0], ends[1]):
+				height = minf(height, view.low_wall_height)
+			if t < 0.0 or t > 1.0 or hit.y < ground - 0.05 or hit.y > ground + height + 0.05:
+				continue
+			nearest = distance
+			best = [wall, BuildingMap.wall_side(wall, eye)]
+		if not best.is_empty():
+			return best
+	var slant := _hover_slant()
+	if slant != NO_SLANT:
+		return [slant, BuildingMap.wall_side(slant, _hover_point)]
+	var edge := _hover_edge()
+	if map.wall_at(edge) != BuildingMap.Wall.NONE and _edge_distance() < 0.35:
+		return [edge, BuildingMap.wall_side(edge, _hover_point)]
+	return []
+
+
 func _has_chosen_slant_opening(key: Vector4i) -> bool:
 	if map.slant_at(key) != opening:
 		return false
@@ -929,6 +1020,11 @@ func _draw_preview() -> void:
 				_shapes.edge(_hover_edge(), demolish_colour)
 			else:
 				_shapes.cells(BuildingMap.cells_in(_drag_rect()), demolish_colour)
+		Tool.WALL when wall_mode == WallMode.PAINT:
+			for entry: Array in planned_paint():
+				var ok := _erasing() or map.can_paint(entry[0], wall_style)
+				_shapes.wall_side(entry[0], entry[1],
+						(demolish_colour if _erasing() else ok_colour) if ok else bad_colour)
 		Tool.WALL:
 			if _dragging:
 				for edge in BuildingMap.edges_on_line(_drag_start_corner, _wall_end_corner()):

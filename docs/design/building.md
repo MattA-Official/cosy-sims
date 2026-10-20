@@ -259,6 +259,16 @@ walls are done, and so is the first slice of people and pathfinding.
   with one click.
 - Doors and windows stay 1 m wide in longer angled wall pieces, with plain
   wall either side.
+- Each side of a wall can be painted in another indoor style's finish
+  (colour, texture and dado), so a wall can be tiled inside a shower room
+  and plain outside (Matt, 2026-10-20). The wall keeps its own height,
+  thickness and top; restyling it takes the paint off. The wall tool's Paint
+  mode paints the side facing the camera, and Shift-click every side facing
+  into the room, like the floor tool. Fences and hedges are not painted.
+- Walls meeting at a corner join at a mitre, worked out from each wall's
+  thickness and angle, and T-junctions and crossings get a post in the
+  middle, so nothing overlaps (overlapping faces flickered) and angled walls
+  no longer poke past the walls they meet. Fences share one post per corner.
 - Objects turn to any angle: R turns by a step (45° by default, [ and ]
   pick 90° down to 1°), and holding F pins the object and turns it to face
   the mouse. Turned objects snap their middle to half or quarter tiles.

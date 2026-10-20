@@ -137,6 +137,19 @@ func edge(on: Vector3i, colour: Color, base := NAN) -> void:
 			colour])
 
 
+## One side of a wall, for painting: a sheet standing just off that side.
+func wall_side(wall: Variant, side: int, colour: Color) -> void:
+	var ends := BuildingMap.wall_ends(wall)
+	var flat := (ends[1] - ends[0]).normalized()
+	var across := Vector2(-flat.y, flat.x) * (1.0 if side == 0 else -1.0)
+	var middle := (ends[0] + ends[1]) * 0.5
+	var ground: float = ground_at.call(middle + across * 0.25)
+	var at := (middle * cell_size + across * 0.12)
+	_boxes.append([Vector3(at.x, ground + wall_height * 0.5, at.y),
+			Vector3(flat.x, 0.0, flat.y) * ends[0].distance_to(ends[1]) * cell_size * 0.5, colour,
+			Vector3(across.x, 0.0, across.y) * 0.03, wall_height * 0.5])
+
+
 func corner(at: Vector2i, colour: Color) -> void:
 	var ground: float = ground_at.call(Vector2(at))
 	_boxes.append([Vector3(at.x * cell_size, ground + 0.5, at.y * cell_size), Vector3(0.12, 0.5, 0.12),

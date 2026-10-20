@@ -52,4 +52,6 @@ static func build(map: BuildingMap, at: Vector2i) -> void:
 	for x in 4:
 		map.place_object(shower, o + Vector2(7.25 + x, 9.25), 0)
 	map.set_room_type(map.room_at(at + Vector2i(8, 6)), &"shower")
+	# Tiles on the shower room's walls, inside only.
+	map.paint_sides(map.sides_facing(o + Vector2(8.5, 6.5)), &"wall_tiles")
 
