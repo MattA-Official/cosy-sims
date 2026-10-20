@@ -38,6 +38,9 @@ var intake: Intake
 var finances: Finances
 var building: Building
 var workshop: Workshop
+## Optional: incidents, for the Safety grade. Without it, Safety goes by
+## how many prisoners were walked back.
+var security: Security
 var prisoner_group: StringName = &"prisoner"
 var clock: GameClock:
 	set(value):
@@ -136,7 +139,11 @@ func grade_day() -> void:
 	_graded = true
 	var prisoners := maxi(_prisoners(), 1)
 	var walked_back: int = _moodlets.get(&"walked_back", 0)
-	measures["Safety"] = _stars(1.0 - float(walked_back) / prisoners, [0.5, 0.75, 0.9, 1.0])
+	if security != null:
+		measures["Safety"] = Security.safety_stars(security.today, prisoners)
+		security.end_day()
+	else:
+		measures["Safety"] = _stars(1.0 - float(walked_back) / prisoners, [0.5, 0.75, 0.9, 1.0])
 	measures["Wellbeing"] = _stars(_average_mood(), [30.0, 45.0, 60.0, 75.0])
 	# Until classes and parole come, work programmes stand in for reform.
 	var working := people.people.filter(func(p: Person) -> bool:
@@ -168,6 +175,13 @@ func write_report() -> String:
 	var walked: int = _yesterday_moodlets.get(&"walked_back", 0)
 	if walked > 0:
 		lines.append("Guards walked back %d %s." % [walked, "prisoner" if walked == 1 else "prisoners"])
+	if security != null:
+		var incidents := PackedStringArray()
+		for kind: StringName in Security.NAMES:
+			if kind != &"walk_back" and security.yesterday.get(kind, 0) > 0:
+				incidents.append("%s %d" % [Security.NAMES[kind].to_lower(), security.yesterday[kind]])
+		if not incidents.is_empty():
+			lines.append("Incidents: %s." % ", ".join(incidents))
 	var money := Ledger.total(ledger.yesterday)
 	lines.append("Money: %s%s, balance %s." % ["+" if money > 0 else "", Ledger.text(money), Ledger.text(ledger.balance)])
 	var story := _story()

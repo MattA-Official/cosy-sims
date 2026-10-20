@@ -28,6 +28,8 @@ var rungs: Array[MisconductDef] = []
 var wear: Wear
 var fights: Fights
 var items: ItemStore
+## Optional: somewhere seen lately counts as watched too.
+var security: Security
 var prisoner_group: StringName = &"prisoner"
 var guard_role: StringName = &"guard"
 ## Off for none of it, such as in a sandbox.
@@ -93,6 +95,8 @@ func roll(person: Person, force := false) -> MisconductDef:
 
 ## Whether a guard is close enough to see them.
 func watched(person: Person) -> bool:
+	if security != null and security.watched(person.level, person.flat()):
+		return true
 	for other in people.nearby(person, WATCH_DISTANCE):
 		if other.role == guard_role and not other.going_home and other.flat().distance_to(person.flat()) <= WATCH_DISTANCE:
 			return true

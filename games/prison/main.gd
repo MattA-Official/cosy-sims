@@ -93,6 +93,8 @@ var infirmary := Infirmary.new()
 ## Things prisoners shouldn't have, and guards searching for them.
 var contraband := Contraband.new()
 var searching := Searching.new()
+var security := Security.new()
+var coverage_tint := CoverageTint.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
 ## The prison's money, and what comes in and goes out.
@@ -133,6 +135,7 @@ var staff_window := StaffWindow.new()
 var finance_window := FinanceWindow.new()
 ## Intake, goals and the grade, on O.
 var office_window := OfficeWindow.new()
+var security_window := SecurityWindow.new()
 ## Save slots and the autosave, on F2.
 var saves_window := SavesWindow.new()
 ## The prison's name in saves: the sample's, or the save's it was loaded from.
@@ -477,6 +480,31 @@ func _ready() -> void:
 			func(person: Person) -> bool: return is_prisoner.call(person) and not people.home_room(person).is_empty()])
 	searching.found.connect(func(_owner: Person, def: ItemDef, where: String) -> void:
 		Toasts.post("Contraband found", "A %s %s." % [def.display_name.to_lower(), where]))
+	security.name = "Security"
+	security.people = people
+	security.jobs = jobs
+	security.building = building
+	security.clock = clock
+	add_child(security)
+	security.start()
+	misconduct.security = security
+	misconduct.acted.connect(func(person: Person, rung: MisconductDef, words: String) -> void:
+		if rung.id == &"vandalism" or rung.id == &"fight":
+			security.count(rung.id, person, words))
+	searching.found.connect(func(owner: Person, def: ItemDef, where: String) -> void:
+		security.count(&"contraband", owner, "A %s %s" % [def.display_name.to_lower(), where]))
+	fights.knocked_out.connect(func(person: Person) -> void:
+		security.count(&"knocked_out", person, "Knocked out in a fight"))
+	escapes.running.connect(func(person: Person) -> void:
+		security.count(&"escape", person, "Making a run for it"))
+	coverage_tint.name = "CoverageTint"
+	coverage_tint.cell_size = grid.cell_size
+	coverage_tint.coverage = security.coverage
+	coverage_tint.building = building
+	coverage_tint.controller = controller
+	coverage_tint.height_at = func(level: int, cell: Vector2i) -> float:
+		return people.nav().height_at(level, Vector2(cell) + Vector2(0.5, 0.5))
+	grid.add_child(coverage_tint)
 	ledger.name = "Ledger"
 	ledger.balance = Finances.STARTING_MONEY
 	add_child(ledger)
@@ -545,6 +573,7 @@ func _ready() -> void:
 		staff_bus.start()
 	standing.name = "Standing"
 	standing.people = people
+	standing.security = security
 	standing.ledger = ledger
 	standing.office = office
 	standing.intake = intake
@@ -637,6 +666,7 @@ func _add_hud() -> void:
 	clock_bar.ledger = ledger
 	clock_bar.money_pressed.connect(finance_window.toggle)
 	clock_bar.office_pressed.connect(office_window.toggle)
+	clock_bar.security_pressed.connect(security_window.toggle)
 	clock_bar.timetable_pressed.connect(timetable.toggle)
 	hud.add_child(clock_bar)
 	timetable.schedule = schedule
@@ -662,6 +692,17 @@ func _add_hud() -> void:
 	office_window.consequences = consequences
 	office_window.searching = searching
 	hud.add_child(office_window)
+	security_window.security = security
+	security_window.secure_area = secure_area
+	security_window.searching = searching
+	security_window.escapes = escapes
+	security_window.coverage_tint = coverage_tint
+	security_window.prisoners = func() -> int:
+		return people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size()
+	security_window.look_pressed.connect(func(level: int, point: Vector2) -> void:
+		building.active = level
+		camera_rig.focus_on(Vector3(point.x * grid.cell_size, people.nav().height_at(level, point), point.y * grid.cell_size)))
+	hud.add_child(security_window)
 	saves_window.save = func(slot: String) -> void:
 		if PrisonSave.write(slot, PrisonSave.capture(self)) == OK:
 			Toasts.post("Saved", PrisonSave.describe(PrisonSave.read(slot)))
@@ -700,6 +741,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("office_toggle"):
 		office_window.toggle()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("security_toggle"):
+		security_window.toggle()
 		get_viewport().set_input_as_handled()
 
 

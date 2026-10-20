@@ -339,6 +339,23 @@ two guards give chase, a little faster than a prisoner runs. Caught, it's
 an escape attempt on their record and a day in the quiet room; reach the
 edge and they're gone, with a £2,000 fine.
 
+**CCTV and the Security window.** Guards see the room they're in; a **CCTV
+camera** (Objects) sees 8 tiles in a quarter-circle in front of it, but only
+while a guard sits at a **CCTV monitor** (a monitor on a guard desk is
+watched by whoever mans the post; one on its own gets a guard of its own).
+What was seen fades over half an hour, and prisoners don't act up where
+they've been seen lately. The patrol route tool, or **Show what's being
+watched** in the **Security** window (K, or the shield in the clock bar),
+tints it blue. The window also lists cameras, guards on duty, the
+perimeter, today's incidents and searches, anyone at large, and the latest
+alerts; click an alert to look there.
+
+**Safety.** Each midnight Safety is graded on the day's incidents, weighted
+(walked back 0.2, contraband found 0.5, vandalism or a fight 1, someone
+knocked out 3, an escape attempt 10) and counted per 10 prisoners: 0.2 or
+less is five stars, then 0.5, 1 and 2, and worse is one star. The morning
+report lists yesterday's incidents.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one
@@ -357,7 +374,7 @@ how prisoners find their way:
 | Locked out | Showers with no door, and a raised canteen that needs Door Steps |
 | Staff wing | A staff room behind a staff door, and an office zoned staff only |
 | Working prison | The staff wing with a kitchen, laundry and workshop, three staff and prisoners on work programmes |
-| Guarded prison | The working prison with a guard post and a security gate to the yard, two guards by day and one by night |
+| Guarded prison | The working prison with a guard post (with a CCTV monitor for a camera in the canteen) and a security gate to the yard, two guards by day and one by night |
 | Paying prison | The guarded prison with a warden in an office, a reception and a bus stop on the road (and a car park with Staff Cars on) |
 
 See [docs/design/building.md](docs/design/building.md) for the design

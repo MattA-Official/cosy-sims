@@ -39,6 +39,7 @@ class Fight:
 
 signal started(fight: Fight)
 signal ended(fight: Fight)
+signal knocked_out(person: Person)
 
 var people: People
 var jobs: JobBoard
@@ -140,7 +141,10 @@ func tick() -> void:
 ## One blow, with whatever weapon they have on them.
 func hit(person: Person, target: Person) -> void:
 	var damage := BASE_HIT * _rng.randf_range(0.5, 1.5) + weapon_hit(person)
+	var was_out := Health.injury(target.health) == Health.Injury.KNOCKED_OUT
 	target.health = maxf(0.0, target.health - damage)
+	if not was_out and Health.injury(target.health) == Health.Injury.KNOCKED_OUT:
+		knocked_out.emit(target)
 
 
 ## The extra damage from the best weapon in their pocket.

@@ -71,6 +71,9 @@ static func capture(main: Node) -> Dictionary:
 		"items_hidden": _items_out((main.items as ItemStore).hidden),
 		"stash_owner": (main.items as ItemStore).stash_owner.duplicate(),
 		"at_large": (main.escapes as Escapes).at_large.duplicate(true),
+		"security": {"today": (main.security as Security).today.duplicate(),
+				"yesterday": (main.security as Security).yesterday.duplicate(),
+				"alerts": (main.security as Security).alerts.duplicate(true)},
 		"policies": {"privilege_days": (main.consequences as Consequences).privilege_days,
 				"quiet_room": (main.consequences as Consequences).quiet_room_on},
 		"searching": {"policy": (main.searching as Searching).random_per_day,
@@ -195,6 +198,10 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	items.hidden.assign(_items_in(data.get("items_hidden", {})))
 	items.stash_owner.assign(data.get("stash_owner", {}))
 	(main.escapes as Escapes).at_large.assign(data.get("at_large", []))
+	var security_data: Dictionary = data.get("security", {})
+	(main.security as Security).today.assign(security_data.get("today", {}))
+	(main.security as Security).yesterday.assign(security_data.get("yesterday", {}))
+	(main.security as Security).alerts.assign(security_data.get("alerts", []))
 	var policies: Dictionary = data.get("policies", {})
 	(main.consequences as Consequences).privilege_days = policies.get("privilege_days", 2.0)
 	(main.consequences as Consequences).quiet_room_on = policies.get("quiet_room", true)

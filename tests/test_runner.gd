@@ -63,6 +63,7 @@ func _process(_delta: float) -> bool:
 	_test_consequences()
 	_test_perimeter()
 	_test_escapes()
+	_test_security()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3259,4 +3260,65 @@ func _test_escapes() -> void:
 			"a guard close behind catches them, and it goes on their record")
 	clock.advance(1.0)
 	_check(b.quiet_room_hours > 0.0 or b.restrictions.size() >= 2, "with a consequence")
+	main.queue_free()
+
+
+func _test_security() -> void:
+	# Coverage: a watcher sees their own room, not through walls.
+	var building := Building.new(Rect2i(0, 0, 20, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var map := building.ground()
+	map.build_room(Rect2i(0, 0, 6, 6), &"wood", &"plaster")
+	map.build_room(Rect2i(6, 0, 6, 6), &"wood", &"plaster")
+	var coverage := Coverage.new()
+	coverage.building = building
+	coverage.update([[0, Vector2(3, 3), 5.0]])
+	_check(coverage.seen_at(0, Vector2(1.5, 1.5)) == 1.0, "a watcher sees across their room")
+	_check(coverage.seen_at(0, Vector2(7.5, 3.5)) == 0.0, "but not through the wall")
+	coverage.update([], 15.0)
+	_check(is_equal_approx(coverage.seen_at(0, Vector2(1.5, 1.5)), 0.5), "what was seen fades")
+	coverage.update([], 15.0)
+	_check(coverage.seen_at(0, Vector2(1.5, 1.5)) == 0.0, "and is gone after half an hour")
+	# A camera sees a cone in front of it.
+	coverage.update([[0, Vector2(0.5, 0.5), 8.0, Vector2(1, 1).normalized(), PI * 0.5]])
+	_check(coverage.seen_at(0, Vector2(4.5, 4.5)) > 0.0, "a camera sees ahead")
+	coverage.seen.clear()
+	coverage.update([[0, Vector2(5.5, 5.5), 8.0, Vector2(1, 1).normalized(), PI * 0.5]])
+	_check(coverage.seen_at(0, Vector2(1.5, 1.5)) == 0.0, "but not behind")
+	# Safety stars from incidents per ten prisoners.
+	_check(Security.safety_stars({}, 20) == 5, "no incidents, five stars")
+	_check(Security.safety_stars({&"fight": 1}, 20) == 4, "one fight among twenty, four stars")
+	_check(Security.safety_stars({&"escape": 1}, 20) == 1, "an escape, one star")
+	# In a prison: the camera is watched from the guard post, and incidents count.
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var security: Security = main.security
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	(main.searching as Searching).random_per_day = 0
+	var minutes := 0
+	while not security.cameras_live() and minutes < 600:
+		clock.advance(1.0)
+		minutes += 1
+	_check(security.cameras_live(), "a guard at the post watches the canteen camera")
+	clock.advance(1.0)
+	var camera: BuildingMap.PlacedObject = main.building.object_at(main.building.objects_tagged(Array([&"camera"], TYPE_STRING_NAME, &"", null))[0])
+	var ahead := camera.centre + Security.facing(camera) * 3.0
+	_check(security.watched(0, ahead), "so the canteen in front of it counts as watched")
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	people.stop(prisoner)
+	prisoner.level = 0
+	prisoner.position = Vector3(ahead.x, prisoner.position.y, ahead.y)
+	_check((main.misconduct as Misconduct).watched(prisoner), "and nobody acts up there")
+	var fights := (main.fights as Fights)
+	fights.knocked_out.emit(prisoner)
+	_check(security.today.get(&"knocked_out", 0) == 1 and not security.alerts.is_empty(), "a knock-out is an incident and an alert")
+	var standing: Standing = main.standing
+	standing.grade_day()
+	_check(standing.measures["Safety"] < 5 and security.today.is_empty() and security.yesterday.get(&"knocked_out", 0) == 1,
+			"which costs Safety at midnight")
+	(main.security_window as SecurityWindow).toggle()
+	_check(Array((main.security_window as SecurityWindow).status_lines())[0].contains("watched from the monitor"),
+			"the Security window says the cameras are watched")
 	main.queue_free()

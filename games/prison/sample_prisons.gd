@@ -423,8 +423,8 @@ static func _staff_wing(site: Site, kitchen := false, guards := false, intake :=
 		site.people.set_role(warden, &"warden")
 
 
-## A guard post under the staff room, through a staff door, and a
-## security gate from the canteen out to the yard that opens while a
+## A guard post under the staff room, through a staff door, with a CCTV
+## monitor for a camera in the canteen, and a security gate from the canteen out to the yard that opens while a
 ## guard sits at the post's desk.
 static func _guard_post(ground: BuildingMap, staff_room: Rect2i, canteen: Rect2i) -> void:
 	var post := Rect2i(Vector2i(staff_room.position.x, staff_room.end.y), Vector2i(4, 4))
@@ -435,6 +435,9 @@ static func _guard_post(ground: BuildingMap, staff_room: Rect2i, canteen: Rect2i
 	ground.place_on_surface(PrisonCatalogue.object(&"cctv_monitor"), desk, 1)
 	ground.place_beside(PrisonCatalogue.object(&"chair"), desk, Vector2(0, 0.3), 3)
 	ground.set_room_zone(ground.room_at(post.position), &"staff")
+	# A camera in the canteen's far corner, looking across it.
+	ground.place_object_at(PrisonCatalogue.object(&"cctv_camera"),
+			Vector2(canteen.end.x - 0.45, canteen.position.y + 0.45), PI * 0.25)
 	var gate := BuildingMap.edge_between(canteen.position + Vector2i(5, 4), canteen.position + Vector2i(5, 5))
 	ground.set_door(gate, true, &"security_gate")
 

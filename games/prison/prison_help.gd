@@ -32,6 +32,7 @@ const SECTIONS := [
 		["P", "Staff and work programmes"],
 		["M", "Money"],
 		["O", "Warden's office: intake, goals, grade"],
+		["K", "Security: cameras, incidents, alerts"],
 	]],
 	["Other", [
 		["F1", "This card"],
