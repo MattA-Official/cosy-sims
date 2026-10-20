@@ -98,6 +98,17 @@ PALETTE = dict(
     hair=("#ffffff", 0.8, 0),
     shoes=("#3b3a3c", 0.7, 0),
     navy=("#3f5168", 0.7, 0),           # staff cap
+    white=("#f1efe9", 0.45, 0),         # appliances
+    crate=("#b98d5e", 0.8, 0),          # rough timber
+    food_a=("#e6b961", 0.7, 0),         # potatoes, bread
+    food_b=("#8fb86a", 0.7, 0),         # peas, greens
+    food_c=("#c9714f", 0.7, 0),         # beans, sauce
+    plastic=("#7fa3c4", 0.6, 0),        # laundry basket
+    uniform=("#e8894a", 0.9, 0),        # folded prison orange
+    skip=("#d6a64a", 0.6, 0.1),
+    bag=("#3b3d40", 0.35, 0),
+    lorry=("#f2efe6", 0.5, 0),
+    stripe=("#8aa98a", 0.6, 0),
     gold=("#e0b65a", 0.35, 0.6),        # staff badge
     trunk=("#ffffff", 0.9, 0),
     canopy=("#ffffff", 0.9, 0),
@@ -165,6 +176,18 @@ class Prop:
         bmesh.ops.create_cube(bm, size=1.0)
         bm.transform(Matrix.Diagonal((*size, 1)))
         self.add(material, bm, bevel, segs, _xf(loc, rot))
+
+    def taper(self, material, bottom, top, height, loc, bevel=0.02, segs=2):
+        """A box narrower at the bottom than the top (or the other way):
+        `bottom` and `top` are (x, y) sizes."""
+        bm = bmesh.new()
+        bmesh.ops.create_cube(bm, size=1.0)
+        for v in bm.verts:
+            size = top if v.co.z > 0 else bottom
+            v.co.x *= size[0]
+            v.co.y *= size[1]
+            v.co.z *= height
+        self.add(material, bm, bevel, segs, _xf(loc, (0, 0, 0)))
 
     def cyl(self, material, r, depth, loc, r2=None, bevel=0.01, segs=2, rot=(0, 0, 0), n=24,
             scale=(1, 1, 1)):
@@ -380,7 +403,8 @@ def cell_door():
 def person():
     """About 0.9 m tall and chunky: big head, short body in one-piece
     overalls, stubby arms. Faces +y. The game tints outfit, skin and hair,
-    and swings the legs (outfit_legs, shoes_legs) forward to sit. Parts
+    swings the legs (outfit_legs, shoes_legs) forward to sit and the arms
+    (outfit_arms, skin_arms) forward to carry. Parts
     named *_staff (a peaked cap and a badge) only show on staff."""
     p = Prop("person")
     # Legs and body: a soft pill, a touch wider at the hips.
@@ -392,9 +416,12 @@ def person():
         p.ball("shoes", 0.07, (x, 0.025, 0.04), scale=(1, 1.35, 0.7))
     p.group = None
     # Arms hang a little out from the body, hands peeking out.
+    p.group = "arms"
+    p.pivots["arms"] = (0, 0, 0.5)
     for side in (-1, 1):
         p.capsule("outfit", 0.05, 0.14, (side * 0.19, 0, 0.42), rot=(0, side * 12, 0))
         p.ball("skin", 0.045, (side * 0.215, 0.0, 0.28))
+    p.group = None
     # Head, with ears and a soft cap of hair.
     p.ball("skin", 0.165, (0, 0, 0.7), scale=(1, 0.95, 1))
     for side in (-1, 1):
@@ -613,11 +640,300 @@ def wall_shelf():
     return p
 
 
+
+# ---------------------------------------------------------------- items and jobs (M4)
+
+def cooker():
+    p = Prop("cooker")  # 1 x 1 range: four rings on top, oven door at the front
+    p.box("steel", (0.94, 0.86, 0.55), (0, 0, 0.275), 0.03, 3)
+    p.box("steel_dark", (0.9, 0.82, 0.02), (0, 0, 0.555), 0.01, 1)
+    for x in (-0.22, 0.22):
+        for y in (-0.18, 0.2):
+            p.cyl("rubber", 0.12, 0.025, (x, y, 0.57), bevel=0.008, n=24)
+            p.cyl("steel_dark", 0.06, 0.03, (x, y, 0.575), bevel=0.005, n=16)
+    p.box("steel_dark", (0.74, 0.03, 0.3), (0, -0.43, 0.24), 0.02, 2)
+    p.box("glass", (0.5, 0.02, 0.16), (0, -0.445, 0.25), 0.01, 1)
+    p.tube("steel", [(-0.28, -0.44, 0.42), (-0.28, -0.48, 0.42), (0.28, -0.48, 0.42), (0.28, -0.44, 0.42)], 0.012, 0.02, n=8)
+    for k in range(4):
+        p.cyl("rubber", 0.025, 0.03, (-0.3 + k * 0.2, -0.44, 0.5), bevel=0.008, n=12, rot=(90, 0, 0))
+    return p
+
+
+def fridge():
+    p = Prop("fridge")  # 1 x 0.75 tall double fridge, doors at the front
+    h = 1.3
+    p.box("white", (0.92, 0.66, h), (0, 0.02, h / 2), 0.04, 3)
+    p.box("steel_dark", (0.004, 0.02, h - 0.1), (0, -0.315, h / 2), 0, 0)
+    for x in (-0.06, 0.06):
+        p.tube("steel", [(x, -0.32, 0.55), (x, -0.36, 0.55), (x, -0.36, 0.85), (x, -0.32, 0.85)], 0.012, 0.02, n=8)
+    p.box("steel_dark", (0.9, 0.02, 0.06), (0, -0.315, 0.06), 0.01, 1)
+    return p
+
+
+def serving_counter():
+    p = Prop("serving_counter")  # 2 x 1 steel counter with hot trays and a sneeze guard
+    p.box("steel", (1.92, 0.7, 0.53), (0, 0.1, 0.265), 0.03, 3)
+    p.box("steel_dark", (1.86, 0.6, 0.02), (0, 0.1, 0.535), 0.01, 1)
+    for k, food in enumerate(("food_a", "food_b", "food_c", "food_a")):
+        x = -0.69 + k * 0.46
+        p.box("steel", (0.4, 0.42, 0.04), (x, 0.12, 0.54), 0.01, 1)
+        p.box(food, (0.36, 0.38, 0.03), (x, 0.12, 0.555), 0.012, 2)
+    # Tray rail along the front, for sliding trays along.
+    for x in (-0.85, 0, 0.85):
+        p.tube("steel", [(x, -0.25, 0.42), (x, -0.4, 0.42)], 0.015, 0, n=8)
+    p.box("steel", (1.92, 0.16, 0.025), (0, -0.35, 0.44), 0.008, 1)
+    # Sneeze guard.
+    for x in (-0.9, 0.9):
+        p.tube("steel", [(x, -0.15, 0.53), (x, -0.15, 0.85)], 0.015, 0, n=8)
+    p.box("glass", (1.82, 0.2, 0.02), (0, -0.1, 0.85), 0.008, 1, rot=(20, 0, 0))
+    # A stack of clean trays at one end.
+    for i in range(4):
+        p.box("cream", (0.3, 0.22, 0.012), (0.8, -0.35, 0.46 + i * 0.016), 0.005, 1)
+    return p
+
+
+def washing_machine():
+    p = Prop("washing_machine")  # 1 x 0.75 big industrial front-loader
+    p.box("white", (0.92, 0.66, 0.68), (0, 0.02, 0.34), 0.045, 3)
+    p.box("steel_dark", (0.88, 0.02, 0.1), (0, -0.315, 0.6), 0.01, 1)
+    p.box("light", (0.12, 0.02, 0.04), (0.28, -0.325, 0.6), 0.005, 1)
+    p.cyl("steel", 0.2, 0.05, (0, -0.31, 0.3), bevel=0.02, segs=3, n=28, rot=(90, 0, 0))
+    p.cyl("glass", 0.15, 0.02, (0, -0.34, 0.3), bevel=0.008, n=28, rot=(90, 0, 0))
+    p.ball("uniform", 0.09, (0.03, -0.3, 0.26), scale=(1, 0.5, 0.7), u=12, v=8)
+    return p
+
+
+def ironing_board():
+    p = Prop("ironing_board")  # 1.5 x 0.5 board on crossed legs, with an iron
+    p.box("sheet", (1.3, 0.36, 0.04), (0.02, 0, 0.53), 0.018, 3)
+    p.box("sheet", (0.26, 0.24, 0.039), (0.72, 0, 0.53), 0.018, 3)  # narrow end
+    for x in (-0.3, 0.3):
+        p.tube("paint", [(x, -0.16, 0), (-x, 0.0, 0.52)], 0.015, 0, n=8)
+        p.tube("paint", [(x, 0.16, 0), (-x, 0.0, 0.52)], 0.015, 0, n=8)
+    p.taper("steel", (0.18, 0.1), (0.14, 0.08), 0.06, (0.3, 0, 0.585), 0.02)
+    p.tube("rubber", [(0.25, 0, 0.62), (0.25, 0, 0.66), (0.35, 0, 0.66), (0.35, 0, 0.62)], 0.012, 0.02, n=8)
+    return p
+
+
+def laundry_basket():
+    p = Prop("laundry_basket")  # 0.5 x 0.5 plastic basket of clothes
+    p.taper("plastic", (0.36, 0.3), (0.44, 0.36), 0.28, (0, 0, 0.14), 0.04, 3)
+    p.ball("uniform", 0.13, (-0.07, 0.0, 0.28), scale=(1.2, 1, 0.5), u=14, v=8)
+    p.ball("sheet", 0.11, (0.1, 0.03, 0.29), scale=(1.2, 1, 0.5), u=14, v=8)
+    return p
+
+
+def clothes_shelf():
+    p = Prop("clothes_shelf")  # 1 x 0.5 open shelves of folded uniforms
+    h, w, d = 1.3, 0.96, 0.4
+    for x in (-w / 2 + 0.03, w / 2 - 0.03):
+        p.box("wood", (0.05, d, h), (x, 0.03, h / 2), 0.015, 2)
+    p.box("wood", (w, 0.03, h), (0, d / 2 + 0.015, h / 2), 0.01, 1)
+    shelves = (0.04, 0.45, 0.86, h - 0.025)
+    for z in shelves:
+        p.box("wood", (w - 0.04, d, 0.04), (0, 0.03, z), 0.012, 2)
+    for z in shelves[:-1]:
+        for k, x in enumerate((-0.28, 0.0, 0.28)):
+            for j in range(3 - (k % 2)):
+                cloth = "uniform" if (k + j) % 3 else "sheet"
+                p.box(cloth, (0.24, 0.28, 0.06), (x, 0.04, z + 0.05 + j * 0.065), 0.02, 2)
+    return p
+
+
+def workbench():
+    p = Prop("workbench")  # 2 x 1 sturdy bench with a vice and a few tools
+    p.box("wood", (1.9, 0.8, 0.07), (0, 0, 0.52), 0.02, 2)
+    for x in (-0.85, 0.85):
+        for y in (-0.32, 0.32):
+            p.box("paint", (0.07, 0.07, 0.49), (x, y, 0.245), 0.015, 2)
+    p.box("wood", (1.76, 0.66, 0.03), (0, 0, 0.12), 0.01, 1)
+    p.box("steel_dark", (0.16, 0.14, 0.08), (-0.75, -0.36, 0.6), 0.02, 2)
+    p.box("steel_dark", (0.16, 0.04, 0.1), (-0.75, -0.46, 0.6), 0.015, 2)
+    p.box("crate", (0.6, 0.12, 0.05), (-0.15, -0.05, 0.58), 0.01, 1, rot=(0, 0, 8))
+    p.box("wood", (0.24, 0.03, 0.03), (0.45, -0.1, 0.57), 0.008, 1, rot=(0, 0, -20))
+    p.box("steel_dark", (0.05, 0.1, 0.05), (0.56, -0.15, 0.575), 0.01, 1, rot=(0, 0, -20))
+    p.box("crate", (0.3, 0.2, 0.06), (0.6, 0.2, 0.585), 0.015, 2)
+    return p
+
+
+def bin_():
+    p = Prop("bin")  # 0.5 x 0.5 pedal bin
+    p.cyl("paint", 0.17, 0.42, (0, 0, 0.21), r2=0.19, bevel=0.02, n=24)
+    p.cyl("paint", 0.2, 0.05, (0, 0, 0.445), bevel=0.02, segs=3, n=24)
+    p.box("steel_dark", (0.1, 0.08, 0.02), (0, -0.2, 0.03), 0.008, 1)
+    return p
+
+
+def skip_():
+    p = Prop("skip")  # 2 x 1 outdoor skip, rubbish heaped inside
+    p.taper("skip", (1.5, 0.82), (1.92, 0.9), 0.62, (0, 0, 0.35), 0.03, 2)
+    for x in (-0.55, 0.55):
+        p.box("rubber", (0.12, 0.7, 0.06), (x, 0, 0.03), 0.02, 1)
+    for x in (-0.95, 0.95):
+        p.tube("steel_dark", [(x, -0.2, 0.55), (x * 1.05, -0.2, 0.62), (x * 1.05, 0.2, 0.62), (x, 0.2, 0.55)], 0.02, 0.04, n=8)
+    for loc, r in (((-0.4, 0, 0.66), 0.22), ((0.1, 0.1, 0.68), 0.24), ((0.5, -0.1, 0.65), 0.2)):
+        p.ball("bag", r, loc, scale=(1.1, 1, 0.7), u=14, v=8)
+    p.box("crate", (0.3, 0.25, 0.2), (-0.05, -0.18, 0.72), 0.02, 2, rot=(0, 10, 25))
+    return p
+
+
+def storage_shelf():
+    p = Prop("storage_shelf")  # 1 x 0.5 steel shelving stacked with crates
+    h = 1.4
+    for x in (-0.46, 0.46):
+        for y in (-0.2, 0.2):
+            p.box("paint", (0.04, 0.04, h), (x, y, h / 2), 0.008, 1)
+    for z in (0.08, 0.55, 1.02, h - 0.02):
+        p.box("steel", (0.94, 0.42, 0.025), (0, 0, z), 0.006, 1)
+    for z, xs in ((0.095, (-0.22, 0.22)), (0.565, (-0.22, 0.2)), (1.035, (0.0,))):
+        for x in xs:
+            p.box("crate", (0.4, 0.34, 0.3), (x, 0, z + 0.15), 0.02, 2)
+            p.box("rubber", (0.12, 0.02, 0.04), (x, -0.172, z + 0.24), 0.008, 1)
+    return p
+
+
+def table_trolley():
+    p = Prop("table_trolley")  # 1 x 0.5 steel trolley with trays
+    for x in (-0.42, 0.42):
+        for y in (-0.18, 0.18):
+            p.tube("steel", [(x, y, 0.07), (x, y, 0.6)], 0.015, 0, n=8)
+            p.cyl("rubber", 0.04, 0.03, (x, y, 0.04), bevel=0.008, n=12, rot=(90, 0, 0))
+    for z in (0.22, 0.58):
+        p.box("steel", (0.9, 0.42, 0.03), (0, 0, z), 0.012, 2)
+    p.tube("steel", [(0.42, -0.18, 0.6), (0.48, -0.18, 0.7), (0.48, 0.18, 0.7), (0.42, 0.18, 0.6)], 0.015, 0.04, n=8)
+    for x in (-0.2, 0.15):
+        _tray(p, (x, 0, 0.6))
+    return p
+
+
+def _tray(p, at):
+    x, y, z = at
+    p.box("cream", (0.34, 0.26, 0.02), (x, y, z + 0.01), 0.008, 1)
+    p.cyl("sheet", 0.08, 0.015, (x - 0.06, y, z + 0.028), bevel=0.005, n=20)
+    p.ball("food_a", 0.035, (x - 0.08, y + 0.02, z + 0.04), scale=(1, 1, 0.6), u=10, v=6)
+    p.ball("food_b", 0.03, (x - 0.04, y - 0.02, z + 0.04), scale=(1, 1, 0.6), u=10, v=6)
+    p.box("food_c", (0.08, 0.08, 0.03), (x + 0.09, y, z + 0.035), 0.012, 2)
+
+
+# Carried things, about 0.4 m, origin at the middle of the bottom.
+
+def food_crate():
+    p = Prop("food_crate")
+    p.box("crate", (0.4, 0.28, 0.2), (0, 0, 0.1), 0.02, 2)
+    p.box("steel_dark", (0.36, 0.24, 0.01), (0, 0, 0.17), 0, 0)
+    for k, (x, y) in enumerate(((-0.1, -0.05), (0.0, 0.06), (0.1, -0.04), (-0.05, 0.07), (0.12, 0.07))):
+        p.ball(("food_a", "food_b", "food_c")[k % 3], 0.06, (x, y, 0.2), u=12, v=8)
+    return p
+
+
+def meal_tray():
+    p = Prop("meal_tray")
+    _tray(p, (0, 0, 0))
+    return p
+
+
+def dirty_laundry():
+    p = Prop("dirty_laundry")
+    p.ball("uniform", 0.17, (0, 0, 0.14), scale=(1.15, 0.9, 0.85), u=16, v=10)
+    p.ball("sheet", 0.1, (0.1, -0.08, 0.2), scale=(1.2, 1, 0.7), u=12, v=8)
+    p.ball("uniform", 0.06, (-0.05, 0, 0.29), scale=(1, 1, 1.3), u=12, v=8)
+    return p
+
+
+def clean_laundry():
+    p = Prop("clean_laundry")
+    for j in range(4):
+        p.box("uniform" if j % 2 == 0 else "sheet", (0.32, 0.26, 0.06), (0, 0, 0.03 + j * 0.062), 0.02, 2)
+    return p
+
+
+def rubbish_bag():
+    p = Prop("rubbish_bag")
+    p.ball("bag", 0.17, (0, 0, 0.16), scale=(1, 0.9, 1.0), u=16, v=10)
+    p.cyl("bag", 0.04, 0.08, (0, 0, 0.33), r2=0.02, bevel=0.01, n=12)
+    for a in (-30, 30):
+        p.ball("bag", 0.04, (math.sin(math.radians(a)) * 0.06, 0, 0.39), scale=(1.3, 0.6, 0.8), u=10, v=6)
+    return p
+
+
+def wooden_toy():
+    p = Prop("wooden_toy")  # a little wooden car
+    p.box("wood", (0.3, 0.14, 0.08), (0, 0, 0.08), 0.03, 3)
+    p.box("crate", (0.15, 0.12, 0.07), (-0.02, 0, 0.155), 0.025, 3)
+    for x in (-0.09, 0.09):
+        for y in (-0.08, 0.08):
+            p.cyl("food_c", 0.04, 0.03, (x, y, 0.04), bevel=0.01, n=16, rot=(90, 0, 0))
+    return p
+
+
+def birdhouse():
+    p = Prop("birdhouse")
+    p.box("wood", (0.2, 0.2, 0.22), (0, 0, 0.11), 0.015, 2)
+    for side in (-1, 1):
+        p.box("crate", (0.17, 0.27, 0.02), (side * 0.065, 0, 0.27), 0.008, 1, rot=(0, side * 40, 0))
+    p.cyl("rubber", 0.035, 0.01, (0, -0.1, 0.14), bevel=0, n=16, rot=(90, 0, 0))
+    p.tube("crate", [(0, -0.1, 0.08), (0, -0.15, 0.08)], 0.008, 0, n=6)
+    return p
+
+
+# Floor litter: small and flat, origin on the floor.
+
+def litter_paper():
+    p = Prop("litter_paper")
+    p.ball("sheet", 0.05, (0, 0, 0.035), scale=(1, 0.9, 0.8), u=8, v=6)
+    return p
+
+
+def litter_can():
+    p = Prop("litter_can")
+    p.cyl("food_c", 0.03, 0.11, (0, 0, 0.03), bevel=0.008, n=14, rot=(90, 0, 30))
+    return p
+
+
+def litter_wrapper():
+    p = Prop("litter_wrapper")
+    p.box("food_a", (0.12, 0.08, 0.008), (0, 0, 0.004), 0.003, 1, rot=(0, 0, 20))
+    p.box("paper", (0.04, 0.081, 0.009), (0.02, 0.01, 0.004), 0, 0, rot=(0, 0, 20))
+    return p
+
+
+def lorry():
+    """A cute delivery lorry, 2 x 5 tiles, cab at the front (-y, Godot +z)."""
+    p = Prop("lorry")
+    # Box body.
+    p.box("lorry", (1.7, 3.0, 1.6), (0, 0.85, 1.25), 0.08, 3)
+    p.box("stripe", (1.72, 2.6, 0.18), (0, 0.85, 1.2), 0.02, 2)
+    p.box("steel_dark", (1.6, 0.04, 1.4), (0, 2.36, 1.25), 0.02, 1)
+    # Cab: a soft rounded box with a big windscreen.
+    p.box("lorry", (1.72, 1.3, 1.3), (0, -1.25, 1.05), 0.22, 4)
+    p.box("glass", (1.5, 0.2, 0.5), (0, -1.86, 1.35), 0.06, 2, rot=(-12, 0, 0))
+    for side in (-1, 1):
+        p.box("glass", (0.04, 0.6, 0.42), (side * 0.86, -1.3, 1.35), 0.02, 1)
+        p.cyl("light", 0.09, 0.05, (side * 0.6, -1.9, 0.72), bevel=0.02, n=16, rot=(90, 0, 0))
+        p.box("steel_dark", (0.06, 0.12, 0.2), (side * 0.94, -1.72, 1.4), 0.02, 2)
+    p.box("steel_dark", (1.7, 0.16, 0.18), (0, -1.92, 0.48), 0.06, 2)
+    p.box("steel_dark", (1.6, 4.2, 0.2), (0, 0.15, 0.45), 0.05, 2)
+    # Chunky wheels.
+    for y in (-1.25, 1.4):
+        for side in (-1, 1):
+            p.cyl("rubber", 0.36, 0.28, (side * 0.78, y, 0.36), bevel=0.06, segs=3, n=28, rot=(0, 90, 0))
+            p.cyl("steel", 0.17, 0.3, (side * 0.78, y, 0.36), bevel=0.03, n=20, rot=(0, 90, 0))
+    return p
+
+
 MODELS = dict(bed=bed, toilet=toilet, shower=shower, table=table, desk=desk, lift=lift, door=door,
               cell_door=cell_door, person=person, tree=tree, bush=bush, flower=flower,
               radio=radio, tv=tv, bookshelf=bookshelf, games_table=games_table,
               weights_bench=weights_bench, basketball_hoop=basketball_hoop, bench=bench, sink=sink,
-              rug=rug, poster=poster, plant_pot=plant_pot, wall_shelf=wall_shelf)
+              rug=rug, poster=poster, plant_pot=plant_pot, wall_shelf=wall_shelf,
+              cooker=cooker, fridge=fridge, serving_counter=serving_counter,
+              washing_machine=washing_machine, ironing_board=ironing_board,
+              laundry_basket=laundry_basket, clothes_shelf=clothes_shelf, workbench=workbench,
+              bin=bin_, skip=skip_, storage_shelf=storage_shelf, table_trolley=table_trolley,
+              food_crate=food_crate, meal_tray=meal_tray, dirty_laundry=dirty_laundry,
+              clean_laundry=clean_laundry, rubbish_bag=rubbish_bag, wooden_toy=wooden_toy,
+              birdhouse=birdhouse, litter_paper=litter_paper, litter_can=litter_can,
+              litter_wrapper=litter_wrapper, lorry=lorry)
 
 
 # ---------------------------------------------------------------- line-up

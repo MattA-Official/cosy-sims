@@ -10,8 +10,8 @@ const SHOWN := 8
 ## Half the size of an item drawn as a box.
 const BOX := Vector3(0.11, 0.06, 0.09)
 ## Where a carried item sits on someone, in their body's frame (which faces
-## -z): chest high and just in front.
-const HELD_AT := Vector3(0.0, 0.62, -0.22)
+## -z): on their hands, held out in front.
+const HELD_AT := Vector3(0.0, 0.47, -0.2)
 
 @export var cell_size := 1.0
 
@@ -102,6 +102,9 @@ func _place_carried() -> void:
 		if not items.carried.has(person) or _carried[person].get_meta(&"item") != items.carrying(person):
 			_carried[person].queue_free()
 			_carried.erase(person)
+			var held_by := people.body_of(person) if people != null else null
+			if held_by != null:
+				PersonPoses.carry(held_by, false)
 	for person: Person in items.carried:
 		var body := people.body_of(person) if people != null else null
 		if body == null:
@@ -109,6 +112,7 @@ func _place_carried() -> void:
 		if not _carried.has(person):
 			_carried[person] = _held_node(items.carrying(person))
 			add_child(_carried[person])
+			PersonPoses.carry(body, true)
 		var node := _carried[person]
 		node.visible = body.visible
 		node.global_transform = Transform3D(Basis(Vector3.UP, body.rotation.y),

@@ -31,6 +31,14 @@ colours a real prison would plausibly use.
 - Objects: bed, toilet, sink, shower, table (canteen), games_table, desk,
   lift, tv, radio, bookshelf, wall_shelf, poster, rug, plant_pot, bench,
   weights_bench, basketball_hoop.
+- Jobs: cooker, fridge, serving_counter, washing_machine, ironing_board,
+  laundry_basket, clothes_shelf, workbench, storage_shelf, table_trolley,
+  bin, skip (outdoor).
+- Carried items (about 0.4 m, origin at the middle of the bottom):
+  food_crate, meal_tray, dirty_laundry, clean_laundry, rubbish_bag,
+  wooden_toy, birdhouse. Floor litter: litter_paper, litter_can,
+  litter_wrapper.
+- Vehicles: lorry (2 x 5 tiles, cab towards Godot's +z).
 - Doors: door (in use), cell_door (barred, not used yet).
 - People: person. Plants: tree, bush, flower.
 - Icons (`core/ui/icons/`): mood_beaming, mood_content, mood_fed_up,
@@ -66,6 +74,9 @@ shelf top about 1.1 m).
 - **Poses**: `core/people/person_poses.gd` lies people in bed, sits them
   at tables, on toilets and on benches (their `*_legs` meshes swing
   forward from the hips) and stands them in showers, by the object's tag.
+  `PersonPoses.carry()` swings the `*_arms` meshes forward from the
+  shoulders; `ItemView` calls it while someone holds an item, which sits on
+  their hands at `ItemView.HELD_AT`.
   Meshes named `*_<group>` (the staff cap and badge, `*_staff`) only show
   on people in that group.
 - **Plants**: `FoliageDef.model`. A mesh named `trunk` takes
