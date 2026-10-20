@@ -16,3 +16,4 @@ likes = Dictionary[StringName, float]({
 &"sink": 1.3
 })
 clashes_with = Array[StringName]([&"messy"])
+litter_scale = 0.2

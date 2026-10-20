@@ -6,6 +6,8 @@ extends RefCounted
 
 ## The items kept somewhere changed, or someone picked up or put down.
 signal changed
+## Items were dropped on or taken off the floor.
+signal floor_changed
 
 ## Items kept in objects, by (level, object id): ItemDef to count.
 var held: Dictionary[Vector2i, Dictionary] = {}
@@ -52,6 +54,7 @@ func take_from(key: Vector2i, tag: StringName, count: int) -> Array:
 func drop_on_floor(key: Vector3i, item: ItemDef, count: int) -> void:
 	_add(on_floor.get_or_add(key, {}), item, count)
 	changed.emit()
+	floor_changed.emit()
 
 
 func take_from_floor(key: Vector3i, tag: StringName, count: int) -> Array:
@@ -60,6 +63,7 @@ func take_from_floor(key: Vector3i, tag: StringName, count: int) -> Array:
 		if on_floor[key].is_empty():
 			on_floor.erase(key)
 		changed.emit()
+		floor_changed.emit()
 	return out
 
 

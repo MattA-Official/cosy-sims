@@ -26,12 +26,24 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/cooker.tres"),
 	preload("res://games/prison/catalogue/serving_counter.tres"),
 	preload("res://games/prison/catalogue/delivery_pallet.tres"),
+	preload("res://games/prison/catalogue/bin.tres"),
+	preload("res://games/prison/catalogue/skip.tres"),
 ]
 
 ## Things people carry about.
 const ITEMS: Array[ItemDef] = [
 	preload("res://games/prison/catalogue/item_food_crate.tres"),
 	preload("res://games/prison/catalogue/item_meal_tray.tres"),
+	preload("res://games/prison/catalogue/item_litter_paper.tres"),
+	preload("res://games/prison/catalogue/item_litter_can.tres"),
+	preload("res://games/prison/catalogue/item_litter_wrapper.tres"),
+	preload("res://games/prison/catalogue/item_rubbish_bag.tres"),
+]
+## What people drop as litter.
+const LITTER: Array[ItemDef] = [
+	preload("res://games/prison/catalogue/item_litter_paper.tres"),
+	preload("res://games/prison/catalogue/item_litter_can.tres"),
+	preload("res://games/prison/catalogue/item_litter_wrapper.tres"),
 ]
 
 const FLOORS: Array[FloorDef] = [

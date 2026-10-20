@@ -41,6 +41,16 @@ func cancel(job: Job) -> void:
 		people.stop(worker)
 
 
+## Takes every job off the board, so jobs and their workers (who point at
+## each other) can be freed.
+func clear() -> void:
+	for job in jobs:
+		if job.worker != null:
+			job.worker.job = null
+		job.worker = null
+	jobs.clear()
+
+
 func step(minutes: float) -> void:
 	for job in jobs:
 		job.wait -= minutes

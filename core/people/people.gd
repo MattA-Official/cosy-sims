@@ -49,6 +49,9 @@ const WOBBLE := 0.1
 const NO_TAGS: Array[StringName] = []
 ## No item to be had for an object that needs one (see _item_source).
 const NONE_LEFT := Vector2i(0, -2)
+## Room quality lost for each piece of litter, and at most.
+const LITTER_EACH := 0.5
+const LITTER_MOST := 3.0
 ## Game minutes before trying again for something that couldn't be found
 ## or reached.
 const RETRY_MINUTES := 8.0
@@ -128,8 +131,17 @@ var paused := false
 var access := Access.new()
 ## The work to be done, for workers. Optional.
 var jobs: JobBoard
-## Where items are, for objects that need one in hand first. Optional.
-var items: ItemStore
+## Where items are, for objects that need one in hand first, and litter.
+## Optional.
+var items: ItemStore:
+	set(value):
+		items = value
+		if items != null:
+			items.floor_changed.connect(func() -> void: _qualities.clear())
+## What people drop as litter, one picked at random each time.
+var litter: Array[ItemDef] = []
+## Items with this tag lying in a room make it worse.
+var litter_tag: StringName = &"litter"
 
 var _dirty := true
 ## Whether the ground under the building has changed too (terrain, water or
@@ -385,8 +397,24 @@ func room_type(id: StringName) -> RoomTypeDef:
 ## How nice a room is (see RoomQuality).
 func quality(level: int, room: Room) -> RoomQuality:
 	if not _qualities.has(room):
-		_qualities[room] = RoomQuality.assess(building.levels[level], room, room_type(room.type))
+		var out := RoomQuality.assess(building.levels[level], room, room_type(room.type))
+		var litter_count := _litter_in(level, room)
+		if litter_count > 0:
+			out.add_part("Litter about", -minf(litter_count * LITTER_EACH, LITTER_MOST))
+		_qualities[room] = out
 	return _qualities[room]
+
+
+## How many pieces of litter lie in a room.
+func _litter_in(level: int, room: Room) -> int:
+	if items == null:
+		return 0
+	var count := 0
+	var map := building.levels[level]
+	for key: Vector3i in items.on_floor:
+		if key.x == level and map.room_at(Vector2i(key.y, key.z)) == room:
+			count += items.count_on_floor(key, litter_tag)
+	return count
 
 
 ## Whether someone is asleep: using a bed for sleep.
@@ -623,7 +651,7 @@ func _think(person: Person, minutes: float) -> void:
 			if _done_using(person):
 				_finish_using(person)
 				_decide(person, false)
-			elif _should_break_off(person):
+			elif _should_break_off(person) or _work_waiting(person):
 				_stop(person)
 				_decide(person, false)
 		Person.State.IDLE:
@@ -905,6 +933,17 @@ func _lowest_need(person: Person, line: float) -> StringName:
 		if best == &"" or person.needs[need] < person.needs[best]:
 			best = need
 	return best
+
+
+## Workers leave off something they're only doing for pleasure (not a
+## need below the line) when there is a job for them.
+func _work_waiting(person: Person) -> bool:
+	if jobs == null or person.needs.get(person.target_need, 100.0) < NEED_LINE:
+		return false
+	var block := person.block
+	if block != null and block.stay_on_main and person.target_tag == block.main_tag:
+		return false
+	return jobs.has_work_for(person)
 
 
 ## Whether someone should leave off what they're doing: a need running
@@ -1528,11 +1567,24 @@ func _done_using(person: Person) -> bool:
 func _finish_using(person: Person) -> void:
 	if person.block != null and person.target_tag == person.block.main_tag:
 		person.done_main = true
+	_maybe_litter(person, target_object(person))
 	person.position = person.stand_spot
 	_release(person)
 	person.state = Person.State.IDLE
 	person.activity = "Standing about"
 	person.timer = 1.0
+
+
+## Someone leaving an object may leave litter where they stood.
+func _maybe_litter(person: Person, placed: BuildingMap.PlacedObject) -> void:
+	if placed == null or items == null or litter.is_empty() or placed.def.litter_chance <= 0.0:
+		return
+	var chance := placed.def.litter_chance
+	for t in person.traits:
+		chance *= t.litter_scale
+	if _rng.randf() < chance:
+		var tile := Vector2i(Vector2(person.stand_spot.x, person.stand_spot.z).floor())
+		items.drop_on_floor(Vector3i(person.target.x, tile.x, tile.y), litter[_rng.randi() % litter.size()], 1)
 
 
 ## Drops whatever someone was doing, stepping off any object they were on.

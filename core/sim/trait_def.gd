@@ -44,3 +44,5 @@ extends Resource
 ## "Misses home" until visits can help.
 @export var steady_mood := 0.0
 @export var steady_text: String
+## How much more (or less) litter they leave about.
+@export var litter_scale := 1.0

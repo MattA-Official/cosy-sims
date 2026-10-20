@@ -5,8 +5,9 @@ extends Node
 ## handymen carry them to fridges and food shelves. An hour before each
 ## mealtime the cooks fetch a crate each, cook a batch of trays and fill
 ## the serving counter, and prisoners pick up a tray on their way to a
-## table. With no serving counter anywhere, tables feed people as they
-## always have, and nothing is cooked.
+## table; leftovers are scraped away once the meal is over. With no
+## serving counter anywhere, tables feed people as they always have, and
+## nothing is cooked.
 
 const DELIVERY_HOUR := 6
 const MEALS_PER_BATCH := 8
@@ -58,6 +59,21 @@ func _on_hour(hour: int) -> void:
 	_unload()
 	if _meal_starts(hour + 1):
 		cook()
+	if _meal_ends(hour):
+		clear_leftovers()
+
+
+## Scrapes away whatever trays are left on the counters and cookers.
+## Returns how many.
+func clear_leftovers() -> int:
+	var cleared := 0
+	for key in _objects_tagged(&"serving_counter") + _objects_tagged(&"cooker"):
+		while true:
+			var taken := items.take_from(key, &"meal", 999)
+			if taken.is_empty():
+				break
+			cleared += taken[1]
+	return cleared
 
 
 ## The lorry leaves enough crates on the delivery pallets to keep two
@@ -140,6 +156,11 @@ func meals_per_day() -> int:
 func _meal_starts(hour: int) -> bool:
 	var now := schedule.at(hour)
 	return now != null and now.main_tag == MEAL_TAG and schedule.at(hour - 1) != now
+
+
+func _meal_ends(hour: int) -> bool:
+	var before := schedule.at(hour - 1)
+	return before != null and before.main_tag == MEAL_TAG and schedule.at(hour) != before
 
 
 func _prisoners() -> int:

@@ -7,9 +7,6 @@ extends Node3D
 
 ## The most shown in one pile, in layers of four.
 const SHOWN := 8
-## How big item models are drawn in piles, so a few fit on top of
-## something.
-const PILED_SCALE := 0.55
 ## Half the size of an item drawn as a box.
 const BOX := Vector3(0.11, 0.06, 0.09)
 ## Where a carried item sits on someone, in their body's frame (which faces
@@ -87,7 +84,7 @@ func _pile(pile: Dictionary, base: Vector3, drawn: bool) -> bool:
 			if item.model != null:
 				var model := item.model.instantiate() as Node3D
 				model.position = at - Vector3.UP * BOX.y
-				model.scale = Vector3.ONE * PILED_SCALE
+				model.scale = Vector3.ONE * item.piled_scale
 				_models.add_child(model)
 			else:
 				if not drawn:

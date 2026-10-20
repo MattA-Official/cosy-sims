@@ -11,3 +11,4 @@ opposite = &"tidy"
 need_rates = Dictionary[StringName, float]({
 &"hygiene": 0.7
 })
+litter_scale = 2.5

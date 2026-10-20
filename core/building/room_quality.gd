@@ -64,6 +64,14 @@ static func assess(map: BuildingMap, room: Room, type: RoomTypeDef, bed_tag: Str
 	return out
 
 
+## Adds something else that makes the room better or worse, such as
+## litter lying about.
+func add_part(text: String, points: float) -> void:
+	_add(text, points)
+	score = clampf(score, MIN, MAX)
+	parts.sort_custom(func(a: Array, b: Array) -> bool: return absf(a[1]) > absf(b[1]))
+
+
 ## Out of five, in halves, for showing as stars.
 func stars() -> float:
 	return roundf((score - MIN) / (MAX - MIN) * 10.0) / 2.0

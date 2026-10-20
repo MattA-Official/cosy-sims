@@ -43,6 +43,7 @@ func _process(_delta: float) -> bool:
 	_test_stopped_on_stairs()
 	_test_jobs_and_carrying()
 	_test_kitchen()
+	_test_cleaning()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -688,7 +689,7 @@ func _test_jobs_and_carrying() -> void:
 	_check(carry.done and finished.has(carry), "a handyman carries food from one shelf to another")
 	_check(items.count_in(Vector2i(0, from), &"food") == 1 and items.count_in(Vector2i(0, to), &"food") == 2,
 			"two crates moved, one left")
-	_check(handy.job == null and jobs.jobs.is_empty(), "the job is off the board once done")
+	_check(handy.job == null and jobs.of_kind(&"carry").is_empty(), "the job is off the board once done")
 
 	# Called away mid-carry, what they hold goes down where they are and
 	# the job starts again from there.
@@ -708,7 +709,7 @@ func _test_jobs_and_carrying() -> void:
 	while not second.done and minutes < 120:
 		clock.advance(1.0)
 		minutes += 1
-	_check(second.done and items.count_in(Vector2i(0, to), &"food") == 3 and items.on_floor.is_empty(),
+	_check(second.done and items.count_in(Vector2i(0, to), &"food") == 3 and items.floor_spots_of(&"food").is_empty(),
 			"and someone finishes it from the floor")
 
 	# No room where it goes: what doesn't fit is left on the floor and the
@@ -724,7 +725,7 @@ func _test_jobs_and_carrying() -> void:
 	_check(items.count_in(Vector2i(0, to)) == 4 and items.total(&"food") == 6,
 			"one fits, the rest are put down, none lost")
 	jobs.cancel(third)
-	_check(jobs.jobs.is_empty() and handy.job == null, "a cancelled job leaves the board")
+	_check(jobs.of_kind(&"carry").is_empty() and handy.job == null, "a cancelled job leaves the board")
 	main.queue_free()
 
 
@@ -780,6 +781,52 @@ func _test_kitchen() -> void:
 	for person in people.people:
 		missed = missed or person.moodlets.has(&"missed_meal")
 	_check(missed, "with an empty counter, prisoners miss the meal")
+	main.queue_free()
+
+
+func _test_cleaning() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var people: People = main.people
+	var items: ItemStore = main.items
+	var cleaning: Cleaning = main.cleaning
+	var clock: GameClock = main.clock
+	var map: BuildingMap = main.map
+	clock.speed_index = 0
+	var o: Vector2i = main.building.land[0].get_center() - Vector2i(10, 8)
+	var canteen := map.room_at(o + Vector2i(4, 7))
+	var before := people.quality(0, canteen).score
+	var paper := PrisonCatalogue.LITTER[0]
+	var spot := Vector3i(0, o.x + 4, o.y + 9)
+	items.drop_on_floor(spot, paper, 3)
+	var after := people.quality(0, canteen)
+	_check(after.score < before and after.parts.any(func(p: Array) -> bool: return p[0] == "Litter about"),
+			"litter makes a room worse")
+	var bins := map.objects.values().filter(func(p: BuildingMap.PlacedObject) -> bool: return p.def.id == &"bin")
+	var skip := map.objects.values().filter(func(p: BuildingMap.PlacedObject) -> bool:
+			return p.def.id == &"skip")[0] as BuildingMap.PlacedObject
+	var in_bins := func() -> int:
+		return bins.reduce(func(sum: int, p: BuildingMap.PlacedObject) -> int:
+				return sum + items.count_in(Vector2i(0, p.id), &"litter"), 0)
+	var minutes := 0
+	while items.count_on_floor(spot) > 0 and minutes < 240:
+		clock.advance(1.0)
+		minutes += 1
+	_check(items.count_on_floor(spot) == 0, "the cleaner sweeps it up")
+	minutes = 0
+	while in_bins.call() < 3 and minutes < 60:
+		clock.advance(1.0)
+		minutes += 1
+	_check(in_bins.call() >= 3, "and puts it in a bin")
+	var bin := bins[0] as BuildingMap.PlacedObject
+	items.put_in(Vector2i(0, bin.id), bin, paper, bin.def.capacity)
+	minutes = 0
+	while items.count_in(Vector2i(0, skip.id)) == 0 and minutes < 240:
+		clock.advance(1.0)
+		minutes += 1
+	_check(items.count_in(Vector2i(0, skip.id), &"rubbish_bag") >= 1, "a full bin is bagged up and taken to the skip")
+	_check(cleaning.collect() >= 1 and items.count_in(Vector2i(0, skip.id)) == 0, "the lorry empties the skip")
 	main.queue_free()
 
 

@@ -39,6 +39,7 @@ var items := ItemStore.new()
 var jobs := JobBoard.new()
 var item_view := ItemView.new()
 var kitchen := Kitchen.new()
+var cleaning := Cleaning.new()
 ## Game time. Everything that happens over time listens to it.
 var clock := GameClock.new()
 ## The prisoners' timetable, a copy of the catalogue's so edits stay in
@@ -116,6 +117,7 @@ func _ready() -> void:
 	jobs.roles = PrisonCatalogue.roles()
 	people.jobs = jobs
 	people.items = items
+	people.litter = PrisonCatalogue.LITTER
 	people.building = building
 	people.paths = paths
 	people.clock = clock
@@ -187,6 +189,12 @@ func _ready() -> void:
 	kitchen.clock = clock
 	add_child(kitchen)
 	kitchen.start()
+	cleaning.name = "Cleaning"
+	cleaning.jobs = jobs
+	cleaning.items = items
+	cleaning.building = building
+	cleaning.clock = clock
+	add_child(cleaning)
 	var load_sample := func(index: int) -> void:
 		SamplePrisons.next = index
 		get_tree().reload_current_scene()
@@ -301,6 +309,10 @@ func _apply_wall_view() -> void:
 		v.walls_low = current and mode == BuildController.WallView.DOWN
 		v.cutaway = current and mode == BuildController.WallView.CUTAWAY
 		v.show_roof = n < level or mode == BuildController.WallView.ROOFS
+
+
+func _exit_tree() -> void:
+	jobs.clear()
 
 
 func _process(_delta: float) -> void:

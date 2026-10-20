@@ -18,7 +18,7 @@ const CHALLENGES: Array[String] = [
 	"Twenty-four hungry prisoners, a dorm of sixteen beds, two tables and two showers: they queue, give up and try again.",
 	"The showers have no door, and the canteen is 0.75 m up. With Door Steps on its door gets steps; with it off, nobody can eat.",
 	"A staff room behind a staff door and an office zoned staff only: staff come and go, prisoners keep out.",
-	"The staff wing with a kitchen: the morning lorry's crates go to the fridge, the cook fills the serving counter before each meal, and prisoners take a tray to a table.",
+	"The staff wing with a kitchen: the morning lorry's crates go to the fridge, the cook fills the serving counter before each meal, prisoners take a tray to a table, and the cleaner sweeps up after them.",
 ]
 
 ## Set before reloading the scene to start in a different sample.
@@ -382,14 +382,15 @@ static func _staff_wing(site: Site, kitchen := false) -> void:
 	_plant(site)
 	for i in 6:
 		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
-	for i in 2:
-		var member := site.people.add_person(0, Vector2(staff_room.position) + Vector2(1.5 - i, 3.5 - i), "", &"staff")
+	for i in 3 if kitchen else 2:
+		var member := site.people.add_person(0, Vector2(staff_room.position) + Vector2(1.5 - i, 3.5 - i % 2), "", &"staff")
 		if kitchen:
-			site.people.set_role(member, [&"cook", &"handyman"][i])
+			site.people.set_role(member, [&"cook", &"handyman", &"cleaner"][i])
 
 
 ## A kitchen off the west end of a canteen, with a serving counter in the
-## canteen's corner and a delivery pallet on a bay outside the back door.
+## canteen's corner, bins, and a delivery pallet and a skip on a bay
+## outside the back door.
 static func _kitchen(ground: BuildingMap, canteen: Rect2i) -> void:
 	var kitchen := Rect2i(canteen.position - Vector2i(5, 0), Vector2i(5, 5))
 	_room(ground, kitchen, &"tiles", &"tiles", &"kitchen")
@@ -405,6 +406,9 @@ static func _kitchen(ground: BuildingMap, canteen: Rect2i) -> void:
 	# A paved delivery bay outside the back door.
 	ground.fill_floor(Rect2i(kitchen.position + Vector2i(-4, 0), Vector2i(4, 5)), &"paving")
 	ground.place_object(PrisonCatalogue.object(&"delivery_pallet"), corner + Vector2(-3, 1.5), 0)
+	ground.place_object(PrisonCatalogue.object(&"skip"), corner + Vector2(-3, 3.75), 0)
+	ground.place_object(PrisonCatalogue.object(&"bin"), Vector2(canteen.end) - Vector2(0.5, 0.5), 0)
+	ground.place_object(PrisonCatalogue.object(&"bin"), Vector2(canteen.position) + Vector2(2, 0), 0)
 
 #endregion
 
