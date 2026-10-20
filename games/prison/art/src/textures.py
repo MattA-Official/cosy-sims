@@ -153,6 +153,7 @@ TEXTURES = {
     "hedge": leaves,
     # Paths and ground
     "path_grit": lambda: speckle(0.25, seed=14),
+    "path_tarmac": lambda: speckle(0.12, dark=0.07, light=0.05, seed=16, size=1.2, base=0.94),
     "ground_grass": ground,
 }
 

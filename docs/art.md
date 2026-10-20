@@ -41,6 +41,11 @@ colours a real prison would plausibly use.
 - Vehicles: lorry (2 x 5 tiles, cab towards Godot's +z), bus (4 x 1.6 m,
   front towards Godot's +x, doors on its -z side), car (1 x 2 tiles, front
   towards +z; looks car_red, car_blue, car_cream).
+- Roads: tunnel_portal (stone mouth round a 3.6 x 2.2 m opening in a 7 m
+  grassy bank running 6 m back; origin at the middle of the road at the
+  mouth, facing +z; dark inside so vehicles vanish), used as
+  `Tunnels.model`. Texture `path_tarmac` (no markings; the game draws
+  them).
 - Roadside: bus_stop (1 x 0.5, sign and shelter, front towards the road
   at +z).
 - Floors also include floor_car_park: tarmac with a white bay line on one

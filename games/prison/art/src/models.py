@@ -118,6 +118,10 @@ PALETTE = dict(
     car_blue=("#6f8fb0", 0.4, 0.05),
     car_cream=("#e8dcc0", 0.4, 0.05),
     sign_blue=("#4d6f9c", 0.5, 0),
+    grass=("#66a14c", 0.95, 0),         # matches the ground shader's grass
+    stone=("#a8a196", 0.9, 0),          # tunnel portal
+    stone_dark=("#8d867b", 0.9, 0),
+    dark=("#151517", 1.0, 0),           # inside a tunnel
     gold=("#e0b65a", 0.35, 0.6),        # staff badge
     trunk=("#ffffff", 0.9, 0),
     canopy=("#ffffff", 0.9, 0),
@@ -197,6 +201,19 @@ class Prop:
             v.co.y *= size[1]
             v.co.z *= height
         self.add(material, bm, bevel, segs, _xf(loc, (0, 0, 0)))
+
+    def prism(self, material, outline, depth, y=0.0, bevel=0.02, segs=1):
+        """A flat shape in the x-z plane (`outline` as (x, z) points, any
+        shape without holes), `depth` thick from `y` towards +y."""
+        bm = bmesh.new()
+        verts = [bm.verts.new((x, y, z)) for x, z in outline]
+        face = bm.faces.new(verts)
+        bmesh.ops.extrude_face_region(bm, geom=[face])
+        for v in bm.verts:
+            if v not in verts:
+                v.co.y = y + depth
+        bmesh.ops.triangulate(bm, faces=bm.faces[:])
+        self.add(material, bm, bevel, segs)
 
     def cyl(self, material, r, depth, loc, r2=None, bevel=0.01, segs=2, rot=(0, 0, 0), n=24,
             scale=(1, 1, 1)):
@@ -617,6 +634,36 @@ def bus_stop():
     p.cyl("sheet", 0.09, 0.034, (0.38, -0.18, 1.38), bevel=0.006, n=28, rot=(90, 0, 0))
     p.box("sign_blue", (0.1, 0.036, 0.05), (0.38, -0.18, 1.38), 0.01, 1)
     p.box("sheet", (0.16, 0.02, 0.1), (0.38, -0.18, 1.12), 0.01, 1)  # timetable
+    return p
+
+
+def tunnel_portal():
+    """Where the road leaves the land: a stone portal round a 3.6 x 2.2 m
+    opening in a grassy bank 7 m wide. Origin at the middle of the road at
+    the mouth; the mouth faces Godot's +z (Blender -Y) and the bank runs
+    6 m back, with the tunnel dark inside so vehicles vanish into it."""
+    p = Prop("tunnel_portal")
+    half, wall, rise = 1.8, 1.3, 0.9   # opening half-width, wall height, arch rise
+    arch = [(half * math.cos(math.pi * k / 16), wall + rise * math.sin(math.pi * k / 16)) for k in range(17)]
+    face = [(-2.5, 0.0), (-2.5, 3.0), (2.5, 3.0), (2.5, 0.0), (half, 0.0)] + arch + [(-half, 0.0)]
+    p.prism("stone", face, 0.45, y=0.0, bevel=0.03)
+    # Voussoirs round the arch and a coping along the top.
+    for k in range(9):
+        a0, a1 = math.pi * k / 9, math.pi * (k + 1) / 9
+        mid = (a0 + a1) / 2
+        inner = [(half * math.cos(t), wall + rise * math.sin(t)) for t in (a0, a1)]
+        outer = [((half + 0.35) * math.cos(t), wall + (rise + 0.35) * math.sin(t)) for t in (a0, a1)]
+        p.prism("stone_dark" if k % 2 else "stone", [inner[0], outer[0], outer[1], inner[1]], 0.12, y=-0.08, bevel=0.02)
+    for side in (-1, 1):
+        p.box("stone_dark", (0.35, 0.12, wall), (side * (half + 0.175), -0.02, wall / 2), 0.02, 1)
+    p.box("stone_dark", (5.2, 0.6, 0.22), (0, 0.15, 3.1), 0.05, 2)
+    # Dark inside, so the road and vehicles disappear.
+    p.box("dark", (half * 2, 5.6, wall + rise), (0, 3.25, (wall + rise) / 2), 0, 0)
+    # The bank: soft grassy mounds either side and over the top.
+    for side in (-1, 1):
+        p.box("grass", (1.5, 6.4, 3.2), (side * 3.0, 3.4, 1.2), 0.7, 4)
+        p.box("grass", (1.4, 2.0, 1.4), (side * 3.0, 0.2, 0.25), 0.6, 4)
+    p.box("grass", (5.2, 6.0, 1.4), (0, 3.4, 2.9), 0.65, 4)
     return p
 
 
@@ -1218,7 +1265,7 @@ def lorry():
     return p
 
 
-MODELS = dict(car=car, car_red=lambda: car("car_red", "car_red"),
+MODELS = dict(tunnel_portal=tunnel_portal, car=car, car_red=lambda: car("car_red", "car_red"),
               car_blue=lambda: car("car_blue", "car_blue"),
               car_cream=lambda: car("car_cream", "car_cream"), bus_stop=bus_stop,
               **_looks(desk), **_looks(office_desk), **_looks(games_table),
