@@ -16,6 +16,15 @@ extends Node3D
 ## on the low side. Off refuses doors between floors more than a step apart.
 @export var door_steps := false
 
+const LORRY := preload("res://games/prison/art/models/lorry.glb")
+## The bus's front is towards +X.
+const BUS := preload("res://games/prison/art/models/bus.glb")
+const CARS: Array[PackedScene] = [preload("res://games/prison/art/models/car_red.glb"),
+		preload("res://games/prison/art/models/car_blue.glb"), preload("res://games/prison/art/models/car_cream.glb")]
+## Game minutes the lorry waits before driving off.
+const LORRY_STAY := 30.0
+## Tiles between the edge of the land and the side of the generated road.
+const ROAD_GAP := 1.0
 ## Spots on the edge of the land tried for the staff entrance, nearest
 ## first.
 const ENTRANCE_TRIES := 60
@@ -40,6 +49,10 @@ var building: Building
 ## The ground level's map. Other levels are in `building`.
 var map: BuildingMap
 var paths := PathNetwork.new()
+## The roads among the paths, and the vehicles on them.
+var roads := Roads.new()
+var vehicles := Vehicles.new()
+var car_park := CarPark.new()
 var people := People.new()
 ## Every item about the place, and the work to be done with them.
 var items := ItemStore.new()
@@ -132,6 +145,8 @@ func _ready() -> void:
 	controller.paths = paths
 	path_view.styles = PrisonCatalogue.PATHS
 	path_view.network = paths
+	roads.paths = paths
+	roads.bounds = Rect2i(Vector2i.ZERO, grid.size)
 	debug_overlay.room_types = PrisonCatalogue.ROOM_TYPES
 	debug_overlay.map = map
 
@@ -277,7 +292,25 @@ func _ready() -> void:
 	shifts.clock = clock
 	add_child(shifts)
 	_set_entrance()
+	if saved.is_empty():
+		_lay_road()
+	vehicles.name = "Vehicles"
+	vehicles.roads = roads
+	vehicles.cell_size = grid.cell_size
+	vehicles.ground_at = func(tile: Vector2) -> float: return terrain.height_at(tile)
+	vehicles.clock = clock
+	vehicles.front_turns[BUS] = -PI * 0.5
+	grid.add_child(vehicles)
+	car_park.name = "CarPark"
+	car_park.building = building
+	car_park.vehicles = vehicles
+	car_park.roads = roads
+	car_park.shifts = shifts
+	car_park.cars = CARS
+	add_child(car_park)
+	car_park.start()
 	shifts.start()
+	car_park.park_staff_here()
 	for role: StringName in site.night_staff:
 		shifts.set_wanted(role, &"night", site.night_staff[role], false)
 	guarding.name = "Guarding"
@@ -347,10 +380,8 @@ func _ready() -> void:
 	intake.categories = PrisonCatalogue.CATEGORIES
 	intake.entrance = shifts.entrance
 	intake.has_warden = office.has_warden
-	intake.world = grid
-	intake.bus_model = load("res://games/prison/art/models/bus.glb")
-	intake.cell_size = grid.cell_size
-	intake.ground_height = func(tile: Vector2) -> float: return terrain.height_at(tile)
+	intake.vehicles = vehicles
+	intake.bus_model = BUS
 	intake.clock = clock
 	add_child(intake)
 	intake.start()
@@ -368,6 +399,11 @@ func _ready() -> void:
 	standing.report_ready.connect(func(text: String) -> void: Toasts.post("Daily report", text, 12.0))
 	standing.goal_done.connect(func(goal: Standing.Goal) -> void:
 		Toasts.post("Goal done: " + goal.title, "A grant of %s came in." % Ledger.text(goal.grant)))
+	# The lorry brings the morning delivery and takes the rubbish and goods.
+	kitchen.delivered.connect(func(_crates: int) -> void:
+		var pallets := building.objects_tagged([&"delivery_pallet"])
+		var to := building.object_at(pallets[0]).centre if not pallets.is_empty() else intake.stop_point()
+		vehicles.drive_in(LORRY, to, Callable(), LORRY_STAY))
 	intake.arrived.connect(func(came: Array[Person]) -> void:
 		Toasts.post("The bus is here", "%d new %s on the way to reception." % [came.size(),
 				"prisoner is" if came.size() == 1 else "prisoners are"]))
@@ -549,6 +585,31 @@ func _apply_wall_view() -> void:
 		v.walls_low = current and mode == BuildController.WallView.DOWN
 		v.cutaway = current and mode == BuildController.WallView.CUTAWAY
 		v.show_roof = n < level or mode == BuildController.WallView.ROOFS
+
+
+## A road along the side of the land nearest the entrance, from one edge
+## of the map to the other, for the bus and lorry. Not across water: a
+## prison over the water goes without.
+func _lay_road() -> void:
+	if shifts.entrance.is_empty() or roads.has_roads():
+		return
+	var land := building.land[0]
+	var spot: Vector2 = shifts.entrance[1]
+	var gaps: Array[float] = [spot.x - land.position.x, land.end.x - spot.x, spot.y - land.position.y,
+			land.end.y - spot.y]
+	var side := gaps.find(gaps.min())
+	var across := ROAD_GAP + PrisonCatalogue.path(&"road").width * 0.5
+	var line: float = [land.position.x - across, land.end.x + across, land.position.y - across,
+			land.end.y + across][side]
+	var size := Vector2(grid.size)
+	var a := Vector2(line, 0.5) if side < 2 else Vector2(0.5, line)
+	var b := Vector2(line, size.y - 0.5) if side < 2 else Vector2(size.x - 0.5, line)
+	for i in 101:
+		var cell := Vector2i(a.lerp(b, i / 100.0).floor())
+		if water.body_at(cell) != null:
+			return
+	foliage.remove_in_rect(Rect2(a, b - a).abs().grow(PrisonCatalogue.path(&"road").width * 0.5 + 0.5))
+	paths.add_segment(a, b, null, &"road")
 
 
 ## Where staff come and go: the spot on the edge of the land with the

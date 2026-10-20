@@ -45,6 +45,7 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/cctv_monitor.tres"),
 	preload("res://games/prison/catalogue/goods_shelf.tres"),
 	preload("res://games/prison/catalogue/reception_desk.tres"),
+	preload("res://games/prison/catalogue/bus_stop.tres"),
 ]
 
 ## Things people carry about.
@@ -250,6 +251,13 @@ static func categories() -> Dictionary[StringName, CategoryDef]:
 	for def in CATEGORIES:
 		out[def.id] = def
 	return out
+
+
+static func path(id: StringName) -> PathStyleDef:
+	for def in PATHS:
+		if def.id == id:
+			return def
+	return null
 
 
 static func object(id: StringName) -> ObjectDef:

@@ -1,7 +1,7 @@
 class_name Intake
 extends Node
-## New prisoners. Each morning a bus stops at the edge of the land and the
-## day's arrivals walk to reception, where they are searched and signed
+## New prisoners. Each morning a bus drives in by road and stops at the
+## bus stop, or by the entrance, and the day's arrivals walk to reception, where they are searched and signed
 ## in. Then a guard walks each one to their cell, or with no guard free
 ## they find their own way. Nobody comes without a reception, or without a
 ## free bed. The prison is paid a fee for each.
@@ -27,10 +27,8 @@ const FIRST_NIGHT := &"first_night"
 const WITHOUT_WARDEN_CATEGORIES: Array[StringName] = [&"low", &"medium"]
 ## Game minutes the bus waits before driving off.
 const BUS_STAY := 30.0
-## Tiles the bus drives in from and off to, and how long it takes, in
-## seconds.
-const BUS_ROAD := 14.0
-const BUS_DRIVE_SECONDS := 2.0
+## Where the bus stops, if there is one.
+const BUS_STOP := &"bus_stop"
 
 enum Stage { WALKING, SEARCHING, WAITING }
 
@@ -52,10 +50,9 @@ var max_limit := 8
 var accepted: Dictionary[StringName, bool] = {&"low": true, &"medium": true, &"high": false}
 ## For drawing the bus, optional: where to put it, the model, and the
 ## ground's height (Vector2 in tiles -> metres).
-var world: Node3D
+## Drives the bus in, when there's a road.
+var vehicles: Vehicles
 var bus_model: PackedScene
-var cell_size := 1.0
-var ground_height: Callable
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -97,18 +94,41 @@ func start() -> void:
 
 ## The bus comes: the day's arrivals get off and head to reception.
 ## Returns them.
+## Sends the bus with today's arrivals. With a road in it drives up and
+## they step off once it stops; without one they walk in from the
+## entrance straight away, and come back at once. Returns those already
+## here.
 func bus() -> Array[Person]:
-	var came: Array[Person] = []
 	var count := mini(todays_count(), free_beds())
+	if count <= 0 or _reception().is_empty() or entrance.is_empty() or _bus != null:
+		return []
+	if vehicles != null:
+		_bus = vehicles.drive_in(bus_model, stop_point(), func(_vehicle: Node3D) -> void:
+			_bus_minutes = 0.0
+			_step_off(count))
+		if _bus != null:
+			return []
+	return _step_off(count)
+
+
+## Is the bus on its way or waiting?
+func bus_here() -> bool:
+	return _bus != null
+
+
+func _step_off(count: int) -> Array[Person]:
+	var came: Array[Person] = []
 	var room := _reception()
-	if count <= 0 or room.is_empty() or entrance.is_empty():
+	var at := _arrival_spot()
+	if room.is_empty() or at.is_empty():
 		return came
 	var choices := _categories()
+	count = mini(count, free_beds())
 	for i in count:
-		var spot: Vector2 = entrance[1] + Vector2(_rng.randf_range(-0.6, 0.6), _rng.randf_range(-0.6, 0.6))
-		var person := people.add_person(entrance[0], spot, "", prisoner_group)
+		var spot: Vector2 = at[1] + Vector2(_rng.randf_range(-0.6, 0.6), _rng.randf_range(-0.6, 0.6))
+		var person := people.add_person(at[0], spot, "", prisoner_group)
 		if person == null:
-			person = people.add_person(entrance[0], entrance[1], "", prisoner_group)
+			person = people.add_person(at[0], at[1], "", prisoner_group)
 		if person == null:
 			continue
 		person.category = choices[_rng.randi() % choices.size()]
@@ -119,7 +139,6 @@ func bus() -> Array[Person]:
 		_head_in(person, room)
 		came.append(person)
 	if not came.is_empty():
-		_show_bus()
 		arrived.emit(came)
 	return came
 
@@ -215,48 +234,35 @@ func _look() -> void:
 					_let_go(person)
 
 
-## The bus pulls up just off the land by the entrance, its doors towards
-## the prison.
-func _show_bus() -> void:
-	if world == null or bus_model == null or _bus != null:
-		return
-	var land := building.land[0]
-	var spot: Vector2 = entrance[1]
-	var sides: Array[Vector2] = [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]
-	var gaps: Array[float] = [spot.x - land.position.x, land.end.x - spot.x, spot.y - land.position.y,
-			land.end.y - spot.y]
-	var out := sides[gaps.find(gaps.min())]
-	var along := Vector2(-out.y, out.x)
-	var stop := spot + out * 1.4
-	_bus = bus_model.instantiate()
-	_bus.rotation.y = atan2(out.x, out.y)
-	world.add_child(_bus)
-	_bus.position = _bus_point(stop - along * BUS_ROAD)
-	_bus.create_tween().tween_property(_bus, ^"position", _bus_point(stop), BUS_DRIVE_SECONDS) \
-			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
-	_bus.set_meta(&"off", _bus_point(stop + along * BUS_ROAD))
-	_bus_minutes = 0.0
+## Where the bus stops: by a bus stop if there is one, otherwise by the
+## entrance.
+func stop_point() -> Vector2:
+	var stops := building.objects_tagged([BUS_STOP])
+	if not stops.is_empty():
+		return building.object_at(stops[0]).centre
+	return entrance[1] if not entrance.is_empty() else Vector2.ZERO
 
 
-func _bus_point(tile: Vector2) -> Vector3:
-	var y: float = ground_height.call(tile) if ground_height.is_valid() else 0.0
-	return Vector3(tile.x * cell_size, y, tile.y * cell_size)
+## Where arrivals step off: beside the bus stop, or at the entrance.
+func _arrival_spot() -> Array:
+	var stops := building.objects_tagged([BUS_STOP])
+	if not stops.is_empty():
+		var placed := building.object_at(stops[0])
+		var spots := people.spots_beside(stops[0].x, placed, placed.centre)
+		if not spots.is_empty():
+			return [stops[0].x, spots[0]]
+	return entrance
 
 
 ## The bus waits a while, then drives off.
 func _bus_waits() -> void:
-	if _bus == null:
+	if _bus == null or vehicles.is_driving(_bus):
 		return
 	_bus_minutes += 1.0
 	if _bus_minutes < BUS_STAY:
 		return
-	var leaving := _bus
+	vehicles.drive_out(_bus)
 	_bus = null
-	var tween := leaving.create_tween()
-	tween.tween_property(leaving, ^"position", leaving.get_meta(&"off"), BUS_DRIVE_SECONDS) \
-			.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
-	tween.tween_callback(leaving.queue_free)
-
 
 ## Sends an arrival to a tile in reception they can get to.
 func _head_in(person: Person, room: Array) -> void:

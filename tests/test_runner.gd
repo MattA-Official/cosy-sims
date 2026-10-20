@@ -55,6 +55,7 @@ func _process(_delta: float) -> bool:
 	_test_undo()
 	_test_saving()
 	_test_flexible_objects()
+	_test_roads()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1130,7 +1131,29 @@ func _test_intake() -> void:
 	intake.limit = 3
 	intake.accepted = {&"low": false, &"medium": false, &"high": true}
 	var fees: int = ledger.today.get("Intake fees", 0)
-	var came := intake.bus()
+	# The bus drives in along the road; they step off when it stops.
+	var ride := func() -> Array[Person]:
+		var got: Array[Person] = intake.bus()
+		var waited := 0
+		while got.is_empty() and intake.bus_here() and waited < 60:
+			var before := people.people.size()
+			clock.advance(1.0)
+			waited += 1
+			if people.people.size() > before:
+				got.assign(people.people.slice(before))
+		return got
+	var parked: int = main.vehicles.get_child_count()
+	_check(parked > 0, "staff cars wait in the car park")
+	var bus_called := intake.bus()
+	_check(bus_called.is_empty() and intake.bus_here() and main.vehicles.get_child_count() == parked + 1,
+			"the bus drives in by road")
+	var came: Array[Person] = []
+	for i in 60:
+		var before := people.people.size()
+		clock.advance(1.0)
+		if people.people.size() > before:
+			came.assign(people.people.slice(before))
+			break
 	_check(came.size() == 3, "the bus brings the warden's limit")
 	_check(came.all(func(p: Person) -> bool: return p.category == &"high" and p.moodlets.has(Intake.FIRST_NIGHT)),
 			"of the categories accepted, each feeling their first night")
@@ -1146,8 +1169,9 @@ func _test_intake() -> void:
 	_check(searched, "arrivals are searched at reception")
 	_check(came.all(func(p: Person) -> bool: return not intake.is_arriving(p) and p.has_bed()),
 			"then signed in with a bed of their own")
-	_check(intake.free_beds() == 1 and intake.bus().size() == 1, "the next bus brings only as many as there are beds")
-	_check(intake.bus().is_empty() and intake.warnings()[0].begins_with("No free beds"), "and none when the cells are full")
+	_check(not intake.bus_here(), "the bus drives off again")
+	_check(intake.free_beds() == 1 and ride.call().size() == 1, "the next bus brings only as many as there are beds")
+	_check(ride.call().is_empty() and intake.warnings()[0].begins_with("No free beds"), "and none when the cells are full")
 	main.shifts.set_wanted(&"warden", &"day", 0)
 	_check(not intake.warden_here() and intake.todays_count() == Intake.WITHOUT_WARDEN, "without a warden a couple come")
 	main.queue_free()
@@ -1258,10 +1282,14 @@ func _test_saving() -> void:
 		if then[3]:
 			workers += 1
 	_check(same_doing >= was.size() - 2, "everyone carries on mid-walk or mid-meal (%d of %d)" % [same_doing, was.size()])
-	for i in 3:
+	# Jobs can finish in the meantime, so count anyone back at one at all.
+	var resumed: Dictionary[Person, bool] = {}
+	for i in 4:
+		for p: Person in loaded.people.people:
+			if p.job != null and not was.get(p.name, []).is_empty() and was[p.name][3]:
+				resumed[p] = true
 		loaded.clock.advance(1.0)
-	var back_at_work: int = loaded.people.people.filter(func(p: Person) -> bool:
-		return not was.get(p.name, []).is_empty() and was[p.name][3] and p.job != null).size()
+	var back_at_work := resumed.size()
 	_check(workers == 0 or back_at_work >= workers - 1, "and workers take up their jobs again (%d of %d)" % [back_at_work, workers])
 	DirAccess.remove_absolute(PrisonSave._path("test"))
 	loaded.queue_free()
@@ -1316,6 +1344,52 @@ func _test_flexible_objects() -> void:
 	people.remove_person(warden)
 	claims.refresh()
 	_check(not office_map.dressing.has(key.y), "an unclaimed desk is bare")
+	main.queue_free()
+
+
+func _test_roads() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var roads: Roads = main.roads
+	_check(roads.has_roads() and not roads.edge_nodes().is_empty(), "every prison gets a road in from the edge of the map")
+	main.queue_free()
+
+	main = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var car_park: CarPark = main.car_park
+	var shifts: Shifts = main.shifts
+	var clock: GameClock = main.clock
+	var people: People = main.people
+	_check(car_park.bays().size() == 6 and car_park.free_bays().is_empty(), "staff already here have parked")
+	var land: Rect2i = main.building.land[0]
+	main.building.ground().fill_floor(Rect2i(land.position + Vector2i(2, 2), Vector2i(6, 2)), &"car_park")
+	var free := car_park.free_bays().size()
+	_check(free == 6, "a bigger car park has room")
+	var before := people.people.size()
+	var cleaners := shifts.wanted_for(&"cleaner", &"day")
+	shifts.set_wanted(&"cleaner", &"day", cleaners + 1)
+	_check(people.people.size() == before and car_park.free_bays().size() == free - 1,
+			"a new cleaner drives in rather than appearing")
+	var cleaner: Person = null
+	for i in 60:
+		clock.advance(1.0)
+		if people.people.size() > before:
+			cleaner = people.people[-1]
+			break
+	_check(cleaner != null and cleaner.role == &"cleaner", "and gets out once parked")
+	var car: Node3D = car_park._drivers[cleaner][0]
+	shifts.set_wanted(&"cleaner", &"day", cleaners)
+	_check(cleaner.going_home, "sent home again")
+	for i in 120:
+		clock.advance(1.0)
+		if not people.people.has(cleaner):
+			break
+	_check(not people.people.has(cleaner) and car_park.free_bays().size() == free, "going home, they walk back to the car")
+	for i in 60:
+		clock.advance(1.0)
+	_check(not is_instance_valid(car) or car.is_queued_for_deletion(), "and drive off")
 	main.queue_free()
 
 
@@ -1776,6 +1850,9 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 
 	# Paths: a straight path, chained on, a curve, freehand, and removal.
 	var paths := controller.paths
+	_check(paths.segments.values().any(func(seg: PathNetwork.Segment) -> bool: return seg.style == &"road"),
+			"a new prison comes with a road")
+	paths.load_data({}) # Without the road, to count paths drawn.
 	controller.tool = BuildController.Tool.PATH
 	controller.path_tool.style = &"gravel"
 	controller.path_tool.mode = PathTool.Mode.STRAIGHT

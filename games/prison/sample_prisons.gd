@@ -397,6 +397,8 @@ static func _staff_wing(site: Site, kitchen := false, guards := false, intake :=
 		_door(ground, o + Vector2i(13, 2), Vector2i.DOWN)
 		ground.set_room_type(ground.room_at(office.position), &"office")
 	_plant(site)
+	if intake:
+		_road_and_parking(site)
 	for i in 6:
 		var prisoner := site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
 		if kitchen:
@@ -447,6 +449,26 @@ static func _reception(ground: BuildingMap, corridor: Rect2i) -> void:
 	_door(ground, reception.position + Vector2i(0, 1), Vector2i.LEFT)
 	ground.place_object(PrisonCatalogue.object(&"reception_desk"), Vector2(reception.position) + Vector2(1, 0), 0)
 	ground.place_object(PrisonCatalogue.object(&"bench"), Vector2(reception.position) + Vector2(1.5, 3.5), 2)
+
+
+## A road along the top of the land, a car park beside it for the staff
+## and a bus stop for the morning bus.
+static func _road_and_parking(site: Site) -> void:
+	var land := site.land()
+	var ground := site.map()
+	var width := PrisonCatalogue.path(&"road").width
+	var line := land.position.y - 1.0 - width * 0.5
+	# The land sits in the middle of the map, so the map is this big.
+	var size := Vector2(land.position * 2 + land.size)
+	site.foliage.remove_in_rect(Rect2(0, line - width, size.x, width * 2.0))
+	site.paths.add_segment(Vector2(0.5, line), Vector2(size.x - 0.5, line), null, &"road")
+	var bays := Rect2i(land.position + Vector2i(2, 0), Vector2i(6, 2))
+	site.foliage.remove_in_rect(Rect2(bays).grow(1.0))
+	ground.fill_floor(bays, &"car_park")
+	var stop := Vector2(land.position) + Vector2(9, 0)
+	site.foliage.remove_in_rect(Rect2(stop, Vector2(1, 1)).grow(1.0))
+	ground.fill_floor(Rect2i(Vector2i(stop), Vector2i(2, 1)), &"paving")
+	ground.place_object(PrisonCatalogue.object(&"bus_stop"), stop, 2)
 
 
 ## A workshop off the far side of the yard, with two workbenches and a
