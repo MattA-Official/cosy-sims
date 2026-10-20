@@ -22,6 +22,11 @@ const SECTIONS := [
 		["[ / ]", "Turn step, or brush size"],
 		["F", "Hold to turn to face the mouse"],
 	]],
+	["Time", [
+		["Space", "Pause, or carry on"],
+		[", / .", "Slower or faster (up to 4×)"],
+		["T", "The timetable"],
+	]],
 	["Other", [
 		["F1", "This card"],
 		["F3", "Debug view and inspector"],

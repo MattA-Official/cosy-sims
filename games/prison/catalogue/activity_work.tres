@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ActivityDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/activity_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"work"
+display_name = "Work"
+short_name = "Work"
+colour = Color(0.86, 0.66, 0.56, 1)
+place = 0
+room_types = Array[StringName]([])
+allowed_tags = Array[StringName]([&"bed", &"shower", &"toilet"])
+main_tag = &""
+stay_on_main = false
+free_after = false
+door_rule = 0
+description = "Jobs come later; until then this is free time."

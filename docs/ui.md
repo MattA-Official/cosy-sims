@@ -11,6 +11,8 @@ is, and how to add things to it.
 | --- | --- | --- | --- |
 | Status bar | Top middle | `core/ui/status_bar.gd` | Short readouts: level, room under the mouse, people |
 | View bar | Top right | `core/ui/view_bar.gd` | Level up and down, wall views, help and debug buttons |
+| Clock bar | Top left | `core/ui/clock_bar.gd` | Time, day, the current timetable block, speeds, timetable and always-day buttons |
+| Timetable | Top middle, on T | `core/ui/timetable_window.gd` | 24 hours to paint with blocks |
 | Build menu | Bottom middle | `games/prison/build_toolbar.gd` | Tool icons, and the choices for the current tool above them |
 | Notes | Bottom right | `core/ui/toasts.gd` | Short messages that fade away |
 | Controls card | Middle, on F1 | `core/ui/help_card.gd` | Every key and mouse control |

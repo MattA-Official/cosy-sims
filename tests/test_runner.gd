@@ -31,6 +31,8 @@ func _process(_delta: float) -> bool:
 	_test_foliage()
 	_test_main_scene_loads()
 	_test_sample_prisons()
+	_test_clock()
+	_test_daily_routine()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -227,6 +229,118 @@ func _test_sample_prisons() -> void:
 	Building.door_steps = false
 
 
+func _test_clock() -> void:
+	var clock := GameClock.new()
+	clock.start_hour = 23.0
+	root.add_child(clock)
+	var hours: Array[int] = []
+	var days: Array[int] = []
+	var minutes := [0]
+	clock.hour_changed.connect(func(hour: int) -> void: hours.append(hour))
+	clock.day_changed.connect(func(day: int) -> void: days.append(day))
+	clock.minute_passed.connect(func(_minute: int) -> void: minutes[0] += 1)
+	_check(clock.time_text() == "23:00" and clock.day() == 1 and clock.weekday() == "Monday", "the clock starts when told")
+	clock.advance(90.0)
+	_check(minutes[0] == 90 and hours == [0] and days == [2], "the clock signals every minute, hour and day it crosses")
+	_check(clock.time_text() == "00:30" and clock.weekday() == "Tuesday", "and moves on to the next day")
+	clock.speed_index = 3
+	clock._process(1.0)
+	_check(is_equal_approx(clock.hour_float(), 0.5 + 4.0 / 60.0), "at 4×, a real second is four game minutes")
+	clock.toggle_pause()
+	clock._process(10.0)
+	_check(clock.paused() and is_equal_approx(clock.hour_float(), 0.5 + 4.0 / 60.0), "paused, the clock stands still")
+	clock.toggle_pause()
+	_check(clock.speed_index == 3, "and carries on at the same speed")
+	clock.jump_to_hour(12)
+	_check(clock.time_text() == "12:00" and clock.day() == 2 and hours.back() == 12, "the clock jumps to an hour")
+	clock.jump_to_hour(6)
+	_check(clock.time_text() == "06:00" and clock.day() == 3, "an hour already gone today means tomorrow")
+	var schedule: Schedule = PrisonCatalogue.SCHEDULE.duplicate()
+	_check(schedule.at(23).id == &"sleep" and schedule.at(12).id == &"eat", "the default timetable")
+	_check(schedule.block_start(3) == 22, "a block runs on across midnight")
+	clock.free()
+
+
+## Runs the starter prison through a whole day at speed: everyone eats in
+## the canteen at lunch and is locked in their own cell at night.
+func _test_daily_routine() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 0
+	root.add_child(main)
+	var clock: GameClock = main.clock
+	var people: People = main.people
+	var runner: ScheduleRunner = main.runner
+	clock.speed_index = 0
+	_check(clock.time_text() == "07:00" and runner.current().id == &"eat", "the day starts with breakfast")
+	_check(people.people.all(func(p: Person) -> bool: return p.has_bed()), "everyone in the starter prison has a bed")
+	var beds := {}
+	for person in people.people:
+		beds[person.bed] = true
+	_check(beds.size() == people.people.size(), "nobody shares a bed")
+	var checked := {}
+	var in_room := func(person: Person, type: StringName) -> bool:
+		var here := people.room_of(person)
+		return not here.is_empty() and here[1].type == type
+	var in_own_cell := func(person: Person) -> bool:
+		var here := people.room_of(person)
+		var home := people.home_room(person)
+		return not here.is_empty() and not home.is_empty() and here[1] == home[1]
+	for i in 25 * 60 * 2:
+		clock.advance(0.5)
+		match clock.time_text():
+			"07:10":
+				if not checked.has("doors open"):
+					checked["doors open"] = true
+					_check(not runner.doors.is_empty() and not runner.doors.values().has(true),
+							"cell doors are open in the day")
+			"12:15":
+				if not checked.has("lunch"):
+					checked["lunch"] = true
+					_check(people.people.all(func(p: Person) -> bool: return in_room.call(p, &"canteen")),
+							"at 12:15 everyone is in the canteen")
+					_check(not people.people.any(func(p: Person) -> bool: return p.out_of_place),
+							"and nobody is out of place")
+			"22:00":
+				if not checked.has("night"):
+					checked["night"] = true
+					_check(people.people.all(in_own_cell), "at 22:00 everyone is in their own cell")
+					_check(runner.doors.size() == 6 and not runner.doors.values().has(false),
+							"with every cell door locked")
+					var person: Person = people.people[0]
+					var outside := Vector2(main.map.land_bounds().position) + Vector2(1.5, 1.5)
+					_check(not people.send(person, 0, outside), "nobody gets out of a locked cell")
+			"03:00":
+				if not checked.has("asleep"):
+					checked["asleep"] = true
+					_check(people.people.all(func(p: Person) -> bool: return p.activity == "Sleeping"),
+							"in the night everyone is asleep")
+	_check(checked.size() == 4, "the day ran through (checked %s)" % [checked.keys()])
+	_check(not runner.doors.values().has(true), "in the morning the cell doors open again")
+	_check(people.people.all(func(p: Person) -> bool: return p.needs[&"hunger"] > 0.0 and p.needs[&"sleep"] > 0.0),
+			"the default day keeps up with hunger and sleep")
+	# Painting the timetable changes the block straight away.
+	var hour := clock.hour()
+	main.timetable.paint(hour) # The first swatch: Sleep.
+	_check(runner.current().id == &"sleep" and people.people.all(func(p: Person) -> bool: return p.block.id == &"sleep"),
+			"painting the current hour puts everyone in the new block")
+	main.schedule.set_hour(hour, PrisonCatalogue.SCHEDULE.at(hour))
+	# Someone who can't get where they should be is flagged once they're late.
+	main.free()
+	main = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 7 # Locked out: the canteen can't be reached.
+	root.add_child(main)
+	main.clock.speed_index = 0
+	for i in 20:
+		main.clock.advance(0.5)
+	_check(main.people.people.all(func(p: Person) -> bool: return not p.out_of_place),
+			"before 15 minutes, nobody is late yet")
+	for i in 20:
+		main.clock.advance(0.5)
+	_check(main.people.people.all(func(p: Person) -> bool: return p.out_of_place),
+			"after 15 minutes, people who can't reach the canteen are out of place")
+	main.free()
+
+
 ## The needs every person in the build can reach an object for.
 func _reachable_needs(people: People) -> Array[StringName]:
 	var out: Array[StringName] = []
@@ -261,12 +375,12 @@ func _test_main_scene_loads() -> void:
 	_check(is_zero_approx(terrain.cell_height(map.land_bounds().get_center())), "owned land starts flat")
 	_check(main.foliage.plants.size() > 50, "the world starts with some plants")
 	_check(main.water.bodies.size() == 1, "the world starts with a pond")
-	_check(map.rooms().size() == 6, "sample layout has six rooms")
+	_check(map.rooms().size() == 10, "sample layout has ten rooms")
 	var view: BuildingView = main.get_node("BuildGrid/BuildingView")
 	view.rebuild()
 	_check(view.get_child_count() > 0, "view builds its parts")
 	var windows := map.walls.values().count(BuildingMap.Wall.WINDOW)
-	_check(windows == 5, "sample layout has five windows")
+	_check(windows == 9, "sample layout has nine windows")
 	var overlay: DebugOverlay = main.debug_overlay
 	overlay.visible = true
 	overlay._draw_rooms()
@@ -998,10 +1112,12 @@ func _test_people() -> void:
 	for i in 100:
 		people.step(0.1)
 	_check(sleepy.state == Person.State.USING and sleepy.activity == "Sleeping", "and sleeps in it")
-	for i in 450:
-		people.step(0.1)
+	# Game minutes: a night's sleep takes hours.
+	for i in 480:
+		people.step(1.0)
 	_check(sleepy.state != Person.State.USING and sleepy.needs[&"sleep"] > 90.0, "and gets up rested")
 	sleepy.needs[&"hunger"] = 5.0
+	sleepy.gave_up.clear()
 	people.step(0.1)
 	_check(sleepy.activity == "Can't find a free table", "with no table, they say so")
 	_check(people.send(sleepy, 0, Vector2(15.5, 15.5)) == false and sleepy.activity == "Can't get there",

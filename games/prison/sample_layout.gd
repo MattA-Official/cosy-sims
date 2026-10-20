@@ -1,5 +1,5 @@
 class_name SampleLayout
-## A tiny starter prison: two cells (with barred windows) off a corridor, a
+## A tiny starter prison: six cells (with barred windows) off a corridor, a
 ## canteen with glass windows, a shower room and a fenced yard, with one
 ## thing left unfinished so the warnings show.
 
@@ -16,16 +16,17 @@ static func build(map: BuildingMap, at: Vector2i) -> void:
 	map.fill_floor(Rect2i(yard.position + Vector2i(0, 3), Vector2i(4, 2)), &"paving")
 	map.set_room_type(map.room_at(yard.position), &"yard")
 
-	# Two 3x3 cells side by side, doors facing a corridor below them.
-	for i in 2:
-		var origin := at + Vector2i(i * 3, 0)
-		map.build_room(Rect2i(origin, Vector2i(3, 3)), &"concrete", &"brick")
+	# Six 2x3 cells side by side, doors facing a corridor below them. The
+	# last one has no toilet yet.
+	for i in 6:
+		var origin := at + Vector2i(i * 2, 0)
+		map.build_room(Rect2i(origin, Vector2i(2, 3)), &"concrete", &"brick")
 		map.set_door(Vector3i(origin.x + 1, origin.y + 3, BuildingMap.EDGE_X), true)
 		map.set_opening(Vector3i(origin.x + 1, origin.y, BuildingMap.EDGE_X),
 				BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS)
 		map.place_object(bed, Vector2(origin), 0)
-		if i == 0:
-			map.place_object(toilet, Vector2(origin) + Vector2(2.5, 0), 0)
+		if i < 5:
+			map.place_object(toilet, Vector2(origin) + Vector2(1.5, 0), 0)
 		map.set_room_type(map.room_at(origin), &"cell")
 
 	# Corridor, then a canteen and a shower room below it.

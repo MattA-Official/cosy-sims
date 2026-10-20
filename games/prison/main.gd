@@ -1,6 +1,7 @@
 extends Node3D
 ## The prison sandbox: a grid you can build on, with a sample prison to
-## start from (see SamplePrisons) and prisoners walking about it.
+## start from (see SamplePrisons) and prisoners living out the day on its
+## timetable.
 
 ## Off starts on empty land.
 @export var build_sample_layout := true
@@ -25,12 +26,27 @@ extends Node3D
 @onready var camera_rig: CameraRig = $CameraRig
 @onready var cursor: GridCursor = $GridCursor
 @onready var hud: CanvasLayer = $HUD
+@onready var sun: DirectionalLight3D = $Sun
+@onready var world_environment: WorldEnvironment = $WorldEnvironment
 
 var building: Building
 ## The ground level's map. Other levels are in `building`.
 var map: BuildingMap
 var paths := PathNetwork.new()
 var people := People.new()
+## Game time. Everything that happens over time listens to it.
+var clock := GameClock.new()
+## The prisoners' timetable, a copy of the catalogue's so edits stay in
+## this game.
+var schedule: Schedule = PrisonCatalogue.SCHEDULE.duplicate()
+## Puts everyone in their timetable block and locks cell doors.
+var runner := ScheduleRunner.new()
+var day_night := DayNight.new()
+var door_lights := DoorLights.new()
+## The day, time, block and speed, top left.
+var clock_bar := ClockBar.new()
+## Painting the timetable, on T.
+var timetable := TimetableWindow.new()
 ## The F3 inspector for people, objects and rooms.
 var inspector := Inspector.new()
 ## Grid lines at the height of the level being built on, off the ground.
@@ -76,14 +92,35 @@ func _ready() -> void:
 	ground.set_shader_parameter("water_level",
 			terrain.sea_level if terrain.has_sea else Terrain.MIN_HEIGHT - 10.0)
 
-	# People walk the build.
+	# People walk the build, following the clock and the timetable.
+	clock.name = "Clock"
+	add_child(clock)
 	people.name = "People"
 	people.terrain = terrain
 	people.body_model = PrisonCatalogue.PERSON_MODEL
 	people.needs = PrisonCatalogue.NEEDS
+	people.room_types = PrisonCatalogue.ROOM_TYPES
+	people.home_room_types = PrisonCatalogue.HOME_ROOM_TYPES
 	people.building = building
 	people.paths = paths
+	people.clock = clock
 	grid.add_child(people)
+	runner.name = "ScheduleRunner"
+	runner.clock = clock
+	runner.building = building
+	runner.people = people
+	runner.schedules = {&"prisoner": schedule}
+	add_child(runner)
+	door_lights.name = "DoorLights"
+	door_lights.cell_size = grid.cell_size
+	door_lights.building = building
+	door_lights.runner = runner
+	grid.add_child(door_lights)
+	day_night.name = "DayNight"
+	day_night.sun = sun
+	day_night.environment = world_environment.environment
+	day_night.clock = clock
+	add_child(day_night)
 	level_grid.name = "LevelGrid"
 	level_grid.grid = grid
 	level_grid.height_at = _floor_level_at
@@ -96,6 +133,8 @@ func _ready() -> void:
 	inspector.controller = controller
 	inspector.debug_overlay = debug_overlay
 	inspector.room_types = PrisonCatalogue.ROOM_TYPES
+	inspector.clock = clock
+	inspector.runner = runner
 	grid.add_child(inspector)
 	if SamplePrisons.next >= 0:
 		sample = SamplePrisons.next
@@ -108,6 +147,8 @@ func _ready() -> void:
 	site.paths = paths
 	site.people = people
 	SamplePrisons.build(sample if build_sample_layout else -1, site)
+	people.assign_beds()
+	runner.refresh()
 	var load_sample := func(index: int) -> void:
 		SamplePrisons.next = index
 		get_tree().reload_current_scene()
@@ -140,6 +181,15 @@ func _add_hud() -> void:
 	hud.add_child(view_bar)
 	help_card.sections = PrisonHelp.SECTIONS
 	hud.add_child(help_card)
+	clock_bar.clock = clock
+	clock_bar.runner = runner
+	clock_bar.day_night = day_night
+	clock_bar.timetable_pressed.connect(timetable.toggle)
+	hud.add_child(clock_bar)
+	timetable.schedule = schedule
+	timetable.activities = PrisonCatalogue.ACTIVITIES
+	timetable.clock = clock
+	hud.add_child(timetable)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("level_up"):
@@ -147,6 +197,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("level_down"):
 		building.active -= 1
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("time_pause"):
+		clock.toggle_pause()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("time_faster"):
+		clock.speed_index += 1
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("time_slower"):
+		if not clock.paused():
+			clock.speed_index = maxi(clock.speed_index - 1, 1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("timetable_toggle"):
+		timetable.toggle()
 		get_viewport().set_input_as_handled()
 
 

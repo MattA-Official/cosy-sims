@@ -49,6 +49,9 @@ var _next_id := 1
 ## (level, cell x, cell y, piece index) for floor, piece -1 for open ground.
 var _ids: Dictionary[Vector4i, int] = {}
 var _levels: Dictionary[int, int] = {} ## Point id: its level.
+## Each door on a straight wall, as (level, edge x, edge y, edge axis): the
+## pairs of points it joins, so it can be locked without a rebuild.
+var _door_links: Dictionary[Vector4i, Array] = {}
 
 
 ## Builds the graph. Pass the last graph's `ground_layer` to reuse it when
@@ -279,12 +282,14 @@ func _join_floors(n: int) -> void:
 			var kind := map.wall_at(edge)
 			if kind != BuildingMap.Wall.NONE and kind != BuildingMap.Wall.DOOR:
 				continue
+			var door_key := Vector4i(n, edge.x, edge.y, edge.z)
 			if map.door_has_steps(edge):
 				# Door steps make up the difference; the low side's tile is
 				# kept as a corner of every route so people climb them there.
 				var across: int = _ids.get(Vector4i(n, next_cell.x, next_cell.y, 0), -1)
 				if across != -1 and piece.is_whole():
 					_join(id, across)
+					_note_door(door_key, id, across)
 					var low := cell if map.floor_height(cell) < map.floor_height(next_cell) else next_cell
 					_stepped[_ids.get(Vector4i(n, low.x, low.y, 0), -1)] = true
 				continue
@@ -301,6 +306,8 @@ func _join_floors(n: int) -> void:
 				if other != -1 and absf(map.edge_height(cell, BuildingMap.DIRECTIONS[tag])
 						- _edge_height_of(other, n, next_cell, -BuildingMap.DIRECTIONS[tag])) <= BuildingMap.MAX_STEP + 0.01:
 					_join(id, other)
+					if kind == BuildingMap.Wall.DOOR:
+						_note_door(door_key, id, other)
 		# Diagonals across whole tiles, when both ways round are open.
 		if piece.is_whole():
 			for d in [Vector2i(1, 1), Vector2i(1, -1)]:
@@ -432,6 +439,30 @@ func _join_diagonal(n: int, cell: Vector2i, d: Vector2i) -> void:
 	if astar.are_points_connected(a, side_x) and astar.are_points_connected(a, side_y) \
 			and astar.are_points_connected(side_x, b) and astar.are_points_connected(side_y, b):
 		_join(a, b)
+
+
+## Locks or unlocks a door on a straight wall: locked, nobody walks
+## through it. Doors in angled walls can't be locked yet.
+func set_door_locked(level: int, edge: Vector3i, locked: bool) -> void:
+	for pair: Vector2i in _door_links.get(Vector4i(level, edge.x, edge.y, edge.z), []):
+		if locked:
+			if astar.are_points_connected(pair.x, pair.y):
+				astar.disconnect_points(pair.x, pair.y)
+		else:
+			_join(pair.x, pair.y)
+
+
+func is_door_locked(level: int, edge: Vector3i) -> bool:
+	var pairs: Array = _door_links.get(Vector4i(level, edge.x, edge.y, edge.z), [])
+	return not pairs.is_empty() and not astar.are_points_connected(pairs[0].x, pairs[0].y)
+
+
+func _note_door(key: Vector4i, a: int, b: int) -> void:
+	if a == -1 or b == -1:
+		return
+	if not _door_links.has(key):
+		_door_links[key] = []
+	_door_links[key].append(Vector2i(a, b))
 
 
 func _join(a: int, b: int) -> void:

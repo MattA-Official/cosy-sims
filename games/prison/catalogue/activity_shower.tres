@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ActivityDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/activity_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"shower"
+display_name = "Shower"
+short_name = "Wash"
+colour = Color(0.52, 0.8, 0.92, 1)
+place = 2
+room_types = Array[StringName]([&"shower"])
+allowed_tags = Array[StringName]([&"shower", &"toilet"])
+main_tag = &"shower"
+stay_on_main = false
+free_after = true
+door_rule = 0
+description = "To the shower room for a wash, then free to go."

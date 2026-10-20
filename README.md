@@ -47,6 +47,12 @@ Built with [Godot 4.7](https://godotengine.org/).
 | F1 | The controls card |
 | F3 | Debug view: rooms tinted and labelled, and details of the tile under the mouse. With no build tool (Esc), click a person, object, room or tile to inspect it: set a person's needs, send them somewhere, add or remove prisoners, pause everyone |
 
+| Time | |
+| --- | --- |
+| Space | Pause, or carry on. Building works while paused |
+| , / . | Slower or faster: 1×, 2× or 4× |
+| T | The timetable |
+
 Hover any button in the build menu to see what it is. The room, floor and
 wall tools let you pick a style from the picture tiles above the toolbar;
 the Room tool shows each floor and wall pairing as a little cut-away room.
@@ -98,6 +104,33 @@ and over bridges. They get sleepy, hungry and grubby, and head off to a
 free bed, table or shower when they need one; otherwise they wander.
 Press F3 and click someone to see what they're up to.
 
+### The daily routine
+
+At normal speed a game minute lasts a real second, so a game day takes 24
+minutes (6 at 4×). The clock in the top-left corner shows the time, the
+day and the block everyone is in. Prisoners follow a timetable of
+one-hour blocks:
+
+| Time | Block | Prisoners go |
+| --- | --- | --- |
+| 22:00 to 07:00 | Sleep | To bed in their own cell, door locked |
+| 07:00, 12:00, 17:00 | Eat | To the canteen; meals only happen now |
+| 08:00 | Shower | To the shower room, then free once washed |
+| 09:00 to 12:00, 15:00 to 17:00 | Work | Free time until jobs arrive |
+| 13:00 to 15:00 | Yard | Out to the yard |
+| 18:00 to 20:00 | Free time | Anywhere, as their needs ask |
+| 20:00 to 22:00 | Lockup | Locked in their own cell |
+
+Press T (or the calendar button) to change it: pick a block and click or
+drag across the hours. Each prisoner gets a bed of their own in a cell,
+and the cell's door locks for Lockup and Sleep once everyone who sleeps
+there is inside; a little lamp over the door shows red when it is locked.
+Anyone not where the block wants them 15 minutes in gets a "?" over their
+head, and the F3 inspector says why (no bed, can't reach the canteen).
+With F3 you can also jump the clock to any hour. The sun follows the
+clock, from dawn about 06:00 to dusk about 20:00; the sun button keeps it
+day while you build.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one
@@ -122,7 +155,7 @@ decisions behind all this.
 
 | Path | What |
 | --- | --- |
-| `core/` | Parts every game will share: camera, grid, input, building, terrain, paths, people. Kept free of prison-specific code. |
+| `core/` | Parts every game will share: camera, grid, input, building, terrain, paths, people. Kept free of prison-specific code. New simulation (the clock, timetables) goes in `core/sim/`. |
 | `games/prison/` | The prison game. Anything specific to prisons lives here. |
 | `tests/` | Headless checks (see below). |
 | `tools/` | Developer helpers, such as the screenshot script. |

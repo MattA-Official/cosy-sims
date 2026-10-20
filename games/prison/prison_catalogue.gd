@@ -51,6 +51,25 @@ const NEEDS: Array[NeedDef] = [
 const DOOR_MODEL := preload("res://games/prison/art/models/door.glb")
 const PERSON_MODEL := preload("res://games/prison/art/models/person.glb")
 
+## Every block the timetable can hold, in the order the timetable window
+## shows them.
+const ACTIVITIES: Array[ActivityDef] = [
+	preload("res://games/prison/catalogue/activity_sleep.tres"),
+	preload("res://games/prison/catalogue/activity_lockup.tres"),
+	preload("res://games/prison/catalogue/activity_eat.tres"),
+	preload("res://games/prison/catalogue/activity_shower.tres"),
+	preload("res://games/prison/catalogue/activity_yard.tres"),
+	preload("res://games/prison/catalogue/activity_free.tres"),
+	preload("res://games/prison/catalogue/activity_work.tres"),
+]
+
+## The prisoners' day: 11 hours in their cells overnight, three meals, a
+## shower, the yard and free time. Work is free time until jobs arrive.
+const SCHEDULE: Schedule = preload("res://games/prison/catalogue/schedule_prisoners.tres")
+
+## Rooms where a bed is someone's own.
+const HOME_ROOM_TYPES: Array[StringName] = [&"cell"]
+
 const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_cell.tres"),
 	preload("res://games/prison/catalogue/room_canteen.tres"),

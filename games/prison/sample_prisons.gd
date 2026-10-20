@@ -86,7 +86,9 @@ static func _two_storeys(site: Site) -> void:
 	_door(ground, o + Vector2i(0, 5), Vector2i.LEFT)
 	_tables(ground, o + Vector2i(1, 7), 2, 2)
 	_showers(ground, o + Vector2i(8, 9), 4)
-	var route: Array[Vector2i] = [o + Vector2i(1, 4), o + Vector2i(2, 4), o + Vector2i(3, 4)]
+	# Along the corridor's lower row, clear of the doors, so the stairwell
+	# upstairs leaves the landing in front of every cell.
+	var route: Array[Vector2i] = [o + Vector2i(4, 5), o + Vector2i(5, 5), o + Vector2i(6, 5)]
 	ground.add_stairs(Staircase.create(route, [false, false, false] as Array[bool], false, &"concrete"))
 	var lift := PrisonCatalogue.object(&"lift")
 	ground.place_object(lift, Vector2(o + Vector2i(13, 4)), 0)
@@ -99,7 +101,7 @@ static func _two_storeys(site: Site) -> void:
 		_door(up, cell + Vector2i(1, 3), Vector2i.DOWN)
 	_plant(site)
 	for i in 8:
-		site.people.add_person(1, Vector2(o) + Vector2(4.5 + i, 4.5 + (i % 2)))
+		site.people.add_person(1, Vector2(o) + Vector2(4.5 + i, 4.5))
 
 
 static func _hillside(site: Site) -> void:
@@ -128,7 +130,7 @@ static func _hillside(site: Site) -> void:
 	_showers(ground, showers.position + Vector2i(0, 3), 4)
 	var block := Rect2i(x + 20, steps[1] + 5, 12, 5)
 	for i in 4:
-		_cell(ground, Rect2i(block.position + Vector2i(i * 3, 2), Vector2i(3, 3)), 4.0)
+		_cell(ground, Rect2i(block.position + Vector2i(i * 3, 2), Vector2i(3, 3)), 4.0, true)
 		_door(ground, block.position + Vector2i(i * 3 + 1, 2), Vector2i.UP)
 	_room(ground, Rect2i(block.position, Vector2i(12, 2)), &"concrete", &"brick", &"", 4.0)
 	_door(ground, block.position, Vector2i.LEFT)
@@ -183,8 +185,9 @@ static func _island(site: Site) -> void:
 	site.paths.add_segment(shore, middle + Vector2(-2.5, 11.5), null, &"gravel")
 	site.paths.add_segment(shore, middle + Vector2(2.5, 11.5), null, &"gravel")
 	_plant(site)
-	for i in 6:
-		site.people.add_person(0, middle + Vector2(-2.5 + i, -0.5 + (i % 2)))
+	# One for each bed: two shared cells.
+	for i in 4:
+		site.people.add_person(0, middle + Vector2(-1.5 + i, -0.5 + (i % 2)))
 
 
 static func _long_way_round(site: Site) -> void:
@@ -316,7 +319,7 @@ static func _locked_out(site: Site) -> void:
 	_door(ground, canteen.position + Vector2i(3, 0), Vector2i.UP)
 	_tables(ground, canteen.position + Vector2i(1, 2), 2, 2)
 	_plant(site)
-	for i in 6:
+	for i in 4:
 		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
 
 #endregion
@@ -342,10 +345,16 @@ static func _room(map: BuildingMap, rect: Rect2i, floor_style: StringName = &"co
 		map.set_room_type(map.room_at(rect.position), type)
 
 
-## A cell with a bed against its back wall and a toilet in the corner.
-static func _cell(map: BuildingMap, rect: Rect2i, height := 0.0) -> void:
+## A cell with a bed against its back wall (two, shared, if it is wide
+## enough) and a toilet in the corner. The back wall is the top one, or the
+## bottom one for a cell with its door at the top.
+static func _cell(map: BuildingMap, rect: Rect2i, height := 0.0, door_at_top := false) -> void:
 	_room(map, rect, &"concrete", &"brick", &"cell", height)
-	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(rect.position), 0)
+	var bed := PrisonCatalogue.object(&"bed")
+	var back := Vector2(rect.position) + (Vector2(0, rect.size.y - 2) if door_at_top else Vector2.ZERO)
+	map.place_object(bed, back, 0)
+	if rect.size.x >= 3:
+		map.place_object(bed, back + Vector2(1, 0), 0)
 	map.place_object(PrisonCatalogue.object(&"toilet"), Vector2(rect.end.x - 0.5, rect.position.y), 0)
 
 

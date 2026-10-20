@@ -27,6 +27,10 @@ const KEY_ACTIONS := {
 	"level_up": [KEY_PAGEUP],
 	"level_down": [KEY_PAGEDOWN],
 	"help_toggle": [KEY_F1],
+	"time_pause": [KEY_SPACE],
+	"time_slower": [KEY_COMMA],
+	"time_faster": [KEY_PERIOD],
+	"timetable_toggle": [KEY_T],
 }
 
 

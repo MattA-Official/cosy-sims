@@ -5,7 +5,8 @@ extends Node3D
 ## about it in a panel on the left, and change it: set a person's needs,
 ## rename them, send them somewhere or remove them; remove an object; add
 ## a prisoner on a tile. The selected person's route is drawn on the ground.
-## The game can also offer ready-made layouts to switch to.
+## With a clock, it can jump to any hour to test the timetable. The game
+## can also offer ready-made layouts to switch to.
 
 @export var cursor: GridCursor
 @export var controller: BuildController
@@ -15,6 +16,8 @@ extends Node3D
 
 var people: People
 var building: Building
+var clock: GameClock
+var runner: ScheduleRunner
 
 var _layer := CanvasLayer.new()
 var _panel := PanelContainer.new()
@@ -165,8 +168,29 @@ func _rebuild() -> void:
 			people.paused = not people.paused
 			_rebuild())
 		pause.tooltip_text = "Stops everyone where they are."
+	if clock != null:
+		_show_clock()
 	if not _samples.is_empty():
 		_show_samples()
+
+
+## Jumping the clock to an hour, to test the timetable.
+func _show_clock() -> void:
+	var row := HBoxContainer.new()
+	var picker := OptionButton.new()
+	for hour in Schedule.HOURS:
+		var def := runner.schedules.values()[0].at(hour) as ActivityDef if runner != null \
+				and not runner.schedules.is_empty() else null
+		picker.add_item("%s  %s" % [GameClock.hour_text(hour), def.display_name if def != null else ""])
+	picker.selected = (clock.hour() + 1) % Schedule.HOURS
+	picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(picker)
+	var jump := Button.new()
+	jump.text = "Jump"
+	jump.tooltip_text = "Moves the clock straight to that hour, today or tomorrow."
+	jump.pressed.connect(func() -> void: clock.jump_to_hour(picker.selected))
+	row.add_child(jump)
+	_box.add_child(row)
 
 
 func _show_samples() -> void:
@@ -228,6 +252,13 @@ func _refresh_person(person: Person) -> void:
 		"Heading for: %s" % (target.def.display_name if target != null else "nothing in particular"),
 		"Steps left on the way: %d" % person.route.size(),
 	])
+	if person.block != null:
+		lines.append("Block: %s, %s" % [person.block.display_name,
+				"in place" if people.is_in_place(person) else ("out of place" if person.out_of_place
+				else "on the way")])
+	var home := people.home_room(person)
+	lines.append("Bed: %s" % ("none of their own" if home.is_empty()
+			else "in a room on the %s" % Building.level_name(home[0]).to_lower()))
 	for need: StringName in person.needs:
 		lines.append("%s: %d%s" % [String(need).capitalize(), roundi(person.needs[need]),
 				"  (below the line)" if person.needs[need] < People.NEED_LINE else ""])
@@ -245,13 +276,16 @@ func _show_object(level: int, id: int) -> void:
 		_text("That object has gone.")
 		return
 	var user := people.user_of(level, id) if people != null else null
-	_text("%s\n%s\nTags: %s\nCentre: %.2f, %.2f\nTurned: %d°\nSize: %s tiles\nIn use: %s" % [
+	var owner := people.owner_of(level, id) if people != null else null
+	_text("%s\n%s\nTags: %s\nCentre: %.2f, %.2f\nTurned: %d°\nSize: %s tiles\nIn use: %s%s" % [
 		placed.def.display_name, Building.level_name(level), ", ".join(placed.def.tags),
 		placed.centre.x, placed.centre.y, roundi(rad_to_deg(placed.angle)),
 		"%s by %s" % [String.num(placed.def.size.x), String.num(placed.def.size.y)],
-		user.name if user != null else "no"])
+		user.name if user != null else "no", "\nBelongs to: %s" % owner.name if owner != null else ""])
 	if user != null:
 		_button("Inspect %s" % user.name, func() -> void: select(user))
+	if owner != null and owner != user:
+		_button("Inspect %s" % owner.name, func() -> void: select(owner))
 	_button("Remove object", func() -> void:
 		map.remove_object(id)
 		select(null))
