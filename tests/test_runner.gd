@@ -44,6 +44,7 @@ func _process(_delta: float) -> bool:
 	_test_jobs_and_carrying()
 	_test_kitchen()
 	_test_cleaning()
+	_test_laundry()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -827,6 +828,40 @@ func _test_cleaning() -> void:
 		minutes += 1
 	_check(items.count_in(Vector2i(0, skip.id), &"rubbish_bag") >= 1, "a full bin is bagged up and taken to the skip")
 	_check(cleaning.collect() >= 1 and items.count_in(Vector2i(0, skip.id)) == 0, "the lorry empties the skip")
+	main.queue_free()
+
+
+func _test_laundry() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var items: ItemStore = main.items
+	var clock: GameClock = main.clock
+	clock.speed_index = 0
+	_check(items.total(&"clean_laundry") == 9, "the shelves start with a clean uniform each and spares")
+	var changed: Array[int] = [0] # Lambdas capture a copy of an int.
+	main.people.used.connect(func(person: Person, placed: BuildingMap.PlacedObject) -> void:
+		if placed.def.id == &"shower" and person.group == &"prisoner":
+			changed[0] += 1)
+	var most_dirty := 0
+	while clock.hour() != 9:
+		clock.advance(1.0)
+		most_dirty = maxi(most_dirty, items.total(&"dirty_laundry"))
+		_check(items.total(&"dirty_laundry") + items.total(&"clean_laundry") == 9, "no uniform goes missing")
+	_check(changed[0] > 0 and most_dirty >= mini(changed[0], Laundry.LOAD),
+			"after a shower, prisoners leave their uniform in the basket and take a clean one")
+	var minutes := 0
+	while items.total(&"dirty_laundry") > 0 and minutes < 600:
+		clock.advance(1.0)
+		minutes += 1
+	_check(items.total(&"dirty_laundry") == 0, "the cleaner washes it")
+	var shelf := main.map.objects.values().filter(func(p: BuildingMap.PlacedObject) -> bool:
+			return p.def.id == &"clothes_shelf")[0] as BuildingMap.PlacedObject
+	minutes = 0
+	while items.count_in(Vector2i(0, shelf.id), &"clean_laundry") < 9 and minutes < 120:
+		clock.advance(1.0)
+		minutes += 1
+	_check(items.count_in(Vector2i(0, shelf.id), &"clean_laundry") == 9, "irons it and stacks it back on the shelf")
 	main.queue_free()
 
 

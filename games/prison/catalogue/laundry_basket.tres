@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/laundry_basket.glb" id="2_model"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"laundry_basket"
+display_name = "Laundry basket"
+size = Vector2(0.5, 0.5)
+height = 0.3
+colour = Color(0.4, 0.6, 0.75, 1)
+tags = Array[StringName]([&"laundry_basket"])
+model = ExtResource("2_model")
+holds = Array[StringName]([&"dirty_laundry"])
+capacity = 12
+shows_held = false

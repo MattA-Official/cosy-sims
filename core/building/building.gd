@@ -87,6 +87,23 @@ func current() -> BuildingMap:
 	return level(active)
 
 
+## Every object with any of the tags, on every level, as (level, object
+## id).
+func objects_tagged(tags: Array[StringName]) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for n: int in levels:
+		for placed: BuildingMap.PlacedObject in levels[n].objects.values():
+			if placed.def.tags.any(func(t: StringName) -> bool: return tags.has(t)):
+				out.append(Vector2i(n, placed.id))
+	return out
+
+
+## The object at (level, object id), or null if it's gone.
+func object_at(key: Vector2i) -> BuildingMap.PlacedObject:
+	var map: BuildingMap = levels.get(key.x)
+	return map.objects.get(key.y) if map != null else null
+
+
 func add_land(rect: Rect2i) -> void:
 	land.append(rect)
 	for map: BuildingMap in levels.values():

@@ -5,7 +5,7 @@ class_name SamplePrisons
 ## Main node (Sample) or from the F3 inspector.
 
 const NAMES: Array[String] = ["Starter block", "Two storeys", "Hillside", "Island", "Long way round",
-		"Basement", "Crowded canteen", "Locked out", "Staff wing", "Kitchen"]
+		"Basement", "Crowded canteen", "Locked out", "Staff wing", "Working prison"]
 
 ## What each one tests, shown in the inspector.
 const CHALLENGES: Array[String] = [
@@ -18,7 +18,7 @@ const CHALLENGES: Array[String] = [
 	"Twenty-four hungry prisoners, a dorm of sixteen beds, two tables and two showers: they queue, give up and try again.",
 	"The showers have no door, and the canteen is 0.75 m up. With Door Steps on its door gets steps; with it off, nobody can eat.",
 	"A staff room behind a staff door and an office zoned staff only: staff come and go, prisoners keep out.",
-	"The staff wing with a kitchen: the morning lorry's crates go to the fridge, the cook fills the serving counter before each meal, prisoners take a tray to a table, and the cleaner sweeps up after them.",
+	"The staff wing with a kitchen and a laundry: the morning lorry's crates go to the fridge, the cook fills the serving counter before each meal, prisoners take a tray to a table, and the cleaner sweeps up and washes the uniforms left after showers.",
 ]
 
 ## Set before reloading the scene to start in a different sample.
@@ -379,6 +379,7 @@ static func _staff_wing(site: Site, kitchen := false) -> void:
 	ground.place_object(PrisonCatalogue.object(&"basketball_hoop"), Vector2(yard.position) + Vector2(10, 0.5), 0)
 	if kitchen:
 		_kitchen(ground, canteen)
+		_laundry(ground, canteen, showers)
 	_plant(site)
 	for i in 6:
 		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
@@ -386,6 +387,20 @@ static func _staff_wing(site: Site, kitchen := false) -> void:
 		var member := site.people.add_person(0, Vector2(staff_room.position) + Vector2(1.5 - i, 3.5 - i % 2), "", &"staff")
 		if kitchen:
 			site.people.set_role(member, [&"cook", &"handyman", &"cleaner"][i])
+
+
+## A laundry under the kitchen, through a door from it, with a basket and
+## a clothes shelf in the shower room.
+static func _laundry(ground: BuildingMap, canteen: Rect2i, showers: Rect2i) -> void:
+	var laundry := Rect2i(canteen.position + Vector2i(-5, 5), Vector2i(5, 5))
+	_room(ground, laundry, &"tiles", &"plaster", &"laundry")
+	_door(ground, laundry.position + Vector2i(2, 0), Vector2i.UP)
+	var corner := Vector2(laundry.position)
+	ground.place_object(PrisonCatalogue.object(&"washing_machine"), corner + Vector2(0, 4.25), 0)
+	ground.place_object(PrisonCatalogue.object(&"washing_machine"), corner + Vector2(1, 4.25), 0)
+	ground.place_object(PrisonCatalogue.object(&"ironing_board"), corner + Vector2(3, 2), 1)
+	ground.place_object(PrisonCatalogue.object(&"laundry_basket"), Vector2(showers.position) + Vector2(0.25, 0.25), 0)
+	ground.place_object(PrisonCatalogue.object(&"clothes_shelf"), Vector2(showers.position) + Vector2(3, 0), 0)
 
 
 ## A kitchen off the west end of a canteen, with a serving counter in the

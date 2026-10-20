@@ -21,6 +21,7 @@ const STORES: Array[StringName] = [&"fridge", &"food_shelf"]
 const COOK_FROM: Array[StringName] = [&"fridge", &"food_shelf", &"delivery_pallet"]
 const COUNTERS: Array[StringName] = [&"serving_counter"]
 const COOKERS: Array[StringName] = [&"cooker"]
+const PALLETS: Array[StringName] = [&"delivery_pallet"]
 
 ## The lorry has been, leaving this many crates.
 signal delivered(count: int)
@@ -48,9 +49,9 @@ func start() -> void:
 	elif schedule.at(clock.hour()) != null and schedule.at(clock.hour()).main_tag == MEAL_TAG:
 		# Starting at a mealtime, the meal is already out.
 		var wanted := _prisoners()
-		for key in _objects_tagged(&"serving_counter"):
-			if _has_any(COOKERS):
-				wanted -= items.put_in(key, _placed(key), tray, wanted)
+		for key in building.objects_tagged(COUNTERS):
+			if not building.objects_tagged(COOKERS).is_empty():
+				wanted -= items.put_in(key, building.object_at(key), tray, wanted)
 
 
 func _on_hour(hour: int) -> void:
@@ -67,7 +68,7 @@ func _on_hour(hour: int) -> void:
 ## Returns how many.
 func clear_leftovers() -> int:
 	var cleared := 0
-	for key in _objects_tagged(&"serving_counter") + _objects_tagged(&"cooker"):
+	for key in building.objects_tagged(COUNTERS) + building.objects_tagged(COOKERS):
 		while true:
 			var taken := items.take_from(key, &"meal", 999)
 			if taken.is_empty():
@@ -82,10 +83,10 @@ func deliver() -> int:
 	var per_day := ceili(float(_prisoners() * meals_per_day()) / MEALS_PER_BATCH)
 	var wanted := per_day * STOCK_DAYS - items.total(&"ingredient")
 	var came := 0
-	for key in _objects_tagged(&"delivery_pallet"):
+	for key in building.objects_tagged(PALLETS):
 		if wanted - came <= 0:
 			break
-		came += items.put_in(key, _placed(key), crate, wanted - came)
+		came += items.put_in(key, building.object_at(key), crate, wanted - came)
 	if came > 0:
 		delivered.emit(came)
 		_unload()
@@ -95,9 +96,9 @@ func deliver() -> int:
 ## Posts jobs to carry crates on the pallets to the stores, for any not
 ## already being carried.
 func _unload() -> void:
-	if not _has_any(STORES):
+	if building.objects_tagged(STORES).is_empty():
 		return
-	for key in _objects_tagged(&"delivery_pallet"):
+	for key in building.objects_tagged(PALLETS):
 		var waiting := items.count_in(key, &"ingredient")
 		for job in jobs.of_kind(&"carry"):
 			if job.stage == 0 and job.current().level == key.x and job.current().object == key.y:
@@ -116,7 +117,7 @@ func _unload() -> void:
 ## any already cooked or cooking. Nothing is cooked without a serving
 ## counter to put it on.
 func cook() -> int:
-	if not _has_any(COUNTERS) or not _has_any(COOKERS):
+	if building.objects_tagged(COUNTERS).is_empty() or building.objects_tagged(COOKERS).is_empty():
 		return 0
 	var ready := items.total(&"meal") + jobs.of_kind(&"cook").size() * MEALS_PER_BATCH
 	var batches := ceili(float(_prisoners() - ready) / MEALS_PER_BATCH)
@@ -133,7 +134,7 @@ func cook() -> int:
 		work.finish = func(stage: Job.Stage, worker: Person) -> void:
 			items.put_down(worker) # The crate, cooked.
 			var key := Vector2i(stage.level, stage.object)
-			items.put_in(key, _placed(key), tray, MEALS_PER_BATCH)
+			items.put_in(key, building.object_at(key), tray, MEALS_PER_BATCH)
 		var collect := Job.at_any(Job.Do.FETCH, COOKERS, &"meal")
 		collect.count = MEALS_PER_BATCH
 		collect.doing = "Picking up the trays"
@@ -165,20 +166,3 @@ func _meal_ends(hour: int) -> bool:
 
 func _prisoners() -> int:
 	return people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size()
-
-
-func _objects_tagged(tag: StringName) -> Array[Vector2i]:
-	var out: Array[Vector2i] = []
-	for n: int in building.levels:
-		for placed: BuildingMap.PlacedObject in building.levels[n].objects.values():
-			if placed.def.tags.has(tag):
-				out.append(Vector2i(n, placed.id))
-	return out
-
-
-func _has_any(tags: Array[StringName]) -> bool:
-	return tags.any(func(tag: StringName) -> bool: return not _objects_tagged(tag).is_empty())
-
-
-func _placed(key: Vector2i) -> BuildingMap.PlacedObject:
-	return building.levels[key.x].objects.get(key.y)

@@ -23,6 +23,8 @@ extends Node3D
 
 signal person_added(person: Person)
 signal person_removed(person: Person)
+## Someone has finished using an object.
+signal used(person: Person, placed: BuildingMap.PlacedObject)
 ## A door was locked or unlocked.
 signal doors_changed
 
@@ -1568,6 +1570,8 @@ func _finish_using(person: Person) -> void:
 	if person.block != null and person.target_tag == person.block.main_tag:
 		person.done_main = true
 	_maybe_litter(person, target_object(person))
+	if target_object(person) != null:
+		used.emit(person, target_object(person))
 	person.position = person.stand_spot
 	_release(person)
 	person.state = Person.State.IDLE

@@ -7,7 +7,7 @@ extends Node3D
 @export var build_sample_layout := true
 ## Which sample prison to start with. The F3 inspector can switch to another.
 @export_enum("Starter block", "Two storeys", "Hillside", "Island", "Long way round", "Basement",
-		"Crowded canteen", "Locked out", "Staff wing", "Kitchen") var sample := 0
+		"Crowded canteen", "Locked out", "Staff wing", "Working prison") var sample := 0
 ## Split levels: floors nudged within their storey, and ramps between
 ## them. Off keeps every floor a whole storey above the one below.
 @export var split_levels := false
@@ -40,6 +40,7 @@ var jobs := JobBoard.new()
 var item_view := ItemView.new()
 var kitchen := Kitchen.new()
 var cleaning := Cleaning.new()
+var laundry := Laundry.new()
 ## Game time. Everything that happens over time listens to it.
 var clock := GameClock.new()
 ## The prisoners' timetable, a copy of the catalogue's so edits stay in
@@ -195,6 +196,14 @@ func _ready() -> void:
 	cleaning.building = building
 	cleaning.clock = clock
 	add_child(cleaning)
+	laundry.name = "Laundry"
+	laundry.jobs = jobs
+	laundry.items = items
+	laundry.building = building
+	laundry.people = people
+	laundry.clock = clock
+	add_child(laundry)
+	laundry.start()
 	var load_sample := func(index: int) -> void:
 		SamplePrisons.next = index
 		get_tree().reload_current_scene()

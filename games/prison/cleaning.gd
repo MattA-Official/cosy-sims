@@ -45,20 +45,20 @@ func look() -> void:
 	for key: Vector2i in _emptying.keys():
 		if not jobs.jobs.has(_emptying[key]):
 			_emptying.erase(key)
-	var bins := _objects_tagged(BINS)
+	var bins := building.objects_tagged(BINS)
 	for key: Vector3i in items.floor_spots_of(LITTER):
 		if not _sweeping.has(key):
 			_sweeping[key] = jobs.post(_sweep_job(key, not bins.is_empty()))
 	for key in bins:
-		var placed := _placed(key)
+		var placed := building.object_at(key)
 		if not _emptying.has(key) and items.count_in(key, LITTER) >= placed.def.capacity * FULL:
-			_emptying[key] = jobs.post(_empty_job(key, not _objects_tagged(SKIPS).is_empty()))
+			_emptying[key] = jobs.post(_empty_job(key, not building.objects_tagged(SKIPS).is_empty()))
 
 
 ## The lorry takes away what's in the skips.
 func collect() -> int:
 	var taken := 0
-	for key in _objects_tagged(SKIPS):
+	for key in building.objects_tagged(SKIPS):
 		taken += items.count_in(key)
 		_take_all(key, &"")
 	return taken
@@ -108,16 +108,3 @@ func _empty_job(key: Vector2i, to_skip: bool) -> Job:
 func _take_all(key: Vector2i, tag: StringName) -> void:
 	while not items.take_from(key, tag, 999).is_empty():
 		pass
-
-
-func _objects_tagged(tags: Array[StringName]) -> Array[Vector2i]:
-	var out: Array[Vector2i] = []
-	for n: int in building.levels:
-		for placed: BuildingMap.PlacedObject in building.levels[n].objects.values():
-			if placed.def.tags.any(func(t: StringName) -> bool: return tags.has(t)):
-				out.append(Vector2i(n, placed.id))
-	return out
-
-
-func _placed(key: Vector2i) -> BuildingMap.PlacedObject:
-	return building.levels[key.x].objects.get(key.y)
