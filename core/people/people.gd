@@ -783,7 +783,8 @@ func _mood_extras(person: Person, here: Array) -> Array:
 	var out: Array = []
 	var home := home_room(person)
 	if home.is_empty():
-		out.append(["Has no bed of their own", -5.0])
+		if access.gets_bed(person.group):
+			out.append(["Has no bed of their own", -5.0])
 	else:
 		var home_type := room_type(home[1].type)
 		_room_part(out, quality(home[0], home[1]), home_type)
@@ -902,6 +903,11 @@ func _decide(person: Person, may_wander: bool) -> void:
 		jobs.abandon(person)
 	if urgent != &"" and _see_to(person, urgent, true):
 		person.reason = "%s has nearly run out" % need_def(urgent).display_name
+		return
+	# Between jobs, workers see to a need that has run low first.
+	var running_low: StringName = _pressing_need(person) if person.job == null else &""
+	if running_low != &"" and jobs != null and jobs.wants_work(person) and _see_to(person, running_low):
+		person.reason = "%s is low" % need_def(running_low).display_name
 		return
 	if jobs != null and jobs.wants_work(person) and is_in_place(person) and jobs.carry_on(person):
 		person.reason = "Working"

@@ -13,9 +13,10 @@ const DESKS: Array[StringName] = [&"guard_desk"]
 const GATE_KIND := &"security_gate"
 ## Tiles from a desk to the gates it opens.
 const GATE_RANGE := 10.0
-## Game minutes a guard sits at a post before the job comes round again.
-## They get up sooner only for a need that has nearly run out.
-const POST_MINUTES := 240.0
+## Game minutes a guard sits at a post before the job comes round again,
+## when they may take a break. They get up sooner only for a need that has
+## nearly run out.
+const POST_MINUTES := 90.0
 ## Game minutes a post's gates stay open after its guard gets up, so a
 ## change of guard or a quick break doesn't shut them.
 const GATE_GRACE := 5.0

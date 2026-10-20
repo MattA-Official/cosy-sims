@@ -42,6 +42,7 @@ Built with [Godot 4.7](https://godotengine.org/).
 | 9 Terrain | Hold to raise, lower, flatten or smooth the ground, with sliders for size and strength; or add water to a hollow, or drain a pond |
 | 0 Demolish | Click an object or wall to remove it, or drag to clear an area |
 | Z Zones | Rooms tint by who may be in them. Pick a zone (Prisoners and staff, Staff only, Visitors and staff, Everyone) and click a room to paint it, or pick Room type's to go back to its default. Click a door to lock or unlock it until the block changes; Shift-click to pin it that way |
+| X Patrol routes | Click points to draw a loop for guards to walk; click the first point or press Enter to close it, Esc to stop. Ctrl-click a route to remove it. Put guards on it in the Staff window |
 | [ / ] | Brush size, for terrain and plants |
 | Tab | Loops through the wall views: Walls up; Cutaway (walls in front of rooms drop, following the camera round); Walls down; Roofs on (every level with its roofs, as from outside) |
 | Esc | Put the tool away |
@@ -175,9 +176,17 @@ staff, who wanders, eats and chats where staff may go.
 ### Staff and jobs
 
 Press P (or the people button by the clock) for the Staff window: + and −
-take on or let go a cook, cleaner or handyman, and put prisoners on or
-off a work programme (kitchen, laundry, cleaning, workshop). Staff are
-free for now and always on site; shifts come with M5 and wages with M6.
+set how many cooks, cleaners, handymen and guards work days (06:00 to
+18:00) and nights (18:00 to 06:00), put guards on patrol routes, and put
+prisoners on or off a work programme (kitchen, laundry, cleaning,
+workshop). Staff arrive at the edge of the land early enough to walk in
+before their shift, and go home when it ends. They are free until wages
+come with M6; nights will pay half as much again.
+
+With Staff needs on (the default, in the Staff window), staff get
+hungry, need the toilet and run low on energy over a shift; a coffee
+machine in the staff room tops it up, and worn-out staff work slower.
+Off, they simply work their shift.
 
 Work is a board of jobs, each a list of stages: fetch something, deliver
 it, or work at an object for a while. The morning lorry leaves crates of
@@ -190,9 +199,19 @@ clean one, and the dirty ones get washed, ironed and stacked back on the
 shelves. In work blocks prisoners on the workshop programme make toys
 and birdhouses that the lorry takes away to sell.
 
+Guards sit at guard post desks, patrol where the prisoners are (or walk
+a patrol route), and walk back any prisoner they spot out of place.
+Security gates (a door kind in the Doors and windows tool) stay locked
+to prisoners unless a guard is at a guard post desk nearby.
+
+Toilets, showers, cookers, washing machines and TVs wear out with use
+and break: nobody can use a broken one, a spanner floats over it, and
+the handyman comes to mend it.
+
 With F3 on, a jobs panel lists every open job (who is on it, or why it is
 waiting), the stock of every item and anything that stops the kitchen or
-laundry working, and dotted lines show where each worker is heading.
+laundry working and anything broken, and dotted lines show where each
+worker is heading. Patrol routes show as dotted loops too.
 
 ### Sample prisons
 
@@ -212,6 +231,7 @@ how prisoners find their way:
 | Locked out | Showers with no door, and a raised canteen that needs Door Steps |
 | Staff wing | A staff room behind a staff door, and an office zoned staff only |
 | Working prison | The staff wing with a kitchen, laundry and workshop, three staff and prisoners on work programmes |
+| Guarded prison | The working prison with a guard post and a security gate to the yard, two guards by day and one by night |
 
 See [docs/design/building.md](docs/design/building.md) for the design
 decisions behind all this.

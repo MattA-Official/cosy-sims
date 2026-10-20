@@ -1,13 +1,14 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [debug] [route] [break=TAG] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [debug] [route] [loop=X,Z,...] [break=TAG] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
 ## person; "zones" opens the zones tool; "staff" opens the staff window;
 ## "debug" turns on the debug view (F3); "route" opens the patrol route
-## tool; break=TAG breaks the first object with that tag;
+## tool; loop=X,Z,X,Z,... draws a patrol route with a guard on it;
+## break=TAG breaks the first object with that tag;
 ## at=X,Z points the camera at a tile, and zoom=F scales its distance.
 
 const FRAMES_TO_WAIT := 90
@@ -50,6 +51,12 @@ func _process(_delta: float) -> bool:
 			if arg.begins_with("at="):
 				var at := arg.get_slice("=", 1).split_floats(",")
 				_main.camera_rig.focus_on(Vector3(at[0], 0.0, at[1]) * _main.grid.cell_size)
+			elif arg.begins_with("loop="):
+				var at := arg.get_slice("=", 1).split_floats(",")
+				for i in range(0, at.size() - 1, 2):
+					_main.routes.click(0, Vector2(at[i], at[i + 1]))
+				_main.routes.finish()
+				_main.routes.set_guards(_main.routes.routes.back(), 1)
 			elif arg.begins_with("break="):
 				var tagged: Array[StringName] = [StringName(arg.get_slice("=", 1))]
 				for key in _main.building.objects_tagged(tagged).slice(0, 1):

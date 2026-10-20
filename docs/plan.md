@@ -22,7 +22,11 @@ evening-sized chunks.
    M4 added items people carry (`core/items/`), a job board with fetch,
    deliver and work stages (`core/jobs/`), staff roles, work programmes
    and the Staff window, and the kitchen, cleaning, laundry and workshop
-   (`games/prison/`).*
+   (`games/prison/`). M5 added day and night shifts (`core/jobs/shifts.gd`),
+   staff energy and the needs setting, guards with guard posts, security
+   gates and patrol routes (`games/prison/guarding.gd`,
+   `core/jobs/patrol_routes.gd`), and wear and repair
+   (`core/jobs/wear.gd`).*
 4. **Review and extract the core.** Note what is prison-specific and what is
    generic (camera, grid, building, agents, needs, schedules), then move the
    generic parts into `core/`.
