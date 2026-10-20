@@ -126,6 +126,8 @@ PALETTE = dict(
     hospital=("#eef2f2", 0.5, 0),       # infirmary white
     cross=("#5fa86f", 0.6, 0),          # first-aid green
     dust=("#efe8da", 1.0, 0),
+    galv=("#a3a9ad", 0.45, 0.4),        # galvanised fence wire and posts
+    hazard=("#e2b13c", 0.6, 0),         # warning yellow
     gold=("#e0b65a", 0.35, 0.6),        # staff badge
     trunk=("#ffffff", 0.9, 0),
     canopy=("#ffffff", 0.9, 0),
@@ -475,6 +477,22 @@ def cctv_monitor():
     p.box("steel_dark", (0.08, 0.08, 0.1), (0, 0.08, 0.06), 0.02, 2)
     p.box("steel_dark", (0.2, 0.14, 0.015), (0, 0.08, 0.0075), 0.006, 1)
     p.box("steel_dark", (0.36, 0.12, 0.02), (0, -0.1, 0.01), 0.008, 1)  # keyboard
+    return p
+
+
+def cctv_camera():
+    """0.5 x 0.5, 2.2 m: a slim grey post with a boxy camera on top, tilted
+    a little down, its lens looking along Godot's +z (Blender -Y)."""
+    p = Prop("cctv_camera")
+    p.cyl("steel_dark", 0.14, 0.05, (0, 0, 0.025), bevel=0.015, n=20)
+    p.tube("steel", [(0, 0, 0.04), (0, 0, 1.98)], 0.035, 0, n=12)
+    p.box("steel_dark", (0.1, 0.1, 0.08), (0, 0, 2.0), 0.02, 2)  # bracket
+    tilt = (-15, 0, 0)
+    p.box("cream", (0.18, 0.36, 0.16), (0, -0.08, 2.1), 0.04, 3, rot=tilt)
+    p.box("cream", (0.22, 0.4, 0.025), (0, -0.1, 2.195), 0.01, 1, rot=tilt)  # sun hood
+    p.cyl("rubber", 0.055, 0.04, (0, -0.27, 2.05), bevel=0.012, n=20, rot=(90 - 15, 0, 0))
+    p.cyl("screen", 0.04, 0.045, (0, -0.275, 2.05), bevel=0.008, n=20, rot=(90 - 15, 0, 0))
+    p.ball("food_c", 0.012, (0.06, -0.24, 2.13), u=8, v=6)  # recording light
     return p
 
 
@@ -847,6 +865,78 @@ def security_gate():
         x = -inner / 2 + inner * (i + 0.5) / 7
         p.tube("paint", [(x, 0, 0.03), (x, 0, DOOR_H - fw - 0.04)], 0.016, 0, n=10)
     p.box("steel", (0.06, 0.1, 0.16), (inner / 2 - 0.05, 0, 0.55), 0.015, 2)
+    return p
+
+
+def _mesh_infill(p, x0, x1, z0, z1, pitch=0.16, r=0.007, y=0.0, material="galv"):
+    """Chain link as thin diagonal wires clipped to a rectangle."""
+    w, h = x1 - x0, z1 - z0
+    for sign in (1, -1):
+        c = -h
+        while c < w + h:
+            pts = []
+            for z in (0.0, h):  # where the line x = c + sign*z meets the rectangle
+                xx = c + sign * z if sign > 0 else c - z
+                pts.append((xx, z))
+            (ax, az), (bx, bz) = pts
+            # Clip the segment to 0..w in x.
+            if ax > bx:
+                (ax, az), (bx, bz) = (bx, bz), (ax, az)
+            if bx < 0 or ax > w:
+                c += pitch
+                continue
+            if ax < 0:
+                az += (0 - ax) * (bz - az) / (bx - ax)
+                ax = 0
+            if bx > w:
+                bz -= (bx - w) * (bz - az) / (bx - ax)
+                bx = w
+            if abs(bx - ax) > 0.02:
+                p.tube(material, [(x0 + ax, y, z0 + az), (x0 + bx, y, z0 + bz)], r, 0, n=4)
+            c += pitch
+
+
+def people_gate():
+    """A chain-link gate for the perimeter fence, same opening as `door`."""
+    p = Prop("people_gate")
+    for x in (-0.47, 0.47):
+        p.tube("galv", [(x, 0, 0), (x, 0, DOOR_H)], 0.03, 0, n=10)
+        p.ball("galv", 0.035, (x, 0, DOOR_H), u=10, v=6)
+    # The leaf: a tube frame with mesh, hinged on the left.
+    x0, x1, z0, z1 = -0.42, 0.42, 0.05, DOOR_H - 0.05
+    p.tube("galv", [(x0, 0, z0), (x0, 0, z1), (x1, 0, z1), (x1, 0, z0), (x0, 0, z0)], 0.018, 0.04, n=8)
+    p.tube("galv", [(x0, 0, (z0 + z1) / 2), (x1, 0, (z0 + z1) / 2)], 0.014, 0, n=8)
+    _mesh_infill(p, x0, x1, z0, z1)
+    p.box("steel_dark", (0.08, 0.08, 0.12), (x1 - 0.02, 0, 0.6), 0.015, 2)
+    for z in (0.2, DOOR_H - 0.2):
+        p.box("steel_dark", (0.07, 0.05, 0.05), (x0 - 0.03, 0, z), 0.01, 1)
+    return p
+
+
+def vehicle_gate():
+    """A sliding vehicle gate squeezed into one tile: a chunky frame on
+    wheels running along a floor track, hazard stripes and a STOP sign."""
+    p = Prop("vehicle_gate")
+    # Guide posts with yellow and dark stripes.
+    for x in (-0.47, 0.47):
+        p.box("steel_dark", (0.08, 0.12, DOOR_H), (x, 0, DOOR_H / 2), 0.02, 2)
+        for k in range(4):
+            p.box("hazard", (0.085, 0.125, 0.12), (x, 0, 0.12 + k * 0.26), 0.01, 1)
+    p.box("steel_dark", (1.0, 0.1, 0.05), (0, 0.0, 0.025), 0.015, 1)  # track
+    # The leaf: heavy box-section frame with a diagonal brace and mesh.
+    x0, x1, z0, z1 = -0.42, 0.42, 0.13, DOOR_H - 0.08
+    p.box("galv", (0.86, 0.06, 0.06), (0, 0, z0), 0.015, 2)
+    p.box("galv", (0.86, 0.06, 0.06), (0, 0, z1), 0.015, 2)
+    for x in (x0, x1):
+        p.box("galv", (0.06, 0.06, z1 - z0), (x, 0, (z0 + z1) / 2), 0.015, 2)
+    p.tube("galv", [(x0, 0, z0), (x1, 0, z1)], 0.02, 0, n=8)
+    _mesh_infill(p, x0, x1, z0, z1, pitch=0.13)
+    for x in (-0.25, 0.25):
+        p.cyl("rubber", 0.05, 0.04, (x, 0, 0.08), bevel=0.012, n=16, rot=(90, 0, 0))
+    # A little STOP sign on both faces.
+    for y in (-0.045, 0.045):
+        p.cyl("food_c", 0.11, 0.015, (0, y, 0.68), bevel=0.004, n=8, rot=(90, 0, 22.5))
+        p.box("sheet", (0.12, 0.017, 0.03), (0, y, 0.68), 0.004, 1)
     return p
 
 
@@ -1393,7 +1483,7 @@ def lorry():
     return p
 
 
-MODELS = dict(biscuit=biscuit, spoon=spoon, rolling_pin=rolling_pin, frying_pan=frying_pan,
+MODELS = dict(cctv_camera=cctv_camera, people_gate=people_gate, vehicle_gate=vehicle_gate, biscuit=biscuit, spoon=spoon, rolling_pin=rolling_pin, frying_pan=frying_pan,
               screwdriver=screwdriver, mallet=mallet, soap_sock=soap_sock,
               infirmary_bed=infirmary_bed, medicine_cabinet=medicine_cabinet, dust_cloud=dust_cloud,
               tunnel_portal=tunnel_portal, car=car, car_red=lambda: car("car_red", "car_red"),

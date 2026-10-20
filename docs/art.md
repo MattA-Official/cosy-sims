@@ -38,6 +38,7 @@ colours a real prison would plausibly use.
   food_crate, meal_tray, dirty_laundry, clean_laundry, rubbish_bag,
   wooden_toy, birdhouse. Floor litter: litter_paper, litter_can,
   litter_wrapper.
+- Security: cctv_camera (0.5 x 0.5, 2.2 m post, lens along +z).
 - Contraband items (same size and origin as other items): biscuit, spoon,
   rolling_pin, frying_pan, screwdriver, mallet, soap_sock.
 - Infirmary: infirmary_bed (1 x 2, head to the front like the cell bed;
@@ -57,7 +58,8 @@ colours a real prison would plausibly use.
 - Floors also include floor_car_park: tarmac with a white bay line on one
   x edge of each tile, so every tile is one bay.
 - Doors: door (in use), cell_door (barred, not used yet), security_gate
-  (all bars, for a door kind).
+  (all bars, for a door kind), people_gate (chain link, for the perimeter
+  fence), vehicle_gate (sliding, with hazard stripes and a no-entry sign).
 - People: person. Plants: tree, bush, flower.
 - Icons (`core/ui/icons/`): mood_beaming, mood_content, mood_fed_up,
   mood_angry, in the same white line style as the rest. Markers
@@ -131,7 +133,10 @@ surface's own frame (front is +z, as for every object).
   (flower stems) keep their own colour. So the round tree and the blossom
   tree share one model.
 - **Floors and walls**: `FloorDef.texture` and `WallDef.texture`. Walls
-  can also have a dado (`dado_colour`, `dado_height`).
+  can also have a dado (`dado_colour`, `dado_height`). A see-through wall
+  whose texture has see-through parts (`chain_link.png`, the perimeter
+  fence) is drawn as a cut-out mesh panel between posts; one without is
+  drawn as rails. The perimeter wall uses `wall_concrete_panels.png`.
 - **Paths**: `PathView.texture`, one grit texture for every style.
 - **Ground**: the `detail` texture on the ground shader
   (`core/grid/grid_ground.gdshader`), repeating every `detail_scale` metres.

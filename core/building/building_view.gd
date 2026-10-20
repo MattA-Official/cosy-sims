@@ -123,6 +123,8 @@ var _ranked: Array[Array] = []
 var _material := MeshShapes.vertex_colour_material()
 var _glass_material := _make_glass_material()
 var _object_materials := {} # Color -> StandardMaterial3D
+## Which textures have see-through parts (see _cut_out).
+static var _cut_outs: Dictionary[Texture2D, bool] = {}
 ## Vertex-coloured materials with a texture over the colour, shared by
 ## every level.
 static var _textured_materials := {} # Texture2D -> StandardMaterial3D
@@ -372,6 +374,17 @@ func _commit(surfaces: Dictionary) -> ArrayMesh:
 	return mesh
 
 
+## Whether a texture has see-through parts, like chain link. (Imported
+## textures don't report their alpha, so this looks once and remembers.)
+func _cut_out(texture: Texture2D) -> bool:
+	if texture == null:
+		return false
+	if not _cut_outs.has(texture):
+		var image := texture.get_image()
+		_cut_outs[texture] = image != null and image.detect_alpha() != Image.ALPHA_NONE
+	return _cut_outs[texture]
+
+
 func _textured_material(texture: Texture2D) -> StandardMaterial3D:
 	if texture == null:
 		return _material
@@ -379,6 +392,12 @@ func _textured_material(texture: Texture2D) -> StandardMaterial3D:
 		var material := MeshShapes.vertex_colour_material()
 		material.albedo_texture = texture
 		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		if _cut_out(texture):
+			# Cut-out, seen from both sides. A low threshold keeps thin wire
+			# showing in the smaller mipmaps, where it reads as a grey haze.
+			material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+			material.alpha_scissor_threshold = 0.15
+			material.cull_mode = BaseMaterial3D.CULL_DISABLED
 		_textured_materials[texture] = material
 	return _textured_materials[texture]
 
@@ -773,16 +792,30 @@ static func _make_glass_material() -> StandardMaterial3D:
 ## Posts at each end and two rails between them. Fences meeting at a corner
 ## share its post.
 func _add_fence(run: WallRun) -> void:
+	# A texture with see-through parts (chain link) is a mesh panel between
+	# plain posts with a top rail; any other is planks on two rails.
+	var mesh_texture := run.def.texture if _cut_out(run.def.texture) else null
+	var plain := run.top_colour if mesh_texture != null else Color(0, 0, 0, 0)
 	for i in 2:
 		if _posts.has(run.corners[i]):
 			continue
 		_posts[run.corners[i]] = true
 		var at := run.length * i
-		_add_slab(run, at - 0.06, at + 0.06, -run.drop, run.height, Color(0, 0, 0, 0),
+		_add_slab(run, at - 0.06, at + 0.06, -run.drop, run.height, plain,
 				Color(0, 0, 0, 0), 0.06 / run.half)
-	for rail_y in [run.height * 0.45, run.height * 0.85]:
-		_add_slab(run, 0.0, run.length, rail_y - 0.05, rail_y + 0.05, Color(0, 0, 0, 0),
-				Color(0, 0, 0, 0), 0.6)
+	if mesh_texture == null:
+		for rail_y in [run.height * 0.45, run.height * 0.85]:
+			_add_slab(run, 0.0, run.length, rail_y - 0.05, rail_y + 0.05, Color(0, 0, 0, 0),
+					Color(0, 0, 0, 0), 0.6)
+		return
+	_add_slab(run, 0.0, run.length, run.height - 0.06, run.height, plain, Color(0, 0, 0, 0), 0.5)
+	var a := run.start
+	var b := run.start + run.along * run.length
+	var low := run.base - run.drop
+	var high := run.base + run.height - 0.06
+	MeshShapes.add_quad(_surface(_surfaces, mesh_texture), Vector3(a.x, low, a.y),
+			Vector3(b.x, low, b.y), Vector3(b.x, high, b.y), Vector3(a.x, high, a.y),
+			Vector3(run.across.x, 0.0, run.across.y), run.own.colour)
 
 
 func _build_objects() -> void:

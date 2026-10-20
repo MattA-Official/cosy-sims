@@ -101,6 +101,33 @@ def car_park(seed=15):
     return out * (1 - lines) + 0.98 * lines
 
 
+def chain_link(pitch=6, wire=5.0):
+    """Diamond chain-link mesh, `pitch` diamonds a metre. Returns (grey,
+    alpha): the wire is opaque, the holes clear."""
+    x, y = grid()
+    period = SIZE / pitch
+    a = line_mask(x + y, period, wire)
+    b = line_mask(x - y, period, wire)
+    alpha = np.clip(np.maximum(a, b) * 1.6, 0, 1)
+    # A touch darker where the wires cross over each other.
+    grey = 0.95 - np.minimum(a, b) * 0.12
+    return grey, alpha
+
+
+def concrete_panels(seed=17):
+    """Precast panels a metre wide and a metre tall, with a soft joint and
+    four little tie holes on each."""
+    x, y = grid()
+    out = 0.95 + soft_noise(40, seed=seed) * 0.025 + soft_noise(3, seed=seed + 1) * 0.01
+    joints = np.maximum(line_mask(x, SIZE, 3.0), line_mask(y, SIZE, 3.0))
+    out = out * (1 - joints) + 0.78 * joints
+    for hx in (0.2, 0.8):
+        for hy in (0.25, 0.75):
+            d = np.hypot(x - hx * SIZE, y - hy * SIZE)
+            out -= np.clip(1 - d / 9.0, 0, 1) * 0.15
+    return out
+
+
 def mottled(blob, amount, base=0.95, fine=0.0, seed=5):
     out = base + soft_noise(blob, seed=seed) * amount
     if fine:
@@ -151,6 +178,9 @@ TEXTURES = {
     # Outdoor walls
     "wood_fence": lambda: planks(4, mortar=1.2, grain=0.035, seed=13),
     "hedge": leaves,
+    # Perimeter
+    "wall_concrete_panels": concrete_panels,
+    "chain_link": chain_link,
     # Paths and ground
     "path_grit": lambda: speckle(0.25, seed=14),
     "path_tarmac": lambda: speckle(0.12, dark=0.07, light=0.05, seed=16, size=1.2, base=0.94),
@@ -159,6 +189,11 @@ TEXTURES = {
 
 
 def save(arr, path):
+    if isinstance(arr, tuple):  # (grey, alpha): a cut-out texture
+        grey, alpha = (np.clip(a, 0, 1) for a in arr)
+        rgba = np.dstack([grey, grey, grey, alpha])
+        Image.fromarray((rgba * 255).astype(np.uint8), "RGBA").save(path, optimize=True)
+        return
     arr = np.clip(arr, 0, 1) ** (1 / 1.0)
     Image.fromarray((arr * 255).astype(np.uint8), "L").convert("RGB").save(path, optimize=True)
 

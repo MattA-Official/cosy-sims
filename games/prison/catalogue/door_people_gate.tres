@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://core/building/door_kind_def.gd" id="1_def"]
 [ext_resource type="Texture2D" path="res://core/ui/icons/opening_security_gate.svg" id="2_icon"]
-[ext_resource type="PackedScene" path="res://games/prison/art/models/security_gate.glb" id="3_model"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/people_gate.glb" id="3_model"]
 
 [resource]
 script = ExtResource("1_def")
