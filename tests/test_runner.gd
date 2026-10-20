@@ -1342,6 +1342,13 @@ func _test_foliage() -> void:
 	_check(foliage.add(tree, Vector2(5 + tree.spacing + 0.1, 5)), "a tree further away goes in")
 	_check(not foliage.add(flower, Vector2(5.1, 5)), "nothing grows right on top of a tree")
 	_check(foliage.add(flower, Vector2(5.5, 5.2)), "flowers can grow near a tree")
+	var sparse := FoliageLayer.new()
+	sparse.add(tree, Vector2(5, 5))
+	_check(not sparse.add(tree, Vector2(5 + tree.spacing + 0.1, 5), 1.0, 0.0, 2.0),
+			"a lower density keeps trees further apart")
+	_check(sparse.add(tree, Vector2(5 + tree.spacing * 2.0 + 0.1, 5), 1.0, 0.0, 2.0),
+			"but no further than it says")
+	sparse.free()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1
 	var added := foliage.paint(flower, Vector2(20, 20), 3.0, 50, rng,

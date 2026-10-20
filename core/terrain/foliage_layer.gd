@@ -30,8 +30,10 @@ func _ready() -> void:
 
 
 ## Adds a plant if nothing is too close. Returns whether it was added.
-func add(def: FoliageDef, position: Vector2, scale := 1.0, rotation := 0.0) -> bool:
-	if not has_room(def, position):
+## `spread` stretches the gap kept from plants of the same kind: 2.0 plants
+## them twice as far apart as their spacing.
+func add(def: FoliageDef, position: Vector2, scale := 1.0, rotation := 0.0, spread := 1.0) -> bool:
+	if not has_room(def, position, spread):
 		return false
 	var plant := Plant.new()
 	plant.def = def
@@ -45,22 +47,24 @@ func add(def: FoliageDef, position: Vector2, scale := 1.0, rotation := 0.0) -> b
 
 
 ## Is there space for this kind of plant here?
-func has_room(def: FoliageDef, position: Vector2) -> bool:
-	var reach := ceili(def.spacing)
+func has_room(def: FoliageDef, position: Vector2, spread := 1.0) -> bool:
+	var spacing := def.spacing * spread
+	var reach := ceili(spacing)
 	var home := Vector2i(position.floor())
 	for z in range(home.y - reach, home.y + reach + 1):
 		for x in range(home.x - reach, home.x + reach + 1):
 			for other: Plant in _buckets.get(Vector2i(x, z), []):
-				var gap := def.spacing if other.def == def else 0.3
+				var gap := spacing if other.def == def else 0.3
 				if other.position.distance_to(position) < gap:
 					return false
 	return true
 
 
-## Scatters up to `attempts` plants at random inside a circle. `can_grow`
+## Scatters up to `attempts` plants at random inside a circle, `spread`
+## apart as for add(). `can_grow`
 ## takes a position and says whether a plant may go there.
 func paint(def: FoliageDef, centre: Vector2, radius: float, attempts: int,
-		rng: RandomNumberGenerator, can_grow: Callable) -> int:
+		rng: RandomNumberGenerator, can_grow: Callable, spread := 1.0) -> int:
 	var added := 0
 	for i in attempts:
 		var offset := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * radius
@@ -68,7 +72,7 @@ func paint(def: FoliageDef, centre: Vector2, radius: float, attempts: int,
 		if not can_grow.call(position):
 			continue
 		var scale := rng.randf_range(def.scale_range.x, def.scale_range.y)
-		if add(def, position, scale, rng.randf() * TAU):
+		if add(def, position, scale, rng.randf() * TAU, spread):
 			added += 1
 	return added
 

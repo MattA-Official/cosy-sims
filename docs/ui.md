@@ -134,7 +134,14 @@ _columns("Brushes", _mode_buttons(BRUSHES, controller.terrain_brush,
 
 `_mode_buttons` makes one button per entry, lights the one equal to the
 current value, and calls your function with the value picked. `_columns`
-lays them out under a heading. For a tile row instead, use
+lays them out under a heading. For modes that deserve big tiles (the
+terrain brushes and water), `_icon_tiles(title, entries, current, pick)`
+takes the same entries and makes a tile each.
+
+Brush tools get a **Brush** section of sliders from
+`_add_brush_sliders(plants)`: size for terrain and plants (plants go down
+to "Single", one plant per click), and density for plants. They follow the
+controller's `brush_changed` signal, so [ and ] move them too. For a tile row instead, use
 `_section("Title")` and add `CosyButton.tile(...)` buttons to the row it
 returns.
 

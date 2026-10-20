@@ -10,6 +10,8 @@ extends Node3D
 signal tool_changed(tool: Tool)
 ## The hint text has changed without the tool changing.
 signal hint_changed
+## The brush size or plant density changed.
+signal brush_changed
 signal wall_view_changed(mode: WallView)
 
 ## What Tab loops through, like The Sims: walls up; cutaway (walls in front
@@ -48,7 +50,7 @@ const HINTS := {
 	Tool.ROOM_TYPE: "Click a room to mark it.",
 	Tool.DEMOLISH: "Click an object or wall to remove it, or drag to clear an area.",
 	Tool.TERRAIN: "Hold the mouse to shape your land. [ and ] change the brush size.",
-	Tool.PLANTS: "Hold the mouse to plant. Hold Ctrl to clear plants. [ and ] change the brush size.",
+	Tool.PLANTS: "Hold the mouse to plant, or click to place one at the smallest size. Hold Ctrl to clear. [ and ] change the size.",
 	Tool.PATH: "",
 }
 
@@ -89,6 +91,8 @@ const WATER_HINTS := {
 @export var blend_speed := 4.0
 @export var min_brush_radius := 1.0
 @export var max_brush_radius := 12.0
+
+const MIN_PLANT_DENSITY := 0.25
 
 @export_group("Preview colours")
 @export var ok_colour := Color(0.45, 0.95, 0.55, 0.45)
@@ -155,8 +159,18 @@ var floor_mode := FloorMode.LAY:
 ## Walls go at any angle between corners, not just straight or 45°.
 var any_angle := false
 var plant_def: FoliageDef
-## Brush radius in tiles, for the terrain and plant tools.
-var brush_radius := 3.0
+## Brush radius in tiles, for the terrain and plant tools. Plants can go
+## down to 0, which places one plant per click.
+var brush_radius := 3.0:
+	set(value):
+		brush_radius = value
+		brush_changed.emit()
+## How closely plants of one kind are painted, from 0.25 (four times their
+## spacing apart) to 1 (as close as their spacing allows).
+var plant_density := 1.0:
+	set(value):
+		plant_density = clampf(value, MIN_PLANT_DENSITY, 1.0)
+		brush_changed.emit()
 
 ## Makes the floor and wall tools remove instead of build, as if Ctrl were
 ## held. Mainly for tests.
@@ -266,7 +280,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		hint_changed.emit()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_brush_smaller") and _uses_brush():
-		brush_radius = maxf(brush_radius - 1.0, min_brush_radius)
+		brush_radius = maxf(brush_radius - 1.0, smallest_brush())
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_brush_bigger") and _uses_brush():
 		brush_radius = minf(brush_radius + 1.0, max_brush_radius)
@@ -325,6 +339,16 @@ func _on_press() -> void:
 				water.fill_at(_hover_cell())
 			elif water != null:
 				water.remove_at(_hover_cell())
+		Tool.PLANTS when brush_radius < 0.5:
+			# The smallest size places or removes one plant per click.
+			if foliage == null or _level() != 0:
+				return
+			if _erasing():
+				foliage.remove_in_circle(_hover_point, 0.6)
+			elif plant_def != null and can_grow(_hover_point):
+				foliage.add(plant_def, _hover_point,
+						_rng.randf_range(plant_def.scale_range.x, plant_def.scale_range.y),
+						_rng.randf() * TAU, 1.0 / plant_density)
 		Tool.TERRAIN, Tool.PLANTS:
 			_brushing = true
 			_flatten_target = terrain.height_at(_hover_point) if terrain != null else 0.0
@@ -646,6 +670,11 @@ func _has_chosen_opening(edge: Vector3i) -> bool:
 	return opening != BuildingMap.Wall.WINDOW or map.window_kind(edge) == window_kind
 
 
+## Plants go down to single placement; terrain keeps a real brush.
+func smallest_brush() -> float:
+	return 0.0 if tool == Tool.PLANTS else min_brush_radius
+
+
 func _uses_brush() -> bool:
 	return tool == Tool.TERRAIN or tool == Tool.PLANTS
 
@@ -660,7 +689,7 @@ func _apply_brush(delta: float) -> void:
 			var strength := sculpt_speed * delta
 			if terrain_brush == Terrain.Brush.FLATTEN or terrain_brush == Terrain.Brush.SMOOTH:
 				strength = clampf(blend_speed * delta, 0.0, 1.0)
-			terrain.sculpt(terrain_brush, _hover_point, brush_radius, strength, _flatten_target,
+			terrain.sculpt(terrain_brush, _hover_point, maxf(brush_radius, min_brush_radius), strength, _flatten_target,
 					can_sculpt)
 		Tool.PLANTS:
 			if foliage == null:
@@ -672,7 +701,7 @@ func _apply_brush(delta: float) -> void:
 			if plant_def == null or _plant_cooldown > 0.0:
 				return
 			_plant_cooldown = 0.08
-			foliage.paint(plant_def, _hover_point, brush_radius, 3, _rng, can_grow)
+			foliage.paint(plant_def, _hover_point, brush_radius, 3, _rng, can_grow, 1.0 / plant_density)
 
 
 ## Sculpting stays on your own land: every tile touching the corner must be owned.
@@ -876,7 +905,8 @@ func _draw_preview() -> void:
 			_preview_water()
 		Tool.TERRAIN, Tool.PLANTS:
 			var colour := demolish_colour if tool == Tool.PLANTS and _erasing() else ok_colour
-			_shapes.ring(_hover_point, brush_radius, colour)
+			var radius := brush_radius if tool == Tool.PLANTS else maxf(brush_radius, min_brush_radius)
+			_shapes.ring(_hover_point, maxf(radius, 0.35), colour)
 		Tool.DEMOLISH:
 			var placed := map.object_at(_hover_point)
 			var flight := map.stairs_at(_hover_cell())

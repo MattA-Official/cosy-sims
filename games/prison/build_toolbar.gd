@@ -79,6 +79,8 @@ var _options_bar := PanelContainer.new()
 var _tool_buttons := {} # Tool -> Button
 var _tool_group := ButtonGroup.new()
 var _thumbnails := Thumbnails.new()
+var _size_slider: HSlider
+var _density_slider: HSlider
 
 
 func _ready() -> void:
@@ -119,6 +121,7 @@ func _ready() -> void:
 	_tool_group.allow_unpress = true
 	controller.tool_changed.connect(_on_tool_changed)
 	controller.hint_changed.connect(func() -> void: _hint.text = controller.hint())
+	controller.brush_changed.connect(_show_brush)
 	_on_tool_changed(controller.tool)
 
 
@@ -139,6 +142,11 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 	_hint.text = controller.hint()
 	for child in _options.get_children():
 		child.queue_free()
+	_size_slider = null
+	_density_slider = null
+	if tool == BuildController.Tool.TERRAIN:
+		# Plants can go down to single placement; terrain can't.
+		controller.brush_radius = maxf(controller.brush_radius, controller.min_brush_radius)
 	match tool:
 		BuildController.Tool.ROOM:
 			_add_room_choices()
@@ -165,6 +173,7 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 		BuildController.Tool.PLANTS:
 			_add_choices("Plants", PrisonCatalogue.PLANTS, controller.plant_def,
 					func(def: Resource) -> void: controller.plant_def = def)
+			_add_brush_sliders(true)
 
 	_options_bar.visible = _options.get_children().any(func(c: Node) -> bool:
 		return not c.is_queued_for_deletion())
@@ -279,18 +288,86 @@ func _add_opening_choices() -> void:
 		row.add_child(button)
 
 
-## Sculpting brushes, then the water modes, as one set of choices.
+## Sculpting brushes, then the water modes, as one set of big tiles, then
+## the brush size.
 func _add_brush_choices() -> void:
 	var group := ButtonGroup.new()
 	var sculpting := controller.water_mode == BuildController.WaterMode.NONE
-	_columns("Brushes", _mode_buttons(BRUSHES, controller.terrain_brush if sculpting else null,
+	_icon_tiles("Brushes", BRUSHES, controller.terrain_brush if sculpting else null,
 			func(brush: Terrain.Brush) -> void:
 				controller.terrain_brush = brush
 				controller.water_mode = BuildController.WaterMode.NONE
-				_hint.text = controller.hint(), group))
-	_columns("Water", _mode_buttons(WATER_MODES, controller.water_mode, func(mode: BuildController.WaterMode) -> void:
+				_hint.text = controller.hint(), group)
+	_icon_tiles("Water", WATER_MODES, controller.water_mode, func(mode: BuildController.WaterMode) -> void:
 		controller.water_mode = mode
-		_hint.text = controller.hint(), group))
+		_hint.text = controller.hint(), group)
+	_add_brush_sliders(false)
+
+
+## One big tile per entry of a mode list ([value, name, icon, what it
+## does]), with the icon drawn in ink.
+func _icon_tiles(title: String, entries: Array, current: Variant, pick: Callable,
+		group := ButtonGroup.new()) -> void:
+	var row := _section(title)
+	for entry: Array in entries:
+		var value: Variant = entry[0]
+		var button := CosyButton.tile(entry[1], entry[3], load(ICONS % entry[2]), true, group)
+		button.button_pressed = current != null and value == current
+		button.toggled.connect(func(on: bool) -> void:
+			if on:
+				pick.call(value))
+		row.add_child(button)
+
+
+## Sliders for the brush: its size, which for plants goes down to placing
+## one at a time, and for plants how densely they are painted.
+func _add_brush_sliders(plants: bool) -> void:
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override(&"h_separation", 10)
+	grid.add_theme_constant_override(&"v_separation", 2)
+	_size_slider = _slider_row(grid, "Size", controller.smallest_brush(), controller.max_brush_radius, 1.0,
+			func(value: float) -> void: controller.brush_radius = value)
+	if plants:
+		_density_slider = _slider_row(grid, "Density", BuildController.MIN_PLANT_DENSITY * 100.0, 100.0, 5.0,
+				func(value: float) -> void: controller.plant_density = value / 100.0)
+	_section("Brush").add_child(grid)
+	_show_brush()
+
+
+func _slider_row(grid: GridContainer, title: String, low: float, high: float, step: float,
+		changed: Callable) -> HSlider:
+	var label := Label.new()
+	label.text = title
+	label.theme_type_variation = &"SubtleLabel"
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	grid.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = low
+	slider.max_value = high
+	slider.step = step
+	slider.focus_mode = Control.FOCUS_NONE
+	slider.custom_minimum_size = Vector2(150, 28)
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	slider.value_changed.connect(changed)
+	grid.add_child(slider)
+	var value := Label.new()
+	value.custom_minimum_size.x = 48
+	value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	grid.add_child(value)
+	slider.set_meta(&"value_label", value)
+	return slider
+
+
+## Moves the sliders to match the brush, which [ and ] also change.
+func _show_brush() -> void:
+	if is_instance_valid(_size_slider) and not _size_slider.is_queued_for_deletion():
+		_size_slider.set_value_no_signal(controller.brush_radius)
+		_size_slider.get_meta(&"value_label").text = "Single" if controller.brush_radius < 0.5 \
+				else "%d" % roundi(controller.brush_radius)
+	if is_instance_valid(_density_slider) and not _density_slider.is_queued_for_deletion():
+		_density_slider.set_value_no_signal(controller.plant_density * 100.0)
+		_density_slider.get_meta(&"value_label").text = "%d%%" % roundi(controller.plant_density * 100.0)
 
 
 ## One small icon button per mode entry, picked when its value is
