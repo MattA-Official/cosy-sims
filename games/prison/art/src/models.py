@@ -97,6 +97,8 @@ PALETTE = dict(
     skin=("#ffffff", 0.7, 0),
     hair=("#ffffff", 0.8, 0),
     shoes=("#3b3a3c", 0.7, 0),
+    navy=("#3f5168", 0.7, 0),           # staff cap
+    gold=("#e0b65a", 0.35, 0.6),        # staff badge
     trunk=("#ffffff", 0.9, 0),
     canopy=("#ffffff", 0.9, 0),
     stem=("#5d8f4a", 0.9, 0),
@@ -141,18 +143,22 @@ def _fillet(pts, radius, steps=6):
 
 class Prop:
     """Shapes built around one origin; parts with the same material are
-    joined into one mesh named after it."""
+    joined into one mesh named after it. Parts added while `group` is set
+    are kept apart as material_group, pivoting about `pivots[group]`, so
+    the game can move them (a person's legs)."""
 
     def __init__(self, name, turn=0):
         self.name = name
         self.turn = turn  # degrees about z, baked in when built
-        self.parts = {}  # material name -> [bmesh]
+        self.parts = {}  # (material, group) -> [bmesh]
+        self.group = None
+        self.pivots = {}
 
     def add(self, material, bm, bevel=0.0, segs=3, xf=Matrix()):
         _bevel(bm, bevel, segs)
         bm.transform(xf)
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-        self.parts.setdefault(material, []).append(bm)
+        self.parts.setdefault((material, self.group), []).append(bm)
 
     def box(self, material, size, loc, bevel=0.02, segs=3, rot=(0, 0, 0)):
         bm = bmesh.new()
@@ -217,7 +223,7 @@ class Prop:
         root = bpy.data.objects.new(self.name, None)
         scene.collection.objects.link(root)
         objects = [root]
-        for material, bms in self.parts.items():
+        for (material, group), bms in self.parts.items():
             joined = bmesh.new()
             for bm in bms:
                 me = bpy.data.meshes.new("tmp")
@@ -227,15 +233,19 @@ class Prop:
                 bm.free()
             if self.turn:
                 joined.transform(Matrix.Rotation(math.radians(self.turn), 4, "Z"))
-            me = bpy.data.meshes.new(material)
+            name = material if group is None else "%s_%s" % (material, group)
+            pivot = Vector(self.pivots.get(group, (0, 0, 0)))
+            joined.transform(Matrix.Translation(-pivot))
+            me = bpy.data.meshes.new(name)
             joined.to_mesh(me)
             joined.free()
             me.materials.append(M(material))
             me.shade_smooth()
             me.set_sharp_from_angle(angle=math.radians(40))
-            ob = bpy.data.objects.new(material, me)
+            ob = bpy.data.objects.new(name, me)
             scene.collection.objects.link(ob)
             ob.parent = root
+            ob.location = pivot
             objects.append(ob)
         root.location = location
         root.rotation_euler = (0, 0, math.radians(rot_z))
@@ -369,13 +379,18 @@ def cell_door():
 
 def person():
     """About 0.9 m tall and chunky: big head, short body in one-piece
-    overalls, stubby arms. Faces +y. The game tints outfit, skin and hair."""
+    overalls, stubby arms. Faces +y. The game tints outfit, skin and hair,
+    and swings the legs (outfit_legs, shoes_legs) forward to sit. Parts
+    named *_staff (a peaked cap and a badge) only show on staff."""
     p = Prop("person")
     # Legs and body: a soft pill, a touch wider at the hips.
     p.capsule("outfit", 0.16, 0.2, (0, 0, 0.38), scale=(1, 0.85, 1))
+    p.group = "legs"
+    p.pivots["legs"] = (0, 0, 0.22)
     for x in (-0.075, 0.075):
         p.capsule("outfit", 0.065, 0.1, (x, 0, 0.14))
         p.ball("shoes", 0.07, (x, 0.025, 0.04), scale=(1, 1.35, 0.7))
+    p.group = None
     # Arms hang a little out from the body, hands peeking out.
     for side in (-1, 1):
         p.capsule("outfit", 0.05, 0.14, (side * 0.19, 0, 0.42), rot=(0, side * 12, 0))
@@ -385,6 +400,13 @@ def person():
     for side in (-1, 1):
         p.ball("skin", 0.04, (side * 0.16, -0.01, 0.69), scale=(0.6, 1, 1), u=12, v=8)
     p.ball("hair", 0.172, (0, -0.02, 0.73), scale=(1.02, 0.98, 0.88))
+    # Staff: a peaked cap over the hair and a badge on the chest.
+    p.group = "staff"
+    p.ball("navy", 0.178, (0, -0.01, 0.75), scale=(1.02, 1.0, 0.72))
+    p.cyl("navy", 0.17, 0.04, (0, 0.0, 0.79), bevel=0.015, n=24)
+    p.ball("navy", 0.11, (0, 0.15, 0.77), scale=(1.1, 0.8, 0.18), u=16, v=8)
+    p.cyl("gold", 0.035, 0.012, (0.07, -0.126, 0.47), bevel=0.004, n=16, rot=(90, 0, 0))
+    p.group = None
     # Face: two small dark eyes.
     for side in (-1, 1):
         p.ball("shoes", 0.018, (side * 0.06, 0.148, 0.71), scale=(1, 0.6, 1.3), u=10, v=6)

@@ -63,6 +63,11 @@ shelf top about 1.1 m).
   Meshes named `outfit`, `skin` and `hair` are tinted: the outfit by
   `People.body_colour`, skin and hair picked per person from
   `People.skin_tones` and `People.hair_colours`.
+- **Poses**: `core/people/person_poses.gd` lies people in bed, sits them
+  at tables, on toilets and on benches (their `*_legs` meshes swing
+  forward from the hips) and stands them in showers, by the object's tag.
+  Meshes named `*_<group>` (the staff cap and badge, `*_staff`) only show
+  on people in that group.
 - **Plants**: `FoliageDef.model`. A mesh named `trunk` takes
   `trunk_colour`; ones named `canopy` or `bloom` take `colour`; the rest
   (flower stems) keep their own colour. So the round tree and the blossom

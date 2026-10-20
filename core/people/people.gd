@@ -139,6 +139,8 @@ var _claimed: Dictionary[Vector2i, Person] = {}
 var _bed_owners: Dictionary[Vector2i, Person] = {}
 var _bodies: Dictionary[Person, Node3D] = {}
 var _materials: Dictionary[Color, StandardMaterial3D] = {}
+## How bodies look while using things (lying in bed, sitting to eat).
+var poses := PersonPoses.new()
 ## Rooms of the types each block sends people to, by group (as zones
 ## keep some groups out), worked out when first wanted.
 var _rooms_for: Dictionary[ActivityDef, Dictionary] = {}
@@ -1415,6 +1417,7 @@ func _update_bodies() -> void:
 			var ahead := Vector2(person.route[0].x, person.route[0].z) - person.flat()
 			if ahead.length() > 0.01:
 				body.rotation.y = atan2(-ahead.x, -ahead.y)
+		_pose(person, body, cs)
 		body.get_node("Flag").visible = person.out_of_place
 		var face := body.get_node("Face") as Sprite3D
 		var mood_face := mood_model.face(person.mood)
@@ -1423,6 +1426,21 @@ func _update_bodies() -> void:
 		if face.visible:
 			face.texture = face_textures[mood_face]
 	_update_visibility()
+
+
+## Lies, sits or showers someone's body while they use an object.
+func _pose(person: Person, body: Node3D, cs: float) -> void:
+	var placed := target_object(person) if person.state == Person.State.USING else null
+	if placed != null:
+		var map := building.levels[person.target.x]
+		var floor_y := map.floor_height(Vector2i(placed.centre.floor()))
+		if poses.apply(body, placed, floor_y, Vector2(person.stand_spot.x, person.stand_spot.z), cs,
+				person.target_need):
+			body.set_meta(&"posed", true)
+			return
+	if body.has_meta(&"posed"):
+		body.remove_meta(&"posed")
+		poses.clear(body)
 
 
 ## People above the level being looked at are hidden, like the floors.
@@ -1449,6 +1467,10 @@ func _make_body(person: Person) -> Node3D:
 				"outfit": mesh.material_override = _flat_material(_outfit(person))
 				"skin": mesh.material_override = _flat_material(skin)
 				"hair": mesh.material_override = _flat_material(hair)
+			# Parts for one group only, like a staff cap (named *_staff).
+			var only := StringName(mesh.name.get_slice("_", 1))
+			if access.groups.has(only):
+				mesh.visible = only == person.group
 		_add_flag(model)
 		return model
 	var root := Node3D.new()
