@@ -2,7 +2,9 @@ class_name TimetableWindow
 extends PanelContainer
 ## The timetable: a strip of 24 hours, each painted with a block. Pick a
 ## block from the row of swatches, then click or drag across hours to paint
-## it, like Prison Architect's regime. Toggle with T.
+## it, like Prison Architect's regime. With a runner and categories, a
+## category can be given its own timetable (and merged back), picked from
+## a menu. Toggle with T.
 
 const HOUR_WIDTH := 40.0
 const STRIP_HEIGHT := 46.0
@@ -13,10 +15,19 @@ var activities: Array[ActivityDef] = []
 var clock: GameClock
 ## Shown in the heading, such as "Prisoners".
 var group_name := "Prisoners"
+## Optional: for category timetables.
+var runner: ScheduleRunner
+var categories: Array[CategoryDef] = []
+## The timetable being painted, as a runner key.
+var key: StringName = &""
 
 var _picked: ActivityDef
 var _strip := HourStrip.new()
 var _note := Label.new()
+var _who := Label.new()
+var _pick_timetable := OptionButton.new()
+var _split := MenuButton.new()
+var _merge := Button.new()
 
 
 ## The 24 hours, drawn and painted on.
@@ -89,11 +100,10 @@ func _ready() -> void:
 	title.text = "Timetable"
 	title.theme_type_variation = &"HeaderLabel"
 	heading.add_child(title)
-	var who := Label.new()
-	who.text = group_name
-	who.theme_type_variation = &"SubtleLabel"
-	who.size_flags_vertical = SIZE_SHRINK_CENTER
-	heading.add_child(who)
+	_who.text = group_name
+	_who.theme_type_variation = &"SubtleLabel"
+	_who.size_flags_vertical = SIZE_SHRINK_CENTER
+	heading.add_child(_who)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
 	heading.add_child(spacer)
@@ -104,6 +114,8 @@ func _ready() -> void:
 	close.pressed.connect(hide)
 	heading.add_child(close)
 	box.add_child(heading)
+	if runner != null and not categories.is_empty():
+		box.add_child(_category_row())
 
 	var swatches := HBoxContainer.new()
 	var group := ButtonGroup.new()
@@ -143,7 +155,85 @@ func _ready() -> void:
 
 func toggle() -> void:
 	visible = not visible
+	_refresh_timetables()
 	_strip.queue_redraw()
+
+
+## Which timetable to paint, and splitting a category off or merging it back.
+func _category_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 8)
+	_pick_timetable.focus_mode = FOCUS_NONE
+	_pick_timetable.tooltip_text = "Which timetable you're painting."
+	_pick_timetable.item_selected.connect(func(index: int) -> void:
+		show_timetable(StringName(_pick_timetable.get_item_metadata(index))))
+	row.add_child(_pick_timetable)
+	_split.text = "Separate timetable for…"
+	_split.flat = false
+	_split.focus_mode = FOCUS_NONE
+	_split.tooltip_text = "Gives a security category its own timetable, starting as a copy of everyone's."
+	_split.get_popup().id_pressed.connect(func(id: int) -> void:
+		var def := categories[id]
+		runner.split(schedule.group, def.id)
+		show_timetable(ScheduleRunner.category_key(schedule.group, def.id)))
+	row.add_child(_split)
+	_merge.text = "Merge back"
+	_merge.focus_mode = FOCUS_NONE
+	_merge.tooltip_text = "This category goes back to everyone's timetable."
+	_merge.pressed.connect(func() -> void:
+		var group := schedule.group
+		runner.merge(key)
+		show_timetable(group))
+	row.add_child(_merge)
+	return row
+
+
+## Switches to painting another timetable, by runner key.
+func show_timetable(to: StringName) -> void:
+	if runner == null or not runner.schedules.has(to):
+		return
+	key = to
+	schedule = runner.schedules[to]
+	_refresh_timetables()
+	_strip.queue_redraw()
+
+
+## The name of a timetable, such as "Everyone" or "High security".
+func timetable_name(of: StringName) -> String:
+	var parts := String(of).split("/")
+	if parts.size() < 2:
+		return "Everyone"
+	for def in categories:
+		if def.id == StringName(parts[1]):
+			return def.display_name
+	return parts[1].capitalize()
+
+
+func _refresh_timetables() -> void:
+	if runner == null or categories.is_empty() or schedule == null:
+		return
+	var group := schedule.group
+	if key == &"":
+		key = group
+	_pick_timetable.clear()
+	var keys: Array[StringName] = [group]
+	for def in categories:
+		var category_key := ScheduleRunner.category_key(group, def.id)
+		if runner.schedules.has(category_key):
+			keys.append(category_key)
+	for i in keys.size():
+		_pick_timetable.add_item(timetable_name(keys[i]))
+		_pick_timetable.set_item_metadata(i, keys[i])
+		if keys[i] == key:
+			_pick_timetable.select(i)
+	var popup := _split.get_popup()
+	popup.clear()
+	for i in categories.size():
+		if not runner.schedules.has(ScheduleRunner.category_key(group, categories[i].id)):
+			popup.add_item(categories[i].display_name, i)
+	_split.disabled = popup.item_count == 0
+	_merge.visible = key != group
+	_who.text = group_name if key == group else "%s: %s only" % [group_name, timetable_name(key)]
 
 
 ## Paints an hour with the picked block.

@@ -65,6 +65,7 @@ func _process(_delta: float) -> bool:
 	_test_escapes()
 	_test_security()
 	_test_sit_ins()
+	_test_category_timetables()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3398,4 +3399,44 @@ func _test_sit_ins() -> void:
 	how.clear()
 	sit_ins.tick()
 	_check(how == ["boiled"] and (main.fights as Fights).fights.size() == 1, "left for hours it boils over into a fight")
+	main.queue_free()
+
+
+func _test_category_timetables() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var runner: ScheduleRunner = main.runner
+	var clock: GameClock = main.clock
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	var high: Person = prisoners[0]
+	var other: Person = prisoners[1]
+	high.category = &"high"
+	other.category = &"medium"
+	_check(runner.key_for(high) == &"prisoner", "without its own timetable a category follows everyone's")
+	var split := runner.split(&"prisoner", &"high")
+	_check(runner.key_for(high) == &"prisoner/high" and runner.key_for(other) == &"prisoner",
+			"a split timetable is followed by that category only")
+	var lockup: ActivityDef = PrisonCatalogue.ACTIVITIES.filter(func(d: ActivityDef) -> bool: return d.id == &"lockup")[0]
+	var hour := clock.hour()
+	var was := runner.current(&"prisoner")
+	split.set_hour(hour, lockup if was != lockup else PrisonCatalogue.ACTIVITIES[0])
+	_check(runner.current_for(high) != runner.current_for(other) and runner.current_for(other) == was,
+			"painting it changes only their block")
+	_check((main.schedule as Schedule).at(hour) == was, "and leaves everyone's timetable alone")
+	high.category = &"medium"
+	clock.advance(1.0)
+	_check(runner.key_for(high) == &"prisoner", "moving category moves timetable")
+	high.category = &"high"
+	clock.advance(1.0)
+	var window: TimetableWindow = main.timetable
+	window.toggle()
+	window.show_timetable(&"prisoner/high")
+	_check(window.schedule == split and window.timetable_name(&"prisoner/high") == "High security",
+			"the timetable window can paint the high security timetable")
+	var data := PrisonSave.capture(main)
+	runner.merge(&"prisoner/high")
+	_check(not runner.schedules.has(&"prisoner/high") and runner.current_for(high) == was, "merging puts them back")
+	_check(data["category_timetables"].has(&"prisoner/high"), "category timetables are saved")
 	main.queue_free()

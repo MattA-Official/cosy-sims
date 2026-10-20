@@ -9,3 +9,6 @@ display_name = "Low security"
 description = "Short sentences and little trouble. A smaller grant."
 outfit_colour = Color(0.55, 0.66, 0.78, 1)
 daily_grant = 40
+temper_scale = 0.8
+search_weight = 0.5
+watch_distance = 3.0

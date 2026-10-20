@@ -138,13 +138,23 @@ func _tick() -> void:
 	var gap := span / random_per_day
 	if minute < FIRST_HOUR * 60 or minute >= LAST_HOUR * 60 or (minute - FIRST_HOUR * 60) % gap != gap / 2:
 		return
+	# Cells weighted by who sleeps there: high security more often.
 	var homes: Array = []
+	var weights: Array[float] = []
 	for person in people.people:
 		var home := people.home_room(person) if person.group == prisoner_group else []
-		if not home.is_empty() and not homes.any(func(h: Array) -> bool: return h[1] == home[1]):
+		if home.is_empty():
+			continue
+		var category: CategoryDef = people.categories.get(person.category)
+		var weight := category.search_weight if category != null else 1.0
+		var at := homes.find_custom(func(h: Array) -> bool: return h[1] == home[1])
+		if at == -1:
 			homes.append(home)
+			weights.append(weight)
+		else:
+			weights[at] = maxf(weights[at], weight)
 	if not homes.is_empty():
-		var home: Array = homes[_rng.randi() % homes.size()]
+		var home: Array = homes[_rng.rand_weighted(PackedFloat32Array(weights))]
 		search_cell(home[0], home[1])
 
 

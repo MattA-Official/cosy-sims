@@ -42,6 +42,12 @@ var people: People
 var jobs: JobBoard
 var building: Building
 var guard_role: StringName = &"guard"
+var prisoner_group: StringName = &"prisoner"
+## Low-security prisoners sharing a room with high-security ones get this.
+var mixing_moodlet: StringName = &"uneasy"
+const MIX_LOW := &"low"
+const MIX_HIGH := &"high"
+const MIX_EVERY := 10
 var coverage := Coverage.new()
 ## Incidents so far today and yesterday, by kind.
 var today: Dictionary[StringName, int] = {}
@@ -51,7 +57,10 @@ var alerts: Array = []
 var clock: GameClock:
 	set(value):
 		clock = value
-		clock.minute_passed.connect(func(_minute: int) -> void: tick())
+		clock.minute_passed.connect(func(minute: int) -> void:
+			tick()
+			if minute % MIX_EVERY == 0:
+				check_mixing())
 
 
 func start() -> void:
@@ -77,6 +86,25 @@ func watchers() -> Array:
 			var placed := building.object_at(key)
 			out.append([key.x, placed.centre, CAMERA_RANGE, facing(placed), CAMERA_CONE])
 	return out
+
+
+## Low-security prisoners in a room with high-security ones feel uneasy,
+## a reason to keep them apart.
+func check_mixing() -> void:
+	var high_rooms: Array[Room] = []
+	for person in people.people:
+		if person.group == prisoner_group and person.category == MIX_HIGH:
+			var here := people.room_of(person)
+			if not here.is_empty() and not high_rooms.has(here[1]):
+				high_rooms.append(here[1])
+	if high_rooms.is_empty():
+		return
+	for person in people.people:
+		if person.group != prisoner_group or person.category != MIX_LOW:
+			continue
+		var here := people.room_of(person)
+		if not here.is_empty() and high_rooms.has(here[1]):
+			people.add_moodlet(person, mixing_moodlet)
 
 
 ## Which way a camera looks: its front, as models face.

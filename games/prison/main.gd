@@ -705,6 +705,8 @@ func _add_hud() -> void:
 	clock_bar.timetable_pressed.connect(timetable.toggle)
 	hud.add_child(clock_bar)
 	timetable.schedule = schedule
+	timetable.runner = runner
+	timetable.categories.assign(PrisonCatalogue.CATEGORIES)
 	timetable.activities = PrisonCatalogue.ACTIVITIES
 	timetable.clock = clock
 	hud.add_child(timetable)

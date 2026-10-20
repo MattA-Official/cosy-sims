@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
@@ -12,7 +12,8 @@ extends SceneTree
 ## tool; loop=X,Z,X,Z,... draws a patrol route with a guard on it;
 ## break=TAG breaks the first object with that tag; "security" opens the
 ## Security window and shows what's being watched; "sitin" sits six
-## prisoners down in the canteen over a missed meal;
+## prisoners down in the canteen over a missed meal; "split" gives high
+## security its own timetable and shows it in the timetable window;
 ## at=X,Z points the camera at a tile, and zoom=F scales its distance.
 
 const FRAMES_TO_WAIT := 90
@@ -100,6 +101,13 @@ func _process(_delta: float) -> bool:
 				else:
 					misconduct.act(person, rung)
 			misconduct.act(prisoners[0], misconduct.rung(&"vandalism"))
+		if args.has("split"):
+			var split: Schedule = _main.runner.split(&"prisoner", &"high")
+			for hour in [8, 9, 10]:
+				split.set_hour(hour, PrisonCatalogue.ACTIVITIES.filter(func(d: ActivityDef) -> bool: return d.id == &"lockup")[0])
+			if not _main.timetable.visible:
+				_main.timetable.toggle()
+			_main.timetable.show_timetable(&"prisoner/high")
 		if args.has("sitin"):
 			var map: BuildingMap = _main.building.ground()
 			var canteen: Room = map.rooms().filter(func(r: Room) -> bool: return r.type == &"canteen")[0]

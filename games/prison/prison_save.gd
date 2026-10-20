@@ -47,6 +47,11 @@ static func capture(main: Node) -> Dictionary:
 	var hours: Array = []
 	for def in (main.schedule as Schedule).hours:
 		hours.append(def.id if def != null else &"")
+	var category_hours: Dictionary = {}
+	for key: StringName in (main.runner as ScheduleRunner).schedules:
+		if String(key).contains("/"):
+			category_hours[key] = (main.runner as ScheduleRunner).schedules[key].hours.map(
+					func(def: ActivityDef) -> StringName: return def.id if def != null else &"")
 	var routes: Array = []
 	for route in (main.routes as PatrolRoutes).routes:
 		routes.append([route.level, route.points.duplicate(), route.guards, route.name])
@@ -84,6 +89,7 @@ static func capture(main: Node) -> Dictionary:
 				"today": (main.searching as Searching).searches_today,
 				"found": (main.searching as Searching).found_today.duplicate()},
 		"timetable": hours,
+		"category_timetables": category_hours,
 		"locks": people.access.locked.duplicate(),
 		"overrides": (main.runner as ScheduleRunner).overrides.duplicate(),
 		"pinned": (main.runner as ScheduleRunner).pinned.duplicate(),
@@ -175,6 +181,15 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 		for def in PrisonCatalogue.ACTIVITIES:
 			if def.id == hours[i]:
 				schedule.hours[i] = def
+	var category_hours: Dictionary = data.get("category_timetables", {})
+	for key: StringName in category_hours:
+		var parts := String(key).split("/")
+		var split := (main.runner as ScheduleRunner).split(StringName(parts[0]), StringName(parts[1]))
+		var saved_hours: Array = category_hours[key]
+		for i in mini(saved_hours.size(), split.hours.size()):
+			for def in PrisonCatalogue.ACTIVITIES:
+				if def.id == saved_hours[i]:
+					split.hours[i] = def
 	people.access.locked.assign(data.get("locks", {}))
 	(main.runner as ScheduleRunner).overrides.assign(data.get("overrides", {}))
 	(main.runner as ScheduleRunner).pinned.assign(data.get("pinned", {}))

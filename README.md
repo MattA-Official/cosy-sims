@@ -58,6 +58,7 @@ Built with [Godot 4.7](https://godotengine.org/).
 | P | Staff and work programmes |
 | M | Money: the balance, today's and yesterday's lines, and Sandbox |
 | O | The warden's office: intake, grant goals, the grade and the daily report |
+| K | Security: cameras, guards, the perimeter, today's incidents, sit-ins and alerts |
 | F2 | Save and load: three slots and the morning autosave |
 
 Hover any button in the build menu to see what it is. The room, floor and
@@ -134,6 +135,15 @@ and the cell's door locks for Lockup and Sleep once everyone who sleeps
 there is inside; a little lamp over the door shows red when it is locked.
 Anyone not where the block wants them 15 minutes in gets a "?" over their
 head, and the F3 inspector says why (no bed, can't reach the canteen).
+**Separate timetable for…** in the timetable window gives a security
+category its own timetable, starting as a copy of everyone's (say, high
+security in the yard an hour later so they never mix); pick which one to
+paint from the menu, and **Merge back** puts them on everyone's again.
+Meals are still cooked by everyone's timetable. Categories also change how
+quickly temper builds (low 0.8×, high 1.2×), how often random searches
+pick their cell (low ½, high 3×) and how far off a guard spots them out of
+place (high 5 tiles, others 3). Low-security prisoners sharing a room with
+high-security ones feel uneasy.
 With F3 you can also jump the clock to any hour. The sun follows the
 clock, from dawn about 06:00 to dusk about 20:00; the sun button keeps it
 day while you build.

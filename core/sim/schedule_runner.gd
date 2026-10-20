@@ -1,7 +1,9 @@
 class_name ScheduleRunner
 extends Node
 ## Runs the timetables. On every hour it works out each group's block and
-## puts everyone in theirs (see People.set_block); every minute it locks
+## puts everyone in theirs (see People.set_block). A group can have extra
+## timetables for some of its categories, keyed "group/category" (such as
+## "prisoner/high"); everyone else follows the group's. Every minute it locks
 ## and unlocks the doors of rooms people sleep in, and marks who is out of
 ## place. It is the only thing besides the clock that knows the time.
 
@@ -22,9 +24,11 @@ var people: People:
 	set(value):
 		people = value
 		people.person_added.connect(func(person: Person) -> void:
-			people.set_block(person, current(person.group)))
+			_keys[person] = key_for(person)
+			people.set_block(person, current(_keys[person])))
 var building: Building
-## One timetable per group of people, such as &"prisoner".
+## One timetable per group of people, such as &"prisoner", and any
+## category timetables, such as &"prisoner/high".
 var schedules: Dictionary[StringName, Schedule] = {}:
 	set(value):
 		schedules = value
@@ -48,11 +52,55 @@ var other_locks: Callable
 var _planned: Dictionary[Vector4i, bool] = {}
 
 var _current: Dictionary[StringName, ActivityDef] = {}
+## The timetable each person followed last.
+var _keys: Dictionary[Person, StringName] = {}
 ## Game minutes on the clock when each group's block began.
 var _started: Dictionary[StringName, float] = {}
 
 
-## The block a group is in now.
+## The timetable someone follows: their category's, if it has one, or
+## their group's.
+func key_for(person: Person) -> StringName:
+	if person.category != &"":
+		var key := category_key(person.group, person.category)
+		if schedules.has(key):
+			return key
+	return person.group
+
+
+static func category_key(group: StringName, category: StringName) -> StringName:
+	return StringName("%s/%s" % [group, category])
+
+
+## The block someone is in now.
+func current_for(person: Person) -> ActivityDef:
+	return current(key_for(person))
+
+
+## Gives a category its own timetable, starting as a copy of its group's.
+func split(group: StringName, category: StringName) -> Schedule:
+	var key := category_key(group, category)
+	if schedules.has(key):
+		return schedules[key]
+	var schedule := schedules[group].copy()
+	schedules[key] = schedule
+	schedule.edited.connect(refresh)
+	refresh()
+	return schedule
+
+
+## Puts a category back on its group's timetable.
+func merge(key: StringName) -> void:
+	if not schedules.has(key) or not String(key).contains("/"):
+		return
+	schedules[key].edited.disconnect(refresh)
+	schedules.erase(key)
+	_current.erase(key)
+	_started.erase(key)
+	refresh()
+
+
+## The block a timetable (a group, or "group/category") is in now.
 func current(group: StringName = &"prisoner") -> ActivityDef:
 	if not _current.has(group) and schedules.has(group) and clock != null:
 		_current[group] = schedules[group].at(clock.hour())
@@ -60,7 +108,7 @@ func current(group: StringName = &"prisoner") -> ActivityDef:
 	return _current.get(group)
 
 
-## Game minutes since a group's block began.
+## Game minutes since a timetable's block began.
 func minutes_into_block(group: StringName = &"prisoner") -> float:
 	current(group)
 	return clock.total_minutes - _started.get(group, clock.total_minutes)
@@ -79,11 +127,18 @@ func refresh() -> void:
 				if not pinned.has(key):
 					overrides.erase(key)
 	for person in people.people:
-		people.set_block(person, current(person.group))
+		_keys[person] = key_for(person)
+		people.set_block(person, current(_keys[person]))
 	_every_minute()
 
 
 func _every_minute() -> void:
+	# Someone who moved category onto a different timetable.
+	for person in people.people:
+		var key := key_for(person)
+		if _keys.get(person, key) != key:
+			_keys[person] = key
+			people.set_block(person, current(key))
 	_update_doors()
 	_update_lateness()
 
@@ -169,7 +224,7 @@ func toggle_lock(level: int, edge: Vector3i, pin := false) -> void:
 
 func _update_lateness() -> void:
 	for person in people.people:
-		var late := minutes_into_block(person.group) >= LATE_MINUTES
+		var late := minutes_into_block(key_for(person)) >= LATE_MINUTES
 		person.out_of_place = (late and not people.is_in_place(person)) or person.truant_minutes > 0.0
 
 

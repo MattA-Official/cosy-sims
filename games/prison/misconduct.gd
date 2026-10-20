@@ -182,6 +182,9 @@ func _temper_scale(person: Person) -> float:
 	var scale := 1.0
 	for t in person.traits:
 		scale *= t.temper_scale
+	var category: CategoryDef = people.categories.get(person.category)
+	if category != null:
+		scale *= category.temper_scale
 	return scale
 
 

@@ -27,6 +27,8 @@ const PATROL_MINUTES := 5.0
 const ROUTE_PAUSE := 0.5
 ## Tiles a guard can see a prisoner out of place from.
 const WATCH_DISTANCE := 3.0
+## The furthest any category is spotted from (see CategoryDef).
+const FAR_WATCH_DISTANCE := 5.0
 ## Game minutes before the same prisoner is walked back again.
 const ESCORT_COOLDOWN := 30.0
 ## Tiles tried in a room for somewhere to walk a prisoner back to.
@@ -229,8 +231,9 @@ func _spot_out_of_place() -> void:
 	for job in jobs.of_kind(&"escort"):
 		asked[job.get_meta(&"prisoner")] = true
 	for guard: Person in guards:
-		for person in people.nearby(guard, WATCH_DISTANCE):
+		for person in people.nearby(guard, FAR_WATCH_DISTANCE):
 			if person.group != prisoner_group or not person.out_of_place or asked.has(person) or person.sitting \
+					or person.flat().distance_to(guard.flat()) > watch_distance(person) \
 					or _led.has(person) or clock.total_minutes - _walked_back.get(person, -INF) < ESCORT_COOLDOWN:
 				continue
 			var to := _place_tile(person)
@@ -238,6 +241,12 @@ func _spot_out_of_place() -> void:
 				continue
 			asked[person] = true
 			escort(person, to)
+
+
+## How far from a guard someone is spotted out of place, by category.
+func watch_distance(person: Person) -> float:
+	var category: CategoryDef = people.categories.get(person.category)
+	return minf(category.watch_distance, FAR_WATCH_DISTANCE) if category != null else WATCH_DISTANCE
 
 
 ## A tile in the first room someone's block wants them in that they can
