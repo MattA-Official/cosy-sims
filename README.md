@@ -53,6 +53,7 @@ Built with [Godot 4.7](https://godotengine.org/).
 | Space | Pause, or carry on. Building works while paused |
 | , / . | Slower or faster: 1×, 2× or 4× |
 | T | The timetable |
+| P | Staff and work programmes |
 
 Hover any button in the build menu to see what it is. The room, floor and
 wall tools let you pick a style from the picture tiles above the toolbar;
@@ -171,6 +172,28 @@ Shift-click it again. Prisoners caught in a room they may not be in walk
 out of it. In the F3 inspector, a room or tile can also take a member of
 staff, who wanders, eats and chats where staff may go.
 
+### Staff and jobs
+
+Press P (or the people button by the clock) for the Staff window: + and −
+take on or let go a cook, cleaner or handyman, and put prisoners on or
+off a work programme (kitchen, laundry, cleaning, workshop). Staff are
+free for now and always on site; shifts come with M5 and wages with M6.
+
+Work is a board of jobs, each a list of stages: fetch something, deliver
+it, or work at an object for a while. The morning lorry leaves crates of
+food on a pallet to carry to the fridge. An hour before each meal the
+cook takes a crate, cooks at the cooker and fills the serving counter;
+prisoners take a tray to a table, and miss the meal if none are left.
+People drop litter (messy ones more), cleaners sweep it to a bin and take
+full bins to the skip. After a shower prisoners swap their uniform for a
+clean one, and the dirty ones get washed, ironed and stacked back on the
+shelves. In work blocks prisoners on the workshop programme make toys
+and birdhouses that the lorry takes away to sell.
+
+With F3 on, a jobs panel lists every open job (who is on it, or why it is
+waiting), the stock of every item and anything that stops the kitchen or
+laundry working, and dotted lines show where each worker is heading.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one
@@ -188,6 +211,7 @@ how prisoners find their way:
 | Crowded canteen | 24 prisoners in a dorm with too few beds, toilets and showers: a stress test for mood |
 | Locked out | Showers with no door, and a raised canteen that needs Door Steps |
 | Staff wing | A staff room behind a staff door, and an office zoned staff only |
+| Working prison | The staff wing with a kitchen, laundry and workshop, three staff and prisoners on work programmes |
 
 See [docs/design/building.md](docs/design/building.md) for the design
 decisions behind all this.

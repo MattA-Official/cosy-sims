@@ -18,7 +18,11 @@ evening-sized chunks.
    seven needs, traits, mood with moodlets and reasons, room quality and
    dorms (`core/sim/mood_model.gd`, `core/building/room_quality.gd`).
    M3 added zones (who may be in each room), staff doors, doors locked by
-   hand and a walking graph set up per group (`core/people/access.gd`).*
+   hand and a walking graph set up per group (`core/people/access.gd`).
+   M4 added items people carry (`core/items/`), a job board with fetch,
+   deliver and work stages (`core/jobs/`), staff roles, work programmes
+   and the Staff window, and the kitchen, cleaning, laundry and workshop
+   (`games/prison/`).*
 4. **Review and extract the core.** Note what is prison-specific and what is
    generic (camera, grid, building, agents, needs, schedules), then move the
    generic parts into `core/`.
