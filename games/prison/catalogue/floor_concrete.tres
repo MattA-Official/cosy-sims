@@ -10,3 +10,4 @@ display_name = "Concrete"
 colour = Color(0.74, 0.72, 0.68, 1)
 outdoor = false
 texture = ExtResource("2_tex")
+price = 10

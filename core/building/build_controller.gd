@@ -20,12 +20,17 @@ signal door_lock_clicked(level: int, edge: Vector3i, pin: bool)
 ## The route tool clicked a point (in tile units) on a level; with `erase`
 ## (Ctrl held), to remove the route there.
 signal route_clicked(level: int, point: Vector2, erase: bool)
+## A click would have built something, but spending_allowed said no.
+signal spending_refused
 
 ## What Tab loops through, like The Sims: walls up; cutaway (walls in front
 ## of rooms drop, as the camera looks); every wall down; and roofs on, for
 ## a look at the whole building from outside.
 enum WallView { UP, CUTAWAY, DOWN, ROOFS }
 const WALL_VIEW_NAMES: Array[String] = ["Walls up", "Cutaway", "Walls down", "Roofs on"]
+
+## Whether building things that cost money is allowed now. Unset allows it.
+var spending_allowed: Callable
 
 var wall_view := WallView.UP:
 	set(value):
@@ -330,6 +335,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_press() -> void:
 	if _ground_only(tool) and _level() != 0:
 		return
+	if _spends() and spending_allowed.is_valid() and not spending_allowed.call():
+		spending_refused.emit()
+		return
 	match tool:
 		Tool.FLOOR when floor_mode == FloorMode.STAIRS:
 			_press_stairs()
@@ -455,6 +463,21 @@ func _on_release() -> void:
 				map.remove_walls([edge])
 			else:
 				map.demolish(rect)
+
+
+## Whether the current tool, as it is set, would build something that
+## costs money.
+func _spends() -> bool:
+	if _erasing():
+		return false
+	match tool:
+		Tool.ROOM, Tool.OPENING, Tool.OBJECT:
+			return true
+		Tool.FLOOR:
+			return floor_mode in [FloorMode.LAY, FloorMode.RAMP, FloorMode.STAIRS]
+		Tool.WALL:
+			return wall_mode == WallMode.BUILD
+	return false
 
 
 ## A click with the stair builder: Ctrl removes the stairs under the mouse;

@@ -8,5 +8,7 @@ extends Resource
 @export_multiline var description: String
 ## The Job kinds they take, such as &"cook" and &"carry".
 @export var job_kinds: Array[StringName] = []
+## Pay for a day shift; other shifts scale it (see ShiftDef.pay_scale).
+@export var wage := 0
 @export var outfit_colour := Color(0.27, 0.36, 0.52)
 @export var icon: Texture2D

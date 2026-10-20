@@ -3,7 +3,11 @@ extends PanelContainer
 ## Who works here. A row for each staff role with how many work each
 ## shift and buttons to take one on or let one go, and a row for each work
 ## programme with how many prisoners are on it and buttons to put one more
-## on or take one off. Staff are free until wages come in. Toggle with P.
+## on or take one off. With a ledger, staff cost their wages and nobody
+## can be taken on while the prison is in debt. Toggle with P.
+
+## Someone tried to take on staff while the prison is in debt.
+signal hire_refused
 
 ## Seconds between counting everyone again while open.
 const REFRESH_SECONDS := 0.5
@@ -22,11 +26,14 @@ var route_icon: Texture2D
 var staff_group: StringName = &"staff"
 ## Who goes on work programmes.
 var programme_group: StringName = &"prisoner"
+## The prison's money, for wages. Optional: without it staff are free.
+var ledger: Ledger
 
 ## Count labels by role, then by shift.
 var _counts: Dictionary[StringName, Dictionary] = {}
 var _programme_counts: Dictionary[StringName, Label] = {}
 var _free_text := Label.new()
+var _wages_text := Label.new()
 var _route_box := VBoxContainer.new()
 var _route_counts: Dictionary[PatrolRoutes.Route, Label] = {}
 var _wait := 0.0
@@ -46,11 +53,10 @@ func _ready() -> void:
 	title.text = "Staff"
 	title.theme_type_variation = &"HeaderLabel"
 	heading.add_child(title)
-	var note := Label.new()
-	note.text = "Free until wages come in"
-	note.theme_type_variation = &"SubtleLabel"
-	note.size_flags_vertical = SIZE_SHRINK_CENTER
-	heading.add_child(note)
+	_wages_text.text = "Free until wages come in"
+	_wages_text.theme_type_variation = &"SubtleLabel"
+	_wages_text.size_flags_vertical = SIZE_SHRINK_CENTER
+	heading.add_child(_wages_text)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
 	heading.add_child(spacer)
@@ -79,13 +85,18 @@ func _ready() -> void:
 			columns.add_child(label)
 		box.add_child(columns)
 	for def in roles:
-		var row := _row(def.icon, def.display_name, def.description)
+		var tip := def.description
+		if ledger != null:
+			tip += "\nWage: %s a day shift, more at night." % Ledger.text(def.wage)
+		var row := _row(def.icon, def.display_name, tip)
 		_counts[def.id] = {}
 		for shift in shifts.shifts if shifts != null else []:
 			var shift_id: StringName = shift.id
 			var role_id := def.id
 			_counts[def.id][shift_id] = _stepper(row,
-					func() -> void: shifts.set_wanted(role_id, shift_id, shifts.wanted_for(role_id, shift_id) + 1),
+					func() -> void:
+						if _may_hire():
+							shifts.set_wanted(role_id, shift_id, shifts.wanted_for(role_id, shift_id) + 1),
 					func() -> void: shifts.set_wanted(role_id, shift_id, shifts.wanted_for(role_id, shift_id) - 1))
 		box.add_child(row)
 
@@ -155,6 +166,8 @@ func refresh() -> void:
 			var here := shifts.on_site(role, shift).size()
 			label.text = str(want)
 			label.tooltip_text = "%d wanted, %d on site now" % [want, here]
+	if ledger != null:
+		_wages_text.text = "Wages %s a day" % Ledger.text(daily_wages())
 	for route: PatrolRoutes.Route in _route_counts:
 		_route_counts[route].text = str(route.guards)
 	for programme: StringName in _programme_counts:
@@ -237,6 +250,23 @@ func _stepper(row: HBoxContainer, more: Callable, fewer: Callable) -> Label:
 	group.add_child(plus)
 	row.add_child(group)
 	return count
+
+
+## What a day of every shift's staff costs.
+func daily_wages() -> int:
+	var sum := 0.0
+	for def in roles:
+		for shift in shifts.shifts if shifts != null else []:
+			sum += def.wage * shift.pay_scale * shifts.wanted_for(def.id, shift.id)
+	return roundi(sum)
+
+
+## Whether more staff can be taken on: not while in debt.
+func _may_hire() -> bool:
+	if ledger == null or ledger.can_spend():
+		return true
+	hire_refused.emit()
+	return false
 
 
 ## Puts the first prisoner on no programme onto one.

@@ -13,3 +13,4 @@ groups = Array[StringName]([&"prisoner", &"staff", &"visitor"])
 colour = Color(0.9, 0.65, 0.25, 1)
 icon = ExtResource("2_icon")
 model = ExtResource("3_model")
+price = 500

@@ -11,3 +11,4 @@ description = "Sweeps up litter, empties bins and washes and irons the uniforms.
 job_kinds = Array[StringName]([&"clean", &"rubbish", &"laundry"])
 outfit_colour = Color(0.46, 0.56, 0.6, 1)
 icon = ExtResource("2_icon")
+wage = 40

@@ -49,6 +49,7 @@ func _process(_delta: float) -> bool:
 	_test_staff_window()
 	_test_guards()
 	_test_wear_and_repair()
+	_test_money()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1056,6 +1057,57 @@ func _test_wear_and_repair() -> void:
 		minutes += 1
 	_check(main.building.objects_tagged([&"cooker"] as Array[StringName]).any(func(k: Vector2i) -> bool: return wear.uses.get(k, 0) > 0),
 			"work done at an object wears it too (cooker was %d)" % before)
+	main.queue_free()
+
+
+func _test_money() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var ledger: Ledger = main.ledger
+	var clock: GameClock = main.clock
+	var map: BuildingMap = main.building.ground()
+	clock.speed_index = 0
+	_check(ledger.balance == Finances.STARTING_MONEY, "a prison starts with some money, the sample free")
+	var land := map.land_bounds()
+	var rect := Rect2i(land.position + Vector2i(1, 1), Vector2i(3, 3))
+	_check(not map.has_build_near(rect.grow(1)), "an empty corner to build in")
+	var before := ledger.balance
+	map.build_room(rect)
+	var cost := before - ledger.balance
+	# Nine tiles of concrete at 10 and twelve lengths of plaster wall at 30.
+	_check(cost == 9 * 10 + 12 * 30, "building a room costs its floor and walls (%d)" % cost)
+	_check(ledger.today.get("Building", 0) == -cost, "under the Building line")
+	var bed: ObjectDef = PrisonCatalogue.object(&"bed")
+	var id := map.place_object(bed, Vector2(rect.position) + Vector2(1, 1), 0)
+	_check(id > 0 and before - ledger.balance == cost + bed.price, "a bed costs its price")
+	map.remove_object(id)
+	_check(before - ledger.balance == cost + bed.price - roundi(bed.price * BuildCosts.REFUND),
+			"demolishing gives three quarters back")
+	ledger.balance = -10
+	_check(not main.controller.spending_allowed.call(), "nothing more can be built in debt")
+	ledger.sandbox = true
+	_check(main.controller.spending_allowed.call(), "except in sandbox")
+	ledger.sandbox = false
+	ledger.balance = 5000
+	var day: ShiftDef = PrisonCatalogue.SHIFTS[0]
+	var wages: int = main.finances.shift_wages(day)
+	_check(wages > 0, "the day shift costs wages (%d)" % wages)
+	var night: ShiftDef = PrisonCatalogue.SHIFTS[1]
+	var paid: Array[int] = []
+	var grant := 0
+	for i in GameClock.MINUTES_PER_DAY * 2:
+		var was: int = ledger.today.get("Wages", 0)
+		clock.advance(1.0)
+		if ledger.today.get("Wages", 0) != was:
+			paid.append(was - ledger.today.get("Wages", 0))
+		if ledger.closing.size() == 1 and grant == 0:
+			grant = ledger.yesterday.get("Daily grant", 0)
+		if paid.has(wages) and grant > 0:
+			break
+	_check(paid.has(wages) or paid.has(main.finances.shift_wages(night)), "wages are paid as a shift starts (%s)" % [paid])
+	_check(grant == main.finances.daily_grant() and grant > 0, "at midnight the grant comes in and the day closes")
+	_check(main.finance_window != null and main.clock_bar._money.text != "", "the balance shows by the clock")
 	main.queue_free()
 
 

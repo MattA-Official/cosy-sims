@@ -14,3 +14,4 @@ height = 0.8
 thickness = 0.08
 see_through = true
 texture = ExtResource("2_tex")
+price = 15

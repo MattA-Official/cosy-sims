@@ -54,6 +54,10 @@ var routes := PatrolRoutes.new()
 var wear := Wear.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
+## The prison's money, and what comes in and goes out.
+var ledger := Ledger.new()
+var build_costs := BuildCosts.new()
+var finances := Finances.new()
 ## Open jobs and stock, with the debug view.
 var jobs_panel := JobsPanel.new()
 ## Game time. Everything that happens over time listens to it.
@@ -73,6 +77,8 @@ var clock_bar := ClockBar.new()
 var timetable := TimetableWindow.new()
 ## Taking on staff and putting prisoners on work programmes, on P.
 var staff_window := StaffWindow.new()
+## The balance and the last week's money, on M.
+var finance_window := FinanceWindow.new()
 ## The F3 inspector for people, objects and rooms.
 var inspector := Inspector.new()
 ## Grid lines at the height of the level being built on, off the ground.
@@ -266,6 +272,29 @@ func _ready() -> void:
 	wear.jobs = jobs
 	wear.building = building
 	grid.add_child(wear)
+	ledger.name = "Ledger"
+	ledger.balance = Finances.STARTING_MONEY
+	add_child(ledger)
+	build_costs.name = "BuildCosts"
+	build_costs.building = building
+	build_costs.ledger = ledger
+	build_costs.door_kinds = people.access.door_kinds
+	add_child(build_costs)
+	build_costs.start()
+	controller.spending_allowed = ledger.can_spend
+	controller.spending_refused.connect(func() -> void:
+		Toasts.post("Out of money", "Building is paused until the balance is back above zero. "
+				+ "Demolishing still gives some money back."))
+	finances.name = "Finances"
+	finances.ledger = ledger
+	finances.people = people
+	finances.shifts = shifts
+	for role in PrisonCatalogue.ROLES:
+		finances.roles[role.id] = role
+	finances.kitchen = kitchen
+	finances.workshop = workshop
+	finances.clock = clock
+	add_child(finances)
 	jobs_panel.name = "JobsPanel"
 	jobs_panel.debug_overlay = debug_overlay
 	jobs_panel.jobs = jobs
@@ -308,6 +337,8 @@ func _add_hud() -> void:
 	clock_bar.clock = clock
 	clock_bar.runner = runner
 	clock_bar.day_night = day_night
+	clock_bar.ledger = ledger
+	clock_bar.money_pressed.connect(finance_window.toggle)
 	clock_bar.timetable_pressed.connect(timetable.toggle)
 	hud.add_child(clock_bar)
 	timetable.schedule = schedule
@@ -321,7 +352,12 @@ func _add_hud() -> void:
 	staff_window.shifts = shifts
 	staff_window.routes = routes
 	staff_window.route_icon = load("res://core/ui/icons/tool_route.svg")
+	staff_window.ledger = ledger
+	staff_window.hire_refused.connect(func() -> void:
+		Toasts.post("Out of money", "Nobody new can be taken on until the balance is back above zero."))
 	hud.add_child(staff_window)
+	finance_window.ledger = ledger
+	hud.add_child(finance_window)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("level_up"):
@@ -344,6 +380,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		timetable.toggle()
 	elif event.is_action_pressed("staff_toggle"):
 		staff_window.toggle()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("money_toggle"):
+		finance_window.toggle()
 		get_viewport().set_input_as_handled()
 
 

@@ -14,3 +14,4 @@ tags = Array[StringName]([&"washing_machine"])
 model = ExtResource("2_model")
 
 uses_before_breaking = 10
+price = 350

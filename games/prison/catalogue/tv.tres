@@ -14,3 +14,4 @@ colour = Color(0.3, 0.33, 0.36, 1)
 tags = Array[StringName]([&"tv"])
 model = ExtResource("2_ext")
 uses_before_breaking = 20
+price = 250

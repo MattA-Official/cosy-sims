@@ -11,3 +11,4 @@ colour = Color(0.8, 0.62, 0.44, 1)
 outdoor = false
 texture = ExtResource("2_tex")
 comfort = 1.0
+price = 25

@@ -14,4 +14,4 @@ tags = Array[StringName]([&"skip"])
 holds = Array[StringName]([&"rubbish_bag"])
 capacity = 10
 model = ExtResource("2_model")
-
+price = 200

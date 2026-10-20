@@ -12,4 +12,4 @@ height = 0.55
 colour = Color(0.75, 0.8, 0.85, 1)
 tags = Array[StringName]([&"ironing_board"])
 model = ExtResource("2_model")
-
+price = 80

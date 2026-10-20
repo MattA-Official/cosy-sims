@@ -5,6 +5,9 @@ extends Node
 ## them away to sell every morning. Every workbench always has a job
 ## waiting, taken only in work blocks.
 
+## The lorry has taken this many goods away to sell.
+signal collected(count: int)
+
 const MAKE_MINUTES := 45.0
 const BENCHES: Array[StringName] = [&"workbench"]
 const SHELVES: Array[StringName] = [&"goods_shelf"]
@@ -24,7 +27,7 @@ var items: ItemStore
 var building: Building
 ## What the workshop makes, one picked at random each time.
 var goods: Array[ItemDef] = [PrisonCatalogue.item(&"wooden_toy"), PrisonCatalogue.item(&"birdhouse")]
-## Everything the lorry has taken away to sell, for the money to come.
+## Everything the lorry has taken away to sell.
 var sold := 0
 
 var _rng := RandomNumberGenerator.new()
@@ -47,6 +50,8 @@ func collect() -> int:
 				break
 			taken += pair[1]
 	sold += taken
+	if taken > 0:
+		collected.emit(taken)
 	return taken
 
 

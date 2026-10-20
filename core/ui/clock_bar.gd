@@ -2,11 +2,12 @@ class_name ClockBar
 extends PanelContainer
 ## The clock in the top-left corner: the day, the time, the timetable
 ## block everyone is in, and buttons for the speed (Space pauses, , and .
-## go slower and faster), the timetable window (T), the staff window (P)
-## and always-day light.
+## go slower and faster), the timetable window (T), the staff window (P),
+## always-day light, and the balance, which opens the money window (M).
 
 signal timetable_pressed
 signal staff_pressed
+signal money_pressed
 
 const ICONS := "res://core/ui/icons/%s.svg"
 const SPEED_ICONS: Array[String] = ["speed_pause", "speed_1", "speed_2", "speed_3"]
@@ -21,6 +22,8 @@ const SPEED_DETAILS: Array[String] = [
 var clock: GameClock
 var runner: ScheduleRunner
 var day_night: DayNight
+## The prison's money, shown as a balance. Optional.
+var ledger: Ledger
 
 var _day := Label.new()
 var _time := Label.new()
@@ -29,6 +32,7 @@ var _chip := PanelContainer.new()
 var _chip_box := StyleBoxFlat.new()
 var _speeds: Array[CosyButton] = []
 var _timetable: CosyButton
+var _money: Button
 
 
 func _ready() -> void:
@@ -87,6 +91,21 @@ func _ready() -> void:
 		if day_night != null:
 			day_night.always_day = on)
 	row.add_child(sun)
+	if ledger != null:
+		row.add_child(VSeparator.new())
+		_money = Button.new()
+		_money.icon = load(ICONS % "money")
+		_money.expand_icon = false
+		_money.add_theme_constant_override(&"icon_max_width", 22)
+		_money.theme_type_variation = &"FlatButton"
+		_money.focus_mode = FOCUS_NONE
+		_money.tooltip_text = "Money: what comes in and goes out. M"
+		_money.pressed.connect(money_pressed.emit)
+		row.add_child(_money)
+		var ink := get_theme_color(&"font_color", &"Label")
+		for state in [&"icon_normal_color", &"icon_hover_color", &"icon_pressed_color",
+				&"icon_hover_pressed_color", &"icon_focus_color"]:
+			_money.add_theme_color_override(state, ink)
 
 	clock.speed_changed.connect(func(_index: int) -> void: _show_speed())
 	_show_speed()
@@ -98,6 +117,14 @@ func _process(_delta: float) -> void:
 
 
 func _refresh() -> void:
+	if _money != null:
+		var balance := "Sandbox" if ledger.sandbox else Ledger.text(ledger.balance)
+		if _money.text != balance:
+			_money.text = balance
+			if ledger.balance < 0 and not ledger.sandbox:
+				_money.add_theme_color_override(&"font_color", Color(0.75, 0.3, 0.28))
+			else:
+				_money.remove_theme_color_override(&"font_color")
 	var time := clock.time_text()
 	if _time.text != time:
 		_time.text = time

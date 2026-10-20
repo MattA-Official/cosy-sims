@@ -15,3 +15,4 @@ holds = Array[StringName]([&"meal"])
 capacity = 16
 hands_out = true
 model = ExtResource("2_model")
+price = 250

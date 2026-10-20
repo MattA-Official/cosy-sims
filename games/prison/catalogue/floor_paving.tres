@@ -10,3 +10,4 @@ display_name = "Paving"
 colour = Color(0.66, 0.63, 0.6, 1)
 outdoor = true
 texture = ExtResource("2_tex")
+price = 15

@@ -60,3 +60,6 @@ enum Connects {
 ## Uses before it wears out and breaks, until someone mends it (see Wear).
 ## 0 never breaks.
 @export var uses_before_breaking := 0
+## What it costs to place, when money is on. Demolishing gives most of it
+## back.
+@export var price := 0

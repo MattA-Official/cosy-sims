@@ -11,3 +11,4 @@ description = "Only staff walk through, whatever the rooms either side allow."
 groups = Array[StringName]([&"staff"])
 colour = Color(0.35, 0.5, 0.85, 1)
 icon = ExtResource("2_icon")
+price = 150

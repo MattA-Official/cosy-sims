@@ -15,3 +15,4 @@ thickness = 0.45
 see_through = false
 texture = ExtResource("2_tex")
 comfort = 1.0
+price = 20

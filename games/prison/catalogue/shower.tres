@@ -14,3 +14,4 @@ colour = Color(0.6, 0.85, 0.95, 1)
 tags = Array[StringName]([&"shower"])
 model = ExtResource("2_model")
 uses_before_breaking = 12
+price = 200

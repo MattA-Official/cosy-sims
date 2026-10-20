@@ -15,6 +15,8 @@ extends Resource
 ## Drawn in the doorway in place of the plain door, filling a one-metre
 ## opening along its x. Optional.
 @export var model: PackedScene
+## What fitting one costs, when money is on.
+@export var price := 0
 
 
 func lets_through(group: StringName) -> bool:

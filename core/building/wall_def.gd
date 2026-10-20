@@ -22,3 +22,5 @@ extends Resource
 @export var dado_height := 0.5
 ## How nice it is to have round a room, for room quality.
 @export var comfort := 0.0
+## What a tile's length of it costs to build, when money is on.
+@export var price := 0

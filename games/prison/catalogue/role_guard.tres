@@ -11,3 +11,4 @@ description = "Mans guard posts so the security gates near them open, patrols wh
 job_kinds = Array[StringName]([&"post", &"patrol", &"escort"])
 outfit_colour = Color(0.2, 0.25, 0.4, 1)
 icon = ExtResource("2_icon")
+wage = 80

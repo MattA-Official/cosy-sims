@@ -13,3 +13,5 @@ extends Resource
 ## How nice it is to be on, for room quality: 0 for bare concrete, 1 for
 ## wood.
 @export var comfort := 0.0
+## What a tile of it costs to lay, when money is on.
+@export var price := 0

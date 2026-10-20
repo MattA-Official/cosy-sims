@@ -13,3 +13,4 @@ height = 0.75
 colour = Color(0.62, 0.72, 0.6, 1)
 tags = Array[StringName]([&"game"])
 model = ExtResource("2_ext")
+price = 150

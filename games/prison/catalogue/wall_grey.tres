@@ -16,3 +16,4 @@ see_through = false
 texture = ExtResource("2_tex")
 dado_colour = Color(0.55, 0.6, 0.66, 1)
 dado_height = 0.5
+price = 30
