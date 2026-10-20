@@ -26,6 +26,20 @@ colours a real prison would plausibly use.
 - Prisoners wear orange; skin and hair vary from person to person.
 - No normal maps, no photo textures.
 
+## What there is
+
+- Objects: bed, toilet, sink, shower, table (canteen), games_table, desk,
+  lift, tv, radio, bookshelf, wall_shelf, poster, rug, plant_pot, bench,
+  weights_bench, basketball_hoop.
+- Doors: door (in use), cell_door (barred, not used yet).
+- People: person. Plants: tree, bush, flower.
+- Icons (`core/ui/icons/`): mood_beaming, mood_content, mood_fed_up,
+  mood_angry, in the same white line style as the rest.
+
+The poster and wall shelf are wall-hung: their footprint is on the floor
+against the wall, and the model is raised (poster middle about 1 m up,
+shelf top about 1.1 m).
+
 ## Scale and orientation
 
 - Tile 1 m, storey 1.75 m, walls 1.5 m tall and 0.15 m thick, doors

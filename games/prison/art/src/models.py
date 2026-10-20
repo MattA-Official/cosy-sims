@@ -75,6 +75,23 @@ PALETTE = dict(
     rubber=("#4f5354", 0.8, 0),
     glass=("#cfe9f2", 0.05, 0),
     light=("#ffe9b0", 0.4, 0),
+    screen=("#3d4a52", 0.15, 0),
+    cream=("#e8e0cc", 0.6, 0),         # plastic: radio, board
+    vinyl=("#5d7184", 0.5, 0),          # gym padding
+    plates=("#45494b", 0.6, 0.2),
+    ball=("#d98a4e", 0.7, 0),           # hoop and basketball
+    rug=("#b9ae98", 1.0, 0),            # oatmeal wool
+    rug_edge=("#8a9f8a", 1.0, 0),
+    paper=("#f1ead8", 0.9, 0),
+    poster_a=("#9fbcc8", 0.9, 0),       # poster sky
+    poster_b=("#8cae84", 0.9, 0),       # poster hills
+    poster_c=("#e9c27a", 0.9, 0),       # poster sun
+    pot=("#c98f6b", 0.8, 0),            # terracotta
+    leaf=("#5f9a52", 0.9, 0),
+    book_a=("#8496a8", 0.8, 0),
+    book_b=("#b5806a", 0.8, 0),
+    book_c=("#9aab84", 0.8, 0),
+    book_d=("#d8c79a", 0.8, 0),
     # Recoloured by the game: kept white-ish so a tint reads true.
     outfit=("#ffffff", 0.85, 0),
     skin=("#ffffff", 0.7, 0),
@@ -408,13 +425,182 @@ def flower():
     return p
 
 
+# ---------------------------------------------------------------- needs and mood (M2)
+
+def radio():
+    p = Prop("radio")  # 0.5 x 0.25, sits on a desk or shelf
+    p.box("cream", (0.44, 0.18, 0.22), (0, 0, 0.11), 0.04, 3)
+    p.cyl("steel_dark", 0.07, 0.02, (-0.1, -0.09, 0.11), bevel=0.008, n=20, rot=(90, 0, 0))
+    p.box("screen", (0.14, 0.02, 0.05), (0.1, -0.09, 0.14), 0.008, 1)
+    p.cyl("paint", 0.025, 0.03, (0.1, -0.095, 0.07), bevel=0.008, n=14, rot=(90, 0, 0))
+    p.tube("paint", [(-0.16, 0, 0.21), (-0.16, 0, 0.29), (0.16, 0, 0.29), (0.16, 0, 0.21)], 0.014, 0.05, n=8)
+    return p
+
+
+def tv():
+    p = Prop("tv")  # 1 x 0.5 television on a low cabinet
+    p.box("wood", (0.96, 0.46, 0.5), (0, 0, 0.25), 0.03, 3)
+    p.box("paint", (0.88, 0.02, 0.36), (0, -0.23, 0.25), 0.01, 1)
+    p.box("paint", (0.2, 0.14, 0.04), (0, 0.02, 0.52), 0.015, 2)
+    p.box("paint", (0.06, 0.04, 0.12), (0, 0.04, 0.58), 0.015, 2)
+    p.box("rubber", (0.9, 0.08, 0.56), (0, 0.04, 0.92), 0.035, 3)
+    p.box("screen", (0.82, 0.02, 0.48), (0, -0.0, 0.92), 0.02, 2)
+    p.ball("light", 0.012, (0.39, -0.002, 0.66), u=8, v=6)
+    return p
+
+
+def bookshelf():
+    p = Prop("bookshelf")  # 1 x 0.5, 1.4 m tall, back to the wall
+    h, w, d = 1.4, 0.96, 0.4
+    for x in (-w / 2 + 0.03, w / 2 - 0.03):
+        p.box("wood", (0.05, d, h), (x, 0.03, h / 2), 0.015, 2)
+    p.box("wood", (w, 0.03, h), (0, d / 2 + 0.015, h / 2), 0.01, 1)
+    shelves = (0.04, 0.38, 0.72, 1.06, h - 0.025)
+    for z in shelves:
+        p.box("wood", (w - 0.04, d, 0.04), (0, 0.03, z), 0.012, 2)
+    colours = ("book_a", "book_b", "book_c", "book_d")
+    for row, z in enumerate(shelves[:-1]):
+        x, k = -0.4, row
+        while x < 0.36 - row * 0.08:
+            t = 0.05 + ((k * 7) % 3) * 0.012
+            ht = 0.22 + ((k * 5) % 4) * 0.02
+            p.box(colours[k % 4], (t, 0.26, ht), (x + t / 2, 0.06, z + 0.02 + ht / 2), 0.012, 2)
+            x += t + 0.006
+            k += 1
+        if row == 1:  # a few lying flat at the end
+            for i in range(3):
+                p.box(colours[(i + 1) % 4], (0.22, 0.26, 0.045), (0.3, 0.06, z + 0.045 + i * 0.047), 0.012, 2)
+    return p
+
+
+def games_table():
+    p = Prop("games_table")  # 1 x 1 small table with a board game on it
+    p.box("wood", (0.9, 0.9, 0.05), (0, 0, 0.7), 0.03, 3)
+    p.tube("paint", [(0, 0, 0), (0, 0, 0.68)], 0.04, 0, n=12)
+    p.cyl("paint", 0.25, 0.03, (0, 0, 0.015), bevel=0.012, n=24)
+    p.box("cream", (0.4, 0.4, 0.02), (0, 0, 0.735), 0.006, 1)
+    for i in range(4):
+        for j in range(4):
+            if (i + j) % 2 == 0:
+                p.box("book_c", (0.09, 0.09, 0.006), (-0.15 + i * 0.1, -0.15 + j * 0.1, 0.747), 0, 0)
+    for k, (x, y) in enumerate(((-0.15, -0.15), (0.05, -0.15), (-0.05, 0.15), (0.15, 0.05))):
+        p.cyl("rubber" if k % 2 else "sheet", 0.03, 0.02, (x, y, 0.76), bevel=0.006, n=14)
+    return p
+
+
+def weights_bench():
+    p = Prop("weights_bench")  # 1 x 2, bench with a barbell on its rack
+    p.box("vinyl", (0.32, 1.2, 0.09), (0, 0.15, 0.44), 0.04, 3)
+    for y in (-0.3, 0.6):
+        p.tube("paint", [(0, y, 0.4), (0, y, 0.0)], 0.03, 0, n=10)
+        p.tube("paint", [(-0.15, y, 0.0), (0.15, y, 0.0)], 0.025, 0, n=10)
+    p.tube("paint", [(0, -0.3, 0.2), (0, 0.6, 0.2)], 0.025, 0, n=10)
+    for x in (-0.3, 0.3):
+        p.tube("paint", [(x, -0.75, 0.0), (x, -0.75, 0.6), (x, -0.62, 0.6)], 0.03, 0.04, n=10)
+        p.tube("paint", [(x - 0.12, -0.75, 0.0), (x + 0.12, -0.75, 0.0)], 0.025, 0, n=10)
+    p.tube("steel", [(-0.48, -0.65, 0.64), (0.48, -0.65, 0.64)], 0.016, 0, n=10)
+    for x in (-0.42, 0.42):
+        p.cyl("plates", 0.13, 0.05, (x, -0.65, 0.64), bevel=0.012, n=24, rot=(0, 90, 0))
+    return p
+
+
+def basketball_hoop():
+    p = Prop("basketball_hoop")  # 1 x 1, post on a weighted base, hoop over the front
+    p.box("paint", (0.7, 0.8, 0.16), (0, 0.05, 0.08), 0.05, 3)
+    p.tube("paint", [(0, 0.25, 0.15), (0, 0.25, 2.0), (0, 0.05, 2.15)], 0.045, 0.2, n=14)
+    p.box("sheet", (0.8, 0.04, 0.55), (0, 0.02, 2.2), 0.02, 2)
+    p.box("ball", (0.28, 0.045, 0.2), (0, 0.0, 2.12), 0.0, 0)
+    p.box("sheet", (0.22, 0.05, 0.14), (0, -0.002, 2.12), 0.0, 0)
+    ring = [(math.cos(a) * 0.16, -0.2 + math.sin(a) * 0.16, 2.0)
+            for a in [k * 2 * math.pi / 24 for k in range(25)]]
+    p.tube("ball", ring, 0.012, 0, n=8)
+    p.tube("ball", [(0, -0.04, 2.0), (0, 0.0, 2.0)], 0.015, 0, n=8)
+    p.ball("ball", 0.12, (0.25, -0.3, 0.12), u=16, v=10)
+    return p
+
+
+def bench():
+    p = Prop("bench")  # 1.5 x 0.5 outdoor bench: wooden slats on painted legs
+    for x in (-0.6, 0.6):
+        p.tube("paint", [(x, -0.18, 0), (x, -0.18, 0.4), (x, 0.2, 0.4), (x, 0.22, 0.72)], 0.025, 0.05, n=10)
+        p.tube("paint", [(x, 0.18, 0), (x, 0.18, 0.4)], 0.025, 0, n=10)
+    for y in (-0.15, -0.03, 0.09):
+        p.box("wood", (1.45, 0.1, 0.035), (0, y, 0.43), 0.012, 2)
+    for z in (0.56, 0.68):
+        p.box("wood", (1.45, 0.03, 0.09), (0, 0.22 + (z - 0.56) * 0.06, z), 0.012, 2)
+    return p
+
+
+def sink():
+    p = Prop("sink", 180)  # 0.5 x 0.5 steel basin on a pedestal, back to the wall
+    p.box("steel", (0.44, 0.2, 0.62), (0, -0.14, 0.31), 0.04, 3)
+    p.box("steel", (0.46, 0.4, 0.14), (0, -0.03, 0.74), 0.045, 3)
+    p.cyl("steel_dark", 0.15, 0.01, (0, 0.0, 0.812), scale=(1, 0.75, 1), bevel=0, n=24)
+    p.tube("steel", [(0, -0.2, 0.8), (0, -0.2, 0.9), (0, -0.12, 0.9)], 0.016, 0.03, n=10)
+    p.cyl("steel", 0.025, 0.03, (0.1, -0.2, 0.83), bevel=0.008, n=12)
+    return p
+
+
+def rug():
+    p = Prop("rug")  # 1.5 x 1, flat
+    p.box("rug_edge", (1.46, 0.96, 0.012), (0, 0, 0.006), 0.006, 1)
+    p.box("rug", (1.32, 0.82, 0.016), (0, 0, 0.008), 0.006, 1)
+    return p
+
+
+def poster():
+    """0.75 x 0.1 footprint against the wall behind, hung with its middle
+    about 1 m up: a calm landscape print."""
+    p = Prop("poster")
+    y, z, w, h = 0.03, 1.0, 0.5, 0.62
+    p.box("paper", (w, 0.01, h), (0, y, z), 0.003, 1)
+    p.box("poster_a", (w - 0.06, 0.012, h - 0.12), (0, y - 0.001, z + 0.02), 0, 0)
+    p.ball("poster_c", 0.06, (0.1, y - 0.004, z + 0.14), scale=(1, 0.1, 1), u=16, v=8)
+    p.ball("poster_b", 0.15, (-0.07, y - 0.006, z - 0.17), scale=(1, 0.1, 0.6), u=20, v=8)
+    p.ball("poster_b", 0.12, (0.1, y - 0.005, z - 0.18), scale=(1, 0.1, 0.55), u=20, v=8)
+    p.box("paper", (w - 0.06, 0.014, 0.1), (0, y - 0.002, z - 0.24), 0, 0)
+    return p
+
+
+def plant_pot():
+    p = Prop("plant_pot")  # 0.5 x 0.5 potted plant, about 0.6 m tall
+    p.cyl("pot", 0.16, 0.3, (0, 0, 0.15), r2=0.2, bevel=0.02, n=24)
+    p.cyl("pot", 0.215, 0.05, (0, 0, 0.3), bevel=0.015, n=24)
+    p.cyl("rubber", 0.18, 0.01, (0, 0, 0.32), bevel=0, n=24)
+    for loc, r in (((0, 0, 0.46), 0.15), ((0.09, 0.05, 0.4), 0.11), ((-0.08, -0.06, 0.41), 0.11),
+                   ((0.02, -0.08, 0.52), 0.1), ((-0.04, 0.08, 0.53), 0.1)):
+        p.ball("leaf", r, loc, u=14, v=8)
+    return p
+
+
+def wall_shelf():
+    """1 x 0.25 shelf against the wall behind, its top about 1.1 m up,
+    with a few books and a mug."""
+    p = Prop("wall_shelf")
+    z = 1.1
+    p.box("wood", (0.95, 0.22, 0.04), (0, 0, z - 0.02), 0.012, 2)
+    for x in (-0.35, 0.35):
+        p.tube("paint", [(x, 0.11, z - 0.2), (x, 0.11, z - 0.05), (x, -0.06, z - 0.05)], 0.012, 0.03, n=8)
+    for k, x in enumerate((-0.38, -0.32, -0.265, -0.21)):
+        ht = 0.2 + (k % 2) * 0.03
+        p.box(("book_a", "book_b", "book_c", "book_d")[k], (0.05, 0.16, ht), (x, 0.01, z + ht / 2), 0.01, 2)
+    p.box("book_d", (0.05, 0.16, 0.19), (-0.15, 0.01, z + 0.09), 0.01, 2, rot=(0, -20, 0))
+    p.cyl("sheet", 0.04, 0.09, (0.12, 0.0, z + 0.045), bevel=0.01, n=16)
+    p.tube("sheet", [(0.16, 0, z + 0.07), (0.19, 0, z + 0.06), (0.19, 0, z + 0.03), (0.16, 0, z + 0.02)], 0.009, 0.02, n=8)
+    p.box("cream", (0.16, 0.1, 0.12), (0.33, 0.01, z + 0.06), 0.02, 2)
+    return p
+
+
 MODELS = dict(bed=bed, toilet=toilet, shower=shower, table=table, desk=desk, lift=lift, door=door,
-              cell_door=cell_door, person=person, tree=tree, bush=bush, flower=flower)
+              cell_door=cell_door, person=person, tree=tree, bush=bush, flower=flower,
+              radio=radio, tv=tv, bookshelf=bookshelf, games_table=games_table,
+              weights_bench=weights_bench, basketball_hoop=basketball_hoop, bench=bench, sink=sink,
+              rug=rug, poster=poster, plant_pot=plant_pot, wall_shelf=wall_shelf)
 
 
 # ---------------------------------------------------------------- line-up
 
-def lineup(folder):
+def lineup(folder, names=None):
     scene.render.engine = "BLENDER_EEVEE_NEXT" if hasattr(bpy.types, "EEVEE_NEXT") else "CYCLES"
     try:
         scene.render.engine = "CYCLES"
@@ -426,6 +612,8 @@ def lineup(folder):
              ("shower", (1.5, 0.2, 0), 180), ("lift", (2.8, 0.2, 0), 0), ("door", (-2.8, 1.8, 0), 0),
              ("cell_door", (-1.4, 1.8, 0), 0), ("desk", (0.1, 1.6, 0), 180), ("person", (1.1, 1.4, 0), 200),
              ("tree", (2.2, 1.9, 0), 0), ("bush", (3.4, 1.7, 0), 0), ("flower", (3.6, 0.9, 0), 0)]
+    if names:  # just these, in rows of four
+        spots = [(n, (-3.0 + (k % 4) * 2.0, -0.4 + (k // 4) * 1.9, 0), 0) for k, n in enumerate(names)]
     for name, loc, rz in spots:
         MODELS[name]().build(loc, rz)
     floor = Prop("floor")
@@ -468,8 +656,8 @@ if __name__ == "__main__":
     out = os.path.abspath(args[0] if args else os.path.join(os.path.dirname(__file__), "..", "models"))
     os.makedirs(out, exist_ok=True)
     names = args[1:] or list(MODELS)
-    if names == ["lineup"]:
-        lineup(out)
+    if names[:1] == ["lineup"]:
+        lineup(out, names[1:])
     else:
         for name in names:
             bpy.ops.wm.read_factory_settings(use_empty=True)
