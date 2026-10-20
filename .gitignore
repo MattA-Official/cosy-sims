@@ -5,3 +5,4 @@
 export_presets.cfg
 export_credentials.cfg
 .DS_Store
+__pycache__/
