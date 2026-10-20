@@ -13,3 +13,4 @@ height = 0.85
 colour = Color(0.95, 0.95, 0.97, 1)
 tags = Array[StringName]([&"toilet"])
 model = ExtResource("2_model")
+uses_before_breaking = 15

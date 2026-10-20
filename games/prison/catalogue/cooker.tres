@@ -14,3 +14,4 @@ tags = Array[StringName]([&"cooker"])
 holds = Array[StringName]([&"meal"])
 capacity = 8
 model = ExtResource("2_model")
+uses_before_breaking = 10

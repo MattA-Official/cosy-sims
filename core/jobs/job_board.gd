@@ -265,7 +265,8 @@ func _choose(person: Person, stage: Job.Stage) -> Vector2i:
 					if not placed.def.holds.has(stage.tag) or items.room_in(key, placed) <= 0:
 						continue
 				Job.Do.WORK:
-					if _busy(key, person) or (stage.tag != &"" and items.room_in(key, placed) <= 0):
+					if _busy(key, person) or people.broken.has(key) \
+							or (stage.tag != &"" and items.room_in(key, placed) <= 0):
 						continue
 			if not people.may_enter(person, map.room_at_point(placed.centre)):
 				continue

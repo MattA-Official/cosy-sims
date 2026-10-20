@@ -50,6 +50,8 @@ var workshop := Workshop.new()
 var guarding := Guarding.new()
 ## Loops drawn for guards to walk.
 var routes := PatrolRoutes.new()
+## Objects wearing out, and jobs to mend them.
+var wear := Wear.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
 ## Open jobs and stock, with the debug view.
@@ -258,12 +260,18 @@ func _ready() -> void:
 	add_child(guarding)
 	runner.other_locks = guarding.gate_locks
 	runner.refresh()
+	wear.name = "Wear"
+	wear.cell_size = grid.cell_size
+	wear.people = people
+	wear.jobs = jobs
+	wear.building = building
+	grid.add_child(wear)
 	jobs_panel.name = "JobsPanel"
 	jobs_panel.debug_overlay = debug_overlay
 	jobs_panel.jobs = jobs
 	jobs_panel.items = items
 	jobs_panel.building = building
-	jobs_panel.warnings = func() -> Array[String]: return kitchen.warnings() + laundry.warnings()
+	jobs_panel.warnings = func() -> Array[String]: return kitchen.warnings() + laundry.warnings() + wear.warnings()
 	grid.add_child(jobs_panel)
 	var load_sample := func(index: int) -> void:
 		SamplePrisons.next = index

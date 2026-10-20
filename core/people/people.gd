@@ -134,6 +134,9 @@ var graph: NavGraph
 var paused := false
 ## Who may go where: zones, staff doors and locked doors.
 var access := Access.new()
+## Objects broken and waiting to be mended, by (level, object id): nobody
+## uses them.
+var broken: Dictionary[Vector2i, bool] = {}
 ## Groups whose needs are switched off in the settings (staff, say): their
 ## needs stay met.
 var needs_off: Array[StringName] = []
@@ -1377,9 +1380,11 @@ func _room_listed(rooms: Array, level: int, room: Room) -> bool:
 ## Owned objects (beds) are for their owner only; people without one may
 ## use any nobody owns.
 func _may_use(person: Person, level: int, placed: BuildingMap.PlacedObject) -> bool:
+	var key := Vector2i(level, placed.id)
+	if broken.has(key):
+		return false
 	if not _is_owned_tag_object(placed):
 		return true
-	var key := Vector2i(level, placed.id)
 	return person.bed == key if person.has_bed() else not _bed_owners.has(key)
 
 

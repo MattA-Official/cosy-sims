@@ -48,6 +48,7 @@ func _process(_delta: float) -> bool:
 	_test_work_programmes()
 	_test_staff_window()
 	_test_guards()
+	_test_wear_and_repair()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -998,6 +999,47 @@ func _test_guards() -> void:
 	clock.advance(1.0)
 	_check(routes.routes.is_empty() and not jobs.of_kind(&"patrol").any(func(j: Job) -> bool:
 			return j.has_meta(&"route")), "Ctrl-click removes it, and the guard stops")
+	main.queue_free()
+
+
+## Objects wear out with use and break; the handyman mends them.
+func _test_wear_and_repair() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var people: People = main.people
+	var wear: Wear = main.wear
+	var jobs: JobBoard = main.jobs
+	var clock: GameClock = main.clock
+	clock.speed_index = 0
+	var toilets: Array[Vector2i] = main.building.objects_tagged([&"toilet"] as Array[StringName])
+	var key := toilets[0]
+	var placed: BuildingMap.PlacedObject = main.building.object_at(key)
+	for i in placed.def.uses_before_breaking - 1:
+		wear.use(key)
+	_check(not wear.is_broken(key), "a toilet takes plenty of use")
+	wear.use(key)
+	_check(wear.is_broken(key) and jobs.of_kind(&"repair").size() == 1, "then breaks, and a job goes up to mend it")
+	_check(main.jobs_panel.describe().contains("Broken: toilet"), "the jobs panel says what's broken")
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	_check(not people._may_use(prisoner, key.x, placed), "nobody uses it while it's broken")
+	var minutes := 0
+	var mending := false
+	while wear.is_broken(key) and minutes < 180:
+		clock.advance(1.0)
+		minutes += 1
+		mending = mending or people.people.any(func(p: Person) -> bool:
+			return p.role == &"handyman" and p.activity == "Mending the toilet")
+	_check(mending and not wear.is_broken(key) and jobs.of_kind(&"repair").is_empty(),
+			"the handyman mends it")
+	var cooker: Vector2i = main.building.objects_tagged([&"cooker"] as Array[StringName])[0]
+	var before: int = wear.uses.get(cooker, 0)
+	while main.building.objects_tagged([&"cooker"] as Array[StringName]).all(func(k: Vector2i) -> bool: return wear.uses.get(k, 0) == 0) \
+			and minutes < 600:
+		clock.advance(1.0)
+		minutes += 1
+	_check(main.building.objects_tagged([&"cooker"] as Array[StringName]).any(func(k: Vector2i) -> bool: return wear.uses.get(k, 0) > 0),
+			"work done at an object wears it too (cooker was %d)" % before)
 	main.queue_free()
 
 

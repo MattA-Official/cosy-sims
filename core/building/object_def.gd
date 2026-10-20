@@ -57,3 +57,6 @@ enum Connects {
 ## The chance someone leaves litter where they stood after using it, as
 ## after a meal.
 @export_range(0.0, 1.0) var litter_chance := 0.0
+## Uses before it wears out and breaks, until someone mends it (see Wear).
+## 0 never breaks.
+@export var uses_before_breaking := 0
