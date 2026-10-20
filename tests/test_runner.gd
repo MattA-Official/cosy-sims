@@ -57,6 +57,7 @@ func _process(_delta: float) -> bool:
 	_test_flexible_objects()
 	_test_roads()
 	_test_buying_land()
+	_test_misconduct()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -2852,3 +2853,63 @@ func _test_foliage() -> void:
 	var count := foliage.plants.size()
 	_check(foliage.remove_in_circle(Vector2(20, 20), 3.5) == count - 1, "remove_in_circle clears the rest")
 	foliage.free()
+
+
+func _test_misconduct() -> void:
+	var model := MisconductModel.new()
+	_check(model.temper_after(0.0, 10.0, 1.0) > 0.0, "temper builds while unhappy")
+	_check(model.temper_after(50.0, 80.0, 1.0) < 50.0, "and cools while content")
+	_check(is_equal_approx(model.chance(80.0, true), model.chance(80.0, false) * model.watched_factor),
+			"a guard close by makes acting up less likely")
+	var hothead: TraitDef = preload("res://games/prison/catalogue/trait_hothead.tres")
+	_check(model.temper_after(0.0, 10.0, 1.0, hothead.temper_scale) > model.temper_after(0.0, 10.0, 1.0),
+			"hotheads boil over sooner")
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var people: People = main.people
+	var misconduct: Misconduct = main.misconduct
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	var prisoner: Person = prisoners[0]
+	prisoner.mood = 40.0
+	_check(model.pick(misconduct.rungs, 40.0, {}, [] as Array[StringName], RandomNumberGenerator.new()).id == &"grumble",
+			"only grumbling while merely fed up")
+	misconduct.act(prisoner, misconduct.rung(&"grumble"))
+	_check(not prisoner.bubble.is_empty() and prisoner.record.is_empty(), "grumbling shows a bubble and leaves no record")
+	# Warnings: a lifted mood calls it off.
+	prisoner.warning = &"vandalism"
+	prisoner.warning_minutes = 10.0
+	prisoner.mood = 90.0
+	misconduct.tick(1.0)
+	_check(prisoner.warning == &"", "cheering someone up calls off what they were about to do")
+	# Vandalism breaks the nearest breakable thing and goes on the record.
+	var tvs: Array[Vector2i] = main.building.objects_tagged([&"toilet"] as Array[StringName])
+	var key := tvs[0]
+	var placed: BuildingMap.PlacedObject = main.building.object_at(key)
+	var vandal: Person = prisoners[1]
+	vandal.level = key.x
+	vandal.position = Vector3(placed.centre.x, vandal.position.y, placed.centre.y)
+	vandal.mood = 10.0
+	misconduct.act(vandal, misconduct.rung(&"vandalism"))
+	_check((main.wear as Wear).is_broken(key), "vandals break things")
+	_check(vandal.record.size() == 1 and String(vandal.record[0][2]).begins_with("broke the toilet"),
+			"and it goes on their record with the reason (%s)" % [vandal.record])
+	# Mischief: off the timetable for a while.
+	var imp: Person = prisoners[2]
+	misconduct.act(imp, misconduct.rung(&"mischief"))
+	_check(imp.truant_minutes > 0.0, "mischief takes them off the timetable")
+	people._decide(imp, true)
+	_check(imp.reason.begins_with("Up to no good"), "and they wander about up to no good")
+	for i in 70:
+		(main.clock as GameClock).advance(1.0)
+	_check(imp.truant_minutes == 0.0, "for an hour")
+	# Left alone and miserable, someone acts up sooner or later.
+	var acted := []
+	for person: Person in prisoners:
+		person.temper = 100.0
+		person.mood = 15.0
+		for hour in 10:
+			if person.warning == &"" and misconduct.roll(person) != null:
+				acted.append(person)
+	_check(not acted.is_empty(), "unhappy prisoners act up")
+	main.queue_free()

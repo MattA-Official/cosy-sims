@@ -79,6 +79,8 @@ var guarding := Guarding.new()
 var routes := PatrolRoutes.new()
 ## Objects wearing out, and jobs to mend them.
 var wear := Wear.new()
+## Unhappy prisoners acting up.
+var misconduct := Misconduct.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
 ## The prison's money, and what comes in and goes out.
@@ -367,6 +369,15 @@ func _ready() -> void:
 	wear.jobs = jobs
 	wear.building = building
 	grid.add_child(wear)
+	misconduct.name = "Misconduct"
+	misconduct.people = people
+	misconduct.model = MisconductModel.new()
+	misconduct.rungs.assign(PrisonCatalogue.MISCONDUCT)
+	misconduct.wear = wear
+	misconduct.items = items
+	misconduct.clock = clock
+	add_child(misconduct)
+	misconduct.start()
 	ledger.name = "Ledger"
 	ledger.balance = Finances.STARTING_MONEY
 	add_child(ledger)

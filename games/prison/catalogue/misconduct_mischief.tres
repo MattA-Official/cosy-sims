@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MisconductDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/misconduct_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"mischief"
+display_name = "Mischief"
+mood_below = 30.0
+weight = 2.0
+trait_weights = Dictionary[StringName, float]({
+&"light_fingered": 2.0
+})
+warning_minutes = 10.0
+bubble = "Up to something"

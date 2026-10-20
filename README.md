@@ -255,6 +255,27 @@ level the strip with your land along their shared edge, for a fee by how
 much ground moves. A road running into the strip carries on to the new
 edge. Buying land can't be undone.
 
+### Trouble
+
+Unhappy prisoners build up temper (shown in the inspector with what's
+mostly behind it). Once a game hour each may act on it, half as likely
+with a guard within a few tiles. How far they go depends on how low their
+mood is:
+
+- **Grumbling** (mood under 45): "Grumble grumble" over their head, and
+  they slow down for a while. No record.
+- **Mischief** (under 30): they skive off the timetable for an hour,
+  wandering about and dropping litter. Guards who spot them walk them back.
+- **Vandalism** (under 20): they break the nearest breakable object (TV,
+  toilet, shower...), which then needs mending. People who see it feel a
+  bit worse.
+
+The worse two warn first ("Up to something", "Fuming!"); a guard turning up
+or their mood lifting calls it off. Offences go on their record in the
+inspector with the reason, such as "broke the toilet in the cell (hungry)".
+Hotheads boil over faster, gentle souls slower; light-fingered prisoners
+lean towards mischief. Acting on it lets off steam.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one

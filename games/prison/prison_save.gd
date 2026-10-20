@@ -34,6 +34,11 @@ static func capture(main: Node) -> Dictionary:
 			"level": person.level,
 			"position": person.stand_spot if person.state == Person.State.USING else person.position, "needs": person.needs.duplicate(),
 			"mood": person.mood, "moodlets": person.moodlets.duplicate(), "traits": traits,
+			"temper": person.temper, "minutes_below": person.minutes_below.duplicate(),
+			"record": person.record.duplicate(true), "warning": person.warning,
+			"warning_minutes": person.warning_minutes, "bubble": person.bubble,
+			"bubble_minutes": person.bubble_minutes, "truant_minutes": person.truant_minutes,
+			"pace": person.pace,
 			"profile": person.profile.duplicate(true), "bed": person.bed,
 			"doing": people.doing_of(person), "work": (main.jobs as JobBoard).work_of(person),
 		})
@@ -99,6 +104,16 @@ static func apply_world(main: Node, data: Dictionary) -> void:
 		person.needs.assign(entry["needs"])
 		person.mood = entry["mood"]
 		person.moodlets.assign(entry["moodlets"])
+		# Saves from before misconduct have none of this.
+		person.temper = entry.get("temper", 0.0)
+		person.minutes_below.assign(entry.get("minutes_below", {}))
+		person.record.assign(entry.get("record", []))
+		person.warning = StringName(entry.get("warning", ""))
+		person.warning_minutes = entry.get("warning_minutes", 0.0)
+		person.bubble = entry.get("bubble", "")
+		person.bubble_minutes = entry.get("bubble_minutes", 0.0)
+		person.truant_minutes = entry.get("truant_minutes", 0.0)
+		person.pace = entry.get("pace", 1.0)
 		person.programme = entry["programme"]
 		person.category = entry["category"]
 		person.shift = entry["shift"]

@@ -325,6 +325,12 @@ func _refresh_person(person: Person) -> void:
 		lines.append("Block: %s, %s" % [person.block.display_name,
 				"in place" if people.is_in_place(person) else ("out of place" if person.out_of_place
 				else "on the way")])
+	if person.temper > 0.5 or not person.record.is_empty():
+		lines.append("Temper: %d%s" % [roundi(person.temper), ", about to act up" if person.warning != &""
+				else (", up to no good" if person.truant_minutes > 0.0 else "")]
+				+ (", mostly %s" % _worst_worry(person) if person.temper > 0.5 else ""))
+	for entry: Array in person.record.slice(-5):
+		lines.append("Record: day %d, %s" % [entry[0], entry[2]])
 	var home := people.home_room(person)
 	lines.append("Bed: %s" % ("none of their own" if home.is_empty()
 			else "in a room on the %s" % Building.level_name(home[0]).to_lower()))
@@ -342,6 +348,15 @@ func _refresh_person(person: Person) -> void:
 		var slider := _need_sliders[need]
 		if not slider.has_focus():
 			slider.set_value_no_signal(person.needs.get(need, 0.0))
+
+
+## The worst thing on someone's mind, in lower case.
+func _worst_worry(person: Person) -> String:
+	var worst: Array = []
+	for part: Array in person.mood_parts:
+		if part[1] < 0.0 and (worst.is_empty() or part[1] < worst[1]):
+			worst = part
+	return String(worst[0]).to_lower() if not worst.is_empty() else "fed up"
 
 
 func _role_name(person: Person) -> String:

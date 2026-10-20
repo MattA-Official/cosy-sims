@@ -164,6 +164,11 @@ var items: ItemStore:
 var litter: Array[ItemDef] = []
 ## Items with this tag lying in a room make it worse.
 var litter_tag: StringName = &"litter"
+## (person, may_wander) -> bool: called before someone decides what to do;
+## true means it has decided for them. This is where something other than
+## their needs and the timetable can take over, such as misconduct or a
+## player in control.
+var deciders: Array[Callable] = []
 
 var _dirty := true
 ## Whether the ground under the building has changed too (terrain, water or
@@ -984,6 +989,10 @@ func _has_errand(person: Person) -> bool:
 ## Works out what someone does next, in the order the class comment gives.
 func _decide(person: Person, may_wander: bool) -> void:
 	var block := person.block
+	# Anything else deciding for them first, such as someone up to no good.
+	for decider in deciders:
+		if decider.call(person, may_wander):
+			return
 	if _leave_if_kept_out(person):
 		return
 	var urgent := _urgent_need(person)
@@ -1506,6 +1515,11 @@ func _need_for_tag(tag: StringName) -> StringName:
 	return &""
 
 
+## Sends someone for a stroll somewhere nearby they may go.
+func wander(person: Person) -> void:
+	_wander(person)
+
+
 func _wander(person: Person) -> void:
 	var spot: Variant = null
 	var here := room_of(person)
@@ -1638,7 +1652,7 @@ func _walk_to(person: Person, level: int, spot: Vector2) -> bool:
 
 
 func _walk(person: Person, minutes: float) -> void:
-	var budget := speed * minutes
+	var budget := speed * person.pace * minutes
 	while budget > 0.0 and not person.route.is_empty():
 		var next := person.route[0]
 		var here := person.flat()
@@ -1812,10 +1826,13 @@ func _update_bodies() -> void:
 			if ahead.length() > 0.01:
 				body.rotation.y = atan2(-ahead.x, -ahead.y)
 		_pose(person, body, cs)
-		body.get_node("Flag").visible = person.out_of_place
+		body.get_node("Flag").visible = person.out_of_place and person.bubble.is_empty()
+		var bubble := body.get_node("Bubble") as Label3D
+		bubble.visible = not person.bubble.is_empty()
+		bubble.text = person.bubble
 		var face := body.get_node("Face") as Sprite3D
 		var mood_face := mood_model.face(person.mood)
-		face.visible = not person.out_of_place and mood_face >= MoodModel.Face.FED_UP \
+		face.visible = not person.out_of_place and person.bubble.is_empty() and mood_face >= MoodModel.Face.FED_UP \
 				and not person.mood_parts.is_empty()
 		if face.visible:
 			face.texture = face_textures[mood_face]
@@ -1935,6 +1952,19 @@ func _add_flag(root: Node3D) -> void:
 	flag.position.y = 1.15
 	flag.visible = false
 	root.add_child(flag)
+	# What they're grumbling about, or a warning before they act up.
+	var bubble := Label3D.new()
+	bubble.name = "Bubble"
+	bubble.font_size = 44
+	bubble.outline_size = 14
+	bubble.pixel_size = 0.006
+	bubble.modulate = Color(1.0, 0.96, 0.9)
+	bubble.outline_modulate = Color(0.45, 0.2, 0.15)
+	bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	bubble.no_depth_test = true
+	bubble.position.y = 1.2
+	bubble.visible = false
+	root.add_child(bubble)
 
 
 ## Shared between everyone of the same colour.

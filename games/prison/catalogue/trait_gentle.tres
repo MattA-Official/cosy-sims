@@ -10,3 +10,4 @@ description = "Calms the people near them, and takes things in their stride."
 opposite = &"hothead"
 bad_mood_scale = 0.8
 nearby_moodlet = &"calmed"
+temper_scale = 0.7

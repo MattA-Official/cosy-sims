@@ -103,6 +103,22 @@ var going_home := false
 ## Being walked somewhere by someone else, such as a guard: they decide
 ## nothing for themselves meanwhile.
 var led := false
+## How close they are to acting up, 0 to 100 (see MisconductModel).
+var temper := 0.0
+## Game minutes spent under each misconduct rung's mood, by rung id.
+var minutes_below: Dictionary[StringName, float] = {}
+## What they have done wrong, oldest first: [day, rung id, words].
+var record: Array = []
+## A rung they are about to act on, and game minutes until they do.
+var warning: StringName = &""
+var warning_minutes := 0.0
+## Words over their head, and game minutes left to show them.
+var bubble := ""
+var bubble_minutes := 0.0
+## Game minutes left ignoring the timetable, up to no good.
+var truant_minutes := 0.0
+## How fast they walk, against everyone's usual speed.
+var pace := 1.0
 
 
 func flat() -> Vector2:

@@ -185,9 +185,17 @@ const TRAITS: Array[TraitDef] = [
 ]
 
 ## Things that happen to prisoners and lift or lower their mood a while.
+## The misconduct ladder, mildest first.
+const MISCONDUCT: Array[MisconductDef] = [
+	preload("res://games/prison/catalogue/misconduct_grumble.tres"),
+	preload("res://games/prison/catalogue/misconduct_mischief.tres"),
+	preload("res://games/prison/catalogue/misconduct_vandalism.tres"),
+]
+
 const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_good_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_missed_meal.tres"),
+	preload("res://games/prison/catalogue/moodlet_saw_vandalism.tres"),
 	preload("res://games/prison/catalogue/moodlet_grubby_uniform.tres"),
 	preload("res://games/prison/catalogue/moodlet_useful_day.tres"),
 	preload("res://games/prison/catalogue/moodlet_made_to_work.tres"),

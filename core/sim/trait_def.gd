@@ -46,3 +46,5 @@ extends Resource
 @export var steady_text: String
 ## How much more (or less) litter they leave about.
 @export var litter_scale := 1.0
+## How much faster (or slower) temper builds when they are unhappy.
+@export var temper_scale := 1.0

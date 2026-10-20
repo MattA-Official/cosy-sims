@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
@@ -62,6 +62,23 @@ func _process(_delta: float) -> bool:
 			_main.controller.tool = BuildController.Tool.TERRAIN
 		if args.has("route"):
 			_main.controller.tool = BuildController.Tool.ROUTE
+		if args.has("trouble"):
+			# Every prisoner fed up: some grumble, some about to act up.
+			var misconduct: Misconduct = _main.misconduct
+			var prisoners: Array = _main.people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+			for i in prisoners.size():
+				var person: Person = prisoners[i]
+				person.mood = 15.0
+				person.temper = 80.0
+				var rung := misconduct.rungs[i % misconduct.rungs.size()]
+				if rung.warning_minutes > 0.0:
+					person.warning = rung.id
+					person.warning_minutes = 60.0
+					person.bubble = Misconduct.words_over_head(rung, person)
+					person.bubble_minutes = 60.0
+				else:
+					misconduct.act(person, rung)
+			misconduct.act(prisoners[0], misconduct.rung(&"vandalism"))
 		for arg in args:
 			if arg.begins_with("at="):
 				var at := arg.get_slice("=", 1).split_floats(",")

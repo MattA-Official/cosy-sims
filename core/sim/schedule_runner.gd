@@ -170,7 +170,7 @@ func toggle_lock(level: int, edge: Vector3i, pin := false) -> void:
 func _update_lateness() -> void:
 	for person in people.people:
 		var late := minutes_into_block(person.group) >= LATE_MINUTES
-		person.out_of_place = late and not people.is_in_place(person)
+		person.out_of_place = (late and not people.is_in_place(person)) or person.truant_minutes > 0.0
 
 
 ## The doors on the straight walls round a room.

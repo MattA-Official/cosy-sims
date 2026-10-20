@@ -9,3 +9,4 @@ display_name = "Hothead"
 description = "Takes bad things hard."
 opposite = &"gentle"
 bad_mood_scale = 1.5
+temper_scale = 1.5
