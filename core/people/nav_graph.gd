@@ -118,10 +118,16 @@ func position_of(id: int) -> Vector3:
 ## are taken in one go rather than tile by tile. `levels` and
 ## `on_surface`, if given, are filled with each position's level and
 ## whether it is on floor or ground (rather than stairs, a lift or a built
-## path).
+## path). Someone stopped part way up the stairs, where `from` is no floor
+## or ground, starts from the nearest point if `from_height` is given.
 func find_path(from_level: int, from: Vector2, to_level: int, to: Vector2,
-		levels: Array[int] = [], on_surface: Array[bool] = []) -> Array[Vector3]:
+		levels: Array[int] = [], on_surface: Array[bool] = [], from_height := NAN) -> Array[Vector3]:
 	var start := point_at(from_level, from)
+	if start == -1 and not is_nan(from_height):
+		var at := Vector3(from.x, from_height, from.y)
+		var nearest := astar.get_closest_point(at)
+		if nearest != -1 and position_of(nearest).distance_to(at) < 1.0:
+			start = nearest
 	var goal := point_at(to_level, to)
 	var out: Array[Vector3] = []
 	if start == -1 or goal == -1:

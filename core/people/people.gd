@@ -219,7 +219,7 @@ func nav() -> NavGraph:
 ## go?
 func can_reach(person: Person, level: int, spot: Vector2) -> bool:
 	_set_up_access(person)
-	return not nav().find_path(person.level, person.flat(), level, spot).is_empty()
+	return not nav().find_path(person.level, person.flat(), level, spot, [], [], person.position.y).is_empty()
 
 
 ## May someone be in a room? Anyone may be outside one.
@@ -1284,7 +1284,7 @@ func _walk_to(person: Person, level: int, spot: Vector2) -> bool:
 	var levels: Array[int] = []
 	var surface: Array[bool] = []
 	_set_up_access(person)
-	var route := nav().find_path(person.level, person.flat(), level, spot, levels, surface)
+	var route := nav().find_path(person.level, person.flat(), level, spot, levels, surface, person.position.y)
 	if route.is_empty():
 		return false
 	person.wandering = false

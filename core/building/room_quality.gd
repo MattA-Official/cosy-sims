@@ -6,7 +6,7 @@ extends RefCounted
 ## inspector. Nothing here is prison-specific: a ward or a lounge has its
 ## own ideal size on its RoomTypeDef.
 ##
-##   var quality := RoomQuality.assess(map, room, PrisonCatalogue.room_type(room.type))
+##   var quality := RoomQuality.assess(map, room, room_type_def, &"bed", &"decor")
 ##   quality.score # 3.0
 ##   quality.parts # [["Has a window", 2.0], ["Bare floor", 0.0], ...]
 

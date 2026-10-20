@@ -39,3 +39,33 @@ Deliberately left until after step 4: money, guards and staff, events.
 - Terrain basics added before step 3: sculpting, a water level, plants,
   and buildings that flatten the ground. Next: spline paths and roads,
   then people on a navmesh.
+
+## Gate 1 review (20 October 2026)
+
+Phase 1 (M1 to M3) is done: a day runs itself. Checked by running every
+sample for three game days.
+
+- **A day plays out on its own.** The starter block and the staff wing
+  sit at a content mood (around 60) with no accidents. One bug turned up
+  and is fixed: someone who stopped part way up the stairs could never
+  find a way anywhere again, which caused most of the accidents in the
+  older samples. Two storeys, Island, Long way round and Basement still
+  sit fed up because they have no yard; they are path tests, so that is
+  left as it is.
+- **The one-way rule holds.** Nothing in `core/` refers to
+  `games/prison/`. The only prison flavour left in core is `&"prisoner"`
+  as the default group (on `Person`, `Schedule`, `ScheduleRunner` and
+  `People.add_person`), which a later game can simply not use.
+- **What lives where.** `core/sim/`: clock, timetable (`Schedule`,
+  `ActivityDef`, `ScheduleRunner`), day and night, door lamps, the mood
+  model, moodlets and traits. `core/people/`: needs, people and their
+  decisions, groups, access and the walking graph. `core/building/`:
+  room types, room quality, zones and door kinds. All prison content is
+  `.tres` data in `games/prison/catalogue/`.
+- **Debts to pay in Phase 2.**
+  - `core/people/people.gd` is about 1,500 lines. Split it into deciding,
+    mood, walking and bodies once the art thread's poses for people
+    have landed, so the two don't collide.
+  - Doors in angled walls can't be locked or made staff doors yet.
+  - Staff only wander, eat and chat; their jobs, shifts and staff room
+    come with M4 and M5.

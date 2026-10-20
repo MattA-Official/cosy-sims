@@ -40,6 +40,7 @@ func _process(_delta: float) -> bool:
 	_test_traits_and_choices()
 	_test_needs_in_a_day()
 	_test_zones_and_doors()
+	_test_stopped_on_stairs()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -639,6 +640,25 @@ func _test_zones_and_doors() -> void:
 					and not people.may_enter(person, here[1]) and not trespass.has(person.name):
 				trespass.append(person.name)
 	_check(trespass.is_empty(), "over a day, no prisoner goes where they may not (%s)" % [trespass])
+	root.remove_child(main)
+	main.free()
+
+
+## Someone who stops part way up the stairs (a block changing mid-climb)
+## can still find a way off them.
+func _test_stopped_on_stairs() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 1
+	root.add_child(main)
+	var people: People = main.people
+	var o: Vector2i = main.building.land[0].get_center() - Vector2i(7, 5)
+	var person: Person = people.people[0]
+	people._stop(person)
+	person.level = 0
+	person.position = Vector3(o.x + 5.5, 0.875, o.y + 5.5)
+	_check(people.nav().point_at(0, person.flat()) == -1, "the middle of the stairs is no floor")
+	_check(people.can_reach(person, 0, Vector2(o + Vector2i(3, 8)) + Vector2(0.5, 0.5)),
+			"someone stopped on the stairs can still get down to the canteen")
 	root.remove_child(main)
 	main.free()
 
