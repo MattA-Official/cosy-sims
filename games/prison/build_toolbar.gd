@@ -81,6 +81,7 @@ var _tool_group := ButtonGroup.new()
 var _thumbnails := Thumbnails.new()
 var _size_slider: HSlider
 var _density_slider: HSlider
+var _strength_slider: HSlider
 
 
 func _ready() -> void:
@@ -144,6 +145,7 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 		child.queue_free()
 	_size_slider = null
 	_density_slider = null
+	_strength_slider = null
 	if tool == BuildController.Tool.TERRAIN:
 		# Plants can go down to single placement; terrain can't.
 		controller.brush_radius = maxf(controller.brush_radius, controller.min_brush_radius)
@@ -320,7 +322,8 @@ func _icon_tiles(title: String, entries: Array, current: Variant, pick: Callable
 
 
 ## Sliders for the brush: its size, which for plants goes down to placing
-## one at a time, and for plants how densely they are painted.
+## one at a time; for terrain how strongly it works; for plants how densely
+## they are painted.
 func _add_brush_sliders(plants: bool) -> void:
 	var grid := GridContainer.new()
 	grid.columns = 3
@@ -328,6 +331,9 @@ func _add_brush_sliders(plants: bool) -> void:
 	grid.add_theme_constant_override(&"v_separation", 2)
 	_size_slider = _slider_row(grid, "Size", controller.smallest_brush(), controller.max_brush_radius, 1.0,
 			func(value: float) -> void: controller.brush_radius = value)
+	if not plants:
+		_strength_slider = _slider_row(grid, "Strength", 10.0, 100.0, 5.0,
+				func(value: float) -> void: controller.terrain_strength = value / 100.0)
 	if plants:
 		_density_slider = _slider_row(grid, "Density", BuildController.MIN_PLANT_DENSITY * 100.0, 100.0, 5.0,
 				func(value: float) -> void: controller.plant_density = value / 100.0)
@@ -365,6 +371,9 @@ func _show_brush() -> void:
 		_size_slider.set_value_no_signal(controller.brush_radius)
 		_size_slider.get_meta(&"value_label").text = "Single" if controller.brush_radius < 0.5 \
 				else "%d" % roundi(controller.brush_radius)
+	if is_instance_valid(_strength_slider) and not _strength_slider.is_queued_for_deletion():
+		_strength_slider.set_value_no_signal(controller.terrain_strength * 100.0)
+		_strength_slider.get_meta(&"value_label").text = "%d%%" % roundi(controller.terrain_strength * 100.0)
 	if is_instance_valid(_density_slider) and not _density_slider.is_queued_for_deletion():
 		_density_slider.set_value_no_signal(controller.plant_density * 100.0)
 		_density_slider.get_meta(&"value_label").text = "%d%%" % roundi(controller.plant_density * 100.0)

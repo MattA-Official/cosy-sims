@@ -140,7 +140,8 @@ takes the same entries and makes a tile each.
 
 Brush tools get a **Brush** section of sliders from
 `_add_brush_sliders(plants)`: size for terrain and plants (plants go down
-to "Single", one plant per click), and density for plants. They follow the
+to "Single", one plant per click), strength for terrain, and density for
+plants. They follow the
 controller's `brush_changed` signal, so [ and ] move them too. For a tile row instead, use
 `_section("Title")` and add `CosyButton.tile(...)` buttons to the row it
 returns.

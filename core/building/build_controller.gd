@@ -167,6 +167,12 @@ var brush_radius := 3.0:
 		brush_changed.emit()
 ## How closely plants of one kind are painted, from 0.25 (four times their
 ## spacing apart) to 1 (as close as their spacing allows).
+## How hard the terrain brush works, from 0.1 to 1. 0.5 is the speeds
+## above; 1 is twice as fast.
+var terrain_strength := 0.5:
+	set(value):
+		terrain_strength = clampf(value, 0.1, 1.0)
+		brush_changed.emit()
 var plant_density := 1.0:
 	set(value):
 		plant_density = clampf(value, MIN_PLANT_DENSITY, 1.0)
@@ -686,9 +692,10 @@ func _apply_brush(delta: float) -> void:
 		Tool.TERRAIN:
 			if terrain == null:
 				return
-			var strength := sculpt_speed * delta
+			var boost := terrain_strength * 2.0
+			var strength := sculpt_speed * boost * delta
 			if terrain_brush == Terrain.Brush.FLATTEN or terrain_brush == Terrain.Brush.SMOOTH:
-				strength = clampf(blend_speed * delta, 0.0, 1.0)
+				strength = clampf(blend_speed * boost * delta, 0.0, 1.0)
 			terrain.sculpt(terrain_brush, _hover_point, maxf(brush_radius, min_brush_radius), strength, _flatten_target,
 					can_sculpt)
 		Tool.PLANTS:

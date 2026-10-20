@@ -38,7 +38,7 @@ All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/)
 | 6 Room type | Click a room to mark it as a cell, canteen and so on |
 | 7 Paths | Straight: click each end. Curved: click the start, a bend and the end. Freehand: drag. Points snap to the middle of tiles (bends don't); hold Alt to swap that for one point, or turn Snap to grid off. Page Up / Down while placing builds stairs, a ramp or a bridge and raises its far end. Esc stops; Ctrl-click removes a path |
 | 8 Plants | Hold to plant trees, bushes or flowers; hold Ctrl to clear them. The Size slider goes down to Single, which places one plant per click; Density spaces them out |
-| 9 Terrain | Hold to raise, lower, flatten or smooth the ground; or add water to a hollow, or drain a pond |
+| 9 Terrain | Hold to raise, lower, flatten or smooth the ground, with sliders for size and strength; or add water to a hollow, or drain a pond |
 | 0 Demolish | Click an object or wall to remove it, or drag to clear an area |
 | [ / ] | Brush size, for terrain and plants |
 | Tab | Loops through the wall views: Walls up; Cutaway (walls in front of rooms drop, following the camera round); Walls down; Roofs on (every level with its roofs, as from outside) |
