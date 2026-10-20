@@ -7,7 +7,8 @@ extends Node3D
 @export var build_sample_layout := true
 ## Which sample prison to start with. The F3 inspector can switch to another.
 @export_enum("Starter block", "Two storeys", "Hillside", "Island", "Long way round", "Basement",
-		"Crowded canteen", "Locked out", "Staff wing", "Working prison", "Guarded prison") var sample := 0
+		"Crowded canteen", "Locked out", "Staff wing", "Working prison", "Guarded prison",
+		"Paying prison") var sample := 0
 ## Split levels: floors nudged within their storey, and ramps between
 ## them. Off keeps every floor a whole storey above the one below.
 @export var split_levels := false
@@ -58,6 +59,10 @@ var shifts := Shifts.new()
 var ledger := Ledger.new()
 var build_costs := BuildCosts.new()
 var finances := Finances.new()
+## New prisoners arriving on the morning bus.
+var intake := Intake.new()
+## The warden's office.
+var office := Office.new()
 ## Open jobs and stock, with the debug view.
 var jobs_panel := JobsPanel.new()
 ## Game time. Everything that happens over time listens to it.
@@ -79,6 +84,8 @@ var timetable := TimetableWindow.new()
 var staff_window := StaffWindow.new()
 ## The balance and the last week's money, on M.
 var finance_window := FinanceWindow.new()
+## Intake, goals and the grade, on O.
+var office_window := OfficeWindow.new()
 ## The F3 inspector for people, objects and rooms.
 var inspector := Inspector.new()
 ## Grid lines at the height of the level being built on, off the ground.
@@ -137,6 +144,7 @@ func _ready() -> void:
 	people.room_types = PrisonCatalogue.ROOM_TYPES
 	people.home_room_types = PrisonCatalogue.HOME_ROOM_TYPES
 	people.access = PrisonCatalogue.access()
+	people.categories = PrisonCatalogue.categories()
 	jobs.people = people
 	jobs.items = items
 	jobs.roles = PrisonCatalogue.roles()
@@ -291,16 +299,39 @@ func _ready() -> void:
 	finances.shifts = shifts
 	for role in PrisonCatalogue.ROLES:
 		finances.roles[role.id] = role
+	finances.categories = PrisonCatalogue.categories()
 	finances.kitchen = kitchen
 	finances.workshop = workshop
 	finances.clock = clock
 	add_child(finances)
+	office.name = "Office"
+	office.people = people
+	office.jobs = jobs
+	office.building = building
+	office.shifts = shifts
+	office.clock = clock
+	add_child(office)
+	intake.name = "Intake"
+	intake.people = people
+	intake.building = building
+	intake.ledger = ledger
+	intake.guarding = guarding
+	intake.categories = PrisonCatalogue.CATEGORIES
+	intake.entrance = shifts.entrance
+	intake.has_warden = office.has_warden
+	intake.clock = clock
+	add_child(intake)
+	intake.start()
+	intake.arrived.connect(func(came: Array[Person]) -> void:
+		Toasts.post("The bus is here", "%d new %s on the way to reception." % [came.size(),
+				"prisoner is" if came.size() == 1 else "prisoners are"]))
 	jobs_panel.name = "JobsPanel"
 	jobs_panel.debug_overlay = debug_overlay
 	jobs_panel.jobs = jobs
 	jobs_panel.items = items
 	jobs_panel.building = building
-	jobs_panel.warnings = func() -> Array[String]: return kitchen.warnings() + laundry.warnings() + wear.warnings()
+	jobs_panel.warnings = func() -> Array[String]:
+		return kitchen.warnings() + laundry.warnings() + wear.warnings() + intake.warnings()
 	grid.add_child(jobs_panel)
 	var load_sample := func(index: int) -> void:
 		SamplePrisons.next = index
@@ -339,6 +370,7 @@ func _add_hud() -> void:
 	clock_bar.day_night = day_night
 	clock_bar.ledger = ledger
 	clock_bar.money_pressed.connect(finance_window.toggle)
+	clock_bar.office_pressed.connect(office_window.toggle)
 	clock_bar.timetable_pressed.connect(timetable.toggle)
 	hud.add_child(clock_bar)
 	timetable.schedule = schedule
@@ -358,6 +390,9 @@ func _add_hud() -> void:
 	hud.add_child(staff_window)
 	finance_window.ledger = ledger
 	hud.add_child(finance_window)
+	office_window.office = office
+	office_window.intake = intake
+	hud.add_child(office_window)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("level_up"):
@@ -383,6 +418,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("money_toggle"):
 		finance_window.toggle()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("office_toggle"):
+		office_window.toggle()
 		get_viewport().set_input_as_handled()
 
 

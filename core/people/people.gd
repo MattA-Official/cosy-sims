@@ -134,6 +134,8 @@ var graph: NavGraph
 var paused := false
 ## Who may go where: zones, staff doors and locked doors.
 var access := Access.new()
+## Security categories by id, for uniform colours.
+var categories: Dictionary[StringName, CategoryDef] = {}
 ## Objects broken and waiting to be mended, by (level, object id): nobody
 ## uses them.
 var broken: Dictionary[Vector2i, bool] = {}
@@ -1797,6 +1799,9 @@ func _outfit(person: Person) -> Color:
 	var role: StaffRoleDef = jobs.roles.get(person.role) if jobs != null else null
 	if role != null:
 		return role.outfit_colour
+	var category: CategoryDef = categories.get(person.category)
+	if category != null:
+		return category.outfit_colour
 	var group: GroupDef = access.groups.get(person.group)
 	return group.outfit_colour if group != null else body_colour
 

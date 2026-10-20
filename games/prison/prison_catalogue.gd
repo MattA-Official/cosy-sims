@@ -105,12 +105,20 @@ const ZONES: Array[ZoneDef] = [
 ## Rooms nobody has painted, and whose type names no zone.
 const DEFAULT_ZONE := &"shared"
 
+## Prisoners' security categories, lowest first.
+const CATEGORIES: Array[CategoryDef] = [
+	preload("res://games/prison/catalogue/category_low.tres"),
+	preload("res://games/prison/catalogue/category_medium.tres"),
+	preload("res://games/prison/catalogue/category_high.tres"),
+]
+
 ## Kinds of staff, and the jobs each takes.
 const ROLES: Array[StaffRoleDef] = [
 	preload("res://games/prison/catalogue/role_cook.tres"),
 	preload("res://games/prison/catalogue/role_cleaner.tres"),
 	preload("res://games/prison/catalogue/role_handyman.tres"),
 	preload("res://games/prison/catalogue/role_guard.tres"),
+	preload("res://games/prison/catalogue/role_warden.tres"),
 ]
 
 ## Staff shifts. Days start at 06:00 so the cook is in for breakfast;
@@ -185,6 +193,7 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_feels_clean.tres"),
 	preload("res://games/prison/catalogue/moodlet_slept_well.tres"),
 	preload("res://games/prison/catalogue/moodlet_had_fun.tres"),
+	preload("res://games/prison/catalogue/moodlet_first_night.tres"),
 ]
 
 ## Models drawn by code rather than placed from the catalogue (see
@@ -221,7 +230,16 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_laundry.tres"),
 	preload("res://games/prison/catalogue/room_workshop.tres"),
 	preload("res://games/prison/catalogue/room_guard_post.tres"),
+	preload("res://games/prison/catalogue/room_reception.tres"),
+	preload("res://games/prison/catalogue/room_office.tres"),
 ]
+
+
+static func categories() -> Dictionary[StringName, CategoryDef]:
+	var out: Dictionary[StringName, CategoryDef] = {}
+	for def in CATEGORIES:
+		out[def.id] = def
+	return out
 
 
 static func object(id: StringName) -> ObjectDef:

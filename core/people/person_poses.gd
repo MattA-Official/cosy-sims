@@ -27,6 +27,7 @@ var by_tag := {
 	&"bench": [Pose.SIT_ON, 0.45, 0.04],
 	&"shower": [Pose.SHOWER, 0.06, 0.05],
 	&"guard_desk": [Pose.SIT_FACING, 0.33, 0.25],
+	&"desk": [Pose.SIT_FACING, 0.33, 0.45],
 }
 
 ## How high off the floor a sitter's bottom is in the body model.

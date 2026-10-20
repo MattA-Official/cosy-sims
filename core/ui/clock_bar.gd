@@ -3,11 +3,12 @@ extends PanelContainer
 ## The clock in the top-left corner: the day, the time, the timetable
 ## block everyone is in, and buttons for the speed (Space pauses, , and .
 ## go slower and faster), the timetable window (T), the staff window (P),
-## always-day light, and the balance, which opens the money window (M).
+## the office (O), always-day light, and the balance, which opens the money window (M).
 
 signal timetable_pressed
 signal staff_pressed
 signal money_pressed
+signal office_pressed
 
 const ICONS := "res://core/ui/icons/%s.svg"
 const SPEED_ICONS: Array[String] = ["speed_pause", "speed_1", "speed_2", "speed_3"]
@@ -85,6 +86,10 @@ func _ready() -> void:
 	staff.toggle_mode = false
 	staff.pressed.connect(staff_pressed.emit)
 	row.add_child(staff)
+	var office := _button("Office", "The warden's office: intake, goals and the grade. O", "office")
+	office.toggle_mode = false
+	office.pressed.connect(office_pressed.emit)
+	row.add_child(office)
 	var sun := _button("Always day", "Keeps the light bright while you build, whatever the time.",
 			"always_day")
 	sun.toggled.connect(func(on: bool) -> void:

@@ -5,7 +5,7 @@ class_name SamplePrisons
 ## Main node (Sample) or from the F3 inspector.
 
 const NAMES: Array[String] = ["Starter block", "Two storeys", "Hillside", "Island", "Long way round",
-		"Basement", "Crowded canteen", "Locked out", "Staff wing", "Working prison", "Guarded prison"]
+		"Basement", "Crowded canteen", "Locked out", "Staff wing", "Working prison", "Guarded prison", "Paying prison"]
 
 ## What each one tests, shown in the inspector.
 const CHALLENGES: Array[String] = [
@@ -20,6 +20,7 @@ const CHALLENGES: Array[String] = [
 	"A staff room behind a staff door and an office zoned staff only: staff come and go, prisoners keep out.",
 	"The staff wing with a kitchen, a laundry and a workshop: the morning lorry's crates go to the fridge, the cook fills the serving counter before each meal, prisoners take a tray to a table, the cleaner sweeps up and washes uniforms, and in work blocks prisoners on programmes help out or make toys and birdhouses.",
 	"The working prison with a guard post: the canteen's door to the yard is a security gate that opens only while a guard sits at the post. Two guards by day and one by night patrol where the prisoners are and walk back anyone out of place.",
+	"The guarded prison with money on: a warden in the office, a reception by the corridor, and a spare cell. The bus brings new prisoners each morning; wages, food and building cost money, and the grant and goals pay it back.",
 ]
 
 ## Set before reloading the scene to start in a different sample.
@@ -62,6 +63,7 @@ static func build(index: int, site: Site) -> bool:
 		8: _staff_wing(site)
 		9: _staff_wing(site, true)
 		10: _staff_wing(site, true, true)
+		11: _staff_wing(site, true, true, true)
 		_: return false
 	return true
 
@@ -334,7 +336,7 @@ static func _locked_out(site: Site) -> void:
 	for i in 4:
 		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
 
-static func _staff_wing(site: Site, kitchen := false, guards := false) -> void:
+static func _staff_wing(site: Site, kitchen := false, guards := false, intake := false) -> void:
 	_landscape(site)
 	var o := site.land().get_center() - Vector2i(10, 8)
 	var ground := site.map()
@@ -388,6 +390,11 @@ static func _staff_wing(site: Site, kitchen := false, guards := false) -> void:
 		_workshop(ground, yard)
 	if guards:
 		_guard_post(ground, staff_room, canteen)
+	if intake:
+		_reception(ground, corridor)
+		_cell(ground, Rect2i(o + Vector2i(12, 0), Vector2i(3, 3)))
+		_door(ground, o + Vector2i(13, 2), Vector2i.DOWN)
+		ground.set_room_type(ground.room_at(office.position), &"office")
 	_plant(site)
 	for i in 6:
 		var prisoner := site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
@@ -408,6 +415,9 @@ static func _staff_wing(site: Site, kitchen := false, guards := false) -> void:
 				if placed == 2:
 					break
 		site.night_staff[&"guard"] = 1
+	if intake:
+		var warden := site.people.add_person(0, Vector2(office.position) + Vector2(2.5, 2.5), "", &"staff")
+		site.people.set_role(warden, &"warden")
 
 
 ## A guard post under the staff room, through a staff door, and a
@@ -422,6 +432,18 @@ static func _guard_post(ground: BuildingMap, staff_room: Rect2i, canteen: Rect2i
 	ground.set_room_zone(ground.room_at(post.position), &"staff")
 	var gate := BuildingMap.edge_between(canteen.position + Vector2i(5, 4), canteen.position + Vector2i(5, 5))
 	ground.set_door(gate, true, &"security_gate")
+
+
+## A reception off the west end of a corridor, through the corridor's
+## end door, with a desk and a door out to the land for the bus's
+## arrivals.
+static func _reception(ground: BuildingMap, corridor: Rect2i) -> void:
+	var reception := Rect2i(corridor.position + Vector2i(-4, -2), Vector2i(4, 4))
+	_room(ground, reception, &"tiles", &"plaster", &"reception")
+	_door(ground, corridor.position, Vector2i.LEFT)
+	_door(ground, reception.position + Vector2i(0, 1), Vector2i.LEFT)
+	ground.place_object(PrisonCatalogue.object(&"desk"), Vector2(reception.position) + Vector2(2, 0), 0)
+	ground.place_object(PrisonCatalogue.object(&"bench"), Vector2(reception.position) + Vector2(1.5, 3.5), 2)
 
 
 ## A workshop off the far side of the yard, with two workbenches and a

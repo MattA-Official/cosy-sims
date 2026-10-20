@@ -51,6 +51,8 @@ var walked_back_moodlet: StringName = &"walked_back"
 var _last_manned: Dictionary[Vector2i, float] = {}
 ## Prisoners being walked somewhere, with the guard walking them.
 var _led: Dictionary[Person, Person] = {}
+## What each of them is shown doing.
+var _led_doing: Dictionary[Person, String] = {}
 ## Prisoners walked back lately, with the game minute it happened.
 var _walked_back: Dictionary[Person, float] = {}
 var _rng := RandomNumberGenerator.new()
@@ -234,7 +236,7 @@ func _spot_out_of_place() -> void:
 			if to.is_empty():
 				continue
 			asked[person] = true
-			jobs.post(_escort_job(person, to))
+			escort(person, to)
 
 
 ## A tile in the first room someone's block wants them in that they can
@@ -249,28 +251,47 @@ func _place_tile(person: Person) -> Array:
 	return []
 
 
-func _escort_job(person: Person, to: Array) -> Job:
+## Posts a job for a guard to walk someone to a tile, as [level, tile]:
+## back where they should be unless `where` says otherwise, such as "to
+## their cell". The moodlet, if any, is theirs when they get there.
+func escort(person: Person, to: Array, where := "back", moodlet := walked_back_moodlet) -> void:
+	jobs.post(_escort_job(person, to, where, moodlet))
+
+
+## Takes down any job to walk someone somewhere, and lets them go if a
+## guard has them.
+func cancel_escort(person: Person) -> void:
+	for job in jobs.of_kind(&"escort"):
+		if job.get_meta(&"prisoner") == person:
+			jobs.cancel(job)
+	if _led.has(person):
+		_let_go(person)
+
+
+func _escort_job(person: Person, to: Array, where: String, moodlet: StringName) -> Job:
+	var first := person.name.get_slice(" ", 0)
 	var job := Job.new()
 	job.kind = &"escort"
-	job.title = "Walk %s back" % person.name.get_slice(" ", 0)
+	job.title = "Walk %s %s" % [first, where]
 	job.priority = 4
 	job.set_meta(&"prisoner", person)
 	var word := Job.on_tile(Job.Do.WORK, person.level, Vector2i(person.flat().floor()))
 	word.minutes = 1.0
-	word.doing = "Having a word"
+	word.doing = "Having a word" if where == "back" else "Collecting %s" % first
 	word.finish = func(_stage: Job.Stage, guard: Person) -> void:
 		if people.people.has(person):
 			people.stop(person)
 			person.led = true
 			_led[person] = guard
+			_led_doing[person] = "Being walked %s" % where
 	var walk := Job.on_tile(Job.Do.WORK, to[0], to[1])
 	walk.minutes = 1.0
-	walk.doing = "Walking %s back" % person.name.get_slice(" ", 0)
+	walk.doing = "Walking %s %s" % [first, where]
 	walk.finish = func(_stage: Job.Stage, _guard: Person) -> void:
 		_let_go(person)
 		_walked_back[person] = clock.total_minutes
-		if people.people.has(person):
-			people.add_moodlet(person, walked_back_moodlet)
+		if people.people.has(person) and moodlet != &"":
+			people.add_moodlet(person, moodlet)
 	job.stages = [word, walk]
 	return job
 
@@ -286,12 +307,13 @@ func _lead() -> void:
 			_let_go(person)
 			continue
 		if person.level != guard.level or person.flat().distance_to(guard.flat()) > FOLLOW_DISTANCE:
-			people.walk_to(person, guard.level, guard.flat(), "Being walked back")
+			people.walk_to(person, guard.level, guard.flat(), _led_doing.get(person, "Being walked back"))
 			person.led = true
 
 
 func _let_go(person: Person) -> void:
 	_led.erase(person)
+	_led_doing.erase(person)
 	person.led = false
 	if people.people.has(person):
 		people.stop(person)

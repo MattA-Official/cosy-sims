@@ -50,6 +50,7 @@ func _process(_delta: float) -> bool:
 	_test_guards()
 	_test_wear_and_repair()
 	_test_money()
+	_test_intake()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1108,6 +1109,43 @@ func _test_money() -> void:
 	_check(paid.has(wages) or paid.has(main.finances.shift_wages(night)), "wages are paid as a shift starts (%s)" % [paid])
 	_check(grant == main.finances.daily_grant() and grant > 0, "at midnight the grant comes in and the day closes")
 	_check(main.finance_window != null and main.clock_bar._money.text != "", "the balance shows by the clock")
+	main.queue_free()
+
+
+func _test_intake() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var intake: Intake = main.intake
+	var ledger: Ledger = main.ledger
+	var people: People = main.people
+	var clock: GameClock = main.clock
+	clock.speed_index = 0
+	_check(main.office.has_warden() and intake.warden_here(), "the paying prison has a warden in an office")
+	_check(intake.warnings().is_empty() and intake.free_beds() == 4, "a reception and four free beds")
+	intake.limit = 3
+	intake.accepted = {&"low": false, &"medium": false, &"high": true}
+	var fees: int = ledger.today.get("Intake fees", 0)
+	var came := intake.bus()
+	_check(came.size() == 3, "the bus brings the warden's limit")
+	_check(came.all(func(p: Person) -> bool: return p.category == &"high" and p.moodlets.has(Intake.FIRST_NIGHT)),
+			"of the categories accepted, each feeling their first night")
+	_check(ledger.today.get("Intake fees", 0) - fees == 3 * Intake.FEE, "and the prison is paid for each")
+	_check(people.body_of(came[0]) == null or people._outfit(came[0]) == PrisonCatalogue.categories()[&"high"].outfit_colour,
+			"high security prisoners wear their own colour")
+	var searched := false
+	for i in 240:
+		clock.advance(1.0)
+		searched = searched or came.any(func(p: Person) -> bool: return p.activity == "Being searched and signed in")
+		if came.all(func(p: Person) -> bool: return not intake.is_arriving(p) and not p.led):
+			break
+	_check(searched, "arrivals are searched at reception")
+	_check(came.all(func(p: Person) -> bool: return not intake.is_arriving(p) and p.has_bed()),
+			"then signed in with a bed of their own")
+	_check(intake.free_beds() == 1 and intake.bus().size() == 1, "the next bus brings only as many as there are beds")
+	_check(intake.bus().is_empty() and intake.warnings()[0].begins_with("No free beds"), "and none when the cells are full")
+	main.shifts.set_wanted(&"warden", &"day", 0)
+	_check(not intake.warden_here() and intake.todays_count() == Intake.WITHOUT_WARDEN, "without a warden a couple come")
 	main.queue_free()
 
 
