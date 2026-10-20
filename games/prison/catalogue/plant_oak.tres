@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="FoliageDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="FoliageDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/terrain/foliage_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/tree.glb" id="2_model"]
 
 [resource]
 script = ExtResource("1_def")
@@ -12,3 +13,4 @@ trunk_colour = Color(0.5, 0.36, 0.25, 1)
 size = 2.2
 scale_range = Vector2(0.8, 1.25)
 spacing = 1.8
+model = ExtResource("2_model")

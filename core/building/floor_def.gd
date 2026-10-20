@@ -7,3 +7,6 @@ extends Resource
 @export var colour := Color.WHITE
 ## Outdoor floors (paths, paving, grass) are for yards and grounds.
 @export var outdoor := false
+## Optional pattern laid over the colour, one repeat a metre: near-white
+## greyscale, so the colour still decides how it looks.
+@export var texture: Texture2D

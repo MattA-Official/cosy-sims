@@ -9,6 +9,9 @@ extends Node3D
 ## How far the path's surface sits above the ground.
 @export var lift := 0.05
 @export var bridge_colour := Color(0.6, 0.45, 0.32)
+## Optional grit laid over every path's colour, one repeat a metre:
+## near-white greyscale, so each style's colour still shows.
+@export var texture: Texture2D
 ## How far the curve at a junction reaches along each path's edge.
 @export var corner_radius := 0.6
 
@@ -32,6 +35,9 @@ func _init() -> void:
 
 func _ready() -> void:
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if texture != null:
+		_material.albedo_texture = texture
+		_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	_mesh.material_override = _material
 	if terrain != null:
 		terrain.changed.connect(queue_rebuild)
@@ -321,4 +327,5 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, colo
 	st.set_normal(outward.normalized() if outward != Vector3.ZERO else -cross.normalized())
 	var order := [a, b, c, a, c, d] if cross.dot(outward) < 0.0 else [a, c, b, a, d, c]
 	for v in order:
+		st.set_uv(MeshShapes.uv_for(v, outward))
 		st.add_vertex(v)

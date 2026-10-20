@@ -13,10 +13,13 @@
 [ext_resource type="Script" path="res://core/debug/debug_overlay.gd" id="11_debug"]
 [ext_resource type="Script" path="res://core/terrain/water_layer.gd" id="12_water"]
 [ext_resource type="Script" path="res://core/paths/path_view.gd" id="13_paths"]
+[ext_resource type="Texture2D" path="res://games/prison/art/textures/ground_grass.png" id="14_grass"]
+[ext_resource type="Texture2D" path="res://games/prison/art/textures/path_grit.png" id="15_grit"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ground"]
 render_priority = 0
 shader = ExtResource("3_shader")
+shader_parameter/detail = ExtResource("14_grass")
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 sky_top_color = Color(0.55, 0.75, 0.95, 1)
@@ -72,6 +75,7 @@ terrain = NodePath("../Terrain")
 [node name="PathView" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("terrain")]
 script = ExtResource("13_paths")
 terrain = NodePath("../Terrain")
+texture = ExtResource("15_grit")
 
 [node name="BuildingView" type="Node3D" parent="BuildGrid" node_paths=PackedStringArray("grid", "terrain")]
 script = ExtResource("6_view")

@@ -10,6 +10,9 @@ uniform float cell_size = 1.0;
 uniform float water_level = -0.35;
 uniform float line_width = 1.2; // In pixels.
 uniform float line_fade_distance = 70.0; // Lines fade out beyond this camera distance.
+// Soft near-white mottling over the colours, repeating every detail_scale metres.
+uniform sampler2D detail : source_color, hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float detail_scale = 6.0;
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -25,6 +28,7 @@ void fragment() {
 	ground = mix(ground, earth_colour, steep);
 	float shore = 1.0 - smoothstep(water_level + 0.05, water_level + 0.3, world_pos.y);
 	ground = mix(ground, sand_colour, shore);
+	ground *= texture(detail, world_pos.xz / detail_scale).rgb;
 
 	vec2 coord = world_pos.xz / cell_size;
 	vec2 width = fwidth(coord) * line_width;

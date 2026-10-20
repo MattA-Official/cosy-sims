@@ -1,7 +1,10 @@
 class_name FoliageDef
 extends Resource
-## A kind of plant. Placeholder shapes for now: trees are a trunk with a
-## round canopy, bushes are a squashed ball, flowers are a tiny ball.
+## A kind of plant. With a model, its meshes are the plant at size 1 (one
+## named trunk takes `trunk_colour`, ones named canopy or bloom take
+## `colour`, the rest keep their own). Without one, placeholder shapes:
+## trees are a trunk with a round canopy, bushes are a squashed ball,
+## flowers are a tiny ball.
 
 enum Shape { TREE, BUSH, FLOWER }
 
@@ -10,6 +13,7 @@ enum Shape { TREE, BUSH, FLOWER }
 @export var shape := Shape.TREE
 @export var colour := Color(0.3, 0.6, 0.3)
 @export var trunk_colour := Color(0.5, 0.36, 0.25)
+@export var model: PackedScene
 ## Base size in metres; each plant is scaled randomly within scale_range.
 @export var size := 1.0
 @export var scale_range := Vector2(0.8, 1.2)

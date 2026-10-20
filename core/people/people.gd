@@ -28,6 +28,15 @@ const SURNAMES: Array[String] = ["Abbott", "Blythe", "Crumb", "Dimble", "Ellery"
 @export var speed := 1.4
 @export var body_colour := Color(0.95, 0.55, 0.2)
 @export var head_colour := Color(0.96, 0.82, 0.68)
+## Optional model for everyone, feet at the origin, facing -z. Meshes named
+## outfit, skin and hair are tinted: the outfit `body_colour`, skin and
+## hair picked for each person from the lists below.
+@export var body_model: PackedScene
+@export var skin_tones: Array[Color] = [Color(0.98, 0.84, 0.72), Color(0.93, 0.76, 0.6),
+		Color(0.82, 0.62, 0.45), Color(0.66, 0.46, 0.32), Color(0.48, 0.33, 0.24)]
+@export var hair_colours: Array[Color] = [Color(0.25, 0.18, 0.14), Color(0.45, 0.3, 0.2),
+		Color(0.72, 0.52, 0.3), Color(0.9, 0.78, 0.5), Color(0.6, 0.3, 0.18), Color(0.7, 0.7, 0.68),
+		Color(0.16, 0.15, 0.15)]
 
 var building: Building:
 	set(value):
@@ -60,6 +69,7 @@ var _rng := RandomNumberGenerator.new()
 ## (level, object id): the person using or heading for it.
 var _claimed: Dictionary[Vector2i, Person] = {}
 var _bodies: Dictionary[Person, Node3D] = {}
+var _materials: Dictionary[Color, StandardMaterial3D] = {}
 
 
 func _ready() -> void:
@@ -358,10 +368,15 @@ func _update_bodies() -> void:
 	for person in people:
 		var body: Node3D = _bodies.get(person)
 		if body == null:
-			body = _make_body()
+			body = _make_body(person)
 			_bodies[person] = body
 			add_child(body)
 		body.position = Vector3(person.position.x * cs, person.position.y, person.position.z * cs)
+		# A little waddle while walking.
+		var walking := person.state == Person.State.WALKING and not paused
+		var step := Time.get_ticks_msec() * 0.001 * speed * 7.0 + person.id
+		body.position.y += absf(sin(step)) * 0.035 if walking else 0.0
+		body.rotation.z = sin(step) * 0.07 if walking else 0.0
 		if not person.route.is_empty():
 			var ahead := Vector2(person.route[0].x, person.route[0].z) - person.flat()
 			if ahead.length() > 0.01:
@@ -376,8 +391,23 @@ func _update_visibility() -> void:
 		_bodies[person].visible = person.level <= active
 
 
-## A little placeholder person, about 0.9 m tall: a rounded body and a head.
-func _make_body() -> Node3D:
+## A little person about 0.9 m tall: the body model with this person's
+## colours, or a placeholder rounded body and head.
+func _make_body(person: Person) -> Node3D:
+	if body_model != null:
+		var model := body_model.instantiate() as Node3D
+		var rng := RandomNumberGenerator.new()
+		rng.seed = person.id
+		var skin := skin_tones[rng.randi() % skin_tones.size()] if not skin_tones.is_empty() else head_colour
+		var hair := hair_colours[rng.randi() % hair_colours.size()] if not hair_colours.is_empty() \
+				else head_colour
+		for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+			var part := mesh.name.get_slice("_", 0).to_lower()
+			match part:
+				"outfit": mesh.material_override = _flat_material(body_colour)
+				"skin": mesh.material_override = _flat_material(skin)
+				"hair": mesh.material_override = _flat_material(hair)
+		return model
 	var root := Node3D.new()
 	var body := MeshInstance3D.new()
 	var capsule := CapsuleMesh.new()
@@ -398,8 +428,11 @@ func _make_body() -> Node3D:
 	return root
 
 
+## Shared between everyone of the same colour.
 func _flat_material(colour: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = colour
-	material.roughness = 0.8
-	return material
+	if not _materials.has(colour):
+		var material := StandardMaterial3D.new()
+		material.albedo_color = colour
+		material.roughness = 0.8
+		_materials[colour] = material
+	return _materials[colour]

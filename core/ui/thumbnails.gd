@@ -47,6 +47,9 @@ func _ready() -> void:
 
 func object(def: ObjectDef) -> Texture2D:
 	return _request(def, func() -> void:
+		if def.model != null:
+			_stage.add_child(def.model.instantiate())
+			return
 		var margin := minf(0.1, minf(def.size.x, def.size.y) * 0.1)
 		_box(Vector3.UP * def.height * 0.5,
 				Vector3(def.size.x - margin * 2.0, def.height, def.size.y - margin * 2.0), def.colour))
@@ -54,7 +57,7 @@ func object(def: ObjectDef) -> Texture2D:
 
 func floor_swatch(def: FloorDef) -> Texture2D:
 	return _request(def, func() -> void:
-		_box(Vector3.ZERO, Vector3(1.2, 0.08, 1.2), def.colour))
+		_box(Vector3.ZERO, Vector3(1.2, 0.08, 1.2), def.colour, def.texture))
 
 
 func wall_swatch(def: WallDef) -> Texture2D:
@@ -66,7 +69,7 @@ func wall_swatch(def: WallDef) -> Texture2D:
 ## style together.
 func room(floor_def: FloorDef, wall_def: WallDef) -> Texture2D:
 	return _request([floor_def, wall_def], func() -> void:
-		_box(Vector3(0, -0.04, 0), Vector3(1.0, 0.08, 1.0), floor_def.colour)
+		_box(Vector3(0, -0.04, 0), Vector3(1.0, 0.08, 1.0), floor_def.colour, floor_def.texture)
 		var height := minf(wall_def.height, 1.0)
 		var t := wall_def.thickness
 		_wall(wall_def, Vector3(0, 0, -0.5 - t * 0.5), Vector3.RIGHT, 1.0 + t * 2.0, height)
@@ -121,9 +124,8 @@ func _bake_queue() -> void:
 func _frame() -> void:
 	var bounds := AABB()
 	var first := true
-	for child: Node in _stage.get_children():
-		var mesh := child as MeshInstance3D
-		var box := mesh.transform * mesh.get_aabb()
+	for mesh: MeshInstance3D in _stage.find_children("*", "MeshInstance3D", true, false):
+		var box := _stage.global_transform.affine_inverse() * mesh.global_transform * mesh.get_aabb()
 		bounds = box if first else bounds.merge(box)
 		first = false
 	var centre := bounds.get_center()
@@ -142,6 +144,17 @@ func _frame() -> void:
 
 
 func _plant_shapes(def: FoliageDef) -> void:
+	if def.model != null:
+		var model := def.model.instantiate() as Node3D
+		for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+			var tint: Variant = FoliageLayer._tint(def, StringName(mesh.name))
+			if tint != null:
+				var material := StandardMaterial3D.new()
+				material.albedo_color = tint
+				material.roughness = 0.9
+				mesh.material_override = material
+		_stage.add_child(model)
+		return
 	match def.shape:
 		FoliageDef.Shape.TREE:
 			_cylinder(Vector3.UP * 0.3, Vector3(0.18, 0.6, 0.18), def.trunk_colour)
@@ -153,10 +166,11 @@ func _plant_shapes(def: FoliageDef) -> void:
 			_ball(Vector3.UP * 0.75, Vector3.ONE * 0.45, def.colour)
 
 
-func _box(centre: Vector3, size: Vector3, colour: Color) -> void:
+func _box(centre: Vector3, size: Vector3, colour: Color, texture: Texture2D = null) -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = size
-	_add(mesh, centre, Vector3.ONE, colour)
+	var instance := _add(mesh, centre, Vector3.ONE, colour)
+	_textured(instance, texture, Vector3(size.x, size.z, 1.0))
 
 
 func _cylinder(centre: Vector3, scale: Vector3, colour: Color) -> void:
@@ -186,15 +200,33 @@ func _wall(def: WallDef, middle: Vector3, along: Vector3, length: float, height:
 		for rail_y in [height * 0.45, height * 0.85]:
 			_oriented_box(middle + Vector3.UP * rail_y, along, Vector3(length, 0.1, t * 0.6), def.colour)
 		return
-	_oriented_box(middle + Vector3.UP * (height - 0.04) * 0.5, along, Vector3(length, height - 0.04, t), def.colour)
+	var dado := minf(def.dado_height, height - 0.04) if def.dado_colour.a > 0.0 else 0.0
+	if dado > 0.0:
+		_oriented_box(middle + Vector3.UP * dado * 0.5, along, Vector3(length, dado, t), def.dado_colour,
+				def.texture)
+	var wall := height - 0.04 - dado
+	_oriented_box(middle + Vector3.UP * (dado + wall * 0.5), along, Vector3(length, wall, t), def.colour,
+			def.texture)
 	_oriented_box(middle + Vector3.UP * (height - 0.02), along, Vector3(length, 0.04, t), def.top_colour)
 
 
-func _oriented_box(centre: Vector3, along: Vector3, size: Vector3, colour: Color) -> void:
+func _oriented_box(centre: Vector3, along: Vector3, size: Vector3, colour: Color,
+		texture: Texture2D = null) -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	var instance := _add(mesh, centre, Vector3.ONE, colour)
 	instance.basis = Basis(Vector3.UP, atan2(-along.z, along.x))
+	_textured(instance, texture, Vector3(size.x, size.y, 1.0))
+
+
+## Lays a one-metre texture over a box's front face. BoxMesh stretches its
+## UVs over each face, so the scale is the face's size in metres.
+func _textured(instance: MeshInstance3D, texture: Texture2D, metres: Vector3) -> void:
+	if texture == null:
+		return
+	var material := instance.material_override as StandardMaterial3D
+	material.albedo_texture = texture
+	material.uv1_scale = metres * Vector3(3.0, 2.0, 1.0)
 
 
 func _add(mesh: Mesh, centre: Vector3, scale: Vector3, colour: Color) -> MeshInstance3D:

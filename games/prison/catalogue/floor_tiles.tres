@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="FloorDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="FloorDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/building/floor_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://games/prison/art/textures/floor_tiles.png" id="2_tex"]
 
 [resource]
 script = ExtResource("1_def")
@@ -8,3 +9,4 @@ id = &"tiles"
 display_name = "Tiles"
 colour = Color(0.88, 0.9, 0.92, 1)
 outdoor = false
+texture = ExtResource("2_tex")

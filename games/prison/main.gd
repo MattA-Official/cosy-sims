@@ -53,6 +53,7 @@ func _ready() -> void:
 	building = Building.new(land, PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
 	map = building.ground()
 	view.room_types = PrisonCatalogue.ROOM_TYPES
+	view.door_model = PrisonCatalogue.DOOR_MODEL
 	view.map = map
 	views[0] = view
 	building.level_added.connect(_add_level_view)
@@ -78,6 +79,7 @@ func _ready() -> void:
 	# People walk the build.
 	people.name = "People"
 	people.terrain = terrain
+	people.body_model = PrisonCatalogue.PERSON_MODEL
 	people.needs = PrisonCatalogue.NEEDS
 	people.building = building
 	people.paths = paths
@@ -155,6 +157,7 @@ func _add_level_view(level: int, level_map: BuildingMap) -> void:
 	level_view.terrain = terrain
 	level_view.level = level
 	level_view.room_types = PrisonCatalogue.ROOM_TYPES
+	level_view.door_model = PrisonCatalogue.DOOR_MODEL
 	level_view.visible = building == null or level <= building.active
 	grid.add_child(level_view)
 	level_view.map = level_map

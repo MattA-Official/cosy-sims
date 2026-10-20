@@ -46,6 +46,11 @@ const NEEDS: Array[NeedDef] = [
 	preload("res://games/prison/catalogue/need_hygiene.tres"),
 ]
 
+## Models drawn by code rather than placed from the catalogue (see
+## games/prison/art/).
+const DOOR_MODEL := preload("res://games/prison/art/models/door.glb")
+const PERSON_MODEL := preload("res://games/prison/art/models/person.glb")
+
 const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_cell.tres"),
 	preload("res://games/prison/catalogue/room_canteen.tres"),

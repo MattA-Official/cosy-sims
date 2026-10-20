@@ -20,6 +20,8 @@ var plants: Array[Plant] = []
 
 var _buckets: Dictionary[Vector2i, Array] = {} ## Tile to the plants in it.
 var _instances := {} # [def id, part] -> MultiMeshInstance3D
+## Each plant model's meshes: model -> {part name: [Mesh, Transform3D]}.
+static var _model_parts := {}
 var _rebuild_queued := false
 
 
@@ -159,6 +161,10 @@ func rebuild() -> void:
 
 
 func _parts(def: FoliageDef) -> Array[StringName]:
+	if def.model != null:
+		var names: Array[StringName] = []
+		names.assign(_model_meshes(def.model).keys())
+		return names
 	if def.shape == FoliageDef.Shape.TREE:
 		return [&"trunk", &"canopy"]
 	return [&"body"]
@@ -167,6 +173,8 @@ func _parts(def: FoliageDef) -> Array[StringName]:
 ## Where each part sits relative to the plant's foot.
 func _part_offset(def: FoliageDef, part: StringName) -> Transform3D:
 	var s := def.size
+	if def.model != null:
+		return Transform3D(Basis.from_scale(Vector3.ONE * s), Vector3.ZERO) * _model_meshes(def.model)[part][1]
 	match def.shape:
 		FoliageDef.Shape.TREE:
 			if part == &"trunk":
@@ -184,6 +192,11 @@ func _instance_for(key: Array, def: FoliageDef) -> MultiMeshInstance3D:
 	var mesh: Mesh
 	var material := StandardMaterial3D.new()
 	material.roughness = 0.9
+	if def.model != null:
+		mesh = _model_meshes(def.model)[part][0]
+		var tint: Variant = _tint(def, part)
+		material.albedo_color = tint if tint != null else Color.WHITE
+		return _add_instance(key, mesh, material if tint != null else null)
 	if part == &"trunk":
 		var cylinder := CylinderMesh.new()
 		cylinder.top_radius = 0.5
@@ -201,14 +214,44 @@ func _instance_for(key: Array, def: FoliageDef) -> MultiMeshInstance3D:
 		mesh = sphere
 		material.albedo_color = def.colour
 	mesh.surface_set_material(0, material)
+	return _add_instance(key, mesh, null)
+
+
+func _add_instance(key: Array, mesh: Mesh, material: Material) -> MultiMeshInstance3D:
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.mesh = mesh
 	var instance := MultiMeshInstance3D.new()
 	instance.multimesh = multimesh
+	instance.material_override = material
 	add_child(instance)
 	_instances[key] = instance
 	return instance
+
+
+## The colour a model's part takes from its def, or null to keep its own.
+static func _tint(def: FoliageDef, part: StringName) -> Variant:
+	if part.begins_with("trunk"):
+		return def.trunk_colour
+	if part.begins_with("canopy") or part.begins_with("bloom"):
+		return def.colour
+	return null
+
+
+static func _model_meshes(model: PackedScene) -> Dictionary:
+	if not _model_parts.has(model):
+		var parts := {}
+		var root := model.instantiate() as Node3D
+		for mesh: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
+			var offset := Transform3D.IDENTITY
+			var node: Node = mesh
+			while node != root:
+				offset = (node as Node3D).transform * offset
+				node = node.get_parent()
+			parts[StringName(mesh.name)] = [mesh.mesh, offset]
+		root.free()
+		_model_parts[model] = parts
+	return _model_parts[model]
 
 
 #endregion

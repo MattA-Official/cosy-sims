@@ -14,6 +14,7 @@ static func add_box(st: SurfaceTool, centre: Vector3, half: Vector3, colour: Col
 		st.set_normal(normal)
 		st.set_color(top_colour if normal == Vector3.UP else colour)
 		for vertex in _face(centre, half, normal):
+			st.set_uv(uv_for(vertex, normal))
 			st.add_vertex(vertex)
 
 
@@ -58,12 +59,14 @@ static func _oriented_faces(centre: Vector3, half_a: Vector3, half_b: Vector3,
 static func add_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3,
 		outward: Vector3, colour: Color) -> void:
 	var cross := (b - a).cross(c - a)
-	st.set_normal(cross.normalized() * (1.0 if cross.dot(outward) >= 0.0 else -1.0))
+	var normal := cross.normalized() * (1.0 if cross.dot(outward) >= 0.0 else -1.0)
+	st.set_normal(normal)
 	st.set_color(colour)
 	var order: Array[Vector3] = [a, b, c, a, c, d]
 	if cross.dot(outward) >= 0.0:
 		order = [a, c, b, a, d, c]
 	for vertex in order:
+		st.set_uv(uv_for(vertex, normal))
 		st.add_vertex(vertex)
 
 
@@ -75,9 +78,11 @@ static func add_polygon(st: SurfaceTool, points: Array[Vector3], outward: Vector
 		var b := points[i]
 		var c := points[i + 1]
 		var cross := (b - a).cross(c - a)
-		st.set_normal(cross.normalized() * (1.0 if cross.dot(outward) >= 0.0 else -1.0))
+		var normal := cross.normalized() * (1.0 if cross.dot(outward) >= 0.0 else -1.0)
+		st.set_normal(normal)
 		st.set_color(colour)
 		for vertex: Vector3 in ([a, c, b] if cross.dot(outward) >= 0.0 else [a, b, c]):
+			st.set_uv(uv_for(vertex, normal))
 			st.add_vertex(vertex)
 
 
@@ -109,6 +114,17 @@ static func add_box_immediate(mesh: ImmediateMesh, centre: Vector3, half: Vector
 		mesh.surface_set_color(colour)
 		for vertex in _face(centre, half, normal):
 			mesh.surface_add_vertex(vertex)
+
+
+## Texture coordinates in metres, so a texture covering one metre repeats
+## once a metre whatever the shape: flat faces map straight down, and
+## upright faces map along their own direction, so walls at any angle get
+## level courses of blocks.
+static func uv_for(vertex: Vector3, normal: Vector3) -> Vector2:
+	if absf(normal.y) > 0.7:
+		return Vector2(vertex.x, vertex.z)
+	var along := Vector3(-normal.z, 0.0, normal.x).normalized()
+	return Vector2(vertex.dot(along), -vertex.y)
 
 
 ## A material that colours geometry by its vertex colours.

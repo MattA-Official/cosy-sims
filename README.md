@@ -8,7 +8,8 @@ school and a museum.
 
 ![The sample prison on its plot, with hills, woods and a pond around it](docs/images/terrain.png)
 
-All art is placeholder for now. Built with [Godot 4.7](https://godotengine.org/).
+The models and textures are made in code (see [docs/art.md](docs/art.md)).
+Built with [Godot 4.7](https://godotengine.org/).
 
 ## Getting started
 

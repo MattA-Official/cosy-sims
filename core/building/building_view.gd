@@ -1,8 +1,9 @@
 class_name BuildingView
 extends Node3D
-## Draws a BuildingMap with placeholder geometry: floors, walls, doors,
-## objects, a floating label over each room that has a type, and flat roofs
-## over indoor rooms with no floor above them.
+## Draws a BuildingMap: floors and walls built in code (each style's colour
+## with its texture over it), doors and objects from their models (or boxes
+## where they have none), a floating label over each room that has a type,
+## and flat roofs over indoor rooms with no floor above them.
 ## Rebuilds everything whenever the map changes, which is plenty fast at
 ## prototype sizes.
 
@@ -27,6 +28,9 @@ extends Node3D
 @export var door_height := 1.15
 @export var window_sill := 0.5
 @export var window_head := 1.15
+## Drawn in each doorway when walls are up. Without one doors are a slab of
+## `door_colour`.
+@export var door_model: PackedScene
 @export var walls_low := false:
 	set(value):
 		walls_low = value
@@ -65,7 +69,7 @@ var cut_direction := Vector2(1, 1).normalized():
 @export var floor_colour := Color(0.74, 0.72, 0.68)
 @export var wall_colour := Color(0.93, 0.88, 0.8)
 @export var wall_top_colour := Color(0.36, 0.32, 0.3)
-@export var door_colour := Color(0.45, 0.65, 0.88)
+@export var door_colour := Color(0.5, 0.61, 0.6)
 ## Stairs whose floor style is missing.
 @export var stairs_colour := Color(0.72, 0.56, 0.4)
 @export var glass_colour := Color(0.7, 0.88, 1.0, 0.35)
@@ -113,6 +117,15 @@ var _ranked: Array[Array] = []
 var _material := MeshShapes.vertex_colour_material()
 var _glass_material := _make_glass_material()
 var _object_materials := {} # Color -> StandardMaterial3D
+## Vertex-coloured materials with a texture over the colour, shared by
+## every level.
+static var _textured_materials := {} # Texture2D -> StandardMaterial3D
+var _doors := Node3D.new()
+## The dado on the wall piece being drawn: its colour (transparent for
+## none), how high it reaches, and the wall colour it replaces.
+var _dado := Color(0, 0, 0, 0)
+var _dado_height := 0.0
+var _piece_colour := Color.WHITE
 var _rebuild_queued := false
 ## Shared by every level's labels.
 static var _label_font := CosyTheme.bold_font()
@@ -121,12 +134,10 @@ var _piece_low := false
 
 
 func _ready() -> void:
-	for child: Node in [_floor_mesh, _wall_mesh, _glass_mesh, _objects, _labels, _roof_mesh]:
+	for child: Node in [_floor_mesh, _wall_mesh, _glass_mesh, _doors, _objects, _labels, _roof_mesh]:
 		add_child(child)
 	_roof_mesh.material_override = _material
 	_roof_mesh.visible = show_roof
-	_floor_mesh.material_override = _material
-	_wall_mesh.material_override = _material
 	_glass_mesh.material_override = _glass_material
 	_glass_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_floor_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -229,8 +240,7 @@ func _stairwell_roof(cell: Vector2i) -> float:
 
 
 func _build_floors() -> void:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var surfaces := {} # Texture2D -> SurfaceTool
 	var cs := grid.cell_size
 	for room in map.rooms():
 		var type := room_type(room.type)
@@ -239,6 +249,7 @@ func _build_floors() -> void:
 			var piece: TilePiece = map.pieces(cell)[id.z]
 			var def := map.floor_def(map.piece_floor(piece))
 			var colour := def.colour if def != null else floor_colour
+			var st := _surface(surfaces, def.texture if def != null else null)
 			if type != null:
 				colour = colour.lerp(type.colour, 0.35)
 			# A faint checkerboard makes floors read as tiles.
@@ -261,11 +272,43 @@ func _build_floors() -> void:
 					Vector3(0.5 * cs, depth * 0.5, 0.5 * cs), foundation_colour, colour * shade)
 			_add_split_steps(st, cell, top_y, colour * shade)
 	if level == 0:
-		_add_land_edge(st)
+		_add_land_edge(_surface(surfaces, null))
 	elif map.floors.is_empty():
 		_floor_mesh.mesh = null
 		return
-	_floor_mesh.mesh = st.commit()
+	_floor_mesh.mesh = _commit(surfaces)
+
+
+## The SurfaceTool for geometry wearing `texture` (or none), started the
+## first time it is asked for.
+func _surface(surfaces: Dictionary, texture: Texture2D) -> SurfaceTool:
+	if not surfaces.has(texture):
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		surfaces[texture] = st
+	return surfaces[texture]
+
+
+## One mesh with a surface for each texture, each with its own material.
+func _commit(surfaces: Dictionary) -> ArrayMesh:
+	if surfaces.is_empty():
+		return null
+	var mesh := ArrayMesh.new()
+	for texture: Texture2D in surfaces:
+		(surfaces[texture] as SurfaceTool).commit(mesh)
+		mesh.surface_set_material(mesh.get_surface_count() - 1, _textured_material(texture))
+	return mesh
+
+
+func _textured_material(texture: Texture2D) -> StandardMaterial3D:
+	if texture == null:
+		return _material
+	if not _textured_materials.has(texture):
+		var material := MeshShapes.vertex_colour_material()
+		material.albedo_texture = texture
+		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		_textured_materials[texture] = material
+	return _textured_materials[texture]
 
 
 ## Where a neighbouring floor is up to MAX_STEP higher, with nothing in
@@ -345,8 +388,9 @@ func _add_land_edge(st: SurfaceTool) -> void:
 
 
 func _build_walls() -> void:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for child in _doors.get_children():
+		child.queue_free()
+	var surfaces := {} # Texture2D -> SurfaceTool
 	var glass := SurfaceTool.new()
 	glass.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var has_glass := false
@@ -360,8 +404,9 @@ func _build_walls() -> void:
 		# a stairwell.
 		var drop := base - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
 				if level == 0 else base - _lowest_floor_beside(edge) + slab_depth
-		has_glass = _add_wall_piece(st, glass, start, end, base, drop, map.wall_at(edge),
-				map.wall_def(map.wall_style(edge)), map.window_kind(edge)) or has_glass
+		var def := map.wall_def(map.wall_style(edge))
+		has_glass = _add_wall_piece(_surface(surfaces, def.texture if def != null else null), glass,
+				start, end, base, drop, map.wall_at(edge), def, map.window_kind(edge)) or has_glass
 	for key: Vector4i in map.slants:
 		var ends := BuildingMap.slant_ends(key)
 		var start := Vector2(ends[0])
@@ -376,10 +421,10 @@ func _build_walls() -> void:
 		_piece_low = walls_low or (cutaway and _cut_away(start, end))
 		var drop := base - minf(_height_at(start), _height_at(end)) + FOUNDATION_DEPTH \
 				if level == 0 else base - (lowest if lowest < INF else base) + slab_depth
-		has_glass = _add_wall_piece(st, glass, start, end, base, drop, map.slant_at(key),
-				map.wall_def(map.slant_style(key)), map.slant_window_kind(key)) or has_glass
-	var empty := map.walls.is_empty() and map.slants.is_empty()
-	_wall_mesh.mesh = st.commit() if not empty else null
+		var def := map.wall_def(map.slant_style(key))
+		has_glass = _add_wall_piece(_surface(surfaces, def.texture if def != null else null), glass,
+				start, end, base, drop, map.slant_at(key), def, map.slant_window_kind(key)) or has_glass
+	_wall_mesh.mesh = _commit(surfaces)
 	_glass_mesh.mesh = glass.commit() if has_glass else null
 
 
@@ -410,6 +455,9 @@ func _add_wall_piece(st: SurfaceTool, glass: SurfaceTool, start: Vector2, end: V
 	var thickness := def.thickness if def != null else wall_thickness
 	var colour := def.colour if def != null else wall_colour
 	var top := def.top_colour if def != null else wall_top_colour
+	_piece_colour = colour
+	_dado = def.dado_colour if def != null else Color(0, 0, 0, 0)
+	_dado_height = def.dado_height if def != null else 0.0
 	var length := start.distance_to(end) * cs
 	var flat := (end - start).normalized()
 	var along := Vector3(flat.x, 0.0, flat.y)
@@ -449,6 +497,14 @@ func _add_wall_piece(st: SurfaceTool, glass: SurfaceTool, start: Vector2, end: V
 ## `half_across` through it, so walls at any angle work.
 func _add_slab(st: SurfaceTool, middle: Vector3, half_len: Vector3, half_across: Vector3,
 		bottom: float, top_y: float, colour: Color, top_colour: Color) -> void:
+	if _dado.a > 0.0 and colour == _piece_colour:
+		# Plain wall gets the dado along its bottom; a slab entirely below
+		# the line (a cut-away wall) is all dado.
+		if top_y <= _dado_height:
+			colour = _dado
+		elif bottom < _dado_height:
+			_add_slab(st, middle, half_len, half_across, bottom, _dado_height, _dado, _dado)
+			bottom = _dado_height
 	var half_height := (top_y - bottom) * 0.5
 	MeshShapes.add_oriented_box(st, middle + Vector3.UP * (bottom + half_height), half_len,
 			half_across, half_height, colour, top_colour)
@@ -461,8 +517,16 @@ func _add_door(st: SurfaceTool, middle: Vector3, half_len: Vector3, half_across:
 				door_colour, door_colour)
 		return
 	_add_slab(st, middle, half_len, half_across, door_height, full_height, colour, top)
-	_add_slab(st, middle, half_len * 0.8, half_across * 0.4, 0.0, door_height, door_colour,
-			door_colour)
+	if door_model == null:
+		_add_slab(st, middle, half_len * 0.8, half_across * 0.4, 0.0, door_height, door_colour,
+				door_colour)
+		return
+	# The model fills a one-metre doorway along its x, facing along z.
+	var door := door_model.instantiate() as Node3D
+	var along := half_len.normalized()
+	door.transform = Transform3D(Basis(along * half_len.length() * 2.0, Vector3.UP,
+			half_across.normalized()), middle)
+	_doors.add_child(door)
 
 
 ## Wall below the sill and above the head, with glass or bars between.
@@ -518,6 +582,14 @@ func _build_objects() -> void:
 	for edge: Vector3i in stepped:
 		_add_door_steps(edge, stepped[edge])
 	for placed: BuildingMap.PlacedObject in map.objects.values():
+		var centre := placed.centre * cs
+		var ground := map.floor_height(Vector2i(placed.centre.floor()))
+		if placed.def.model != null:
+			var model := placed.def.model.instantiate() as Node3D
+			model.position = Vector3(centre.x, ground + 0.03, centre.y)
+			model.rotation.y = -placed.angle
+			_objects.add_child(model)
+			continue
 		# Shrink a touch so neighbours and walls do not look fused together.
 		var size := placed.def.size
 		var margin := minf(0.1, minf(size.x, size.y) * 0.1)
@@ -526,8 +598,6 @@ func _build_objects() -> void:
 		var instance := MeshInstance3D.new()
 		instance.mesh = box
 		instance.material_override = _object_material(placed.def.colour)
-		var centre := placed.centre * cs
-		var ground := map.floor_height(Vector2i(placed.centre.floor()))
 		instance.position = Vector3(centre.x, ground + 0.03 + placed.def.height * 0.5, centre.y)
 		# Turning about Y goes the other way to turning a Vector2 on the ground.
 		instance.rotation.y = -placed.angle
