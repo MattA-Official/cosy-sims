@@ -303,7 +303,9 @@ func _refresh_person(person: Person) -> void:
 	var group: GroupDef = people.access.groups.get(person.group)
 	var lines := PackedStringArray([
 		"Group: %s" % (group.display_name if group != null else String(person.group))
-				+ (", %s" % _role_name(person) if person.role != &"" else ""),
+				+ (", %s" % _role_name(person) if person.role != &"" else "")
+				+ (", %s shift" % person.shift if person.shift != &"" else "")
+				+ (", going home" if person.going_home else ""),
 		"Doing: %s" % person.activity,
 		"Because: %s" % (person.reason if not person.reason.is_empty() else "-"),
 		"State: %s" % ["idle", "walking", "using an object"][person.state],

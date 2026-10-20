@@ -1,25 +1,25 @@
 class_name StaffWindow
 extends PanelContainer
-## Who works here. A row for each staff role with how many there are and
-## buttons to take one on or let one go, and a row for each work programme
-## with how many prisoners are on it and buttons to put one more on or
-## take one off. Staff are free for now and always on site; shifts and
-## wages come later. Toggle with P.
-
-## Take on someone for a role, or let one go.
-signal hire_pressed(role: StringName)
-signal fire_pressed(role: StringName)
+## Who works here. A row for each staff role with how many work each
+## shift and buttons to take one on or let one go, and a row for each work
+## programme with how many prisoners are on it and buttons to put one more
+## on or take one off. Staff are free until wages come in. Toggle with P.
 
 ## Seconds between counting everyone again while open.
 const REFRESH_SECONDS := 0.5
+## Width of each − count + group, and the shift names over them.
+const CONTROLS_WIDTH := 104.0
 
 var roles: Array[StaffRoleDef] = []
 var programmes: Array[WorkProgrammeDef] = []
 var people: People
+## Who works which shift.
+var shifts: Shifts
 ## Who goes on work programmes.
 var programme_group: StringName = &"prisoner"
 
-var _counts: Dictionary[StringName, Label] = {}
+## Count labels by role, then by shift.
+var _counts: Dictionary[StringName, Dictionary] = {}
 var _programme_counts: Dictionary[StringName, Label] = {}
 var _free_text := Label.new()
 var _wait := 0.0
@@ -29,7 +29,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(PRESET_CENTER_TOP, PRESET_MODE_MINSIZE)
 	grow_horizontal = GROW_DIRECTION_BOTH
 	offset_top = 76.0
-	custom_minimum_size = Vector2(460, 0)
+	custom_minimum_size = Vector2(520, 0)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override(&"separation", 8)
 	add_child(box)
@@ -40,7 +40,7 @@ func _ready() -> void:
 	title.theme_type_variation = &"HeaderLabel"
 	heading.add_child(title)
 	var note := Label.new()
-	note.text = "Free for now, and always on site"
+	note.text = "Free until wages come in"
 	note.theme_type_variation = &"SubtleLabel"
 	note.size_flags_vertical = SIZE_SHRINK_CENTER
 	heading.add_child(note)
@@ -55,10 +55,32 @@ func _ready() -> void:
 	heading.add_child(close)
 	box.add_child(heading)
 
+	if shifts != null:
+		var columns := HBoxContainer.new()
+		columns.add_theme_constant_override(&"separation", 8)
+		var gap := Control.new()
+		gap.size_flags_horizontal = SIZE_EXPAND_FILL
+		columns.add_child(gap)
+		for shift in shifts.shifts:
+			var label := Label.new()
+			label.text = shift.display_name
+			label.tooltip_text = shift.hours_text()
+			label.mouse_filter = MOUSE_FILTER_PASS
+			label.theme_type_variation = &"SubtleLabel"
+			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			label.custom_minimum_size = Vector2(CONTROLS_WIDTH, 0)
+			columns.add_child(label)
+		box.add_child(columns)
 	for def in roles:
-		box.add_child(_row(def.icon, def.display_name, def.description, _counts, def.id,
-				func() -> void: hire_pressed.emit(def.id),
-				func() -> void: fire_pressed.emit(def.id)))
+		var row := _row(def.icon, def.display_name, def.description)
+		_counts[def.id] = {}
+		for shift in shifts.shifts if shifts != null else []:
+			var shift_id: StringName = shift.id
+			var role_id := def.id
+			_counts[def.id][shift_id] = _stepper(row,
+					func() -> void: shifts.set_wanted(role_id, shift_id, shifts.wanted_for(role_id, shift_id) + 1),
+					func() -> void: shifts.set_wanted(role_id, shift_id, shifts.wanted_for(role_id, shift_id) - 1))
+		box.add_child(row)
 
 	if not programmes.is_empty():
 		box.add_child(HSeparator.new())
@@ -70,8 +92,10 @@ func _ready() -> void:
 		_free_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(_free_text)
 		for def in programmes:
-			box.add_child(_row(def.icon, def.display_name, def.description, _programme_counts, def.id,
-					func() -> void: _put_on(def.id), func() -> void: _take_off(def.id)))
+			var row := _row(def.icon, def.display_name, def.description)
+			_programme_counts[def.id] = _stepper(row,
+					func() -> void: _put_on(def.id), func() -> void: _take_off(def.id))
+			box.add_child(row)
 	visible = false
 	refresh()
 
@@ -95,7 +119,12 @@ func refresh() -> void:
 	if people == null:
 		return
 	for role: StringName in _counts:
-		_counts[role].text = str(_with(func(p: Person) -> bool: return p.role == role).size())
+		for shift: StringName in _counts[role]:
+			var label: Label = _counts[role][shift]
+			var want := shifts.wanted_for(role, shift)
+			var here := shifts.on_site(role, shift).size()
+			label.text = str(want)
+			label.tooltip_text = "%d wanted, %d on site now" % [want, here]
 	for programme: StringName in _programme_counts:
 		_programme_counts[programme].text = str(_with(func(p: Person) -> bool:
 				return p.programme == programme).size())
@@ -105,8 +134,8 @@ func refresh() -> void:
 				free, "prisoner is" if free == 1 else "prisoners are"]
 
 
-func _row(icon: Texture2D, text: String, tip: String, counts: Dictionary[StringName, Label],
-		id: StringName, more: Callable, fewer: Callable) -> Control:
+## A row with an icon and a name, for steppers to go on the end of.
+func _row(icon: Texture2D, text: String, tip: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override(&"separation", 8)
 	row.tooltip_text = tip
@@ -124,6 +153,14 @@ func _row(icon: Texture2D, text: String, tip: String, counts: Dictionary[StringN
 	name_label.tooltip_text = tip
 	name_label.mouse_filter = MOUSE_FILTER_PASS
 	row.add_child(name_label)
+	return row
+
+
+## − count + on the end of a row. Returns the count's label.
+func _stepper(row: HBoxContainer, more: Callable, fewer: Callable) -> Label:
+	var group := HBoxContainer.new()
+	group.add_theme_constant_override(&"separation", 4)
+	group.custom_minimum_size = Vector2(CONTROLS_WIDTH, 0)
 	var minus := Button.new()
 	minus.text = "−"
 	minus.focus_mode = FOCUS_NONE
@@ -131,12 +168,12 @@ func _row(icon: Texture2D, text: String, tip: String, counts: Dictionary[StringN
 	minus.pressed.connect(func() -> void:
 		fewer.call()
 		refresh())
-	row.add_child(minus)
+	group.add_child(minus)
 	var count := Label.new()
 	count.custom_minimum_size = Vector2(28, 0)
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	counts[id] = count
-	row.add_child(count)
+	count.mouse_filter = MOUSE_FILTER_PASS
+	group.add_child(count)
 	var plus := Button.new()
 	plus.text = "+"
 	plus.focus_mode = FOCUS_NONE
@@ -144,8 +181,9 @@ func _row(icon: Texture2D, text: String, tip: String, counts: Dictionary[StringN
 	plus.pressed.connect(func() -> void:
 		more.call()
 		refresh())
-	row.add_child(plus)
-	return row
+	group.add_child(plus)
+	row.add_child(group)
+	return count
 
 
 ## Puts the first prisoner on no programme onto one.

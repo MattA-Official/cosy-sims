@@ -110,6 +110,13 @@ const ROLES: Array[StaffRoleDef] = [
 	preload("res://games/prison/catalogue/role_handyman.tres"),
 ]
 
+## Staff shifts. Days start at 06:00 so the cook is in for breakfast;
+## nights pay half as much again.
+const SHIFTS: Array[ShiftDef] = [
+	preload("res://games/prison/catalogue/shift_day.tres"),
+	preload("res://games/prison/catalogue/shift_night.tres"),
+]
+
 ## Work prisoners can do in work blocks.
 const PROGRAMMES: Array[WorkProgrammeDef] = [
 	preload("res://games/prison/catalogue/programme_kitchen.tres"),

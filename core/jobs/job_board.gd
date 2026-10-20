@@ -70,6 +70,8 @@ func of_kind(kind: StringName) -> Array[Job]:
 
 ## Does someone work from the board just now?
 func wants_work(person: Person) -> bool:
+	if person.going_home:
+		return false
 	if person.role != &"":
 		return true
 	return person.programme != &"" and person.block != null and person.block.jobs

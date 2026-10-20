@@ -91,6 +91,10 @@ var job: Job
 var role: StringName = &""
 ## The work programme a prisoner is on, such as &"kitchen", or empty.
 var programme: StringName = &""
+## The shift a member of staff works, such as &"day", or empty for always.
+var shift: StringName = &""
+## On their way home at the end of a shift: they do nothing else.
+var going_home := false
 
 
 func flat() -> Vector2:

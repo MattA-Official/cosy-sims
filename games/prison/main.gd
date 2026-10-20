@@ -15,6 +15,10 @@ extends Node3D
 ## on the low side. Off refuses doors between floors more than a step apart.
 @export var door_steps := false
 
+## Spots on the edge of the land tried for the staff entrance, nearest
+## first.
+const ENTRANCE_TRIES := 60
+
 @onready var grid: BuildGrid = $BuildGrid
 @onready var view: BuildingView = $BuildGrid/BuildingView
 @onready var controller: BuildController = $BuildGrid/BuildController
@@ -42,6 +46,8 @@ var kitchen := Kitchen.new()
 var cleaning := Cleaning.new()
 var laundry := Laundry.new()
 var workshop := Workshop.new()
+## Staff coming and going on day and night shifts.
+var shifts := Shifts.new()
 ## Open jobs and stock, with the debug view.
 var jobs_panel := JobsPanel.new()
 ## Game time. Everything that happens over time listens to it.
@@ -221,6 +227,15 @@ func _ready() -> void:
 	workshop.clock = clock
 	add_child(workshop)
 	workshop.look()
+	shifts.name = "Shifts"
+	shifts.people = people
+	shifts.roles = PrisonCatalogue.ROLES
+	shifts.shifts = PrisonCatalogue.SHIFTS
+	shifts.start_spot = _staff_spot
+	shifts.clock = clock
+	add_child(shifts)
+	_set_entrance()
+	shifts.start()
 	jobs_panel.name = "JobsPanel"
 	jobs_panel.debug_overlay = debug_overlay
 	jobs_panel.jobs = jobs
@@ -273,8 +288,7 @@ func _add_hud() -> void:
 	staff_window.roles = PrisonCatalogue.ROLES
 	staff_window.programmes = PrisonCatalogue.PROGRAMMES
 	staff_window.people = people
-	staff_window.hire_pressed.connect(hire)
-	staff_window.fire_pressed.connect(let_go)
+	staff_window.shifts = shifts
 	hud.add_child(staff_window)
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -353,25 +367,38 @@ func _apply_wall_view() -> void:
 		v.show_roof = n < level or mode == BuildController.WallView.ROOFS
 
 
-## Takes on a member of staff for a role. They turn up in a staff room if
-## there is one, or else in the middle of the land. Returns them, or null
-## if there is nowhere to stand.
-func hire(role: StringName) -> Person:
-	var spot := _staff_spot()
-	if spot.is_empty():
-		return null
-	var person := people.add_person(spot[0], spot[1], "", &"staff")
-	if person != null:
-		people.set_role(person, role)
-	return person
-
-
-## Lets go the newest member of staff in a role.
-func let_go(role: StringName) -> void:
-	for i in range(people.people.size() - 1, -1, -1):
-		if people.people[i].role == role:
-			people.remove_person(people.people[i])
-			return
+## Where staff come and go: the spot on the edge of the land with the
+## shortest walk to where they work, of the nearest few. They set off
+## early enough to be in by the time their shift starts.
+func _set_entrance() -> void:
+	var work := _staff_spot()
+	if work.is_empty():
+		return
+	var land := building.land[0]
+	var edge: Array[Vector2] = []
+	for x in range(land.position.x, land.end.x):
+		edge.append(Vector2(x + 0.5, land.position.y + 0.5))
+		edge.append(Vector2(x + 0.5, land.end.y - 0.5))
+	for z in range(land.position.y + 1, land.end.y - 1):
+		edge.append(Vector2(land.position.x + 0.5, z + 0.5))
+		edge.append(Vector2(land.end.x - 0.5, z + 0.5))
+	edge.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+		return a.distance_squared_to(work[1]) < b.distance_squared_to(work[1]))
+	var best: Array = []
+	var shortest := INF
+	for spot in edge.slice(0, ENTRANCE_TRIES):
+		if is_nan(people.nav().height_at(0, spot)):
+			continue
+		var route := people.nav().find_path(0, spot, work[0], work[1])
+		var length := 0.0
+		for i in range(1, route.size()):
+			length += route[i].distance_to(route[i - 1])
+		if not route.is_empty() and length < shortest:
+			best = [0, spot]
+			shortest = length
+	shifts.entrance = best
+	if not best.is_empty():
+		shifts.walk_in_minutes = shortest / people.speed
 
 
 ## Somewhere for new staff to stand, as [level, spot], or [] for nowhere.

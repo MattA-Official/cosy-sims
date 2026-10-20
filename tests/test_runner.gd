@@ -910,17 +910,36 @@ func _test_staff_window() -> void:
 	root.add_child(main)
 	var people: People = main.people
 	var window: StaffWindow = main.staff_window
-	var cooks := func() -> int: return people.people.filter(func(p: Person) -> bool: return p.role == &"cook").size()
-	window.hire_pressed.emit(&"cook")
-	window.hire_pressed.emit(&"cook")
-	var cook: Person = people.people.back()
-	_check(cooks.call() == 2 and cook.group == &"staff", "the staff window takes on cooks")
-	var room := people.room_of(cook)
-	_check(not room.is_empty() and people.access.zone_of(room[1]).id == &"staff", "who turn up in a staff room")
+	var shifts: Shifts = main.shifts
+	var clock: GameClock = main.clock
+	clock.speed_index = 0
+	var cooks := func() -> Array: return people.people.filter(func(p: Person) -> bool:
+			return p.role == &"cook" and not p.going_home)
+	_check(shifts.on_now().id == &"day", "the game starts on the day shift")
+	_check(not shifts.entrance.is_empty(), "staff have an entrance at the edge of the land")
+	shifts.set_wanted(&"cook", &"day", 2)
+	var cook: Person = cooks.call().back()
+	_check(cooks.call().size() == 2 and cook.group == &"staff" and cook.shift == &"day",
+			"the staff window takes on cooks for the day shift")
+	_check(cook.flat().distance_to(shifts.entrance[1]) < 1.0, "who arrive at the entrance")
 	window.refresh()
-	_check(window._counts[&"cook"].text == "2", "and counts them")
-	window.fire_pressed.emit(&"cook")
-	_check(cooks.call() == 1 and not people.people.has(cook), "and lets the newest go")
+	_check(window._counts[&"cook"][&"day"].text == "2" and window._counts[&"cook"][&"night"].text == "0",
+			"and counts them for each shift")
+	shifts.set_wanted(&"cook", &"day", 1)
+	_check(cooks.call().size() == 1 and cook.going_home, "and sends one home")
+	for i in 60:
+		clock.advance(1.0)
+	_check(not people.people.has(cook), "who walks out and is gone")
+	shifts.set_wanted(&"cook", &"night", 1)
+	_check(cooks.call().size() == 1, "nobody comes in for nights during the day")
+	clock.jump_to_hour(17)
+	while clock.minute_of_day() < 17 * 60 + 50:
+		clock.advance(1.0)
+	_check(cooks.call().size() == 2, "the night cook arrives before the day one leaves")
+	while clock.minute_of_day() < 18 * 60 + 5:
+		clock.advance(1.0)
+	var on: Array = cooks.call()
+	_check(on.size() == 1 and on[0].shift == &"night", "and the day cook goes home at the end of the shift")
 	window._put_on(&"workshop")
 	_check(people.people.filter(func(p: Person) -> bool: return p.programme == &"workshop").size() == 1,
 			"puts a prisoner on a work programme")
