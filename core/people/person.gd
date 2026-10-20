@@ -123,6 +123,12 @@ var pace := 1.0
 var health := 100.0
 ## Lying down where they are, such as in an infirmary bed.
 var lying := false
+## Privileges lost for now (see PrivilegeDef): id to game days left.
+var restrictions: Dictionary[StringName, float] = {}
+## Points from offences on their record, fading a little each day.
+var points := 0.0
+## Game hours left in the quiet room, 0 if not.
+var quiet_room_hours := 0.0
 ## Contraband tucked away about them, out of sight.
 var pocket: Array[ItemDef] = []
 

@@ -60,6 +60,7 @@ func _process(_delta: float) -> bool:
 	_test_misconduct()
 	_test_contraband()
 	_test_fights()
+	_test_consequences()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3113,4 +3114,63 @@ func _test_fights() -> void:
 		clock.advance(1.0)
 		minutes += 1
 	_check(not hurt.lying and not infirmary.beds.has(hurt), "and they're back on their feet")
+	main.queue_free()
+
+
+func _test_consequences() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var consequences: Consequences = main.consequences
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	(main.searching as Searching).random_per_day = 0
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	var a: Person = prisoners[0]
+	a.record.append([1, &"mischief", "skived off"])
+	clock.advance(1.0)
+	_check(a.points == 1.0 and a.bubble == "Warned" and a.restrictions.is_empty(), "a first minor offence is a warning")
+	a.record.append([1, &"mischief", "skived off again"])
+	clock.advance(1.0)
+	_check(a.restrictions.has(&"yard"), "a second loses them the yard")
+	people.set_block(a, people.activities[&"yard"])
+	_check(a.block.id == &"lockup", "so yard time is lockup for them")
+	var tv := BuildingMap.PlacedObject.new()
+	tv.def = PrisonCatalogue.object(&"tv")
+	a.restrictions[&"tv"] = 1.0
+	_check(people.restricted_from(a, tv), "and a lost telly keeps them off the TV")
+	consequences.new_day()
+	_check(not a.restrictions.has(&"tv") and a.points == 1.0, "restrictions run out and points fade day by day")
+	# A fight with no quiet room costs two privileges.
+	var b: Person = prisoners[1]
+	b.record.append([1, &"fight", "started a fight"])
+	clock.advance(1.0)
+	_check(b.restrictions.size() == 2 and b.quiet_room_hours == 0.0, "without a quiet room a fight costs two privileges")
+	# Mark someone else's cell a quiet room.
+	var map: BuildingMap = main.building.ground()
+	var cell: Room = null
+	for room in map.rooms():
+		if room.type == &"cell":
+			cell = room
+	map.set_room_type(cell, &"quiet_room")
+	var c: Person = prisoners[2]
+	c.record.append([1, &"fight", "joined a fight"])
+	var minutes := 0
+	while not consequences.in_quiet_room(c) and minutes < 240:
+		clock.advance(1.0)
+		minutes += 1
+	_check(consequences.in_quiet_room(c) and c.quiet_room_hours > 20.0, "a fighter is walked to the quiet room")
+	for i in 30:
+		clock.advance(1.0)
+	_check(consequences.in_quiet_room(c) and c.activity == "In the quiet room", "and stays there")
+	_check(c.moodlets.has(&"in_the_quiet_room"), "which they don't enjoy")
+	consequences.let_off(c)
+	_check(c.quiet_room_hours == 0.0 and c.temper == 0.0, "letting them off lets them out")
+	# Too many points by midnight moves them up a category.
+	var d: Person = prisoners[3]
+	d.category = &"medium"
+	d.points = 9.0
+	consequences.new_day()
+	_check(d.category == &"high", "lots of trouble moves them up to high security")
 	main.queue_free()

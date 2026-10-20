@@ -8,6 +8,8 @@ const REFRESH_SECONDS := 0.5
 var office: Office
 var intake: Intake
 var standing: Standing
+var consequences: Consequences
+var searching: Searching
 
 var _missing := Label.new()
 var _limit := Label.new()
@@ -20,6 +22,10 @@ var _grade := Label.new()
 var _measures := Label.new()
 var _goals := VBoxContainer.new()
 var _report := Label.new()
+var _policies: Array[Control] = []
+var _searches := OptionButton.new()
+var _days := OptionButton.new()
+var _quiet := CheckBox.new()
 
 
 func _ready() -> void:
@@ -85,6 +91,8 @@ func _ready() -> void:
 	box.add_child(categories)
 	_beds.theme_type_variation = &"SubtleLabel"
 	box.add_child(_beds)
+	if consequences != null and searching != null:
+		_add_policies(box)
 	if standing != null:
 		box.add_child(HSeparator.new())
 		_grade.theme_type_variation = &"HeaderLabel"
@@ -136,10 +144,56 @@ func refresh() -> void:
 		_checks[id].disabled = not warden
 		_checks[id].set_pressed_no_signal(intake.accepted.get(id, false) if warden
 				else Intake.WITHOUT_WARDEN_CATEGORIES.has(id))
+	for control in _policies:
+		if control is BaseButton:
+			(control as BaseButton).disabled = not warden
+	if searching != null:
+		_searches.selected = maxi(Searching.POLICIES.find(searching.random_per_day), 0)
+		_days.selected = maxi(DAYS.find(roundi(consequences.privilege_days)), 0)
+		_quiet.set_pressed_no_signal(consequences.quiet_room_on)
 	var problems := intake.warnings()
 	_beds.text = problems[0] if not problems.is_empty() else "%d free beds." % intake.free_beds()
 	if standing != null:
 		_show_standing(warden)
+
+
+## How long privileges are lost for, in game days.
+const DAYS: Array[int] = [1, 2, 4]
+
+
+func _add_policies(box: VBoxContainer) -> void:
+	box.add_child(HSeparator.new())
+	var heading := Label.new()
+	heading.text = "Policies"
+	heading.theme_type_variation = &"HeaderLabel"
+	box.add_child(heading)
+	for count in Searching.POLICIES:
+		_searches.add_item("None" if count == 0 else "%d a day" % count)
+	_searches.item_selected.connect(func(index: int) -> void: searching.random_per_day = Searching.POLICIES[index])
+	_searches.tooltip_text = "Guards turn over random cells. Finds contraband, but being searched puts prisoners out."
+	box.add_child(_row("Random cell searches", _searches))
+	for days in DAYS:
+		_days.add_item("%d day%s" % [days, "" if days == 1 else "s"])
+	_days.item_selected.connect(func(index: int) -> void: consequences.privilege_days = DAYS[index])
+	_days.tooltip_text = "How long a prisoner loses the yard, the telly or games after an offence."
+	box.add_child(_row("Privileges lost for", _days))
+	_quiet.text = "Quiet room for fights"
+	_quiet.tooltip_text = "Fighters spend a day in a quiet room, if you have one. Off, they lose two privileges instead."
+	_quiet.focus_mode = FOCUS_NONE
+	_quiet.toggled.connect(func(on: bool) -> void: consequences.quiet_room_on = on)
+	box.add_child(_quiet)
+	_policies.assign([_searches, _days, _quiet])
+
+
+func _row(text: String, control: Control) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	var label := Label.new()
+	label.text = text
+	label.size_flags_horizontal = SIZE_EXPAND_FILL
+	row.add_child(label)
+	control.focus_mode = FOCUS_NONE
+	row.add_child(control)
+	return row
 
 
 func _show_standing(warden: bool) -> void:

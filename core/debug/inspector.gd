@@ -337,6 +337,14 @@ func _refresh_person(person: Person) -> void:
 		lines.append("Temper: %d%s" % [roundi(person.temper), ", about to act up" if person.warning != &""
 				else (", up to no good" if person.truant_minutes > 0.0 else "")]
 				+ (", mostly %s" % _worst_worry(person) if person.temper > 0.5 else ""))
+	if person.points > 0.0:
+		lines.append("Points on record: %.1f" % person.points)
+	for id: StringName in person.restrictions:
+		var privilege: PrivilegeDef = people.privileges.get(id)
+		lines.append("Lost %s: %d days left" % [privilege.display_name.to_lower() if privilege != null else String(id),
+				ceili(person.restrictions[id])])
+	if person.quiet_room_hours > 0.0:
+		lines.append("Quiet room: %d hours left" % ceili(person.quiet_room_hours))
 	for entry: Array in person.record.slice(-5):
 		lines.append("Record: day %d, %s" % [entry[0], entry[2]])
 	var home := people.home_room(person)

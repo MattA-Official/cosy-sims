@@ -199,6 +199,13 @@ const CONTRABAND: Array[ItemDef] = [
 	preload("res://games/prison/catalogue/item_soap_sock.tres"),
 ]
 
+## Privileges lost as a consequence, in the order they're taken.
+const PRIVILEGES: Array[PrivilegeDef] = [
+	preload("res://games/prison/catalogue/privilege_yard.tres"),
+	preload("res://games/prison/catalogue/privilege_tv.tres"),
+	preload("res://games/prison/catalogue/privilege_games.tres"),
+]
+
 ## The misconduct ladder, mildest first.
 const MISCONDUCT: Array[MisconductDef] = [
 	preload("res://games/prison/catalogue/misconduct_grumble.tres"),
@@ -216,6 +223,7 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_had_a_biscuit.tres"),
 	preload("res://games/prison/catalogue/moodlet_saw_a_fight.tres"),
 	preload("res://games/prison/catalogue/moodlet_saw_a_nasty_fight.tres"),
+	preload("res://games/prison/catalogue/moodlet_in_the_quiet_room.tres"),
 	preload("res://games/prison/catalogue/moodlet_grubby_uniform.tres"),
 	preload("res://games/prison/catalogue/moodlet_useful_day.tres"),
 	preload("res://games/prison/catalogue/moodlet_made_to_work.tres"),
@@ -264,6 +272,7 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_dorm.tres"),
 	preload("res://games/prison/catalogue/room_canteen.tres"),
 	preload("res://games/prison/catalogue/room_infirmary.tres"),
+	preload("res://games/prison/catalogue/room_quiet_room.tres"),
 	preload("res://games/prison/catalogue/room_shower.tres"),
 	preload("res://games/prison/catalogue/room_yard.tres"),
 	preload("res://games/prison/catalogue/room_kitchen.tres"),

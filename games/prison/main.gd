@@ -81,6 +81,8 @@ var routes := PatrolRoutes.new()
 var wear := Wear.new()
 ## Unhappy prisoners acting up.
 var misconduct := Misconduct.new()
+## What happens after an offence.
+var consequences := Consequences.new()
 ## Fights, and mending afterwards.
 var fights := Fights.new()
 var infirmary := Infirmary.new()
@@ -192,6 +194,10 @@ func _ready() -> void:
 	people.moodlet_defs = PrisonCatalogue.moodlets()
 	people.room_types = PrisonCatalogue.ROOM_TYPES
 	people.home_room_types = PrisonCatalogue.HOME_ROOM_TYPES
+	for def in PrisonCatalogue.PRIVILEGES:
+		people.privileges[def.id] = def
+	for def in PrisonCatalogue.ACTIVITIES:
+		people.activities[def.id] = def
 	people.access = PrisonCatalogue.access()
 	people.categories = PrisonCatalogue.categories()
 	jobs.people = people
@@ -405,6 +411,22 @@ func _ready() -> void:
 	infirmary.clock = clock
 	add_child(infirmary)
 	infirmary.start()
+	consequences.name = "Consequences"
+	consequences.people = people
+	consequences.guarding = guarding
+	consequences.clock = clock
+	add_child(consequences)
+	consequences.start()
+	consequences.punished.connect(func(person: Person, words: String) -> void:
+		Toasts.post(person.name, words[0].to_upper() + words.substr(1) + "."))
+	inspector.person_actions.append(["Send to the quiet room", "A guard walks them to a free quiet room for a day.",
+			func(person: Person) -> void:
+				if not consequences.send_to_quiet_room(person):
+					Toasts.post("No quiet room free", "Build a small room with a bed and a toilet and mark it a quiet room."),
+			func(person: Person) -> bool: return person.group == &"prisoner" and person.quiet_room_hours <= 0.0])
+	inspector.person_actions.append(["Let them off", "Gives back lost privileges and lets them out of the quiet room.",
+			consequences.let_off,
+			func(person: Person) -> bool: return not person.restrictions.is_empty() or person.quiet_room_hours > 0.0])
 	contraband.name = "Contraband"
 	contraband.people = people
 	contraband.items = items
@@ -613,6 +635,8 @@ func _add_hud() -> void:
 	office_window.office = office
 	office_window.intake = intake
 	office_window.standing = standing
+	office_window.consequences = consequences
+	office_window.searching = searching
 	hud.add_child(office_window)
 	saves_window.save = func(slot: String) -> void:
 		if PrisonSave.write(slot, PrisonSave.capture(self)) == OK:

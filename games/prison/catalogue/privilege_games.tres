@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="PrivilegeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/privilege_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"games"
+display_name = "Games and the gym"
+blocks_tags = Array[StringName]([&"game", &"exercise"])

@@ -310,6 +310,19 @@ bed they mend slowly, and a nurse's visit mends them quickly; they get up
 at 90. Without an infirmary the hurt mend slowly as they go and the knocked
 out come round after an hour. Nobody dies.
 
+**Consequences.** Each offence scores points (grumbling 0, mischief 1,
+contraband or vandalism 2, a fight 3) that fade by one a day. The first
+minor one is a warning; after that they lose a privilege (the yard, which
+becomes lockup for them; the telly and radio; games and the gym), two once
+it reaches 4 points. A fight means a day in a **Quiet room** (mark a small
+room with a bed and a toilet as one): a guard walks them there and they
+stay put, meals passed in, and come out calm. Over 8 points at midnight
+moves them up a security category; a clean week moves them down. In the
+inspector you can **Send to the quiet room** or **Let them off**. The
+warden's office has the policies: random cell searches (none, 2 or 5 a
+day), how long privileges are lost for (1, 2 or 4 days) and whether fights
+mean the quiet room.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one

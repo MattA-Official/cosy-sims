@@ -38,7 +38,8 @@ static func capture(main: Node) -> Dictionary:
 			"record": person.record.duplicate(true), "warning": person.warning,
 			"warning_minutes": person.warning_minutes, "bubble": person.bubble,
 			"bubble_minutes": person.bubble_minutes, "truant_minutes": person.truant_minutes,
-			"pace": person.pace, "health": person.health, "lying": person.lying,
+			"pace": person.pace, "health": person.health, "restrictions": person.restrictions.duplicate(),
+			"points": person.points, "quiet_room_hours": person.quiet_room_hours, "lying": person.lying,
 			"bed_in_infirmary": (main.infirmary as Infirmary).beds.get(person, Vector2i(-1, -1)), "pocket": person.pocket.map(func(def: ItemDef) -> StringName: return def.id),
 			"profile": person.profile.duplicate(true), "bed": person.bed,
 			"doing": people.doing_of(person), "work": (main.jobs as JobBoard).work_of(person),
@@ -69,6 +70,8 @@ static func capture(main: Node) -> Dictionary:
 		"items_floor": _items_out((main.items as ItemStore).on_floor),
 		"items_hidden": _items_out((main.items as ItemStore).hidden),
 		"stash_owner": (main.items as ItemStore).stash_owner.duplicate(),
+		"policies": {"privilege_days": (main.consequences as Consequences).privilege_days,
+				"quiet_room": (main.consequences as Consequences).quiet_room_on},
 		"searching": {"policy": (main.searching as Searching).random_per_day,
 				"today": (main.searching as Searching).searches_today,
 				"found": (main.searching as Searching).found_today.duplicate()},
@@ -121,6 +124,9 @@ static func apply_world(main: Node, data: Dictionary) -> void:
 		person.truant_minutes = entry.get("truant_minutes", 0.0)
 		person.pace = entry.get("pace", 1.0)
 		person.health = entry.get("health", 100.0)
+		person.restrictions.assign(entry.get("restrictions", {}))
+		person.points = entry.get("points", 0.0)
+		person.quiet_room_hours = entry.get("quiet_room_hours", 0.0)
 		person.lying = entry.get("lying", false)
 		var bed: Vector2i = entry.get("bed_in_infirmary", Vector2i(-1, -1))
 		if bed.x != -1:
@@ -186,6 +192,9 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	items.on_floor.assign(_items_in(data.get("items_floor", {})))
 	items.hidden.assign(_items_in(data.get("items_hidden", {})))
 	items.stash_owner.assign(data.get("stash_owner", {}))
+	var policies: Dictionary = data.get("policies", {})
+	(main.consequences as Consequences).privilege_days = policies.get("privilege_days", 2.0)
+	(main.consequences as Consequences).quiet_room_on = policies.get("quiet_room", true)
 	var searching: Dictionary = data.get("searching", {})
 	(main.searching as Searching).random_per_day = searching.get("policy", 2)
 	(main.searching as Searching).searches_today = searching.get("today", 0)

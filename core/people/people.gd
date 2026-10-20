@@ -130,6 +130,10 @@ var room_types: Array[RoomTypeDef] = []
 ## Room types a bed makes someone's own, such as a cell. Beds elsewhere
 ## (an infirmary, say) belong to nobody.
 var home_room_types: Array[StringName] = []
+## Privileges people can lose, by id (see Person.restrictions).
+var privileges: Dictionary[StringName, PrivilegeDef] = {}
+## Every timetable block by id, for swapping one for another.
+var activities: Dictionary[StringName, ActivityDef] = {}
 ## Object tags that belong to one person each: they use their own, and
 ## nobody else's.
 var owned_tags: Array[StringName] = [&"bed"]
@@ -433,6 +437,13 @@ func set_role(person: Person, role: StringName) -> void:
 		_bodies.erase(person)
 
 
+## Draws someone afresh, such as after their category changes colour.
+func redraw(person: Person) -> void:
+	if _bodies.has(person):
+		_bodies[person].queue_free()
+		_bodies.erase(person)
+
+
 func remove_person(person: Person) -> void:
 	_stop(person)
 	_chatting_with.erase(person)
@@ -580,6 +591,7 @@ func face(person: Person) -> MoodModel.Face:
 ## unless the new block still allows it where they are (asleep in their
 ## cell from Lockup into Sleep, say).
 func set_block(person: Person, def: ActivityDef) -> void:
+	def = swapped_block(person, def)
 	if person.block == def:
 		return
 	_block_moodlets(person, person.block, def)
@@ -592,6 +604,27 @@ func set_block(person: Person, def: ActivityDef) -> void:
 		return
 	_stop(person)
 	person.timer = 0.0
+
+
+## The block someone gets instead of `def` while a privilege is lost,
+## such as lockup instead of the yard.
+func swapped_block(person: Person, def: ActivityDef) -> ActivityDef:
+	if def == null:
+		return def
+	for id: StringName in person.restrictions:
+		var privilege: PrivilegeDef = privileges.get(id)
+		if privilege != null and privilege.swap_block.has(def.id):
+			return activities.get(privilege.swap_block[def.id], def)
+	return def
+
+
+## Whether a lost privilege keeps someone off an object.
+func restricted_from(person: Person, placed: BuildingMap.PlacedObject) -> bool:
+	for id: StringName in person.restrictions:
+		var privilege: PrivilegeDef = privileges.get(id)
+		if privilege != null and privilege.blocks_tags.any(func(tag: StringName) -> bool: return placed.def.tags.has(tag)):
+			return true
+	return false
 
 
 ## Whether someone is where their block wants them. Without a bed of
@@ -1495,6 +1528,8 @@ func _room_listed(rooms: Array, level: int, room: Room) -> bool:
 func _may_use(person: Person, level: int, placed: BuildingMap.PlacedObject) -> bool:
 	var key := Vector2i(level, placed.id)
 	if broken.has(key):
+		return false
+	if not person.restrictions.is_empty() and restricted_from(person, placed):
 		return false
 	if not _is_owned_tag_object(placed):
 		return true
