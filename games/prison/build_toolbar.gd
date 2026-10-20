@@ -514,12 +514,12 @@ func _section(title: String) -> HBoxContainer:
 func _describe(def: Resource) -> String:
 	if def is ObjectDef:
 		var size: Vector2 = def.size
-		return "%s × %s tiles" % [_number(size.x), _number(size.y)]
+		return "%s × %s tiles · %s" % [_number(size.x), _number(size.y), Ledger.text(def.price)]
 	if def is FloorDef:
-		return "Outdoor floor" if def.outdoor else "Indoor floor"
+		return "%s · %s a tile" % ["Outdoor floor" if def.outdoor else "Indoor floor", Ledger.text(def.price)]
 	if def is WallDef:
 		var kind := "Outdoor" if def.outdoor else "Indoor"
-		return "%s, %s m high\n%s" % [kind, _number(def.height),
+		return "%s, %s m high · %s a tile\n%s" % [kind, _number(def.height), Ledger.text(def.price),
 				"Leaves rooms outdoors" if def.outdoor else "Makes rooms indoors"]
 	if def is ZoneDef:
 		return def.description

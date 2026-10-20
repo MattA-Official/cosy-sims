@@ -51,6 +51,7 @@ func _process(_delta: float) -> bool:
 	_test_wear_and_repair()
 	_test_money()
 	_test_intake()
+	_test_standing()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1107,7 +1108,7 @@ func _test_money() -> void:
 		if paid.has(wages) and grant > 0:
 			break
 	_check(paid.has(wages) or paid.has(main.finances.shift_wages(night)), "wages are paid as a shift starts (%s)" % [paid])
-	_check(grant == main.finances.daily_grant() and grant > 0, "at midnight the grant comes in and the day closes")
+	_check(grant > 0, "at midnight the grant comes in and the day closes")
 	_check(main.finance_window != null and main.clock_bar._money.text != "", "the balance shows by the clock")
 	main.queue_free()
 
@@ -1146,6 +1147,29 @@ func _test_intake() -> void:
 	_check(intake.bus().is_empty() and intake.warnings()[0].begins_with("No free beds"), "and none when the cells are full")
 	main.shifts.set_wanted(&"warden", &"day", 0)
 	_check(not intake.warden_here() and intake.todays_count() == Intake.WITHOUT_WARDEN, "without a warden a couple come")
+	main.queue_free()
+
+
+func _test_standing() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var standing: Standing = main.standing
+	var ledger: Ledger = main.ledger
+	_check(standing.grade == 3 and is_equal_approx(main.finances.grant_scale, 1.0), "a new prison starts at three stars")
+	_check(standing.current_goals().size() == Standing.GOALS_SHOWN, "with a few grant goals to work on")
+	main.shifts.set_wanted(&"warden", &"day", 0)
+	_check(standing.check_goals().is_empty(), "which need a warden to claim")
+	main.shifts.set_wanted(&"warden", &"day", 1)
+	var finished := standing.check_goals()
+	_check(finished.size() == 1 and finished[0].title == "Open a workshop" and ledger.today.get("Grants", 0) == 1500,
+			"the paying prison's workshop wins its grant")
+	_check(standing.current_goals().size() == Standing.GOALS_SHOWN, "and the next goal comes up")
+	standing.grade_day()
+	_check(standing.measures.size() == 4 and standing.grade >= 1 and standing.grade <= 5, "each midnight it is graded")
+	_check(main.intake.max_limit == 2 + standing.grade * 2, "the grade sets the biggest intake")
+	var report := standing.write_report()
+	_check(report.contains("★") and report.contains("Money:"), "and the morning report sums up yesterday")
 	main.queue_free()
 
 

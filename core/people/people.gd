@@ -27,6 +27,8 @@ signal person_removed(person: Person)
 signal used(person: Person, placed: BuildingMap.PlacedObject)
 ## A door was locked or unlocked.
 signal doors_changed
+## Someone has a moodlet, by its id after their traits swap it.
+signal moodlet_added(person: Person, id: StringName)
 
 ## Needs below this send people off to see to them, cutting short a
 ## wander.
@@ -453,6 +455,7 @@ func add_moodlet(person: Person, id: StringName) -> void:
 	var def: MoodletDef = moodlet_defs.get(id)
 	if def != null:
 		person.moodlets[id] = def.hours * 60.0
+		moodlet_added.emit(person, id)
 
 
 ## People within `distance` (up to NEARBY) of someone on the same level,

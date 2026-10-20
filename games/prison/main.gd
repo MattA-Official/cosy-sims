@@ -63,6 +63,8 @@ var finances := Finances.new()
 var intake := Intake.new()
 ## The warden's office.
 var office := Office.new()
+## The grade, grant goals and the daily report.
+var standing := Standing.new()
 ## Open jobs and stock, with the debug view.
 var jobs_panel := JobsPanel.new()
 ## Game time. Everything that happens over time listens to it.
@@ -319,9 +321,27 @@ func _ready() -> void:
 	intake.categories = PrisonCatalogue.CATEGORIES
 	intake.entrance = shifts.entrance
 	intake.has_warden = office.has_warden
+	intake.world = grid
+	intake.bus_model = load("res://games/prison/art/models/bus.glb")
+	intake.cell_size = grid.cell_size
+	intake.ground_height = func(tile: Vector2) -> float: return terrain.height_at(tile)
 	intake.clock = clock
 	add_child(intake)
 	intake.start()
+	standing.name = "Standing"
+	standing.people = people
+	standing.ledger = ledger
+	standing.office = office
+	standing.intake = intake
+	standing.finances = finances
+	standing.building = building
+	standing.workshop = workshop
+	standing.clock = clock
+	add_child(standing)
+	standing.start()
+	standing.report_ready.connect(func(text: String) -> void: Toasts.post("Daily report", text, 12.0))
+	standing.goal_done.connect(func(goal: Standing.Goal) -> void:
+		Toasts.post("Goal done: " + goal.title, "A grant of %s came in." % Ledger.text(goal.grant)))
 	intake.arrived.connect(func(came: Array[Person]) -> void:
 		Toasts.post("The bus is here", "%d new %s on the way to reception." % [came.size(),
 				"prisoner is" if came.size() == 1 else "prisoners are"]))
@@ -392,6 +412,7 @@ func _add_hud() -> void:
 	hud.add_child(finance_window)
 	office_window.office = office
 	office_window.intake = intake
+	office_window.standing = standing
 	hud.add_child(office_window)
 
 func _unhandled_input(event: InputEvent) -> void:

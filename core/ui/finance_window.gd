@@ -33,12 +33,15 @@ class BalanceChart:
 		var bottom := mini(values.min(), 0)
 		var span := maxf(top - bottom, 1.0)
 		var zero := size.y * top / span
+		# A slot for every day of history, filled from the right.
+		var slots := maxi(values.size(), Ledger.HISTORY_DAYS + 1)
 		var gap := 6.0
-		var width := (size.x - gap * (values.size() - 1)) / values.size()
+		var width := (size.x - gap * (slots - 1)) / slots
+		var start := slots - values.size()
 		var font := get_theme_default_font()
 		for i in values.size():
 			var height := size.y * values[i] / span
-			var x := i * (width + gap)
+			var x := (start + i) * (width + gap)
 			var colour := Color(0.45, 0.68, 0.55) if values[i] >= 0 else Color(0.85, 0.45, 0.42)
 			if i == values.size() - 1:
 				colour = colour.lightened(0.25)

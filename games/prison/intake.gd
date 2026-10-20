@@ -16,7 +16,6 @@ const BUS_HOUR := 9
 const RECEPTION := &"reception"
 ## Arrivals a day without a warden to set the limit.
 const WITHOUT_WARDEN := 2
-const MAX_LIMIT := 10
 const FEE := 200
 const SEARCH_MINUTES := 10.0
 ## Game minutes an arrival waits for a guard before finding their own way.
@@ -26,6 +25,12 @@ const ESCORT_WAIT := 45.0
 const WALK_LIMIT := 90.0
 const FIRST_NIGHT := &"first_night"
 const WITHOUT_WARDEN_CATEGORIES: Array[StringName] = [&"low", &"medium"]
+## Game minutes the bus waits before driving off.
+const BUS_STAY := 30.0
+## Tiles the bus drives in from and off to, and how long it takes, in
+## seconds.
+const BUS_ROAD := 14.0
+const BUS_DRIVE_SECONDS := 2.0
 
 enum Stage { WALKING, SEARCHING, WAITING }
 
@@ -39,14 +44,24 @@ var prisoner_group: StringName = &"prisoner"
 var entrance: Array = []
 ## Whether a warden is running the prison, for the intake settings.
 var has_warden: Callable
-## How many arrive a day, with a warden.
+## How many arrive a day, with a warden, and the most that may (the
+## grade raises it).
 var limit := 4
+var max_limit := 8
 ## Category ids a warden accepts.
 var accepted: Dictionary[StringName, bool] = {&"low": true, &"medium": true, &"high": false}
+## For drawing the bus, optional: where to put it, the model, and the
+## ground's height (Vector2 in tiles -> metres).
+var world: Node3D
+var bus_model: PackedScene
+var cell_size := 1.0
+var ground_height: Callable
 var clock: GameClock:
 	set(value):
 		clock = value
-		clock.minute_passed.connect(func(_minute: int) -> void: _look())
+		clock.minute_passed.connect(func(_minute: int) -> void:
+			_look()
+			_bus_waits())
 		clock.hour_changed.connect(func(hour: int) -> void:
 			if hour == BUS_HOUR:
 				bus())
@@ -54,6 +69,8 @@ var clock: GameClock:
 ## Arrivals still being signed in: [stage, minutes in it].
 var _arriving: Dictionary[Person, Array] = {}
 var _rng := RandomNumberGenerator.new()
+var _bus: Node3D
+var _bus_minutes := 0.0
 
 
 ## Gives everyone already here a category: medium, unless they have one.
@@ -87,6 +104,7 @@ func bus() -> Array[Person]:
 		_head_in(person, room)
 		came.append(person)
 	if not came.is_empty():
+		_show_bus()
 		arrived.emit(came)
 	return came
 
@@ -180,6 +198,49 @@ func _look() -> void:
 				elif entry[1] >= ESCORT_WAIT:
 					guarding.cancel_escort(person)
 					_let_go(person)
+
+
+## The bus pulls up just off the land by the entrance, its doors towards
+## the prison.
+func _show_bus() -> void:
+	if world == null or bus_model == null or _bus != null:
+		return
+	var land := building.land[0]
+	var spot: Vector2 = entrance[1]
+	var sides: Array[Vector2] = [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]
+	var gaps: Array[float] = [spot.x - land.position.x, land.end.x - spot.x, spot.y - land.position.y,
+			land.end.y - spot.y]
+	var out := sides[gaps.find(gaps.min())]
+	var along := Vector2(-out.y, out.x)
+	var stop := spot + out * 1.4
+	_bus = bus_model.instantiate()
+	_bus.rotation.y = atan2(out.x, out.y)
+	world.add_child(_bus)
+	_bus.position = _bus_point(stop - along * BUS_ROAD)
+	_bus.create_tween().tween_property(_bus, ^"position", _bus_point(stop), BUS_DRIVE_SECONDS) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+	_bus.set_meta(&"off", _bus_point(stop + along * BUS_ROAD))
+	_bus_minutes = 0.0
+
+
+func _bus_point(tile: Vector2) -> Vector3:
+	var y: float = ground_height.call(tile) if ground_height.is_valid() else 0.0
+	return Vector3(tile.x * cell_size, y, tile.y * cell_size)
+
+
+## The bus waits a while, then drives off.
+func _bus_waits() -> void:
+	if _bus == null:
+		return
+	_bus_minutes += 1.0
+	if _bus_minutes < BUS_STAY:
+		return
+	var leaving := _bus
+	_bus = null
+	var tween := leaving.create_tween()
+	tween.tween_property(leaving, ^"position", leaving.get_meta(&"off"), BUS_DRIVE_SECONDS) \
+			.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
+	tween.tween_callback(leaving.queue_free)
 
 
 ## Sends an arrival to a tile in reception they can get to.

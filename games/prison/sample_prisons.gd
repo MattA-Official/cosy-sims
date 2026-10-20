@@ -442,7 +442,7 @@ static func _reception(ground: BuildingMap, corridor: Rect2i) -> void:
 	_room(ground, reception, &"tiles", &"plaster", &"reception")
 	_door(ground, corridor.position, Vector2i.LEFT)
 	_door(ground, reception.position + Vector2i(0, 1), Vector2i.LEFT)
-	ground.place_object(PrisonCatalogue.object(&"desk"), Vector2(reception.position) + Vector2(2, 0), 0)
+	ground.place_object(PrisonCatalogue.object(&"reception_desk"), Vector2(reception.position) + Vector2(1, 0), 0)
 	ground.place_object(PrisonCatalogue.object(&"bench"), Vector2(reception.position) + Vector2(1.5, 3.5), 2)
 
 

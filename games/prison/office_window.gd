@@ -7,8 +7,7 @@ const REFRESH_SECONDS := 0.5
 
 var office: Office
 var intake: Intake
-## Extra sections below the intake, such as goals: a Control each.
-var sections: Array[Control] = []
+var standing: Standing
 
 var _missing := Label.new()
 var _limit := Label.new()
@@ -17,6 +16,10 @@ var _beds := Label.new()
 var _checks: Dictionary[StringName, CheckBox] = {}
 var _buttons: Array[Button] = []
 var _wait := 0.0
+var _grade := Label.new()
+var _measures := Label.new()
+var _goals := VBoxContainer.new()
+var _report := Label.new()
 
 
 func _ready() -> void:
@@ -66,7 +69,7 @@ func _ready() -> void:
 	_limit.custom_minimum_size = Vector2(32, 0)
 	_limit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_limit_row.add_child(_limit)
-	_limit_row.add_child(_button("+", func() -> void: intake.limit = mini(intake.limit + 1, Intake.MAX_LIMIT)))
+	_limit_row.add_child(_button("+", func() -> void: intake.limit = mini(intake.limit + 1, intake.max_limit)))
 	box.add_child(_limit_row)
 	var categories := HBoxContainer.new()
 	categories.add_theme_constant_override(&"separation", 12)
@@ -82,9 +85,24 @@ func _ready() -> void:
 	box.add_child(categories)
 	_beds.theme_type_variation = &"SubtleLabel"
 	box.add_child(_beds)
-	for section in sections:
+	if standing != null:
 		box.add_child(HSeparator.new())
-		box.add_child(section)
+		_grade.theme_type_variation = &"HeaderLabel"
+		_grade.tooltip_text = "Graded each midnight on safety, wellbeing, reform and money. A better grade brings a bigger grant and a bigger intake."
+		_grade.mouse_filter = MOUSE_FILTER_PASS
+		box.add_child(_grade)
+		_measures.theme_type_variation = &"SubtleLabel"
+		box.add_child(_measures)
+		box.add_child(HSeparator.new())
+		var goals_heading := Label.new()
+		goals_heading.text = "Grant goals"
+		goals_heading.theme_type_variation = &"HeaderLabel"
+		box.add_child(goals_heading)
+		_goals.add_theme_constant_override(&"separation", 2)
+		box.add_child(_goals)
+		_report.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_report.theme_type_variation = &"SubtleLabel"
+		box.add_child(_report)
 	visible = false
 	refresh()
 
@@ -120,6 +138,37 @@ func refresh() -> void:
 				else Intake.WITHOUT_WARDEN_CATEGORIES.has(id))
 	var problems := intake.warnings()
 	_beds.text = problems[0] if not problems.is_empty() else "%d free beds." % intake.free_beds()
+	if standing != null:
+		_show_standing(warden)
+
+
+func _show_standing(warden: bool) -> void:
+	_grade.text = "Grade  %s%s" % ["★".repeat(standing.grade), "☆".repeat(5 - standing.grade)]
+	var parts := PackedStringArray()
+	for measure: String in standing.measures:
+		parts.append("%s %d★" % [measure, standing.measures[measure]])
+	_measures.text = ("  ·  ".join(parts) if standing.measures_known() else "First graded at midnight.") \
+			+ "\nUp to %d arrivals a day at this grade." % intake.max_limit
+	for child in _goals.get_children():
+		_goals.remove_child(child)
+		child.queue_free()
+	if not warden:
+		var none := Label.new()
+		none.text = "A warden in the office takes on grant goals."
+		none.theme_type_variation = &"SubtleLabel"
+		_goals.add_child(none)
+	else:
+		for goal in standing.current_goals():
+			var row := HBoxContainer.new()
+			var title := Label.new()
+			title.text = goal.title + (" (%s)" % goal.progress.call() if goal.progress.is_valid() else "")
+			title.size_flags_horizontal = SIZE_EXPAND_FILL
+			row.add_child(title)
+			var grant := Label.new()
+			grant.text = Ledger.text(goal.grant)
+			row.add_child(grant)
+			_goals.add_child(row)
+	_report.text = ("Today's report:\n" + standing.report) if warden and not standing.report.is_empty() else ""
 
 
 func _button(text: String, pressed: Callable) -> Button:
