@@ -34,12 +34,14 @@ colours a real prison would plausibly use.
 - Jobs: cooker, fridge, serving_counter, washing_machine, ironing_board,
   laundry_basket, clothes_shelf, workbench, storage_shelf, table_trolley,
   bin, skip (outdoor), coffee_machine, guard_desk (1.5 x 1, chair at the
-  front facing the monitor).
+  front facing the monitor), reception_desk (2 x 1 counter, staff side at
+  the back).
 - Carried items (about 0.4 m, origin at the middle of the bottom):
   food_crate, meal_tray, dirty_laundry, clean_laundry, rubbish_bag,
   wooden_toy, birdhouse. Floor litter: litter_paper, litter_can,
   litter_wrapper.
-- Vehicles: lorry (2 x 5 tiles, cab towards Godot's +z).
+- Vehicles: lorry (2 x 5 tiles, cab towards Godot's +z), bus (4 x 1.6 m,
+  front towards Godot's +x, doors on its -z side).
 - Doors: door (in use), cell_door (barred, not used yet), security_gate
   (all bars, for a door kind).
 - People: person. Plants: tree, bush, flower.
@@ -82,7 +84,8 @@ shelf top about 1.1 m).
   their hands at `ItemView.HELD_AT`.
   Meshes named `*_<group>` or `*_<role>` only show on people in that
   group or with that role: the staff badge (`gold_staff`), the guard's
-  peaked cap (`navy_guard`) and the cook's hat (`sheet_cook`).
+  peaked cap (`navy_guard`), the warden's banded cap and tie
+  (`navy_warden`, `gold_warden`) and the cook's hat (`sheet_cook`).
 - **Plants**: `FoliageDef.model`. A mesh named `trunk` takes
   `trunk_colour`; ones named `canopy` or `bloom` take `colour`; the rest
   (flower stems) keep their own colour. So the round tree and the blossom

@@ -109,6 +109,7 @@ PALETTE = dict(
     bag=("#3b3d40", 0.35, 0),
     lorry=("#f2efe6", 0.5, 0),
     stripe=("#8aa98a", 0.6, 0),
+    blue_stripe=("#7d93ad", 0.6, 0),
     gold=("#e0b65a", 0.35, 0.6),        # staff badge
     trunk=("#ffffff", 0.9, 0),
     canopy=("#ffffff", 0.9, 0),
@@ -393,6 +394,64 @@ def guard_desk():
     return p
 
 
+def reception_desk():
+    """2 x 1 reception counter: a raised front for the new arrivals, a desk
+    behind for the officer, a rubber stamp and a paper tray on top."""
+    p = Prop("reception_desk")
+    p.box("paint", (1.9, 0.5, 0.62), (0, -0.2, 0.31), 0.03, 3)
+    p.box("wood", (1.96, 0.32, 0.04), (0, -0.32, 0.64), 0.015, 2)
+    p.box("wood", (1.9, 0.5, 0.04), (0, 0.22, 0.48), 0.015, 2)
+    for x in (-0.9, 0.9):
+        p.box("paint", (0.06, 0.4, 0.46), (x, 0.25, 0.23), 0.015, 2)
+    p.box("steel_dark", (1.8, 0.02, 0.06), (0, -0.455, 0.12), 0.008, 1)
+    # Tray of forms and a stamp on its pad.
+    p.box("steel", (0.3, 0.22, 0.04), (-0.55, -0.32, 0.68), 0.012, 2)
+    p.box("paper", (0.26, 0.18, 0.02), (-0.55, -0.32, 0.69), 0.004, 1)
+    p.box("food_c", (0.14, 0.09, 0.012), (0.4, -0.3, 0.665), 0.004, 1)
+    p.cyl("rubber", 0.03, 0.02, (0.55, -0.3, 0.67), bevel=0.006, n=14)
+    p.cyl("wood", 0.012, 0.06, (0.55, -0.3, 0.71), bevel=0.003, n=10)
+    p.ball("wood", 0.025, (0.55, -0.3, 0.75), u=12, v=8)
+    p.box("paper", (0.18, 0.24, 0.01), (0.1, -0.3, 0.665), 0.003, 1, rot=(0, 0, 8))
+    p.box("steel_dark", (0.36, 0.14, 0.02), (-0.2, 0.25, 0.51), 0.008, 1)
+    return p
+
+
+def bus():
+    """Prison bus, 4 x 1.6 x 1.6 m: front towards Blender +X (Godot +x),
+    doors on Blender +Y (Godot -z)."""
+    p = Prop("bus")
+    L, W = 4.0, 1.6
+    p.box("lorry", (L - 0.1, W - 0.06, 1.15), (0, 0, 0.95), 0.2, 4)
+    p.box("blue_stripe", (L - 0.06, W - 0.02, 0.14), (0, 0, 0.72), 0.04, 2)
+    p.box("steel_dark", (L - 0.4, W - 0.2, 0.2), (0, 0, 0.32), 0.05, 2)
+    # Windscreen, lights and bumper at the front.
+    p.box("glass", (0.12, W - 0.36, 0.42), (L / 2 - 0.08, 0, 1.18), 0.05, 2)
+    for y in (-0.55, 0.55):
+        p.cyl("light", 0.08, 0.05, (L / 2 - 0.04, y, 0.62), bevel=0.02, n=16, rot=(0, 90, 0))
+    p.box("steel_dark", (0.16, W - 0.1, 0.16), (L / 2 - 0.04, 0, 0.42), 0.05, 2)
+    p.box("steel_dark", (0.16, W - 0.1, 0.16), (-L / 2 + 0.04, 0, 0.42), 0.05, 2)
+    # Barred side windows, both sides.
+    for side in (-1, 1):
+        for k in range(4):
+            x = -1.35 + k * 0.72
+            p.box("glass", (0.56, 0.06, 0.34), (x, side * (W / 2 - 0.02), 1.2), 0.03, 2)
+            for b in range(4):
+                bx = x - 0.21 + b * 0.14
+                p.tube("paint", [(bx, side * (W / 2 + 0.005), 1.04), (bx, side * (W / 2 + 0.005), 1.36)], 0.012, 0, n=6)
+        # Mirrors by the cab.
+        p.box("steel_dark", (0.05, 0.1, 0.16), (L / 2 - 0.25, side * (W / 2 + 0.06), 1.2), 0.02, 2)
+    # Folding doors on the +Y side, near the front.
+    p.box("glass", (0.56, 0.06, 0.9), (1.25, W / 2 - 0.01, 0.85), 0.03, 2)
+    p.box("paint", (0.01, 0.07, 0.9), (1.25, W / 2 - 0.01, 0.85), 0, 0)
+    p.box("steel_dark", (0.6, 0.2, 0.08), (1.25, W / 2 - 0.08, 0.2), 0.02, 2)
+    # Chunky wheels.
+    for x in (-1.25, 1.2):
+        for side in (-1, 1):
+            p.cyl("rubber", 0.3, 0.24, (x, side * (W / 2 - 0.1), 0.3), bevel=0.05, segs=3, n=28, rot=(90, 0, 0))
+            p.cyl("steel", 0.14, 0.26, (x, side * (W / 2 - 0.1), 0.3), bevel=0.03, n=20, rot=(90, 0, 0))
+    return p
+
+
 def lift():
     p = Prop("lift", 180)  # 1 x 1 cabin, 1.5 m tall, doors at the front
     h = 1.5
@@ -474,7 +533,8 @@ def person():
     swings the legs (outfit_legs, shoes_legs) forward to sit and the arms
     (outfit_arms, skin_arms) forward to carry. Parts named after a group
     or role only show on those people: *_staff (a badge), *_guard (a
-    peaked cap), *_cook (a chef's hat)."""
+    peaked cap), *_warden (a cap with a gold band, and a tie), *_cook (a
+    chef's hat)."""
     p = Prop("person")
     # Legs and body: a soft pill, a touch wider at the hips.
     p.capsule("outfit", 0.16, 0.2, (0, 0, 0.38), scale=(1, 0.85, 1))
@@ -504,6 +564,14 @@ def person():
     p.ball("navy", 0.178, (0, -0.01, 0.75), scale=(1.02, 1.0, 0.72))
     p.cyl("navy", 0.17, 0.04, (0, 0.0, 0.79), bevel=0.015, n=24)
     p.ball("navy", 0.11, (0, 0.15, 0.77), scale=(1.1, 0.8, 0.18), u=16, v=8)
+    # The warden: a smarter cap with a gold band, and a tie.
+    p.group = "warden"
+    p.ball("navy", 0.178, (0, -0.01, 0.75), scale=(1.02, 1.0, 0.72))
+    p.cyl("navy", 0.17, 0.04, (0, 0.0, 0.79), bevel=0.015, n=24)
+    p.ball("navy", 0.11, (0, 0.15, 0.77), scale=(1.1, 0.8, 0.18), u=16, v=8)
+    p.cyl("gold", 0.173, 0.025, (0, 0.0, 0.77), bevel=0.006, n=24)
+    p.box("navy", (0.05, 0.02, 0.04), (0, 0.142, 0.55), 0.008, 1)
+    p.taper("navy", (0.065, 0.02), (0.04, 0.02), 0.14, (0, 0.145, 0.46), 0.008, 1)
     # Cooks: a soft white chef's hat.
     p.group = "cook"
     p.cyl("sheet", 0.15, 0.1, (0, -0.01, 0.84), bevel=0.03, n=24)
@@ -1010,7 +1078,8 @@ MODELS = dict(bed=bed, toilet=toilet, shower=shower, table=table, desk=desk, lif
               clean_laundry=clean_laundry, rubbish_bag=rubbish_bag, wooden_toy=wooden_toy,
               birdhouse=birdhouse, litter_paper=litter_paper, litter_can=litter_can,
               litter_wrapper=litter_wrapper, lorry=lorry,
-              coffee_machine=coffee_machine, security_gate=security_gate, guard_desk=guard_desk)
+              coffee_machine=coffee_machine, security_gate=security_gate, guard_desk=guard_desk,
+              reception_desk=reception_desk, bus=bus)
 
 
 # ---------------------------------------------------------------- line-up
