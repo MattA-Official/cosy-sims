@@ -119,6 +119,8 @@ var bubble_minutes := 0.0
 var truant_minutes := 0.0
 ## How fast they walk, against everyone's usual speed.
 var pace := 1.0
+## Contraband tucked away about them, out of sight.
+var pocket: Array[ItemDef] = []
 
 
 func flat() -> Vector2:

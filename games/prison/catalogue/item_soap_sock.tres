@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ItemDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/items/item_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"soap_sock"
+display_name = "Sock full of soap"
+tags = Array[StringName]([&"contraband", &"weapon"])
+colour = Color(0.92, 0.92, 0.88, 1)
+pocketed_from = Array[StringName]([&"shower"])
+smell = 0.2
+trade_value = 2
+use = &"weapon"

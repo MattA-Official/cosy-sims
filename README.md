@@ -276,6 +276,22 @@ inspector with the reason, such as "broke the toilet in the cell (hungry)".
 Hotheads boil over faster, gentle souls slower; light-fingered prisoners
 lean towards mischief. Acting on it lets off steam.
 
+**Contraband.** Prisoners tempted to mischief (or light-fingered ones) may
+pocket something when they finish with an object and no staff are within
+3 tiles: a spoon from a canteen table, a biscuit from the serving counter,
+a rolling pin or frying pan from the cooker, a screwdriver or mallet from
+the workbench, a sock full of soap from the shower. Back in their cell they
+hide it in whatever hides things best (toilet, then bed, bookshelf, bin).
+Biscuits get eaten when they're feeling low. You never see a stash until
+it's found.
+
+**Searches.** In the inspector, a prisoner has **Search them** (a guard
+stops them and pats them down, finding everything on them) and **Search
+their cell** (a guard turns it over for 8 minutes; well-hidden stashes are
+found less often, messy cells more). Guards also search two random cells a
+day. Anything found is taken away and goes on the owner's record, and
+being searched puts people out (tidy prisoners most).
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one

@@ -7,8 +7,8 @@
 script = ExtResource("1_def")
 id = &"guard"
 display_name = "Guard"
-description = "Mans guard posts so the security gates near them open, patrols where the prisoners are, and walks back anyone out of place."
-job_kinds = Array[StringName]([&"post", &"patrol", &"escort"])
+description = "Mans guard posts so the security gates near them open, patrols where the prisoners are, walks back anyone out of place, and searches cells and prisoners."
+job_kinds = Array[StringName]([&"post", &"patrol", &"escort", &"search"])
 outfit_colour = Color(0.2, 0.25, 0.4, 1)
 icon = ExtResource("2_icon")
 wage = 80

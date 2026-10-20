@@ -185,6 +185,17 @@ const TRAITS: Array[TraitDef] = [
 ]
 
 ## Things that happen to prisoners and lift or lower their mood a while.
+## Things prisoners shouldn't have.
+const CONTRABAND: Array[ItemDef] = [
+	preload("res://games/prison/catalogue/item_biscuit.tres"),
+	preload("res://games/prison/catalogue/item_spoon.tres"),
+	preload("res://games/prison/catalogue/item_rolling_pin.tres"),
+	preload("res://games/prison/catalogue/item_frying_pan.tres"),
+	preload("res://games/prison/catalogue/item_screwdriver.tres"),
+	preload("res://games/prison/catalogue/item_mallet.tres"),
+	preload("res://games/prison/catalogue/item_soap_sock.tres"),
+]
+
 ## The misconduct ladder, mildest first.
 const MISCONDUCT: Array[MisconductDef] = [
 	preload("res://games/prison/catalogue/misconduct_grumble.tres"),
@@ -196,6 +207,9 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_good_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_missed_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_saw_vandalism.tres"),
+	preload("res://games/prison/catalogue/moodlet_searched.tres"),
+	preload("res://games/prison/catalogue/moodlet_searched_tidy.tres"),
+	preload("res://games/prison/catalogue/moodlet_had_a_biscuit.tres"),
 	preload("res://games/prison/catalogue/moodlet_grubby_uniform.tres"),
 	preload("res://games/prison/catalogue/moodlet_useful_day.tres"),
 	preload("res://games/prison/catalogue/moodlet_made_to_work.tres"),
@@ -322,7 +336,7 @@ static func moodlets() -> Dictionary[StringName, MoodletDef]:
 
 
 static func item(id: StringName) -> ItemDef:
-	for def in ITEMS + LITTER:
+	for def in ITEMS + LITTER + CONTRABAND:
 		if def.id == id:
 			return def
 	return null

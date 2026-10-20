@@ -18,6 +18,9 @@ var people: People
 var building: Building
 var clock: GameClock
 var runner: ScheduleRunner
+## Buttons offered under a person, each [text, tooltip, pressed (person),
+## shown (person) -> bool], such as the prison's "Search them".
+var person_actions: Array = []
 
 var _layer := CanvasLayer.new()
 var _panel := PanelContainer.new()
@@ -224,6 +227,9 @@ func _show_person(person: Person) -> void:
 		_text("\n".join(traits)).theme_type_variation = &"SubtleLabel"
 	if people.jobs != null and person.role == &"" and not people.jobs.programmes.is_empty():
 		_show_programme(person)
+	for action: Array in person_actions:
+		if (action[3] as Callable).call(person):
+			_button(action[0], func() -> void: (action[2] as Callable).call(person)).tooltip_text = action[1]
 	var mood_row := HBoxContainer.new()
 	_mood_face = TextureRect.new()
 	_mood_face.custom_minimum_size = Vector2(32, 32)

@@ -81,6 +81,9 @@ var routes := PatrolRoutes.new()
 var wear := Wear.new()
 ## Unhappy prisoners acting up.
 var misconduct := Misconduct.new()
+## Things prisoners shouldn't have, and guards searching for them.
+var contraband := Contraband.new()
+var searching := Searching.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
 ## The prison's money, and what comes in and goes out.
@@ -378,6 +381,32 @@ func _ready() -> void:
 	misconduct.clock = clock
 	add_child(misconduct)
 	misconduct.start()
+	contraband.name = "Contraband"
+	contraband.people = people
+	contraband.items = items
+	contraband.misconduct = misconduct
+	contraband.catalogue.assign(PrisonCatalogue.CONTRABAND)
+	contraband.clock = clock
+	add_child(contraband)
+	contraband.start()
+	searching.name = "Searching"
+	searching.people = people
+	searching.jobs = jobs
+	searching.items = items
+	searching.clock = clock
+	add_child(searching)
+	searching.start()
+	var is_prisoner := func(person: Person) -> bool: return person.group == &"prisoner"
+	inspector.person_actions.append(["Search them", "A guard stops them and pats them down. "
+			+ "Being searched puts people out.", searching.search_person, is_prisoner])
+	inspector.person_actions.append(["Search their cell", "A guard turns over the room they sleep in.",
+			func(person: Person) -> void:
+				var home := people.home_room(person)
+				if not home.is_empty():
+					searching.search_cell(home[0], home[1]),
+			func(person: Person) -> bool: return is_prisoner.call(person) and not people.home_room(person).is_empty()])
+	searching.found.connect(func(_owner: Person, def: ItemDef, where: String) -> void:
+		Toasts.post("Contraband found", "A %s %s." % [def.display_name.to_lower(), where]))
 	ledger.name = "Ledger"
 	ledger.balance = Finances.STARTING_MONEY
 	add_child(ledger)

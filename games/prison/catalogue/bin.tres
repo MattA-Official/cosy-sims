@@ -16,3 +16,4 @@ capacity = 12
 model = ExtResource("2_model")
 shows_held = false
 price = 30
+hide_spot = 0.3

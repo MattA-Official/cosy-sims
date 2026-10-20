@@ -15,6 +15,11 @@ var held: Dictionary[Vector2i, Dictionary] = {}
 var on_floor: Dictionary[Vector3i, Dictionary] = {}
 ## What each person is carrying, as [ItemDef, count].
 var carried: Dictionary[Person, Array] = {}
+## Things hidden in objects, out of sight until a search finds them, by
+## (level, object id): ItemDef to count.
+var hidden: Dictionary[Vector2i, Dictionary] = {}
+## Who hid what's in each stash, by (level, object id): their person id.
+var stash_owner: Dictionary[Vector2i, int] = {}
 
 
 ## How many items with a tag an object holds.
@@ -120,12 +125,36 @@ func put_down(person: Person) -> Array:
 	return pair
 
 
+## Hides something in an object.
+func hide_in(key: Vector2i, item: ItemDef, owner_id: int) -> void:
+	var stash: Dictionary = hidden.get_or_add(key, {})
+	stash[item] = stash.get(item, 0) + 1
+	stash_owner[key] = owner_id
+
+
+## Takes one hidden item out of a stash, emptying it when it's the last.
+func unhide(key: Vector2i, item: ItemDef) -> void:
+	var stash: Dictionary = hidden.get(key, {})
+	if not stash.has(item):
+		return
+	stash[item] -= 1
+	if stash[item] <= 0:
+		stash.erase(item)
+	if stash.is_empty():
+		hidden.erase(key)
+		stash_owner.erase(key)
+
+
 ## Forgets items kept in objects that are gone. Returns how many objects
 ## were forgotten.
 func forget_missing(objects_exist: Callable) -> int:
 	var gone := held.keys().filter(func(key: Vector2i) -> bool: return not objects_exist.call(key))
 	for key: Vector2i in gone:
 		held.erase(key)
+	for key: Vector2i in hidden.keys():
+		if not objects_exist.call(key):
+			hidden.erase(key)
+			stash_owner.erase(key)
 	if not gone.is_empty():
 		changed.emit()
 	return gone.size()

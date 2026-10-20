@@ -58,6 +58,7 @@ func _process(_delta: float) -> bool:
 	_test_roads()
 	_test_buying_land()
 	_test_misconduct()
+	_test_contraband()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -2912,4 +2913,87 @@ func _test_misconduct() -> void:
 			if person.warning == &"" and misconduct.roll(person) != null:
 				acted.append(person)
 	_check(not acted.is_empty(), "unhappy prisoners act up")
+	main.queue_free()
+
+
+func _test_contraband() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var items: ItemStore = main.items
+	var contraband: Contraband = main.contraband
+	var searching: Searching = main.searching
+	var clock: GameClock = main.clock
+	searching.random_per_day = 0
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool:
+		return p.group == &"prisoner" and not people.home_room(p).is_empty())
+	var prisoner: Person = prisoners[0]
+	prisoner.traits.clear()
+	prisoner.mood = 80.0
+	_check(not contraband.tempted(prisoner), "content prisoners leave things be")
+	prisoner.mood = 20.0
+	_check(contraband.tempted(prisoner), "unhappy ones are tempted")
+	var tables: Array[Vector2i] = main.building.objects_tagged([&"table"] as Array[StringName])
+	var spoon := contraband.pocket_from(prisoner, main.building.object_at(tables[0]))
+	_check(spoon != null and spoon.id == &"spoon" and prisoner.pocket.has(spoon), "a spoon from the canteen goes in their pocket")
+	# Hidden in their cell, in whatever hides best.
+	var home := people.home_room(prisoner)
+	var room: Room = home[1]
+	people.stop(prisoner)
+	prisoner.level = home[0]
+	prisoner.position = Vector3(room.cells[0].x + 0.5, prisoner.position.y, room.cells[0].y + 0.5)
+	var spot := contraband.hiding_place(prisoner)
+	_check(spot != Vector2i(-1, -1), "their cell has somewhere to hide it")
+	contraband.tick()
+	_check(prisoner.pocket.is_empty() and items.hidden.has(spot) and items.stash_owner[spot] == prisoner.id,
+			"and they hide it there")
+	_check(Searching.find_chance(0.6, 0) < Searching.find_chance(0.3, 0)
+			and Searching.find_chance(0.6, 3) > Searching.find_chance(0.6, 0),
+			"good hiding places are found less often, messy cells more")
+	# A guard searches the cell, again until it turns up.
+	var found := []
+	searching.found.connect(func(owner: Person, def: ItemDef, _where: String) -> void: found.append([owner, def]))
+	for attempt in 6:
+		if not found.is_empty():
+			break
+		_check(searching.search_cell(home[0], room) != null, "a cell search goes up as a job")
+		var minutes := 0
+		while not searching.jobs.of_kind(&"search").is_empty() and minutes < 240:
+			clock.advance(1.0)
+			minutes += 1
+		_check(searching.jobs.of_kind(&"search").is_empty(), "and a guard does it")
+	_check(not found.is_empty() and found[0][0] == prisoner and found[0][1] == spoon and not items.hidden.has(spot),
+			"the spoon is found and taken away")
+	_check(prisoner.record.any(func(e: Array) -> bool: return e[1] == &"contraband"), "and goes on their record")
+	_check(prisoner.moodlets.has(&"searched"), "having their cell turned over puts them out")
+	# A person search finds what's in their pocket.
+	var other: Person = prisoners[1]
+	other.pocket.append(contraband.item(&"screwdriver"))
+	found.clear()
+	searching.search_person(other)
+	var held := false
+	var minutes := 0
+	while not searching.jobs.of_kind(&"search").is_empty() and minutes < 240:
+		clock.advance(1.0)
+		minutes += 1
+		held = held or other.led
+	_check(held and not other.led, "a guard stops them while they're searched, then lets them go")
+	_check(other.pocket.is_empty() and not found.is_empty(), "and finds the screwdriver")
+	# Treats are eaten when low.
+	other.pocket.append(contraband.item(&"biscuit"))
+	other.mood = 20.0
+	contraband.tick()
+	_check(other.pocket.is_empty() and other.moodlets.has(&"had_a_biscuit"), "a biscuit cheers someone up")
+	# Saved and loaded.
+	items.hide_in(spot, contraband.item(&"mallet"), prisoner.id)
+	other.pocket.append(contraband.item(&"spoon"))
+	_check(PrisonSave.write("test", PrisonSave.capture(main)) == OK, "a prison with contraband saves")
+	main.queue_free()
+	PrisonSave.pending = PrisonSave.read("test")
+	main = load("res://games/prison/main.tscn").instantiate()
+	root.add_child(main)
+	_check((main.items as ItemStore).hidden.has(spot), "stashes are saved")
+	var again: Array = (main.people as People).people.filter(func(p: Person) -> bool: return p.id == other.id)
+	_check(not again.is_empty() and again[0].pocket.size() == 1, "and so are pockets")
 	main.queue_free()

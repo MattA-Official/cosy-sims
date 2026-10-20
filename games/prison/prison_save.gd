@@ -38,7 +38,7 @@ static func capture(main: Node) -> Dictionary:
 			"record": person.record.duplicate(true), "warning": person.warning,
 			"warning_minutes": person.warning_minutes, "bubble": person.bubble,
 			"bubble_minutes": person.bubble_minutes, "truant_minutes": person.truant_minutes,
-			"pace": person.pace,
+			"pace": person.pace, "pocket": person.pocket.map(func(def: ItemDef) -> StringName: return def.id),
 			"profile": person.profile.duplicate(true), "bed": person.bed,
 			"doing": people.doing_of(person), "work": (main.jobs as JobBoard).work_of(person),
 		})
@@ -66,6 +66,11 @@ static func capture(main: Node) -> Dictionary:
 		"wear_uses": (main.wear as Wear).uses.duplicate(),
 		"items_held": _items_out((main.items as ItemStore).held),
 		"items_floor": _items_out((main.items as ItemStore).on_floor),
+		"items_hidden": _items_out((main.items as ItemStore).hidden),
+		"stash_owner": (main.items as ItemStore).stash_owner.duplicate(),
+		"searching": {"policy": (main.searching as Searching).random_per_day,
+				"today": (main.searching as Searching).searches_today,
+				"found": (main.searching as Searching).found_today.duplicate()},
 		"timetable": hours,
 		"locks": people.access.locked.duplicate(),
 		"overrides": (main.runner as ScheduleRunner).overrides.duplicate(),
@@ -114,6 +119,11 @@ static func apply_world(main: Node, data: Dictionary) -> void:
 		person.bubble_minutes = entry.get("bubble_minutes", 0.0)
 		person.truant_minutes = entry.get("truant_minutes", 0.0)
 		person.pace = entry.get("pace", 1.0)
+		person.pocket.clear()
+		for id: StringName in entry.get("pocket", []):
+			var def := PrisonCatalogue.item(id)
+			if def != null:
+				person.pocket.append(def)
 		person.programme = entry["programme"]
 		person.category = entry["category"]
 		person.shift = entry["shift"]
@@ -168,6 +178,12 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	var items: ItemStore = main.items
 	items.held.assign(_items_in(data.get("items_held", {})))
 	items.on_floor.assign(_items_in(data.get("items_floor", {})))
+	items.hidden.assign(_items_in(data.get("items_hidden", {})))
+	items.stash_owner.assign(data.get("stash_owner", {}))
+	var searching: Dictionary = data.get("searching", {})
+	(main.searching as Searching).random_per_day = searching.get("policy", 2)
+	(main.searching as Searching).searches_today = searching.get("today", 0)
+	(main.searching as Searching).found_today.assign(searching.get("found", []))
 	items.changed.emit()
 	items.floor_changed.emit()
 	var money: Dictionary = data.get("money", {})

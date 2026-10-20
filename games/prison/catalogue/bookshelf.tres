@@ -14,3 +14,4 @@ colour = Color(0.7, 0.55, 0.4, 1)
 tags = Array[StringName]([&"book", &"decor"])
 model = ExtResource("2_ext")
 price = 120
+hide_spot = 0.4

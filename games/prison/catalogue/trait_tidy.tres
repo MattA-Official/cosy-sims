@@ -17,3 +17,6 @@ likes = Dictionary[StringName, float]({
 })
 clashes_with = Array[StringName]([&"messy"])
 litter_scale = 0.2
+moodlet_swaps = Dictionary[StringName, StringName]({
+&"searched": &"searched_tidy"
+})

@@ -15,6 +15,21 @@ extends Resource
 @export var model: PackedScene
 @export var colour := Color(0.8, 0.65, 0.45)
 
+## Contraband: things prisoners shouldn't have. Prisoners up to no good may
+## pocket one when they finish using an object with one of these tags
+## (a spoon from a canteen table, a screwdriver from a workbench).
+@export var pocketed_from: Array[StringName] = []
+## Sets off a metal detector.
+@export var metal := false
+## How easily a search or a dog notices it, 0 to 1.
+@export var smell := 0.0
+## What it's worth between prisoners, in biscuits.
+@export var trade_value := 1
+## What it's for: &"treat", &"weapon", &"dig", &"phone" or &"rowdy".
+@export var use: StringName
+## Given to whoever uses it up, for treats.
+@export var use_moodlet: StringName
+
 
 func has_tag(tag: StringName) -> bool:
 	return tags.has(tag)
