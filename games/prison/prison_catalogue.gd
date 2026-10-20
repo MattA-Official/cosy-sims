@@ -32,6 +32,8 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/washing_machine.tres"),
 	preload("res://games/prison/catalogue/ironing_board.tres"),
 	preload("res://games/prison/catalogue/clothes_shelf.tres"),
+	preload("res://games/prison/catalogue/workbench.tres"),
+	preload("res://games/prison/catalogue/goods_shelf.tres"),
 ]
 
 ## Things people carry about.
@@ -44,6 +46,8 @@ const ITEMS: Array[ItemDef] = [
 	preload("res://games/prison/catalogue/item_rubbish_bag.tres"),
 	preload("res://games/prison/catalogue/item_dirty_laundry.tres"),
 	preload("res://games/prison/catalogue/item_clean_laundry.tres"),
+	preload("res://games/prison/catalogue/item_wooden_toy.tres"),
+	preload("res://games/prison/catalogue/item_birdhouse.tres"),
 ]
 ## What people drop as litter.
 const LITTER: Array[ItemDef] = [
@@ -106,6 +110,14 @@ const ROLES: Array[StaffRoleDef] = [
 	preload("res://games/prison/catalogue/role_handyman.tres"),
 ]
 
+## Work prisoners can do in work blocks.
+const PROGRAMMES: Array[WorkProgrammeDef] = [
+	preload("res://games/prison/catalogue/programme_kitchen.tres"),
+	preload("res://games/prison/catalogue/programme_laundry.tres"),
+	preload("res://games/prison/catalogue/programme_cleaning.tres"),
+	preload("res://games/prison/catalogue/programme_workshop.tres"),
+]
+
 const DOOR_KINDS: Array[DoorKindDef] = [
 	preload("res://games/prison/catalogue/door_staff.tres"),
 ]
@@ -146,6 +158,8 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_good_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_missed_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_grubby_uniform.tres"),
+	preload("res://games/prison/catalogue/moodlet_useful_day.tres"),
+	preload("res://games/prison/catalogue/moodlet_made_to_work.tres"),
 	preload("res://games/prison/catalogue/moodlet_lovely_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_locked_up_hungry.tres"),
 	preload("res://games/prison/catalogue/moodlet_had_an_accident.tres"),
@@ -192,6 +206,7 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_yard.tres"),
 	preload("res://games/prison/catalogue/room_kitchen.tres"),
 	preload("res://games/prison/catalogue/room_laundry.tres"),
+	preload("res://games/prison/catalogue/room_workshop.tres"),
 ]
 
 
@@ -221,6 +236,13 @@ static func access() -> Access:
 static func roles() -> Dictionary[StringName, StaffRoleDef]:
 	var out: Dictionary[StringName, StaffRoleDef] = {}
 	for def in ROLES:
+		out[def.id] = def
+	return out
+
+
+static func programmes() -> Dictionary[StringName, WorkProgrammeDef]:
+	var out: Dictionary[StringName, WorkProgrammeDef] = {}
+	for def in PROGRAMMES:
 		out[def.id] = def
 	return out
 

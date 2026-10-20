@@ -18,7 +18,7 @@ const CHALLENGES: Array[String] = [
 	"Twenty-four hungry prisoners, a dorm of sixteen beds, two tables and two showers: they queue, give up and try again.",
 	"The showers have no door, and the canteen is 0.75 m up. With Door Steps on its door gets steps; with it off, nobody can eat.",
 	"A staff room behind a staff door and an office zoned staff only: staff come and go, prisoners keep out.",
-	"The staff wing with a kitchen and a laundry: the morning lorry's crates go to the fridge, the cook fills the serving counter before each meal, prisoners take a tray to a table, and the cleaner sweeps up and washes the uniforms left after showers.",
+	"The staff wing with a kitchen, a laundry and a workshop: the morning lorry's crates go to the fridge, the cook fills the serving counter before each meal, prisoners take a tray to a table, the cleaner sweeps up and washes uniforms, and in work blocks prisoners on programmes help out or make toys and birdhouses.",
 ]
 
 ## Set before reloading the scene to start in a different sample.
@@ -380,13 +380,28 @@ static func _staff_wing(site: Site, kitchen := false) -> void:
 	if kitchen:
 		_kitchen(ground, canteen)
 		_laundry(ground, canteen, showers)
+		_workshop(ground, yard)
 	_plant(site)
 	for i in 6:
-		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
+		var prisoner := site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
+		if kitchen:
+			prisoner.programme = [&"kitchen", &"laundry", &"cleaning", &"workshop", &"workshop", &""][i]
 	for i in 3 if kitchen else 2:
 		var member := site.people.add_person(0, Vector2(staff_room.position) + Vector2(1.5 - i, 3.5 - i % 2), "", &"staff")
 		if kitchen:
 			site.people.set_role(member, [&"cook", &"handyman", &"cleaner"][i])
+
+
+## A workshop off the far side of the yard, with two workbenches and a
+## shelf for what they make.
+static func _workshop(ground: BuildingMap, yard: Rect2i) -> void:
+	var workshop := Rect2i(Vector2i(yard.position.x, yard.end.y), Vector2i(6, 4))
+	_room(ground, workshop, &"wood", &"brick", &"workshop")
+	_door(ground, workshop.position + Vector2i(2, 0), Vector2i.UP)
+	var corner := Vector2(workshop.position)
+	ground.place_object(PrisonCatalogue.object(&"workbench"), corner + Vector2(0, 3), 0)
+	ground.place_object(PrisonCatalogue.object(&"workbench"), corner + Vector2(3, 3), 0)
+	ground.place_object(PrisonCatalogue.object(&"goods_shelf"), corner + Vector2(5, 0), 0)
 
 
 ## A laundry under the kitchen, through a door from it, with a basket and

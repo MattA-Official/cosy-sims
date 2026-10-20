@@ -41,6 +41,7 @@ var item_view := ItemView.new()
 var kitchen := Kitchen.new()
 var cleaning := Cleaning.new()
 var laundry := Laundry.new()
+var workshop := Workshop.new()
 ## Game time. Everything that happens over time listens to it.
 var clock := GameClock.new()
 ## The prisoners' timetable, a copy of the catalogue's so edits stay in
@@ -116,6 +117,11 @@ func _ready() -> void:
 	jobs.people = people
 	jobs.items = items
 	jobs.roles = PrisonCatalogue.roles()
+	jobs.programmes = PrisonCatalogue.programmes()
+	# A job done on a work programme makes for a useful day.
+	jobs.job_finished.connect(func(_job: Job, worker: Person) -> void:
+		if worker.programme != &"":
+			people.add_moodlet(worker, &"useful_day"))
 	people.jobs = jobs
 	people.items = items
 	people.litter = PrisonCatalogue.LITTER
@@ -204,6 +210,13 @@ func _ready() -> void:
 	laundry.clock = clock
 	add_child(laundry)
 	laundry.start()
+	workshop.name = "Workshop"
+	workshop.items = items
+	workshop.building = building
+	workshop.jobs = jobs
+	workshop.clock = clock
+	add_child(workshop)
+	workshop.look()
 	var load_sample := func(index: int) -> void:
 		SamplePrisons.next = index
 		get_tree().reload_current_scene()

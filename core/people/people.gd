@@ -491,6 +491,9 @@ func is_in_place(person: Person) -> bool:
 	var block := person.block
 	if block == null or not block.has_place() or (block.free_after and person.done_main):
 		return true
+	# On a work programme, they go where the work is.
+	if block.jobs and person.programme != &"":
+		return true
 	var here := room_of(person)
 	if here.is_empty():
 		return false

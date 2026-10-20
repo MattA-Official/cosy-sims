@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/workbench.glb" id="2_model"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"workbench"
+display_name = "Workbench"
+size = Vector2(2, 1)
+height = 0.56
+colour = Color(0.7, 0.55, 0.38, 1)
+tags = Array[StringName]([&"workbench"])
+model = ExtResource("2_model")

@@ -14,13 +14,16 @@ const RETRY_MINUTES := 5.0
 ## How long picking up or putting down takes.
 const HANDLING_MINUTES := 0.5
 
-signal job_finished(job: Job)
+## A job's last stage is done, by `worker`.
+signal job_finished(job: Job, worker: Person)
 
 var jobs: Array[Job] = []
 var people: People
 var items: ItemStore
 ## Staff roles by id, for the job kinds each may take.
 var roles: Dictionary[StringName, StaffRoleDef] = {}
+## Work programmes by id, likewise.
+var programmes: Dictionary[StringName, WorkProgrammeDef] = {}
 
 
 func post(job: Job) -> Job:
@@ -77,7 +80,11 @@ func may_take(person: Person, job: Job) -> bool:
 	if person.role != &"":
 		var role: StaffRoleDef = roles.get(person.role)
 		return job.roles.has(person.role) or (role != null and role.job_kinds.has(job.kind) and job.roles.is_empty())
-	return person.programme != &"" and job.programmes.has(person.programme)
+	if person.programme == &"":
+		return false
+	var programme: WorkProgrammeDef = programmes.get(person.programme)
+	return job.programmes.has(person.programme) \
+			or (programme != null and programme.job_kinds.has(job.kind) and job.programmes.is_empty())
 
 
 ## Is there a job someone could take now?
@@ -142,7 +149,7 @@ func stage_done(person: Person) -> void:
 	jobs.erase(job)
 	if job.on_done.is_valid():
 		job.on_done.call(job)
-	job_finished.emit(job)
+	job_finished.emit(job, person)
 
 
 ## Someone has stopped part way (called away, or removed): whatever they

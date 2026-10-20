@@ -44,7 +44,8 @@ var kind: StringName
 var title := ""
 ## 1 (whenever) to 5 (drop everything).
 var priority := 3
-## Staff roles that may take it, and work programmes whose prisoners may.
+## Staff roles that may take it, and work programmes whose people may.
+## Empty lets any role or programme that takes jobs of its kind.
 var roles: Array[StringName] = []
 var programmes: Array[StringName] = []
 var stages: Array[Stage] = []

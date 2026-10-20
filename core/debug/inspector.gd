@@ -222,6 +222,8 @@ func _show_person(person: Person) -> void:
 		traits.append("%s: %s" % [t.display_name, t.description])
 	if not traits.is_empty():
 		_text("\n".join(traits)).theme_type_variation = &"SubtleLabel"
+	if people.jobs != null and person.role == &"" and not people.jobs.programmes.is_empty():
+		_show_programme(person)
 	var mood_row := HBoxContainer.new()
 	_mood_face = TextureRect.new()
 	_mood_face.custom_minimum_size = Vector2(32, 32)
@@ -263,6 +265,30 @@ func _show_person(person: Person) -> void:
 		people.remove_person(person))
 
 
+## Which work programme someone is on, to change.
+func _show_programme(person: Person) -> void:
+	var row := HBoxContainer.new()
+	var label := Label.new()
+	label.text = "Work programme"
+	row.add_child(label)
+	var picker := OptionButton.new()
+	picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	picker.add_item("None")
+	var ids: Array[StringName] = [&""]
+	for id: StringName in people.jobs.programmes:
+		var def := people.jobs.programmes[id]
+		picker.add_item(def.display_name)
+		picker.set_item_tooltip(ids.size(), def.description)
+		ids.append(id)
+	picker.selected = maxi(ids.find(person.programme), 0)
+	picker.item_selected.connect(func(index: int) -> void:
+		if person.job != null:
+			people.stop(person)
+		person.programme = ids[index])
+	row.add_child(picker)
+	_box.add_child(row)
+
+
 func _refresh_person(person: Person) -> void:
 	if _live_text == null:
 		return
@@ -276,7 +302,8 @@ func _refresh_person(person: Person) -> void:
 	var target := people.target_object(person)
 	var group: GroupDef = people.access.groups.get(person.group)
 	var lines := PackedStringArray([
-		"Group: %s" % (group.display_name if group != null else String(person.group)),
+		"Group: %s" % (group.display_name if group != null else String(person.group))
+				+ (", %s" % _role_name(person) if person.role != &"" else ""),
 		"Doing: %s" % person.activity,
 		"Because: %s" % (person.reason if not person.reason.is_empty() else "-"),
 		"State: %s" % ["idle", "walking", "using an object"][person.state],
@@ -285,6 +312,13 @@ func _refresh_person(person: Person) -> void:
 		"Heading for: %s" % (target.def.display_name if target != null else "nothing in particular"),
 		"Steps left on the way: %d" % person.route.size(),
 	])
+	if person.job != null:
+		var stage := person.job.current()
+		lines.append("Job: %s%s" % [person.job.title, ", %s" % stage.doing.to_lower()
+				if stage != null and not stage.doing.is_empty() else ""])
+	var carrying := people.items.carrying(person) if people.items != null else null
+	if carrying != null:
+		lines.append("Carrying: %d × %s" % [people.items.carried[person][1], carrying.display_name.to_lower()])
 	if person.block != null:
 		lines.append("Block: %s, %s" % [person.block.display_name,
 				"in place" if people.is_in_place(person) else ("out of place" if person.out_of_place
@@ -306,6 +340,11 @@ func _refresh_person(person: Person) -> void:
 		var slider := _need_sliders[need]
 		if not slider.has_focus():
 			slider.set_value_no_signal(person.needs.get(need, 0.0))
+
+
+func _role_name(person: Person) -> String:
+	var role: StaffRoleDef = people.jobs.roles.get(person.role) if people.jobs != null else null
+	return role.display_name.to_lower() if role != null else String(person.role)
 
 
 ## "2 h 30 min", "45 min"

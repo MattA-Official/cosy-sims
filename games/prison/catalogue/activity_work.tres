@@ -15,4 +15,5 @@ main_tag = &""
 stay_on_main = false
 free_after = false
 door_rule = 0
-description = "Jobs come later; until then this is free time."
+description = "Prisoners on a work programme help in the kitchen, the laundry, with cleaning or in the workshop. Everyone else has free time."
+jobs = true

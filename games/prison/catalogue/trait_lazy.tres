@@ -14,3 +14,6 @@ need_rates = Dictionary[StringName, float]({
 likes = Dictionary[StringName, float]({
 &"tv": 1.5
 })
+moodlet_swaps = Dictionary[StringName, StringName]({
+&"useful_day": &"made_to_work"
+})

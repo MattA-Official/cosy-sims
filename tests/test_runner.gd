@@ -45,6 +45,7 @@ func _process(_delta: float) -> bool:
 	_test_kitchen()
 	_test_cleaning()
 	_test_laundry()
+	_test_work_programmes()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -680,7 +681,7 @@ func _test_jobs_and_carrying() -> void:
 			"staff with a role work from the board, prisoners off a programme don't")
 	items.put_in(Vector2i(0, from), map.objects[from], crate, 3)
 	var finished: Array[Job] = []
-	jobs.job_finished.connect(func(job: Job) -> void: finished.append(job))
+	jobs.job_finished.connect(func(job: Job, _worker: Person) -> void: finished.append(job))
 	var carry := jobs.post(Job.carry(&"food", 2, Job.at(Job.Do.FETCH, 0, from), Job.at(Job.Do.DELIVER, 0, to)))
 	carry.title = "Carry food"
 	var minutes := 0
@@ -862,6 +863,41 @@ func _test_laundry() -> void:
 		clock.advance(1.0)
 		minutes += 1
 	_check(items.count_in(Vector2i(0, shelf.id), &"clean_laundry") == 9, "irons it and stacks it back on the shelf")
+	main.queue_free()
+
+
+func _test_work_programmes() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var people: People = main.people
+	var jobs: JobBoard = main.jobs
+	var clock: GameClock = main.clock
+	clock.speed_index = 0
+	var maker: Person = people.people.filter(func(p: Person) -> bool: return p.programme == &"workshop")[0]
+	var idle: Person = people.people.filter(func(p: Person) -> bool:
+			return p.group == &"prisoner" and p.programme == &"")[0]
+	_check(jobs.of_kind(&"make").size() == 2, "a making job waits at each workbench")
+	_check(not jobs.wants_work(maker), "prisoners on a programme don't work outside work blocks")
+	while not main.runner.current().jobs:
+		clock.advance(1.0)
+	_check(jobs.wants_work(maker) and not jobs.wants_work(idle), "in a work block they do; others have free time")
+	_check(people.is_in_place(maker), "and they count as in place wherever the work is")
+	var useful := false
+	var minutes := 0
+	while main.items.total(&"goods") == 0 and minutes < 180:
+		clock.advance(1.0)
+		minutes += 1
+		useful = useful or maker.moodlets.has(&"useful_day") or maker.moodlets.has(&"made_to_work")
+	_check(main.items.total(&"goods") > 0, "the workshop makes goods")
+	minutes = 0
+	while not useful and minutes < 30:
+		clock.advance(1.0)
+		minutes += 1
+		useful = maker.moodlets.has(&"useful_day") or maker.moodlets.has(&"made_to_work")
+	_check(useful, "a job done makes for a useful day")
+	var made: int = main.items.total(&"goods")
+	_check(main.workshop.collect() == made and main.workshop.sold == made, "the lorry takes the goods to sell")
 	main.queue_free()
 
 
