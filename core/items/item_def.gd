@@ -27,6 +27,8 @@ extends Resource
 @export var trade_value := 1
 ## What it's for: &"treat", &"weapon", &"dig", &"phone" or &"rowdy".
 @export var use: StringName
+## Extra damage a blow does with it, for weapons.
+@export var hit := 0.0
 ## Given to whoever uses it up, for treats.
 @export var use_moodlet: StringName
 

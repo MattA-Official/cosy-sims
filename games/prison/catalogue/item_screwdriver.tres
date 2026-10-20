@@ -12,3 +12,4 @@ pocketed_from = Array[StringName]([&"workbench"])
 metal = true
 trade_value = 8
 use = &"dig"
+hit = 4.0

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MisconductDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/misconduct_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"fight"
+display_name = "Fighting"
+mood_below = 15.0
+weight = 1.0
+trait_weights = Dictionary[StringName, float]({
+&"gentle": 0.2,
+&"hothead": 2.0
+})
+warning_minutes = 10.0
+bubble = "Spoiling for a fight!"
+points = 3

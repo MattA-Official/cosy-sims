@@ -292,6 +292,24 @@ found less often, messy cells more). Guards also search two random cells a
 day. Anything found is taken away and goes on the owner's record, and
 being searched puts people out (tidy prisoners most).
 
+**Fights.** Below mood 15 a prisoner may square up ("Spoiling for a
+fight!") and then pick on the unhappiest prisoner within 3 tiles. A dust
+cloud with stars and bonks appears; everyone in it lands a blow each
+minute, harder with a weapon from their pocket. Hotheads close by may pile
+in (up to 4); gentle souls often walk off. Fights last 4 minutes, 2 if
+armed, or until a guard arrives to break them up (a guard breaking up an
+armed fight takes a knock). Everyone who sees one feels worse, more so if
+weapons came out.
+
+**Health and the infirmary.** Health runs from 100: bruised (above 70, no
+effect), hurt (above 40, they limp) and knocked out (flat on the floor
+seeing stars). Build an **Infirmary** (an infirmary bed and a medicine
+cabinet) and hire a **Nurse** in the staff window. The hurt limp to a free
+bed and lie down; a guard or the nurse carries the knocked out there. In
+bed they mend slowly, and a nurse's visit mends them quickly; they get up
+at 90. Without an infirmary the hurt mend slowly as they go and the knocked
+out come round after an hour. Nobody dies.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one

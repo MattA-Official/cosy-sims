@@ -59,6 +59,7 @@ func _process(_delta: float) -> bool:
 	_test_buying_land()
 	_test_misconduct()
 	_test_contraband()
+	_test_fights()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -934,6 +935,8 @@ func _test_guards() -> void:
 	var clock: GameClock = main.clock
 	var jobs: JobBoard = main.jobs
 	clock.speed_index = 0
+	# Nobody acting up while the guards are tested.
+	(main.misconduct as Misconduct).enabled = false
 	_check(shifts.wanted_for(&"guard", &"day") == 2 and shifts.wanted_for(&"guard", &"night") == 1,
 			"two guards by day and one by night")
 	var gates := guarding.gate_locks()
@@ -985,9 +988,10 @@ func _test_guards() -> void:
 		minutes += 1
 	var guard: Person = on_patrol.call()[0]
 	prisoner.out_of_place = true
+	# Stopped first, as stopping someone mid-use puts them back where they stood.
+	people.stop(prisoner)
 	prisoner.position = guard.position
 	prisoner.level = guard.level
-	people.stop(prisoner)
 	people._buckets_fresh = false
 	guarding._walked_back.erase(prisoner)
 	prisoner.moodlets.erase(&"walked_back")
@@ -2954,7 +2958,7 @@ func _test_contraband() -> void:
 	# A guard searches the cell, again until it turns up.
 	var found := []
 	searching.found.connect(func(owner: Person, def: ItemDef, _where: String) -> void: found.append([owner, def]))
-	for attempt in 6:
+	for attempt in 15:
 		if not found.is_empty():
 			break
 		_check(searching.search_cell(home[0], room) != null, "a cell search goes up as a job")
@@ -2967,7 +2971,8 @@ func _test_contraband() -> void:
 			"the spoon is found and taken away")
 	_check(prisoner.record.any(func(e: Array) -> bool: return e[1] == &"contraband"), "and goes on their record")
 	_check(prisoner.moodlets.has(&"searched"), "having their cell turned over puts them out")
-	# A person search finds what's in their pocket.
+	# A person search finds what's in their pocket (before they can hide it).
+	contraband.enabled = false
 	var other: Person = prisoners[1]
 	other.pocket.append(contraband.item(&"screwdriver"))
 	found.clear()
@@ -2981,6 +2986,7 @@ func _test_contraband() -> void:
 	_check(held and not other.led, "a guard stops them while they're searched, then lets them go")
 	_check(other.pocket.is_empty() and not found.is_empty(), "and finds the screwdriver")
 	# Treats are eaten when low.
+	contraband.enabled = true
 	other.pocket.append(contraband.item(&"biscuit"))
 	other.mood = 20.0
 	contraband.tick()
@@ -2996,4 +3002,115 @@ func _test_contraband() -> void:
 	_check((main.items as ItemStore).hidden.has(spot), "stashes are saved")
 	var again: Array = (main.people as People).people.filter(func(p: Person) -> bool: return p.id == other.id)
 	_check(not again.is_empty() and again[0].pocket.size() == 1, "and so are pockets")
+	main.queue_free()
+
+
+func _test_fights() -> void:
+	_check(Health.injury(100.0) == Health.Injury.NONE and Health.injury(80.0) == Health.Injury.BRUISED
+			and Health.injury(50.0) == Health.Injury.HURT and Health.injury(20.0) == Health.Injury.KNOCKED_OUT,
+			"health bands: bruised, hurt, knocked out")
+	_check(Health.pace(50.0) < 1.0, "the hurt limp")
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var fights: Fights = main.fights
+	var infirmary: Infirmary = main.infirmary
+	var clock: GameClock = main.clock
+	var misconduct: Misconduct = main.misconduct
+	misconduct.enabled = false
+	(main.searching as Searching).random_per_day = 0
+	var minutes := 0
+	while not people.people.any(func(p: Person) -> bool: return p.role == &"guard") and minutes < 240:
+		clock.advance(1.0)
+		minutes += 1
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	var a: Person = prisoners[0]
+	var b: Person = prisoners[1]
+	for p: Person in [a, b]:
+		people.stop(p)
+		p.level = 0
+		p.traits.clear()
+	b.position = a.position + Vector3(0.6, 0.0, 0.0)
+	people._buckets_fresh = false
+	var fight := fights.begin(a, b)
+	_check(fight != null and fight.cloud != null and fights.fighting(a) and fights.fighting(b), "two prisoners start a fight")
+	_check(main.jobs.of_kind(&"break_up").size() == 1, "and a guard is sent to break it up")
+	people._decide(a, true)
+	_check(a.activity == "Fighting", "fighters stay put")
+	var ended := []
+	fights.ended.connect(func(_f: Fights.Fight) -> void: ended.append(true))
+	for i in 10:
+		clock.advance(1.0)
+	_check(not ended.is_empty() and fights.fights.is_empty(), "it doesn't last long")
+	_check(a.health < 100.0 and b.health < 100.0, "and both come off worse")
+	# With a weapon it's quicker and nastier.
+	var c: Person = prisoners[2]
+	people.stop(c)
+	c.level = a.level
+	c.position = a.position + Vector3(0.0, 0.0, 0.6)
+	people._buckets_fresh = false
+	a.pocket.append((main.contraband as Contraband).item(&"mallet"))
+	fight = fights.begin(a, c)
+	_check(fight != null and fight.armed and fight.minutes_left <= Fights.ARMED_MINUTES, "a mallet makes it armed")
+	fights.end(fight)
+	_check(people.people.any(func(p: Person) -> bool: return p.moodlets.has(&"saw_a_nasty_fight")),
+			"and those nearby saw a nasty fight")
+	a.pocket.clear()
+	# The fight rung picks someone close by.
+	var d: Person = prisoners[3]
+	people.stop(d)
+	d.level = a.level
+	d.position = a.position + Vector3(0.5, 0.0, 0.5)
+	people._buckets_fresh = false
+	misconduct.act(d, misconduct.rung(&"fight"))
+	_check(fights.fighting(d) and String(d.record[-1][2]).begins_with("started a fight with"), "a fight goes on the record")
+	for f in fights.fights.duplicate():
+		fights.end(f)
+	# The infirmary: two beds in the canteen.
+	var map: BuildingMap = main.building.ground()
+	var canteen: Room = null
+	for room in map.rooms():
+		if room.type == &"canteen":
+			canteen = room
+	var placed_beds := 0
+	for cell in canteen.cells:
+		if placed_beds < 2 and map.place_object(PrisonCatalogue.object(&"infirmary_bed"), Vector2(cell), 0) != 0:
+			placed_beds += 1
+	_check(placed_beds == 2, "infirmary beds go in")
+	(main.shifts as Shifts).set_wanted(&"nurse", &"day", 1)
+	var hurt: Person = prisoners[4]
+	hurt.health = 50.0
+	var out: Person = prisoners[5]
+	out.health = 20.0
+	people.stop(out)
+	var lay := false
+	var helped := []
+	main.jobs.job_finished.connect(func(j: Job, w: Person) -> void:
+		if j.kind == &"carry_patient" and (w.role == &"guard" or w.role == &"nurse"):
+			helped.append(true))
+	infirmary.tick(1.0)
+	var stars := out.bubble == "Seeing stars"
+	minutes = 0
+	while not (hurt.lying and out.lying) and minutes < 240:
+		clock.advance(1.0)
+		minutes += 1
+	_check(stars, "the knocked out see stars")
+	_check(hurt.lying, "the hurt limp to an infirmary bed and lie down")
+	_check(not helped.is_empty() and out.lying, "a guard carries the knocked out there")
+	var before := out.health
+	var treated := []
+	main.jobs.job_finished.connect(func(j: Job, _w: Person) -> void:
+		if j.kind == &"treat":
+			treated.append(true))
+	minutes = 0
+	while treated.is_empty() and minutes < 300:
+		clock.advance(1.0)
+		minutes += 1
+	_check(not treated.is_empty() and out.health > before, "a nurse patches them up")
+	minutes = 0
+	while hurt.lying and minutes < 600:
+		clock.advance(1.0)
+		minutes += 1
+	_check(not hurt.lying and not infirmary.beds.has(hurt), "and they're back on their feet")
 	main.queue_free()

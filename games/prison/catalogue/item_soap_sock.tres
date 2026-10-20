@@ -12,3 +12,4 @@ pocketed_from = Array[StringName]([&"shower"])
 smell = 0.2
 trade_value = 2
 use = &"weapon"
+hit = 2.0

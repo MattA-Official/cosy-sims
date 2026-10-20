@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
@@ -62,6 +62,19 @@ func _process(_delta: float) -> bool:
 			_main.controller.tool = BuildController.Tool.TERRAIN
 		if args.has("route"):
 			_main.controller.tool = BuildController.Tool.ROUTE
+		if args.has("fight"):
+			# Two prisoners scrapping, and one already knocked out beside them.
+			var prisoners: Array = _main.people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+			var a: Person = prisoners[0]
+			for i in [1, 2]:
+				var other: Person = prisoners[i]
+				_main.people.stop(other)
+				other.level = a.level
+				other.position = a.position + Vector3(0.7 * i, 0.0, 0.3 * i)
+			(prisoners[2] as Person).health = 20.0
+			_main.people.stop(a)
+			_main.fights.begin(a, prisoners[1])
+			_main.camera_rig.focus_on(a.position * _main.grid.cell_size)
 		if args.has("trouble"):
 			# Every prisoner fed up: some grumble, some about to act up.
 			var misconduct: Misconduct = _main.misconduct

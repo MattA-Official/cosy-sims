@@ -119,6 +119,10 @@ var bubble_minutes := 0.0
 var truant_minutes := 0.0
 ## How fast they walk, against everyone's usual speed.
 var pace := 1.0
+## How well they are, 0 to 100 (see Health).
+var health := 100.0
+## Lying down where they are, such as in an infirmary bed.
+var lying := false
 ## Contraband tucked away about them, out of sight.
 var pocket: Array[ItemDef] = []
 

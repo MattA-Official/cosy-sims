@@ -81,6 +81,9 @@ var routes := PatrolRoutes.new()
 var wear := Wear.new()
 ## Unhappy prisoners acting up.
 var misconduct := Misconduct.new()
+## Fights, and mending afterwards.
+var fights := Fights.new()
+var infirmary := Infirmary.new()
 ## Things prisoners shouldn't have, and guards searching for them.
 var contraband := Contraband.new()
 var searching := Searching.new()
@@ -377,10 +380,31 @@ func _ready() -> void:
 	misconduct.model = MisconductModel.new()
 	misconduct.rungs.assign(PrisonCatalogue.MISCONDUCT)
 	misconduct.wear = wear
+	misconduct.fights = fights
 	misconduct.items = items
 	misconduct.clock = clock
 	add_child(misconduct)
 	misconduct.start()
+	fights.name = "Fights"
+	fights.people = people
+	fights.jobs = jobs
+	fights.cell_size = grid.cell_size
+	fights.height_at = func(level: int, point: Vector2) -> float: return people.nav().height_at(level, point)
+	fights.clock = clock
+	grid.add_child(fights)
+	fights.start()
+	fights.started.connect(func(fight: Fights.Fight) -> void:
+		var map: BuildingMap = building.levels.get(fight.level)
+		var room := map.room_at_point(fight.centre) if map != null else null
+		var type := people.room_type(room.type) if room != null else null
+		Toasts.post("Fight!", "A fight broke out%s. A guard is on the way." % (
+				" in the %s" % type.display_name.to_lower() if type != null else "")))
+	infirmary.name = "Infirmary"
+	infirmary.people = people
+	infirmary.jobs = jobs
+	infirmary.clock = clock
+	add_child(infirmary)
+	infirmary.start()
 	contraband.name = "Contraband"
 	contraband.people = people
 	contraband.items = items

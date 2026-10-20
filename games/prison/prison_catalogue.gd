@@ -46,6 +46,8 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/goods_shelf.tres"),
 	preload("res://games/prison/catalogue/reception_desk.tres"),
 	preload("res://games/prison/catalogue/bus_stop.tres"),
+	preload("res://games/prison/catalogue/infirmary_bed.tres"),
+	preload("res://games/prison/catalogue/medicine_cabinet.tres"),
 ]
 
 ## Things people carry about.
@@ -127,6 +129,7 @@ const CATEGORIES: Array[CategoryDef] = [
 const ROLES: Array[StaffRoleDef] = [
 	preload("res://games/prison/catalogue/role_cook.tres"),
 	preload("res://games/prison/catalogue/role_cleaner.tres"),
+	preload("res://games/prison/catalogue/role_nurse.tres"),
 	preload("res://games/prison/catalogue/role_handyman.tres"),
 	preload("res://games/prison/catalogue/role_guard.tres"),
 	preload("res://games/prison/catalogue/role_warden.tres"),
@@ -201,6 +204,7 @@ const MISCONDUCT: Array[MisconductDef] = [
 	preload("res://games/prison/catalogue/misconduct_grumble.tres"),
 	preload("res://games/prison/catalogue/misconduct_mischief.tres"),
 	preload("res://games/prison/catalogue/misconduct_vandalism.tres"),
+	preload("res://games/prison/catalogue/misconduct_fight.tres"),
 ]
 
 const MOODLETS: Array[MoodletDef] = [
@@ -210,6 +214,8 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_searched.tres"),
 	preload("res://games/prison/catalogue/moodlet_searched_tidy.tres"),
 	preload("res://games/prison/catalogue/moodlet_had_a_biscuit.tres"),
+	preload("res://games/prison/catalogue/moodlet_saw_a_fight.tres"),
+	preload("res://games/prison/catalogue/moodlet_saw_a_nasty_fight.tres"),
 	preload("res://games/prison/catalogue/moodlet_grubby_uniform.tres"),
 	preload("res://games/prison/catalogue/moodlet_useful_day.tres"),
 	preload("res://games/prison/catalogue/moodlet_made_to_work.tres"),
@@ -257,6 +263,7 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_cell.tres"),
 	preload("res://games/prison/catalogue/room_dorm.tres"),
 	preload("res://games/prison/catalogue/room_canteen.tres"),
+	preload("res://games/prison/catalogue/room_infirmary.tres"),
 	preload("res://games/prison/catalogue/room_shower.tres"),
 	preload("res://games/prison/catalogue/room_yard.tres"),
 	preload("res://games/prison/catalogue/room_kitchen.tres"),

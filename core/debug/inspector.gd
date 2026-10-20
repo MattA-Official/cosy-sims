@@ -331,6 +331,8 @@ func _refresh_person(person: Person) -> void:
 		lines.append("Block: %s, %s" % [person.block.display_name,
 				"in place" if people.is_in_place(person) else ("out of place" if person.out_of_place
 				else "on the way")])
+	if person.health < Health.WELL:
+		lines.append("Health: %d, %s" % [roundi(person.health), Health.words(person.health).to_lower()])
 	if person.temper > 0.5 or not person.record.is_empty():
 		lines.append("Temper: %d%s" % [roundi(person.temper), ", about to act up" if person.warning != &""
 				else (", up to no good" if person.truant_minutes > 0.0 else "")]

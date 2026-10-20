@@ -38,7 +38,8 @@ static func capture(main: Node) -> Dictionary:
 			"record": person.record.duplicate(true), "warning": person.warning,
 			"warning_minutes": person.warning_minutes, "bubble": person.bubble,
 			"bubble_minutes": person.bubble_minutes, "truant_minutes": person.truant_minutes,
-			"pace": person.pace, "pocket": person.pocket.map(func(def: ItemDef) -> StringName: return def.id),
+			"pace": person.pace, "health": person.health, "lying": person.lying,
+			"bed_in_infirmary": (main.infirmary as Infirmary).beds.get(person, Vector2i(-1, -1)), "pocket": person.pocket.map(func(def: ItemDef) -> StringName: return def.id),
 			"profile": person.profile.duplicate(true), "bed": person.bed,
 			"doing": people.doing_of(person), "work": (main.jobs as JobBoard).work_of(person),
 		})
@@ -119,6 +120,11 @@ static func apply_world(main: Node, data: Dictionary) -> void:
 		person.bubble_minutes = entry.get("bubble_minutes", 0.0)
 		person.truant_minutes = entry.get("truant_minutes", 0.0)
 		person.pace = entry.get("pace", 1.0)
+		person.health = entry.get("health", 100.0)
+		person.lying = entry.get("lying", false)
+		var bed: Vector2i = entry.get("bed_in_infirmary", Vector2i(-1, -1))
+		if bed.x != -1:
+			(main.infirmary as Infirmary).beds[person] = bed
 		person.pocket.clear()
 		for id: StringName in entry.get("pocket", []):
 			var def := PrisonCatalogue.item(id)

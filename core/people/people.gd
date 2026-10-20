@@ -1652,7 +1652,7 @@ func _walk_to(person: Person, level: int, spot: Vector2) -> bool:
 
 
 func _walk(person: Person, minutes: float) -> void:
-	var budget := speed * person.pace * minutes
+	var budget := speed * person.pace * Health.pace(person.health) * minutes
 	while budget > 0.0 and not person.route.is_empty():
 		var next := person.route[0]
 		var here := person.flat()
@@ -1826,6 +1826,7 @@ func _update_bodies() -> void:
 			if ahead.length() > 0.01:
 				body.rotation.y = atan2(-ahead.x, -ahead.y)
 		_pose(person, body, cs)
+		_lie_down(person, body)
 		body.get_node("Flag").visible = person.out_of_place and person.bubble.is_empty()
 		var bubble := body.get_node("Bubble") as Label3D
 		bubble.visible = not person.bubble.is_empty()
@@ -1869,6 +1870,28 @@ func _pose(person: Person, body: Node3D, cs: float) -> void:
 	if body.has_meta(&"posed"):
 		body.remove_meta(&"posed")
 		poses.clear(body)
+
+
+## Flat out when knocked out or lying in bed for treatment. Only the body
+## tips over; the labels over their head stay put.
+func _lie_down(person: Person, body: Node3D) -> void:
+	var lying := person.lying or Health.injury(person.health) == Health.Injury.KNOCKED_OUT
+	if lying == body.has_meta(&"lying"):
+		return
+	if lying:
+		body.set_meta(&"lying", true)
+	else:
+		body.remove_meta(&"lying")
+	var tip := Transform3D(Basis(Vector3.RIGHT, -PI / 2.0), Vector3(0.0, 0.15, 0.0))
+	for child in body.get_children():
+		if child is Node3D and not (child is Label3D or child is Sprite3D):
+			var part := child as Node3D
+			if lying:
+				part.set_meta(&"standing", part.transform)
+				part.transform = tip * part.transform
+			elif part.has_meta(&"standing"):
+				part.transform = part.get_meta(&"standing")
+				part.remove_meta(&"standing")
 
 
 ## People above the level being looked at are hidden, like the floors.

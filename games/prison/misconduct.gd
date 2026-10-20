@@ -26,6 +26,7 @@ var model: MisconductModel
 ## Rungs in order, mildest first.
 var rungs: Array[MisconductDef] = []
 var wear: Wear
+var fights: Fights
 var items: ItemStore
 var prisoner_group: StringName = &"prisoner"
 var guard_role: StringName = &"guard"
@@ -125,6 +126,14 @@ func act(person: Person, def: MisconductDef) -> void:
 			what = _break_something(person)
 			if what.is_empty():
 				what = _mischief(person)
+		&"fight":
+			var other := fights.target_for(person) if fights != null else null
+			if other != null and fights.begin(person, other) != null:
+				what = "started a fight with %s" % other.name.get_slice(" ", 0)
+			else:
+				what = _break_something(person)
+				if what.is_empty():
+					what = _mischief(person)
 		_:
 			what = _mischief(person)
 	person.temper = maxf(0.0, person.temper - model.after_acting)

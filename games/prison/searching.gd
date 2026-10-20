@@ -55,6 +55,10 @@ func search_cell(level: int, room: Room) -> Job:
 	for job in jobs.of_kind(&"search"):
 		if job.has_meta(&"room") and job.get_meta(&"room") == room:
 			return null
+	return jobs.post(_cell_job(level, room))
+
+
+func _cell_job(level: int, room: Room) -> Job:
 	var job := Job.new()
 	job.kind = &"search"
 	job.title = "Search %s" % _room_words(level, room)
@@ -66,7 +70,7 @@ func search_cell(level: int, room: Room) -> Job:
 	look.doing = "Searching"
 	look.finish = func(_stage: Job.Stage, _guard: Person) -> void: _search_room(level, room)
 	job.stages = [look]
-	return jobs.post(job)
+	return job
 
 
 ## Has a guard stop someone and search them. Returns the job, or null if
@@ -75,6 +79,10 @@ func search_person(person: Person) -> Job:
 	for job in jobs.of_kind(&"search"):
 		if job.has_meta(&"prisoner") and job.get_meta(&"prisoner") == person:
 			return null
+	return jobs.post(_person_job(person))
+
+
+func _person_job(person: Person) -> Job:
 	var first := person.name.get_slice(" ", 0)
 	var job := Job.new()
 	job.kind = &"search"
@@ -96,7 +104,7 @@ func search_person(person: Person) -> Job:
 		_pat_down(person)
 		_release(person)
 	job.stages = [reach, pat]
-	return jobs.post(job)
+	return job
 
 
 ## A search again for a guard loaded part way through one.
@@ -105,12 +113,12 @@ func rebuild(work: Dictionary) -> Job:
 	if id != -1:
 		for person in people.people:
 			if person.id == id:
-				return search_person(person)
+				return _person_job(person)
 		return null
 	var level: int = work["last"][0]
 	var map: BuildingMap = people.building.levels.get(level)
 	var room := map.room_at_point(Vector2(work["last"][2]) + Vector2(0.5, 0.5)) if map != null else null
-	return search_cell(level, room) if room != null else null
+	return _cell_job(level, room) if room != null else null
 
 
 ## The chance a search finds a stash in this object.

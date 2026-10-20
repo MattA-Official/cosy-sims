@@ -11,3 +11,4 @@ colour = Color(0.6, 0.45, 0.3, 1)
 pocketed_from = Array[StringName]([&"workbench"])
 trade_value = 8
 use = &"weapon"
+hit = 6.0
