@@ -9,11 +9,15 @@ extends Resource
 @export_multiline var description: String
 ## The groups of people (Person.group) allowed in.
 @export var groups: Array[StringName] = []
+## Only these categories of them (Person.category), such as high security
+## prisoners. Empty lets in every category; people with no category (staff)
+## are always let in if their group is.
+@export var categories: Array[StringName] = []
 ## How rooms in this zone are tinted while the Zones tool is open.
 @export var colour := Color.WHITE
 ## A white line drawing for the build menu.
 @export var icon: Texture2D
 
 
-func allows(group: StringName) -> bool:
-	return groups.has(group)
+func allows(group: StringName, category: StringName = &"") -> bool:
+	return groups.has(group) and (categories.is_empty() or category.is_empty() or categories.has(category))

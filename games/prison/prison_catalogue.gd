@@ -115,6 +115,8 @@ const GROUPS: Array[GroupDef] = [
 const ZONES: Array[ZoneDef] = [
 	preload("res://games/prison/catalogue/zone_shared.tres"),
 	preload("res://games/prison/catalogue/zone_staff.tres"),
+	preload("res://games/prison/catalogue/zone_high_security.tres"),
+	preload("res://games/prison/catalogue/zone_low_security.tres"),
 	preload("res://games/prison/catalogue/zone_visitors.tres"),
 	preload("res://games/prison/catalogue/zone_everyone.tres"),
 ]

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ZoneDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/zone_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/zone_high_security.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"high_security"
+display_name = "High security wing"
+description = "Staff, and only high security prisoners. Paint their cells and yard to keep them apart."
+groups = Array[StringName]([&"prisoner", &"staff"])
+categories = Array[StringName]([&"high"])
+colour = Color(0.9, 0.45, 0.45, 1)
+icon = ExtResource("2_icon")

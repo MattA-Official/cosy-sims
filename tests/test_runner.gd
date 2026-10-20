@@ -66,6 +66,7 @@ func _process(_delta: float) -> bool:
 	_test_security()
 	_test_sit_ins()
 	_test_category_timetables()
+	_test_category_zones()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3166,9 +3167,12 @@ func _test_consequences() -> void:
 		clock.advance(1.0)
 		minutes += 1
 	_check(consequences.in_quiet_room(c) and c.quiet_room_hours > 20.0, "a fighter is walked to the quiet room")
+	# They may use the toilet or bed in there, but never leave.
+	var stayed := true
 	for i in 30:
 		clock.advance(1.0)
-	_check(consequences.in_quiet_room(c) and c.activity == "In the quiet room", "and stays there")
+		stayed = stayed and consequences.in_quiet_room(c)
+	_check(stayed, "and stays there")
 	_check(c.moodlets.has(&"in_the_quiet_room"), "which they don't enjoy")
 	consequences.let_off(c)
 	_check(c.quiet_room_hours == 0.0 and c.temper == 0.0, "letting them off lets them out")
@@ -3439,4 +3443,32 @@ func _test_category_timetables() -> void:
 	runner.merge(&"prisoner/high")
 	_check(not runner.schedules.has(&"prisoner/high") and runner.current_for(high) == was, "merging puts them back")
 	_check(data["category_timetables"].has(&"prisoner/high"), "category timetables are saved")
+	main.queue_free()
+
+
+func _test_category_zones() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var map: BuildingMap = main.building.ground()
+	var cells: Array = map.rooms().filter(func(r: Room) -> bool: return r.type == &"cell")
+	var wing: Room = cells[0]
+	map.set_room_zone(wing, &"high_security")
+	wing = map.room_at(wing.cells[0])
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	var high: Person = prisoners[0]
+	high.category = &"high"
+	for i in range(1, prisoners.size()):
+		(prisoners[i] as Person).category = &"medium"
+	var staff: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"staff")[0]
+	_check(people.may_enter(high, wing) and not people.may_enter(prisoners[1], wing) and people.may_enter(staff, wing),
+			"a high security wing lets in high security prisoners and staff only")
+	people.beds_changed()
+	people.assign_beds()
+	var in_wing := func(p: Person) -> bool:
+		var home := people.home_room(p)
+		return not home.is_empty() and home[1].cells.has(wing.cells[0])
+	_check(in_wing.call(high), "high security prisoners get their beds in it")
+	_check(not prisoners.slice(1).any(in_wing), "and nobody else does")
 	main.queue_free()

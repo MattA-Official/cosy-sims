@@ -237,6 +237,13 @@ func _process(delta: float) -> void:
 	_update_bodies()
 
 
+## Beds are handed out again before they're next needed, such as after
+## someone moves category and may no longer sleep where they did.
+func beds_changed() -> void:
+	_beds_dirty = true
+	_rooms_for.clear()
+
+
 func mark_dirty() -> void:
 	_dirty = true
 	_beds_dirty = true
@@ -283,7 +290,7 @@ func can_reach(person: Person, level: int, spot: Vector2) -> bool:
 
 ## May someone be in a room? Anyone may be outside one.
 func may_enter(person: Person, room: Room) -> bool:
-	return access.may_enter(person.group, room)
+	return access.may_enter(person.group, room, person.category)
 
 
 ## Walks someone to a spot for a job, saying what they're off to do.
@@ -661,13 +668,14 @@ func place_rooms(person: Person) -> Array:
 			out.append(home)
 		return out
 	var by_group: Dictionary = _rooms_for.get_or_add(block, {})
-	if not by_group.has(person.group):
+	var key := access.key_of(person.group, person.category)
+	if not by_group.has(key):
 		for n: int in building.levels:
 			for room: Room in building.levels[n].rooms():
 				if block.room_types.has(room.type) and may_enter(person, room):
 					out.append([n, room])
-		by_group[person.group] = out
-	return by_group[person.group]
+		by_group[key] = out
+	return by_group[key]
 
 
 ## The room someone is in, as [level, Room], or [] if they are not in one.
@@ -716,7 +724,8 @@ func assign_beds() -> void:
 				valid[Vector2i(n, placed.id)] = true
 	for key: Vector2i in _bed_owners.keys():
 		var owner := _bed_owners[key]
-		if not valid.has(key) or owner.bed != key or not people.has(owner):
+		if not valid.has(key) or owner.bed != key or not people.has(owner) \
+				or not may_enter(owner, building.levels[key.x].room_at_point(building.levels[key.x].objects[key.y].centre)):
 			_bed_owners.erase(key)
 			if owner.bed == key:
 				owner.bed = Person.NO_BED
@@ -728,13 +737,19 @@ func assign_beds() -> void:
 			continue
 		var best := 0
 		var best_score := INF
+		best = -1
 		for i in free.size():
 			var key: Vector2i = free[i]
 			var placed: BuildingMap.PlacedObject = building.levels[key.x].objects[key.y]
+			# Only beds in rooms they may be in, such as their category's wing.
+			if not may_enter(person, building.levels[key.x].room_at_point(placed.centre)):
+				continue
 			var score := placed.centre.distance_to(person.flat()) + absi(key.x - person.level) * 12.0
 			if score < best_score:
 				best = i
 				best_score = score
+		if best == -1:
+			continue
 		person.bed = free[best]
 		_bed_owners[person.bed] = person
 		free.remove_at(best)
@@ -1670,7 +1685,7 @@ static func _door_middle(edge: Vector3i) -> Vector2:
 func _set_up_access(person: Person) -> void:
 	var here := room_of(person)
 	access.set_up(nav(), building, person.group, here[1] if not here.is_empty() else null,
-			person.level)
+			person.level, person.category)
 
 
 func _walk_to(person: Person, level: int, spot: Vector2) -> bool:

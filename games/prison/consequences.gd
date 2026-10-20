@@ -173,6 +173,7 @@ func _move_category(person: Person, step: int) -> void:
 	if to == at:
 		return
 	person.category = CATEGORY_ORDER[to]
+	people.beds_changed()
 	people.redraw(person)
 	punished.emit(person, "moved %s to %s security" % ["up" if step > 0 else "down", CATEGORY_ORDER[to]])
 
@@ -188,6 +189,11 @@ func _in_quiet_room(person: Person, minutes: float) -> void:
 			else:
 				guarding.escort(person, spot, "to the quiet room", &"")
 		return
+	# There already: no need for the guard to walk them anywhere.
+	if person.led or guarding.jobs.of_kind(&"escort").any(func(j: Job) -> bool:
+			return j.get_meta(&"prisoner") == person):
+		guarding.cancel_escort(person)
+		people.add_moodlet(person, quiet_room_moodlet)
 	person.quiet_room_hours -= minutes / 60.0
 	for need: StringName in person.needs:
 		person.needs[need] = maxf(person.needs[need], QUIET_ROOM_NEEDS)
@@ -222,5 +228,16 @@ func _quiet_room_spot(person: Person) -> Array:
 				return other != person and other.quiet_room_hours > 0.0 and other.level == level \
 						and map.room_at_point(other.flat()) == room)
 			if not taken:
-				return [level, room.cells[room.cells.size() / 2]]
+				return [level, _clear_cell(map, room)]
 	return []
+
+
+## A tile in a room with no furniture over its middle, so whoever walks
+## there stands inside the room.
+static func _clear_cell(map: BuildingMap, room: Room) -> Vector2i:
+	for cell in room.cells:
+		var middle := Vector2(cell) + Vector2(0.5, 0.5)
+		if not map.objects.values().any(func(placed: BuildingMap.PlacedObject) -> bool:
+				return placed.def.blocks and placed.rect.has_point(middle)):
+			return cell
+	return room.cells[room.cells.size() / 2]

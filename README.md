@@ -143,7 +143,10 @@ Meals are still cooked by everyone's timetable. Categories also change how
 quickly temper builds (low 0.8×, high 1.2×), how often random searches
 pick their cell (low ½, high 3×) and how far off a guard spots them out of
 place (high 5 tiles, others 3). Low-security prisoners sharing a room with
-high-security ones feel uneasy.
+high-security ones feel uneasy. To keep them apart, the Zones tool has a
+**High security wing** (staff and high security prisoners only) and a
+**Low and medium wing**; prisoners only get beds in cells they're allowed
+in, and moving category hands beds out again.
 With F3 you can also jump the clock to any hour. The sun follows the
 clock, from dawn about 06:00 to dusk about 20:00; the sun button keeps it
 day while you build.

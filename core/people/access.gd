@@ -5,9 +5,10 @@ extends RefCounted
 ## without keys. Ground outside any room is open to everyone.
 ##
 ## Everyone shares one walking graph, so before finding someone a way, the
-## graph is set up for their group: the floor of rooms they may not enter
-## is shut, and so are doors they can't pass. Only what differs from the
-## group set up last changes, so going from one group to the next is cheap.
+## graph is set up for their group (and category, once any zone asks
+## about categories): the floor of rooms they may not enter is shut, and
+## so are doors they can't pass. Only what differs from the group set up
+## last changes, so going from one group to the next is cheap.
 
 ## Every zone, by id.
 var zones: Dictionary[StringName, ZoneDef] = {}
@@ -54,11 +55,19 @@ func zone_of(room: Room) -> ZoneDef:
 	return zones.get(id)
 
 
-## May people of a group be in a room? Anyone may be outside any room, or
-## where no zones are set up.
-func may_enter(group: StringName, room: Room) -> bool:
+## May people of a group (and category) be in a room? Anyone may be
+## outside any room, or where no zones are set up.
+func may_enter(group: StringName, room: Room, category: StringName = &"") -> bool:
 	var zone := zone_of(room)
-	return zone == null or zone.allows(group)
+	return zone == null or zone.allows(group, category)
+
+
+## What the graph is set up and cached by: the group, or "group/category"
+## once some zone lets in only some categories.
+func key_of(group: StringName, category: StringName) -> StringName:
+	if category.is_empty() or not zones.values().any(func(z: ZoneDef) -> bool: return not z.categories.is_empty()):
+		return group
+	return StringName("%s/%s" % [group, category])
 
 
 ## May people of a group walk through a door? Not a staff door unless they
@@ -107,7 +116,8 @@ func set_locked(key: Vector4i, lock: bool) -> bool:
 ## stays open even if they may not be there, so someone caught in the wrong
 ## room can still walk out of it.
 func set_up(graph: NavGraph, building: Building, group: StringName,
-		let_out_of: Room = null, let_out_level := 0) -> void:
+		let_out_of: Room = null, let_out_level := 0, category: StringName = &"") -> void:
+	var access_key := key_of(group, category)
 	if graph != _graph:
 		# A fresh graph starts with everything open.
 		_graph = graph
@@ -115,14 +125,14 @@ func set_up(graph: NavGraph, building: Building, group: StringName,
 		_shut_doors.clear()
 		_wanted.clear()
 		_set_for = &""
-	var letting_out := let_out_of != null and not may_enter(group, let_out_of)
-	if group == _set_for and not letting_out:
+	var letting_out := let_out_of != null and not may_enter(group, let_out_of, category)
+	if access_key == _set_for and not letting_out:
 		return
-	_set_for = &"" if letting_out else group
-	if not _wanted.has(group):
-		_wanted[group] = _work_out(graph, building, group)
-	var points: Dictionary[int, bool] = _wanted[group][0]
-	var doors: Dictionary[Vector4i, bool] = _wanted[group][1]
+	_set_for = &"" if letting_out else access_key
+	if not _wanted.has(access_key):
+		_wanted[access_key] = _work_out(graph, building, group, category)
+	var points: Dictionary[int, bool] = _wanted[access_key][0]
+	var doors: Dictionary[Vector4i, bool] = _wanted[access_key][1]
 	if letting_out:
 		points = points.duplicate()
 		for id in graph.points_in(let_out_level, let_out_of):
@@ -145,12 +155,12 @@ func set_up(graph: NavGraph, building: Building, group: StringName,
 			_shut_doors[key] = true
 
 
-func _work_out(graph: NavGraph, building: Building, group: StringName) -> Array:
+func _work_out(graph: NavGraph, building: Building, group: StringName, category: StringName) -> Array:
 	var points: Dictionary[int, bool] = {}
 	var doors: Dictionary[Vector4i, bool] = {}
 	for n: int in building.levels:
 		for room: Room in building.levels[n].rooms():
-			if not may_enter(group, room):
+			if not may_enter(group, room, category):
 				for id in graph.points_in(n, room):
 					points[id] = true
 	for key in graph.doors():
