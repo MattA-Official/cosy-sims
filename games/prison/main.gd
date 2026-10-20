@@ -57,6 +57,8 @@ var zone_tints := ZoneTints.new()
 var clock_bar := ClockBar.new()
 ## Painting the timetable, on T.
 var timetable := TimetableWindow.new()
+## Taking on staff and putting prisoners on work programmes, on P.
+var staff_window := StaffWindow.new()
 ## The F3 inspector for people, objects and rooms.
 var inspector := Inspector.new()
 ## Grid lines at the height of the level being built on, off the ground.
@@ -258,6 +260,13 @@ func _add_hud() -> void:
 	timetable.activities = PrisonCatalogue.ACTIVITIES
 	timetable.clock = clock
 	hud.add_child(timetable)
+	clock_bar.staff_pressed.connect(staff_window.toggle)
+	staff_window.roles = PrisonCatalogue.ROLES
+	staff_window.programmes = PrisonCatalogue.PROGRAMMES
+	staff_window.people = people
+	staff_window.hire_pressed.connect(hire)
+	staff_window.fire_pressed.connect(let_go)
+	hud.add_child(staff_window)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("level_up"):
@@ -278,6 +287,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("timetable_toggle"):
 		timetable.toggle()
+	elif event.is_action_pressed("staff_toggle"):
+		staff_window.toggle()
 		get_viewport().set_input_as_handled()
 
 
@@ -331,6 +342,45 @@ func _apply_wall_view() -> void:
 		v.walls_low = current and mode == BuildController.WallView.DOWN
 		v.cutaway = current and mode == BuildController.WallView.CUTAWAY
 		v.show_roof = n < level or mode == BuildController.WallView.ROOFS
+
+
+## Takes on a member of staff for a role. They turn up in a staff room if
+## there is one, or else in the middle of the land. Returns them, or null
+## if there is nowhere to stand.
+func hire(role: StringName) -> Person:
+	var spot := _staff_spot()
+	if spot.is_empty():
+		return null
+	var person := people.add_person(spot[0], spot[1], "", &"staff")
+	if person != null:
+		people.set_role(person, role)
+	return person
+
+
+## Lets go the newest member of staff in a role.
+func let_go(role: StringName) -> void:
+	for i in range(people.people.size() - 1, -1, -1):
+		if people.people[i].role == role:
+			people.remove_person(people.people[i])
+			return
+
+
+## Somewhere for new staff to stand, as [level, spot], or [] for nowhere.
+func _staff_spot() -> Array:
+	var tries: Array = []
+	for n: int in building.levels:
+		for room: Room in building.levels[n].rooms():
+			var zone := people.access.zone_of(room)
+			if zone != null and zone.id == &"staff":
+				tries.append([n, room.centre()])
+	var centre := Vector2(building.land[0].get_center())
+	for ring in 12:
+		for step in 8:
+			tries.append([0, centre + Vector2.from_angle(step * TAU / 8) * ring * 2.0])
+	for entry: Array in tries:
+		if not is_nan(people.nav().height_at(entry[0], entry[1])):
+			return entry
+	return []
 
 
 func _exit_tree() -> void:

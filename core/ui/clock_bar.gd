@@ -2,9 +2,11 @@ class_name ClockBar
 extends PanelContainer
 ## The clock in the top-left corner: the day, the time, the timetable
 ## block everyone is in, and buttons for the speed (Space pauses, , and .
-## go slower and faster), the timetable window (T) and always-day light.
+## go slower and faster), the timetable window (T), the staff window (P)
+## and always-day light.
 
 signal timetable_pressed
+signal staff_pressed
 
 const ICONS := "res://core/ui/icons/%s.svg"
 const SPEED_ICONS: Array[String] = ["speed_pause", "speed_1", "speed_2", "speed_3"]
@@ -75,6 +77,10 @@ func _ready() -> void:
 	_timetable.toggle_mode = false
 	_timetable.pressed.connect(timetable_pressed.emit)
 	row.add_child(_timetable)
+	var staff := _button("Staff", "Who works here, and work programmes. P", "staff")
+	staff.toggle_mode = false
+	staff.pressed.connect(staff_pressed.emit)
+	row.add_child(staff)
 	var sun := _button("Always day", "Keeps the light bright while you build, whatever the time.",
 			"always_day")
 	sun.toggled.connect(func(on: bool) -> void:

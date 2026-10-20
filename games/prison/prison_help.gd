@@ -27,6 +27,7 @@ const SECTIONS := [
 		["Space", "Pause, or carry on"],
 		[", / .", "Slower or faster (up to 4×)"],
 		["T", "The timetable"],
+		["P", "Staff and work programmes"],
 	]],
 	["Other", [
 		["F1", "This card"],

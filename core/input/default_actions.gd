@@ -31,6 +31,7 @@ const KEY_ACTIONS := {
 	"time_slower": [KEY_COMMA],
 	"time_faster": [KEY_PERIOD],
 	"timetable_toggle": [KEY_T],
+	"staff_toggle": [KEY_P],
 }
 
 

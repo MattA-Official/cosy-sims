@@ -46,6 +46,7 @@ func _process(_delta: float) -> bool:
 	_test_cleaning()
 	_test_laundry()
 	_test_work_programmes()
+	_test_staff_window()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -898,6 +899,32 @@ func _test_work_programmes() -> void:
 	_check(useful, "a job done makes for a useful day")
 	var made: int = main.items.total(&"goods")
 	_check(main.workshop.collect() == made and main.workshop.sold == made, "the lorry takes the goods to sell")
+	main.queue_free()
+
+
+func _test_staff_window() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 8
+	root.add_child(main)
+	var people: People = main.people
+	var window: StaffWindow = main.staff_window
+	var cooks := func() -> int: return people.people.filter(func(p: Person) -> bool: return p.role == &"cook").size()
+	window.hire_pressed.emit(&"cook")
+	window.hire_pressed.emit(&"cook")
+	var cook: Person = people.people.back()
+	_check(cooks.call() == 2 and cook.group == &"staff", "the staff window takes on cooks")
+	var room := people.room_of(cook)
+	_check(not room.is_empty() and people.access.zone_of(room[1]).id == &"staff", "who turn up in a staff room")
+	window.refresh()
+	_check(window._counts[&"cook"].text == "2", "and counts them")
+	window.fire_pressed.emit(&"cook")
+	_check(cooks.call() == 1 and not people.people.has(cook), "and lets the newest go")
+	window._put_on(&"workshop")
+	_check(people.people.filter(func(p: Person) -> bool: return p.programme == &"workshop").size() == 1,
+			"puts a prisoner on a work programme")
+	window._take_off(&"workshop")
+	_check(people.people.all(func(p: Person) -> bool: return p.programme == &""), "and takes them off")
+	_check(InputMap.has_action("staff_toggle"), "P opens it")
 	main.queue_free()
 
 
