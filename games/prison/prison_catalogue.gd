@@ -247,6 +247,15 @@ static func access() -> Access:
 	return out
 
 
+## Door models by door kind, for the building views.
+static func door_models() -> Dictionary[StringName, PackedScene]:
+	var out: Dictionary[StringName, PackedScene] = {}
+	for def in DOOR_KINDS:
+		if def.model != null:
+			out[def.id] = def.model
+	return out
+
+
 static func roles() -> Dictionary[StringName, StaffRoleDef]:
 	var out: Dictionary[StringName, StaffRoleDef] = {}
 	for def in ROLES:

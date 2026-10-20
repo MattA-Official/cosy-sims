@@ -12,6 +12,9 @@ extends Resource
 ## The little plate over the door that marks it.
 @export var colour := Color.WHITE
 @export var icon: Texture2D
+## Drawn in the doorway in place of the plain door, filling a one-metre
+## opening along its x. Optional.
+@export var model: PackedScene
 
 
 func lets_through(group: StringName) -> bool:

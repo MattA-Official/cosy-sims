@@ -1675,11 +1675,18 @@ func body_of(person: Person) -> Node3D:
 	return _bodies.get(person)
 
 
-## Lies, sits or showers someone's body while they use an object.
+## Lies, sits or showers someone's body while they use an object, or
+## work at one for a job (a guard at a desk).
 func _pose(person: Person, body: Node3D, cs: float) -> void:
 	var placed := target_object(person) if person.state == Person.State.USING else null
+	var level := person.target.x
+	if placed == null and person.state == Person.State.USING and person.job != null:
+		var stage := person.job.current()
+		if stage != null and stage.object != -1 and building.levels.has(stage.level):
+			placed = building.levels[stage.level].objects.get(stage.object)
+			level = stage.level
 	if placed != null:
-		var map := building.levels[person.target.x]
+		var map := building.levels[level]
 		var floor_y := map.floor_height(Vector2i(placed.centre.floor()))
 		if poses.apply(body, placed, floor_y, Vector2(person.stand_spot.x, person.stand_spot.z), cs,
 				person.target_need):

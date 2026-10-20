@@ -14,6 +14,7 @@ enum Pose {
 	SIT_ON, ## On the object itself, facing its front (toilets, benches).
 	LIE, ## On their back, head towards the object's front (beds).
 	SHOWER, ## Standing in it, facing out, swaying a little.
+	SIT_FACING, ## On a chair in front of it, facing it (desks).
 }
 
 ## The pose for objects with each tag: [pose, seat height in metres, how
@@ -25,6 +26,7 @@ var by_tag := {
 	&"toilet": [Pose.SIT_ON, 0.31, 0.02],
 	&"bench": [Pose.SIT_ON, 0.45, 0.04],
 	&"shower": [Pose.SHOWER, 0.06, 0.05],
+	&"guard_desk": [Pose.SIT_FACING, 0.33, 0.25],
 }
 
 ## How high off the floor a sitter's bottom is in the body model.
@@ -76,6 +78,9 @@ func apply(body: Node3D, placed: BuildingMap.PlacedObject, floor_y: float, stand
 				body.position.y += absf(sin(t * 6.0)) * 0.012
 		Pose.SIT_ON:
 			_face(body, front, centre + front * reach + Vector3.UP * (height - SEAT))
+			_legs(body, PI * 0.5)
+		Pose.SIT_FACING:
+			_face(body, -front, centre + front * reach + Vector3.UP * (height - SEAT))
 			_legs(body, PI * 0.5)
 		Pose.SHOWER:
 			_face(body, front, centre + front * reach + Vector3.UP * height)

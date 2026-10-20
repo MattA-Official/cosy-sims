@@ -31,6 +31,9 @@ extends Node3D
 ## Drawn in each doorway when walls are up. Without one doors are a slab of
 ## `door_colour`.
 @export var door_model: PackedScene
+## Models for doors of a kind (see DoorKindDef), such as a security gate,
+## in place of `door_model`.
+@export var door_models: Dictionary[StringName, PackedScene] = {}
 @export var walls_low := false:
 	set(value):
 		walls_low = value
@@ -705,12 +708,14 @@ func _add_door(run: WallRun, from: float, to: float) -> void:
 		return
 	_add_slab(run, from, to, door_height, run.full_height)
 	var width := to - from
-	if door_model == null:
+	var kind := map.door_kind_at(run.wall) if run.wall is Vector3i else &""
+	var model: PackedScene = door_models.get(kind, door_model)
+	if model == null:
 		_add_slab(run, from + width * 0.1, to - width * 0.1, 0.0, door_height, door_colour,
 				door_colour, 0.4)
 		return
 	# The model fills a one-metre doorway along its x, facing along z.
-	var door := door_model.instantiate() as Node3D
+	var door := model.instantiate() as Node3D
 	var middle := run.start + run.along * (from + to) * 0.5
 	door.transform = Transform3D(Basis(Vector3(run.along.x, 0.0, run.along.y) * width, Vector3.UP,
 			Vector3(run.across.x, 0.0, run.across.y)), Vector3(middle.x, run.base, middle.y))
