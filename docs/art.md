@@ -33,16 +33,19 @@ colours a real prison would plausibly use.
   weights_bench, basketball_hoop.
 - Jobs: cooker, fridge, serving_counter, washing_machine, ironing_board,
   laundry_basket, clothes_shelf, workbench, storage_shelf, table_trolley,
-  bin, skip (outdoor).
+  bin, skip (outdoor), coffee_machine, guard_desk (1.5 x 1, chair at the
+  front facing the monitor).
 - Carried items (about 0.4 m, origin at the middle of the bottom):
   food_crate, meal_tray, dirty_laundry, clean_laundry, rubbish_bag,
   wooden_toy, birdhouse. Floor litter: litter_paper, litter_can,
   litter_wrapper.
 - Vehicles: lorry (2 x 5 tiles, cab towards Godot's +z).
-- Doors: door (in use), cell_door (barred, not used yet).
+- Doors: door (in use), cell_door (barred, not used yet), security_gate
+  (all bars, for a door kind).
 - People: person. Plants: tree, bush, flower.
 - Icons (`core/ui/icons/`): mood_beaming, mood_content, mood_fed_up,
-  mood_angry, in the same white line style as the rest.
+  mood_angry, in the same white line style as the rest. Markers
+  (`core/ui/markers/`): broken (a spanner with a puff of smoke).
 
 The poster and wall shelf are wall-hung: their footprint is on the floor
 against the wall, and the model is raised (poster middle about 1 m up,
@@ -77,8 +80,9 @@ shelf top about 1.1 m).
   `PersonPoses.carry()` swings the `*_arms` meshes forward from the
   shoulders; `ItemView` calls it while someone holds an item, which sits on
   their hands at `ItemView.HELD_AT`.
-  Meshes named `*_<group>` (the staff cap and badge, `*_staff`) only show
-  on people in that group.
+  Meshes named `*_<group>` or `*_<role>` only show on people in that
+  group or with that role: the staff badge (`gold_staff`), the guard's
+  peaked cap (`navy_guard`) and the cook's hat (`sheet_cook`).
 - **Plants**: `FoliageDef.model`. A mesh named `trunk` takes
   `trunk_colour`; ones named `canopy` or `bloom` take `colour`; the rest
   (flower stems) keep their own colour. So the round tree and the blossom

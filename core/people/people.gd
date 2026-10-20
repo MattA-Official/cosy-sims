@@ -1714,10 +1714,14 @@ func _make_body(person: Person) -> Node3D:
 				"outfit": mesh.material_override = _flat_material(_outfit(person))
 				"skin": mesh.material_override = _flat_material(skin)
 				"hair": mesh.material_override = _flat_material(hair)
-			# Parts for one group only, like a staff cap (named *_staff).
+			# Parts for one group or role only, like the staff badge (named
+			# *_staff) or a guard's cap (*_guard). Legs and arms are for
+			# posing and always show.
 			var only := StringName(mesh.name.get_slice("_", 1))
 			if access.groups.has(only):
 				mesh.visible = only == person.group
+			elif only not in [&"", &"legs", &"arms"]:
+				mesh.visible = only == person.role
 		_add_flag(model)
 		return model
 	var root := Node3D.new()

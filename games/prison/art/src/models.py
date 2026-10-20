@@ -344,6 +344,55 @@ def desk():
     return p
 
 
+def coffee_machine():
+    p = Prop("coffee_machine")  # 0.75 x 0.5: a little counter with a machine and mugs
+    p.box("wood", (0.72, 0.46, 0.04), (0, 0, 0.56), 0.012, 2)
+    p.box("paint", (0.68, 0.42, 0.54), (0, 0.01, 0.27), 0.02, 2)
+    p.box("steel_dark", (0.3, 0.02, 0.4), (-0.17, -0.2, 0.27), 0.008, 1)
+    p.box("steel_dark", (0.3, 0.02, 0.4), (0.17, -0.2, 0.27), 0.008, 1)
+    # Machine: a rounded body with a spout and a drip tray.
+    p.box("steel_dark", (0.3, 0.3, 0.3), (-0.12, 0.05, 0.73), 0.04, 3)
+    p.box("steel", (0.26, 0.2, 0.04), (-0.12, -0.02, 0.6), 0.012, 2)
+    p.box("steel_dark", (0.3, 0.12, 0.07), (-0.12, -0.08, 0.85), 0.02, 2)
+    p.cyl("steel", 0.02, 0.05, (-0.12, -0.11, 0.8), bevel=0.005, n=12)
+    p.cyl("light", 0.015, 0.01, (-0.02, -0.1, 0.72), bevel=0, n=12, rot=(90, 0, 0))
+    p.cyl("cream", 0.035, 0.07, (-0.12, -0.08, 0.655), bevel=0.01, n=16)
+    # A jar of sugar and a row of mugs.
+    p.cyl("glass", 0.045, 0.1, (0.13, 0.12, 0.63), bevel=0.012, n=16)
+    p.cyl("steel", 0.047, 0.015, (0.13, 0.12, 0.685), bevel=0.005, n=16)
+    for k, x in enumerate((0.08, 0.18, 0.28)):
+        p.cyl(("cream", "plastic", "cream")[k], 0.04, 0.08, (x, -0.1, 0.62), bevel=0.012, n=16)
+    return p
+
+
+def guard_desk():
+    """1.5 x 1 guard post: desk against the wall behind, a CCTV monitor
+    facing the chair at the front."""
+    p = Prop("guard_desk")
+    p.box("wood", (1.45, 0.55, 0.06), (0, 0.2, 0.5), 0.025, 3)
+    for x in (-0.66, 0.66):
+        p.box("paint", (0.06, 0.5, 0.47), (x, 0.2, 0.235), 0.015, 2)
+    p.box("paint", (0.4, 0.5, 0.42), (0.42, 0.2, 0.26), 0.02, 2)  # drawers
+    for z in (0.16, 0.34):
+        p.box("steel", (0.12, 0.02, 0.03), (0.42, -0.06, z), 0.008, 1)
+    # Monitor with a split CCTV picture.
+    p.box("steel_dark", (0.52, 0.12, 0.36), (-0.1, 0.32, 0.79), 0.04, 3)
+    p.box("screen", (0.44, 0.02, 0.28), (-0.1, 0.255, 0.79), 0.01, 1)
+    p.box("light", (0.004, 0.022, 0.28), (-0.1, 0.255, 0.79), 0, 0)
+    p.box("light", (0.44, 0.022, 0.004), (-0.1, 0.255, 0.79), 0, 0)
+    p.box("steel_dark", (0.08, 0.08, 0.1), (-0.1, 0.34, 0.58), 0.02, 2)
+    p.box("steel_dark", (0.36, 0.14, 0.02), (-0.1, 0.0, 0.54), 0.008, 1)  # keyboard
+    p.box("paper", (0.18, 0.24, 0.01), (0.35, 0.05, 0.535), 0.003, 1, rot=(0, 0, -12))
+    # Swivel chair at the front, facing the desk.
+    p.box("vinyl", (0.38, 0.36, 0.07), (0, -0.25, 0.33), 0.03, 3)
+    p.box("vinyl", (0.36, 0.06, 0.32), (0, -0.44, 0.52), 0.03, 3)
+    p.tube("steel_dark", [(0, -0.25, 0.3), (0, -0.25, 0.06)], 0.025, 0, n=10)
+    for a in range(5):
+        ang = math.radians(a * 72)
+        p.tube("steel_dark", [(0, -0.25, 0.06), (math.sin(ang) * 0.2, -0.25 + math.cos(ang) * 0.2, 0.05)], 0.018, 0, n=8)
+    return p
+
+
 def lift():
     p = Prop("lift", 180)  # 1 x 1 cabin, 1.5 m tall, doors at the front
     h = 1.5
@@ -380,6 +429,25 @@ def door():
     return p
 
 
+def security_gate():
+    """All-bars sliding gate: same opening as `door`, see-through."""
+    p = Prop("security_gate")
+    w, fw, depth = 1.0, 0.08, 0.22
+    for x in (-w / 2 + fw / 2, w / 2 - fw / 2):
+        p.box("paint", (fw, depth, DOOR_H), (x, 0, DOOR_H / 2), 0.02, 2)
+    p.box("paint", (w - 2 * fw, depth - 0.02, fw), (0, 0, DOOR_H - fw / 2), 0.02, 2)
+    # The track it slides along, and the rails top and bottom.
+    p.box("steel_dark", (w - 2 * fw, 0.12, 0.04), (0, 0, DOOR_H - fw - 0.02), 0.01, 1)
+    inner = w - 2 * fw
+    for z in (0.06, 0.55, DOOR_H - fw - 0.08):
+        p.box("paint", (inner, 0.05, 0.05), (0, 0, z), 0.015, 2)
+    for i in range(7):
+        x = -inner / 2 + inner * (i + 0.5) / 7
+        p.tube("paint", [(x, 0, 0.03), (x, 0, DOOR_H - fw - 0.04)], 0.016, 0, n=10)
+    p.box("steel", (0.06, 0.1, 0.16), (inner / 2 - 0.05, 0, 0.55), 0.015, 2)
+    return p
+
+
 def cell_door():
     """Barred cell door for later: same opening as `door`."""
     p = Prop("cell_door")
@@ -404,8 +472,9 @@ def person():
     """About 0.9 m tall and chunky: big head, short body in one-piece
     overalls, stubby arms. Faces +y. The game tints outfit, skin and hair,
     swings the legs (outfit_legs, shoes_legs) forward to sit and the arms
-    (outfit_arms, skin_arms) forward to carry. Parts
-    named *_staff (a peaked cap and a badge) only show on staff."""
+    (outfit_arms, skin_arms) forward to carry. Parts named after a group
+    or role only show on those people: *_staff (a badge), *_guard (a
+    peaked cap), *_cook (a chef's hat)."""
     p = Prop("person")
     # Legs and body: a soft pill, a touch wider at the hips.
     p.capsule("outfit", 0.16, 0.2, (0, 0, 0.38), scale=(1, 0.85, 1))
@@ -427,12 +496,19 @@ def person():
     for side in (-1, 1):
         p.ball("skin", 0.04, (side * 0.16, -0.01, 0.69), scale=(0.6, 1, 1), u=12, v=8)
     p.ball("hair", 0.172, (0, -0.02, 0.73), scale=(1.02, 0.98, 0.88))
-    # Staff: a peaked cap over the hair and a badge on the chest.
+    # Staff: a badge on the chest.
     p.group = "staff"
+    p.cyl("gold", 0.035, 0.012, (0.07, -0.126, 0.47), bevel=0.004, n=16, rot=(90, 0, 0))
+    # Guards: a peaked cap over the hair.
+    p.group = "guard"
     p.ball("navy", 0.178, (0, -0.01, 0.75), scale=(1.02, 1.0, 0.72))
     p.cyl("navy", 0.17, 0.04, (0, 0.0, 0.79), bevel=0.015, n=24)
     p.ball("navy", 0.11, (0, 0.15, 0.77), scale=(1.1, 0.8, 0.18), u=16, v=8)
-    p.cyl("gold", 0.035, 0.012, (0.07, -0.126, 0.47), bevel=0.004, n=16, rot=(90, 0, 0))
+    # Cooks: a soft white chef's hat.
+    p.group = "cook"
+    p.cyl("sheet", 0.15, 0.1, (0, -0.01, 0.84), bevel=0.03, n=24)
+    for x, y in ((-0.07, -0.05), (0.07, -0.05), (0, 0.07)):
+        p.ball("sheet", 0.11, (x, y, 0.95), u=16, v=10)
     p.group = None
     # Face: two small dark eyes.
     for side in (-1, 1):
@@ -933,7 +1009,8 @@ MODELS = dict(bed=bed, toilet=toilet, shower=shower, table=table, desk=desk, lif
               food_crate=food_crate, meal_tray=meal_tray, dirty_laundry=dirty_laundry,
               clean_laundry=clean_laundry, rubbish_bag=rubbish_bag, wooden_toy=wooden_toy,
               birdhouse=birdhouse, litter_paper=litter_paper, litter_can=litter_can,
-              litter_wrapper=litter_wrapper, lorry=lorry)
+              litter_wrapper=litter_wrapper, lorry=lorry,
+              coffee_machine=coffee_machine, security_gate=security_gate, guard_desk=guard_desk)
 
 
 # ---------------------------------------------------------------- line-up
