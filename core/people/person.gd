@@ -95,6 +95,9 @@ var programme: StringName = &""
 var shift: StringName = &""
 ## On their way home at the end of a shift: they do nothing else.
 var going_home := false
+## Being walked somewhere by someone else, such as a guard: they decide
+## nothing for themselves meanwhile.
+var led := false
 
 
 func flat() -> Vector2:

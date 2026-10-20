@@ -650,7 +650,7 @@ func _think(person: Person, minutes: float) -> void:
 		if person.gave_up[key] <= 0.0:
 			person.gave_up.erase(key)
 	person.place_wait -= since
-	if person.going_home:
+	if person.going_home or person.led:
 		return
 	if person.has_object() and target_object(person) == null:
 		_stop(person) # The object went while they were on their way.

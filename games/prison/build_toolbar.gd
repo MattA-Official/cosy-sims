@@ -78,6 +78,7 @@ const WATER_MODES := [
 const OPENINGS := [
 	[BuildingMap.Wall.DOOR, &"", "Door", "opening_door", "A door people can walk through."],
 	[BuildingMap.Wall.DOOR, &"staff", "Staff door", "opening_staff_door", "Only staff walk through, whatever the rooms either side allow."],
+	[BuildingMap.Wall.DOOR, &"security_gate", "Security gate", "opening_security_gate", "Locked to prisoners unless a guard is at a guard post desk nearby."],
 	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_GLASS, "Glass window", "opening_glass", "Lets light in."],
 	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS, "Barred window", "opening_bars", "For cells and secure rooms."],
 ]

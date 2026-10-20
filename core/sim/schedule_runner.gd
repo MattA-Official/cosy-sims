@@ -39,6 +39,10 @@ var doors: Dictionary[Vector4i, bool] = {}
 ## pinned.
 var overrides: Dictionary[Vector4i, bool] = {}
 var pinned: Dictionary[Vector4i, bool] = {}
+## Other doors something else controls, such as security gates: returns
+## each one's key and whether it should be locked. Hand locks still win.
+## Optional.
+var other_locks: Callable
 
 ## What the timetable alone wants each door it controls to be.
 var _planned: Dictionary[Vector4i, bool] = {}
@@ -119,6 +123,8 @@ func _update_doors() -> void:
 			for edge in room_doors(map, room):
 				var key := Vector4i(n, edge.x, edge.y, edge.z)
 				wanted[key] = wanted.get(key, false) or lock
+	if other_locks.is_valid():
+		wanted.merge(other_locks.call(), true)
 	_planned = wanted.duplicate()
 	for key: Vector4i in overrides.keys():
 		var map := building.levels.get(key.x) as BuildingMap

@@ -5,7 +5,7 @@ class_name SamplePrisons
 ## Main node (Sample) or from the F3 inspector.
 
 const NAMES: Array[String] = ["Starter block", "Two storeys", "Hillside", "Island", "Long way round",
-		"Basement", "Crowded canteen", "Locked out", "Staff wing", "Working prison"]
+		"Basement", "Crowded canteen", "Locked out", "Staff wing", "Working prison", "Guarded prison"]
 
 ## What each one tests, shown in the inspector.
 const CHALLENGES: Array[String] = [
@@ -19,6 +19,7 @@ const CHALLENGES: Array[String] = [
 	"The showers have no door, and the canteen is 0.75 m up. With Door Steps on its door gets steps; with it off, nobody can eat.",
 	"A staff room behind a staff door and an office zoned staff only: staff come and go, prisoners keep out.",
 	"The staff wing with a kitchen, a laundry and a workshop: the morning lorry's crates go to the fridge, the cook fills the serving counter before each meal, prisoners take a tray to a table, the cleaner sweeps up and washes uniforms, and in work blocks prisoners on programmes help out or make toys and birdhouses.",
+	"The working prison with a guard post: the canteen's door to the yard is a security gate that opens only while a guard sits at the post. Two guards by day and one by night patrol where the prisoners are and walk back anyone out of place.",
 ]
 
 ## Set before reloading the scene to start in a different sample.
@@ -33,6 +34,8 @@ class Site:
 	var foliage: FoliageLayer
 	var paths: PathNetwork
 	var people: People
+	## Staff wanted on the night shift, by role, for samples with staff.
+	var night_staff: Dictionary[StringName, int] = {}
 
 	func land() -> Rect2i:
 		return building.land[0]
@@ -58,6 +61,7 @@ static func build(index: int, site: Site) -> bool:
 		7: _locked_out(site)
 		8: _staff_wing(site)
 		9: _staff_wing(site, true)
+		10: _staff_wing(site, true, true)
 		_: return false
 	return true
 
@@ -330,7 +334,7 @@ static func _locked_out(site: Site) -> void:
 	for i in 4:
 		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
 
-static func _staff_wing(site: Site, kitchen := false) -> void:
+static func _staff_wing(site: Site, kitchen := false, guards := false) -> void:
 	_landscape(site)
 	var o := site.land().get_center() - Vector2i(10, 8)
 	var ground := site.map()
@@ -382,6 +386,8 @@ static func _staff_wing(site: Site, kitchen := false) -> void:
 		_kitchen(ground, canteen)
 		_laundry(ground, canteen, showers)
 		_workshop(ground, yard)
+	if guards:
+		_guard_post(ground, staff_room, canteen)
 	_plant(site)
 	for i in 6:
 		var prisoner := site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
@@ -391,6 +397,31 @@ static func _staff_wing(site: Site, kitchen := false) -> void:
 		var member := site.people.add_person(0, Vector2(staff_room.position) + Vector2(1.5 - i, 3.5 - i % 2), "", &"staff")
 		if kitchen:
 			site.people.set_role(member, [&"cook", &"handyman", &"cleaner"][i])
+	if guards:
+		var placed := 0
+		for cell in staff_room.size.x * staff_room.size.y:
+			var guard := site.people.add_person(0, Vector2(staff_room.position)
+					+ Vector2(cell % staff_room.size.x + 0.5, cell / staff_room.size.x + 0.5), "", &"staff")
+			if guard != null:
+				site.people.set_role(guard, &"guard")
+				placed += 1
+				if placed == 2:
+					break
+		site.night_staff[&"guard"] = 1
+
+
+## A guard post under the staff room, through a staff door, and a
+## security gate from the canteen out to the yard that opens while a
+## guard sits at the post's desk.
+static func _guard_post(ground: BuildingMap, staff_room: Rect2i, canteen: Rect2i) -> void:
+	var post := Rect2i(Vector2i(staff_room.position.x, staff_room.end.y), Vector2i(4, 4))
+	_room(ground, post, &"tiles", &"plaster", &"guard_post")
+	ground.set_door(BuildingMap.edge_between(post.position + Vector2i(1, 0), post.position + Vector2i(1, -1)),
+			true, &"staff")
+	ground.place_object(PrisonCatalogue.object(&"guard_desk"), Vector2(post.position) + Vector2(1, 1.5), 0)
+	ground.set_room_zone(ground.room_at(post.position), &"staff")
+	var gate := BuildingMap.edge_between(canteen.position + Vector2i(5, 4), canteen.position + Vector2i(5, 5))
+	ground.set_door(gate, true, &"security_gate")
 
 
 ## A workshop off the far side of the yard, with two workbenches and a

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="DoorKindDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/door_kind_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/opening_security_gate.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"security_gate"
+display_name = "Security gate"
+description = "Locked to prisoners unless a guard is at a guard post desk nearby."
+groups = Array[StringName]([&"prisoner", &"staff", &"visitor"])
+colour = Color(0.9, 0.65, 0.25, 1)
+icon = ExtResource("2_icon")

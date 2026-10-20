@@ -34,6 +34,7 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/ironing_board.tres"),
 	preload("res://games/prison/catalogue/clothes_shelf.tres"),
 	preload("res://games/prison/catalogue/workbench.tres"),
+	preload("res://games/prison/catalogue/guard_desk.tres"),
 	preload("res://games/prison/catalogue/goods_shelf.tres"),
 ]
 
@@ -109,6 +110,7 @@ const ROLES: Array[StaffRoleDef] = [
 	preload("res://games/prison/catalogue/role_cook.tres"),
 	preload("res://games/prison/catalogue/role_cleaner.tres"),
 	preload("res://games/prison/catalogue/role_handyman.tres"),
+	preload("res://games/prison/catalogue/role_guard.tres"),
 ]
 
 ## Staff shifts. Days start at 06:00 so the cook is in for breakfast;
@@ -128,6 +130,7 @@ const PROGRAMMES: Array[WorkProgrammeDef] = [
 
 const DOOR_KINDS: Array[DoorKindDef] = [
 	preload("res://games/prison/catalogue/door_staff.tres"),
+	preload("res://games/prison/catalogue/door_security_gate.tres"),
 ]
 
 ## What prisoners need, and what sees to it.
@@ -169,6 +172,7 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_grubby_uniform.tres"),
 	preload("res://games/prison/catalogue/moodlet_useful_day.tres"),
 	preload("res://games/prison/catalogue/moodlet_made_to_work.tres"),
+	preload("res://games/prison/catalogue/moodlet_walked_back.tres"),
 	preload("res://games/prison/catalogue/moodlet_lovely_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_locked_up_hungry.tres"),
 	preload("res://games/prison/catalogue/moodlet_had_an_accident.tres"),
@@ -216,6 +220,7 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_kitchen.tres"),
 	preload("res://games/prison/catalogue/room_laundry.tres"),
 	preload("res://games/prison/catalogue/room_workshop.tres"),
+	preload("res://games/prison/catalogue/room_guard_post.tres"),
 ]
 
 

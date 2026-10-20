@@ -7,7 +7,7 @@ extends Node3D
 @export var build_sample_layout := true
 ## Which sample prison to start with. The F3 inspector can switch to another.
 @export_enum("Starter block", "Two storeys", "Hillside", "Island", "Long way round", "Basement",
-		"Crowded canteen", "Locked out", "Staff wing", "Working prison") var sample := 0
+		"Crowded canteen", "Locked out", "Staff wing", "Working prison", "Guarded prison") var sample := 0
 ## Split levels: floors nudged within their storey, and ramps between
 ## them. Off keeps every floor a whole storey above the one below.
 @export var split_levels := false
@@ -46,6 +46,8 @@ var kitchen := Kitchen.new()
 var cleaning := Cleaning.new()
 var laundry := Laundry.new()
 var workshop := Workshop.new()
+## Guard posts and gates, patrols, and walking prisoners back.
+var guarding := Guarding.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
 ## Open jobs and stock, with the debug view.
@@ -236,6 +238,16 @@ func _ready() -> void:
 	add_child(shifts)
 	_set_entrance()
 	shifts.start()
+	for role: StringName in site.night_staff:
+		shifts.set_wanted(role, &"night", site.night_staff[role], false)
+	guarding.name = "Guarding"
+	guarding.people = people
+	guarding.jobs = jobs
+	guarding.building = building
+	guarding.clock = clock
+	add_child(guarding)
+	runner.other_locks = guarding.gate_locks
+	runner.refresh()
 	jobs_panel.name = "JobsPanel"
 	jobs_panel.debug_overlay = debug_overlay
 	jobs_panel.jobs = jobs
