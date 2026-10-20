@@ -12,3 +12,5 @@ height = 0.53
 colour = Color(0.8, 0.62, 0.42, 1)
 tags = Array[StringName]([&"table"])
 model = ExtResource("2_model")
+needs_item = &"meal"
+without_item_moodlet = &"missed_meal"

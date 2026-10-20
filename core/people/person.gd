@@ -73,6 +73,9 @@ var route_on_surface: Array[bool] = []
 var target := Vector2i(0, 0)
 var target_tag: StringName = &""
 var target_need: StringName = &""
+## Where they are fetching the item their object needs first (a meal
+## tray for a table), as (level, object id), or NO_OBJECT.
+var fetch_from := NO_OBJECT
 ## Where they stood before stepping onto the object.
 var stand_spot := Vector3.ZERO
 ## Game minutes left: using an object, or waiting before wandering again.

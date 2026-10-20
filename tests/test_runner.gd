@@ -42,6 +42,7 @@ func _process(_delta: float) -> bool:
 	_test_zones_and_doors()
 	_test_stopped_on_stairs()
 	_test_jobs_and_carrying()
+	_test_kitchen()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -669,11 +670,11 @@ func _test_jobs_and_carrying() -> void:
 	var from := map.place_object(shelf, Vector2(o + Vector2i(1, 6)), 0)
 	var to := map.place_object(shelf, Vector2(o + Vector2i(6, 8)), 0)
 	_check(from != -1 and to != -1, "shelves for the jobs test go in the canteen")
-	var cook: Person = people.people[6]
-	for need: StringName in cook.needs:
-		cook.needs[need] = 100.0
-	people.set_role(cook, &"cook")
-	_check(jobs.wants_work(cook) and not jobs.wants_work(people.people[0]),
+	var handy: Person = people.people[6]
+	for need: StringName in handy.needs:
+		handy.needs[need] = 100.0
+	people.set_role(handy, &"handyman")
+	_check(jobs.wants_work(handy) and not jobs.wants_work(people.people[0]),
 			"staff with a role work from the board, prisoners off a programme don't")
 	items.put_in(Vector2i(0, from), map.objects[from], crate, 3)
 	var finished: Array[Job] = []
@@ -684,25 +685,25 @@ func _test_jobs_and_carrying() -> void:
 	while not carry.done and minutes < 120:
 		clock.advance(1.0)
 		minutes += 1
-	_check(carry.done and finished.has(carry), "a cook carries food from one shelf to another")
+	_check(carry.done and finished.has(carry), "a handyman carries food from one shelf to another")
 	_check(items.count_in(Vector2i(0, from), &"food") == 1 and items.count_in(Vector2i(0, to), &"food") == 2,
 			"two crates moved, one left")
-	_check(cook.job == null and jobs.jobs.is_empty(), "the job is off the board once done")
+	_check(handy.job == null and jobs.jobs.is_empty(), "the job is off the board once done")
 
 	# Called away mid-carry, what they hold goes down where they are and
 	# the job starts again from there.
 	var second := jobs.post(Job.carry(&"food", 1, Job.at(Job.Do.FETCH, 0, from), Job.at(Job.Do.DELIVER, 0, to)))
 	minutes = 0
-	while items.carrying(cook) == null and minutes < 120:
+	while items.carrying(handy) == null and minutes < 120:
 		clock.advance(0.5)
 		minutes += 1
-	_check(items.carrying(cook) == crate, "they pick the crate up")
-	people.set_role(cook, &"")
-	_check(items.carrying(cook) == null and not items.floor_spots_of(&"food").is_empty(),
+	_check(items.carrying(handy) == crate, "they pick the crate up")
+	people.set_role(handy, &"")
+	_check(items.carrying(handy) == null and not items.floor_spots_of(&"food").is_empty(),
 			"dropped where they were when their role went")
 	_check(second.worker == null and second.current().do == Job.Do.FETCH and not second.current().at_object(),
 			"the job goes back on the board to pick it up off the floor")
-	people.set_role(cook, &"cook")
+	people.set_role(handy, &"handyman")
 	minutes = 0
 	while not second.done and minutes < 120:
 		clock.advance(1.0)
@@ -723,7 +724,62 @@ func _test_jobs_and_carrying() -> void:
 	_check(items.count_in(Vector2i(0, to)) == 4 and items.total(&"food") == 6,
 			"one fits, the rest are put down, none lost")
 	jobs.cancel(third)
-	_check(jobs.jobs.is_empty() and cook.job == null, "a cancelled job leaves the board")
+	_check(jobs.jobs.is_empty() and handy.job == null, "a cancelled job leaves the board")
+	main.queue_free()
+
+
+func _test_kitchen() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var people: People = main.people
+	var items: ItemStore = main.items
+	var jobs: JobBoard = main.jobs
+	var kitchen: Kitchen = main.kitchen
+	var clock: GameClock = main.clock
+	var map: BuildingMap = main.map
+	clock.speed_index = 0
+	_check(kitchen.meals_per_day() == 3, "three meals a day on the prisoners' timetable")
+	_check(items.total(&"ingredient") == 6 and jobs.of_kind(&"carry").size() == 3,
+			"the lorry leaves two days of crates and the handyman is given them to put away")
+	_check(items.total(&"meal") == 6, "starting at breakfast, the meal is already out")
+	var fetched := false
+	var minutes := 0
+	while minutes < 60:
+		clock.advance(0.5)
+		minutes += 1
+		for person in people.people:
+			var held := items.carrying(person)
+			fetched = fetched or (held != null and held.has_tag(&"meal") and person.target_tag == &"table")
+	_check(fetched, "prisoners carry a tray from the counter to a table")
+	var pallet := map.objects.values().filter(func(p: BuildingMap.PlacedObject) -> bool:
+			return p.def.id == &"delivery_pallet")[0] as BuildingMap.PlacedObject
+	while clock.hour() != 11:
+		clock.advance(1.0)
+	_check(items.count_in(Vector2i(0, pallet.id)) == 0, "the delivery is all put away")
+	_check(jobs.of_kind(&"cook").size() >= 1, "cooking starts an hour before lunch")
+	var missed := false
+	while clock.day() < 2 or clock.hour() < 8:
+		clock.advance(1.0)
+		for person in people.people:
+			missed = missed or person.moodlets.has(&"missed_meal")
+	_check(not missed, "nobody misses a meal for a day and a half")
+	_check(items.total(&"ingredient") >= 4, "the morning lorry tops up the stock")
+
+	# Without a cooker, nothing is cooked and meals are missed, softly.
+	for placed: BuildingMap.PlacedObject in map.objects.values().duplicate():
+		if placed.def.id == &"cooker":
+			map.remove_object(placed.id)
+	for key: Vector2i in items.held.keys():
+		items.take_from(key, &"meal", 99)
+	while clock.hour() != 12:
+		clock.advance(1.0)
+	_check(jobs.of_kind(&"cook").is_empty(), "nothing to cook on, so no cooking")
+	clock.advance(45.0)
+	missed = false
+	for person in people.people:
+		missed = missed or person.moodlets.has(&"missed_meal")
+	_check(missed, "with an empty counter, prisoners miss the meal")
 	main.queue_free()
 
 

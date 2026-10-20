@@ -6,6 +6,6 @@
 script = ExtResource("1_def")
 id = &"handyman"
 display_name = "Handyman"
-description = "Mends broken things and fixes up anything damaged."
-job_kinds = Array[StringName]([&"repair"])
+description = "Unloads deliveries into the kitchen and stores, and mends broken things."
+job_kinds = Array[StringName]([&"carry", &"repair"])
 outfit_colour = Color(0.44, 0.4, 0.32, 1)

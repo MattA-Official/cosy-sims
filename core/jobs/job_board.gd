@@ -120,7 +120,7 @@ func stage_done(person: Person) -> void:
 	var job := person.job
 	var stage := job.current()
 	if stage.do == Job.Do.WORK and stage.finish.is_valid():
-		stage.finish.call()
+		stage.finish.call(stage, person)
 	people.finish_working(person)
 	job.stage += 1
 	if job.stage < job.stages.size():
@@ -149,6 +149,13 @@ func abandon(person: Person) -> void:
 func _start_stage(person: Person) -> bool:
 	var job := person.job
 	var stage := job.current()
+	if not stage.places.is_empty():
+		var key := _choose(person, stage)
+		if key.y == -1:
+			_fail(job, ["Nothing to pick up", "Nowhere to put it", "Nowhere free to do it"][stage.do])
+			return false
+		stage.level = key.x
+		stage.object = key.y
 	var map := people.building.levels.get(stage.level) as BuildingMap
 	if map == null:
 		_fail(job, "Its place has gone")
@@ -206,12 +213,54 @@ func _best_for(person: Person) -> Job:
 		if job.worker != null or job.wait > 0.0 or not may_take(person, job):
 			continue
 		var stage := job.current()
-		var distance := _place(stage).distance_to(person.flat()) + absi(stage.level - person.level) * 12.0
+		var distance := 0.0
+		if stage.places.is_empty():
+			distance = _place(stage).distance_to(person.flat()) + absi(stage.level - person.level) * 12.0
 		var score := -job.priority * 1000.0 + distance
 		if score < best_score:
 			best = job
 			best_score = score
 	return best
+
+
+## The nearest object for a stage that picks its place, as (level, object
+## id), or (0, -1) if none suits.
+func _choose(person: Person, stage: Job.Stage) -> Vector2i:
+	var best := Vector2i(0, -1)
+	var best_distance := INF
+	for n: int in people.building.levels:
+		var map := people.building.levels[n]
+		for placed: BuildingMap.PlacedObject in map.objects.values():
+			if not placed.def.tags.any(func(t: StringName) -> bool: return stage.places.has(t)):
+				continue
+			var key := Vector2i(n, placed.id)
+			match stage.do:
+				Job.Do.FETCH:
+					if items.count_in(key, stage.tag) <= 0:
+						continue
+				Job.Do.DELIVER:
+					if not placed.def.holds.has(stage.tag) or items.room_in(key, placed) <= 0:
+						continue
+				Job.Do.WORK:
+					if _busy(key, person) or (stage.tag != &"" and items.room_in(key, placed) <= 0):
+						continue
+			if not people.may_enter(person, map.room_at_point(placed.centre)):
+				continue
+			var distance := placed.centre.distance_to(person.flat()) + absi(n - person.level) * 12.0
+			if distance < best_distance:
+				best = key
+				best_distance = distance
+	return best
+
+
+## Is someone else working at an object for a job?
+func _busy(key: Vector2i, person: Person) -> bool:
+	for job in jobs:
+		var stage := job.current()
+		if job.worker != null and job.worker != person and stage != null and stage.do == Job.Do.WORK \
+				and stage.level == key.x and stage.object == key.y:
+			return true
+	return false
 
 
 func _place(stage: Job.Stage) -> Vector2:

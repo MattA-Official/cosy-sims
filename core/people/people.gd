@@ -47,6 +47,8 @@ const DISTANCE_EASE := 10.0
 ## pick the same table.
 const WOBBLE := 0.1
 const NO_TAGS: Array[StringName] = []
+## No item to be had for an object that needs one (see _item_source).
+const NONE_LEFT := Vector2i(0, -2)
 ## Game minutes before trying again for something that couldn't be found
 ## or reached.
 const RETRY_MINUTES := 8.0
@@ -126,6 +128,8 @@ var paused := false
 var access := Access.new()
 ## The work to be done, for workers. Optional.
 var jobs: JobBoard
+## Where items are, for objects that need one in hand first. Optional.
+var items: ItemStore
 
 var _dirty := true
 ## Whether the ground under the building has changed too (terrain, water or
@@ -164,6 +168,9 @@ var _need_defs: Dictionary[StringName, NeedDef] = {}
 ## Every object by tag, as [level, PlacedObject, Room or null] entries,
 ## worked out when first wanted after a build change.
 var _by_tag: Dictionary[StringName, Array] = {}
+## Objects people help themselves to items from, by item tag, as [level,
+## PlacedObject, Room or null].
+var _givers: Dictionary[StringName, Array] = {}
 ## The room each person was last found in, and where they stood then.
 var _where: Dictionary[Person, Array] = {}
 
@@ -192,6 +199,7 @@ func mark_dirty() -> void:
 	_qualities.clear()
 	_where.clear()
 	_by_tag.clear()
+	_givers.clear()
 	access.changed()
 
 
@@ -981,24 +989,81 @@ func _seek(person: Person, tags: Array[StringName], need: StringName = &"", unre
 	if need == &"":
 		need = _need_for_tag(tags[0])
 	var candidates := _candidates(person, tags, unrestricted)
+	var none_left: BuildingMap.PlacedObject = null
 	for entry: Array in candidates.slice(0, 5):
 		var n: int = entry[1]
 		var placed: BuildingMap.PlacedObject = entry[2]
-		for spot in _spots_beside(n, placed, person.flat()):
-			if _walk_to(person, n, spot):
+		var source := _item_source(person, placed, entry[3])
+		if source == NONE_LEFT:
+			none_left = placed
+			continue
+		var going_to := placed if source == Person.NO_OBJECT \
+				else building.levels[source.x].objects[source.y] as BuildingMap.PlacedObject
+		for spot in _spots_beside(source.x if going_to != placed else n, going_to, person.flat()):
+			if _walk_to(person, source.x if going_to != placed else n, spot):
 				person.target = Vector2i(n, placed.id)
 				person.target_tag = entry[3]
 				person.target_need = need
+				person.fetch_from = source
 				_claimed[person.target] = person
 				var def := need_def(need)
-				person.activity = "Going to a %s" % placed.def.display_name.to_lower() \
-						+ (" for %s" % def.display_name.to_lower() if def != null else "")
+				if going_to != placed:
+					person.activity = "Fetching a %s" % String(placed.def.needs_item).replace("_", " ")
+				else:
+					person.activity = "Going to a %s" % placed.def.display_name.to_lower() \
+							+ (" for %s" % def.display_name.to_lower() if def != null else "")
 				return true
+	if none_left != null:
+		_give_up(person, tags, need)
+		add_moodlet(person, none_left.def.without_item_moodlet)
+		person.activity = "No %ss left" % String(none_left.def.needs_item).replace("_", " ")
+		person.timer = 2.0
+		return false
 	_give_up(person, tags, need)
 	person.activity = ("Can't find a free %s" if candidates.is_empty() else "Can't reach a %s") \
 			% String(tags[0]).replace("_", " ")
 	person.timer = 2.0
 	return false
+
+
+## Where to fetch the item an object needs in hand first, as (level,
+## object id): Person.NO_OBJECT when it needs none just now, or NONE_LEFT
+## when it does and nothing they can get to has any.
+func _item_source(person: Person, placed: BuildingMap.PlacedObject, tag: StringName) -> Vector2i:
+	var item := placed.def.needs_item
+	if item == &"" or items == null or person.block == null or person.block.main_tag != tag:
+		return Person.NO_OBJECT
+	var holding := items.carrying(person)
+	if holding != null and holding.has_tag(item):
+		return Person.NO_OBJECT
+	var givers := _givers_of(item)
+	if givers.is_empty():
+		return Person.NO_OBJECT
+	var best := NONE_LEFT
+	var best_distance := INF
+	for entry: Array in givers:
+		var key := Vector2i(entry[0], (entry[1] as BuildingMap.PlacedObject).id)
+		if items.count_in(key, item) <= 0 or not may_enter(person, entry[2]):
+			continue
+		var distance := (entry[1] as BuildingMap.PlacedObject).centre.distance_to(person.flat()) \
+				+ absi(key.x - person.level) * 12.0
+		if distance < best_distance:
+			best = key
+			best_distance = distance
+	return best
+
+
+## Objects people help themselves to items with a tag from.
+func _givers_of(item: StringName) -> Array:
+	if not _givers.has(item):
+		var out: Array = []
+		for n: int in building.levels:
+			var map := building.levels[n]
+			for placed: BuildingMap.PlacedObject in map.objects.values():
+				if placed.def.hands_out and placed.def.holds.has(item):
+					out.append([n, placed, map.room_at_point(placed.centre)])
+		_givers[item] = out
+	return _givers[item]
 
 
 ## Why a need can't be seen to now, such as "Can't find a free table".
@@ -1396,6 +1461,9 @@ func _arrive(person: Person) -> void:
 	if person.job != null:
 		jobs.arrived(person)
 		return
+	if person.fetch_from != Person.NO_OBJECT:
+		_fetch_item(person)
+		return
 	if person.has_target() and not person.has_object():
 		# Somewhere to be or someone to be with, rather than an object.
 		person.stand_spot = person.position
@@ -1411,6 +1479,8 @@ func _arrive(person: Person) -> void:
 		person.state = Person.State.IDLE
 		person.activity = "Standing about"
 		return
+	if items != null and placed.def.needs_item != &"":
+		items.put_down(person) # Their tray, eaten.
 	person.stand_spot = person.position
 	person.state = Person.State.USING
 	person.timer = USE_MINUTES
@@ -1419,6 +1489,26 @@ func _arrive(person: Person) -> void:
 			+ placed.def.height * 0.6, placed.centre.y)
 	var def := need_def(person.target_need)
 	person.activity = def.doing if def != null else "Using the %s" % placed.def.display_name.to_lower()
+
+
+## At the counter: take the item and carry it on to the object.
+func _fetch_item(person: Person) -> void:
+	var source := person.fetch_from
+	person.fetch_from = Person.NO_OBJECT
+	var placed := target_object(person)
+	var got := items.take_from(source, placed.def.needs_item, 1) if placed != null else []
+	if got.is_empty():
+		_stop(person)
+		person.activity = "Someone took the last one"
+		person.timer = 0.5
+		return
+	items.pick_up(person, got)
+	for spot in _spots_beside(person.target.x, placed, person.flat()):
+		if _walk_to(person, person.target.x, spot):
+			person.activity = "Taking a %s to a %s" % [(got[0] as ItemDef).display_name.to_lower(),
+					placed.def.display_name.to_lower()]
+			return
+	_stop(person)
 
 
 ## Done once the need is met, or the time is up for objects that meet
@@ -1464,6 +1554,9 @@ func _stop(person: Person) -> void:
 func _release(person: Person) -> void:
 	if person.has_object() and _claimed.get(person.target) == person:
 		_claimed.erase(person.target)
+	person.fetch_from = Person.NO_OBJECT
+	if items != null and person.job == null:
+		items.put_down(person) # A tray they were taking somewhere.
 	_chatting_with.erase(person)
 	person.target_tag = &""
 	person.target_need = &""

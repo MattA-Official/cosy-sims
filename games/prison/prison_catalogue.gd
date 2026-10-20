@@ -21,6 +21,17 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/plant_pot.tres"),
 	preload("res://games/prison/catalogue/wall_shelf.tres"),
 	preload("res://games/prison/catalogue/lift.tres"),
+	preload("res://games/prison/catalogue/fridge.tres"),
+	preload("res://games/prison/catalogue/food_shelf.tres"),
+	preload("res://games/prison/catalogue/cooker.tres"),
+	preload("res://games/prison/catalogue/serving_counter.tres"),
+	preload("res://games/prison/catalogue/delivery_pallet.tres"),
+]
+
+## Things people carry about.
+const ITEMS: Array[ItemDef] = [
+	preload("res://games/prison/catalogue/item_food_crate.tres"),
+	preload("res://games/prison/catalogue/item_meal_tray.tres"),
 ]
 
 const FLOORS: Array[FloorDef] = [
@@ -115,6 +126,7 @@ const TRAITS: Array[TraitDef] = [
 ## Things that happen to prisoners and lift or lower their mood a while.
 const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_good_meal.tres"),
+	preload("res://games/prison/catalogue/moodlet_missed_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_lovely_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_locked_up_hungry.tres"),
 	preload("res://games/prison/catalogue/moodlet_had_an_accident.tres"),
@@ -159,6 +171,7 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_canteen.tres"),
 	preload("res://games/prison/catalogue/room_shower.tres"),
 	preload("res://games/prison/catalogue/room_yard.tres"),
+	preload("res://games/prison/catalogue/room_kitchen.tres"),
 ]
 
 
@@ -197,6 +210,13 @@ static func moodlets() -> Dictionary[StringName, MoodletDef]:
 	for def in MOODLETS:
 		out[def.id] = def
 	return out
+
+
+static func item(id: StringName) -> ItemDef:
+	for def in ITEMS:
+		if def.id == id:
+			return def
+	return null
 
 
 static func room_type(id: StringName) -> RoomTypeDef:

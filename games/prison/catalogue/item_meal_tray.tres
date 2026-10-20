@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/items/item_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/meal_tray.glb" id="2_model"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"meal_tray"
+display_name = "Meal tray"
+tags = Array[StringName]([&"meal"])
+carry_count = 8
+colour = Color(0.78, 0.82, 0.76, 1)
+model = ExtResource("2_model")

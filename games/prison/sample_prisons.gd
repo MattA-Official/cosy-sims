@@ -5,7 +5,7 @@ class_name SamplePrisons
 ## Main node (Sample) or from the F3 inspector.
 
 const NAMES: Array[String] = ["Starter block", "Two storeys", "Hillside", "Island", "Long way round",
-		"Basement", "Crowded canteen", "Locked out", "Staff wing"]
+		"Basement", "Crowded canteen", "Locked out", "Staff wing", "Kitchen"]
 
 ## What each one tests, shown in the inspector.
 const CHALLENGES: Array[String] = [
@@ -18,6 +18,7 @@ const CHALLENGES: Array[String] = [
 	"Twenty-four hungry prisoners, a dorm of sixteen beds, two tables and two showers: they queue, give up and try again.",
 	"The showers have no door, and the canteen is 0.75 m up. With Door Steps on its door gets steps; with it off, nobody can eat.",
 	"A staff room behind a staff door and an office zoned staff only: staff come and go, prisoners keep out.",
+	"The staff wing with a kitchen: the morning lorry's crates go to the fridge, the cook fills the serving counter before each meal, and prisoners take a tray to a table.",
 ]
 
 ## Set before reloading the scene to start in a different sample.
@@ -56,6 +57,7 @@ static func build(index: int, site: Site) -> bool:
 		6: _crowded(site)
 		7: _locked_out(site)
 		8: _staff_wing(site)
+		9: _staff_wing(site, true)
 		_: return false
 	return true
 
@@ -328,7 +330,7 @@ static func _locked_out(site: Site) -> void:
 	for i in 4:
 		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
 
-static func _staff_wing(site: Site) -> void:
+static func _staff_wing(site: Site, kitchen := false) -> void:
 	_landscape(site)
 	var o := site.land().get_center() - Vector2i(10, 8)
 	var ground := site.map()
@@ -375,11 +377,34 @@ static func _staff_wing(site: Site) -> void:
 	_door(ground, canteen.position + Vector2i(5, 4), Vector2i.DOWN)
 	ground.place_object(PrisonCatalogue.object(&"bench"), Vector2(yard.position) + Vector2(1, 4.5), 2)
 	ground.place_object(PrisonCatalogue.object(&"basketball_hoop"), Vector2(yard.position) + Vector2(10, 0.5), 0)
+	if kitchen:
+		_kitchen(ground, canteen)
 	_plant(site)
 	for i in 6:
 		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
 	for i in 2:
-		site.people.add_person(0, Vector2(staff_room.position) + Vector2(1.5 - i, 3.5 - i), "", &"staff")
+		var member := site.people.add_person(0, Vector2(staff_room.position) + Vector2(1.5 - i, 3.5 - i), "", &"staff")
+		if kitchen:
+			site.people.set_role(member, [&"cook", &"handyman"][i])
+
+
+## A kitchen off the west end of a canteen, with a serving counter in the
+## canteen's corner and a delivery pallet on a bay outside the back door.
+static func _kitchen(ground: BuildingMap, canteen: Rect2i) -> void:
+	var kitchen := Rect2i(canteen.position - Vector2i(5, 0), Vector2i(5, 5))
+	_room(ground, kitchen, &"tiles", &"tiles", &"kitchen")
+	_door(ground, canteen.position + Vector2i(0, 2), Vector2i.LEFT)
+	_door(ground, kitchen.position + Vector2i(0, 2), Vector2i.LEFT)
+	var corner := Vector2(kitchen.position)
+	ground.place_object(PrisonCatalogue.object(&"fridge"), corner, 0)
+	ground.place_object(PrisonCatalogue.object(&"cooker"), corner + Vector2(2, 0), 0)
+	ground.place_object(PrisonCatalogue.object(&"cooker"), corner + Vector2(3, 0), 0)
+	ground.place_object(PrisonCatalogue.object(&"food_shelf"), corner + Vector2(0, 4.5), 0)
+	ground.place_object(PrisonCatalogue.object(&"sink"), corner + Vector2(4, 4), 0)
+	ground.place_object(PrisonCatalogue.object(&"serving_counter"), Vector2(canteen.position), 0)
+	# A paved delivery bay outside the back door.
+	ground.fill_floor(Rect2i(kitchen.position + Vector2i(-4, 0), Vector2i(4, 5)), &"paving")
+	ground.place_object(PrisonCatalogue.object(&"delivery_pallet"), corner + Vector2(-3, 1.5), 0)
 
 #endregion
 

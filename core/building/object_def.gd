@@ -34,8 +34,23 @@ enum Connects {
 @export var tags: Array[StringName] = []
 ## Whether this links to the level above, and how.
 @export var connects := Connects.NONE
+## People may help themselves to what it holds, as at a serving counter.
+## Otherwise only workers take from it.
+@export var hands_out := false
 ## Item tags it can hold, such as "ingredient" for a fridge or "meal" for
 ## a serving counter. Empty for objects that hold nothing.
 @export var holds: Array[StringName] = []
 ## How many items it holds at most.
 @export var capacity := 0
+## Whether what it holds is drawn on top of it (trays on a counter) or is
+## shut away (crates in a fridge).
+@export var shows_held := true
+## Using it at mealtimes and such needs an item with this tag in hand
+## first, such as a meal tray for a table: people fetch one from whatever
+## holds them on their way. Only during a block whose own object this is,
+## and only once something about the place holds such items; until then
+## it works without.
+@export var needs_item: StringName
+## The moodlet someone gets when there's none of `needs_item` to be had,
+## such as "Missed a meal".
+@export var without_item_moodlet: StringName

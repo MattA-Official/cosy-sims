@@ -17,18 +17,25 @@ class Stage:
 	var level := 0
 	## The object to go to, or -1 for a floor tile.
 	var object := -1
+	## Object tags to choose from instead of a set object: the nearest
+	## suitable one is picked each time the stage starts (one holding the
+	## items to fetch, with room for those to deliver, or free to work at).
+	var places: Array[StringName] = []
 	var tile := Vector2i.ZERO
-	## FETCH: the tag of the items to take, and how many at most.
+	## FETCH: the tag of the items to take, and how many at most. DELIVER
+	## and WORK with `places`: the tag of items the place must have room
+	## for.
 	var tag: StringName
 	var count := 1
-	## WORK: game minutes, and what happens after.
+	## WORK: game minutes, and what happens after, called with the stage
+	## and the worker.
 	var minutes := 0.0
 	var finish: Callable
 	## What they are doing here, in words, such as "Cooking".
 	var doing := ""
 
 	func at_object() -> bool:
-		return object != -1
+		return object != -1 or not places.is_empty()
 
 
 ## Such as &"carry", &"cook" or &"clean".
@@ -72,6 +79,15 @@ static func on_tile(do: Do, level: int, tile: Vector2i) -> Stage:
 	out.do = do
 	out.level = level
 	out.tile = tile
+	return out
+
+
+## A stage at the nearest object with one of the tags that suits.
+static func at_any(do: Do, places: Array[StringName], tag: StringName = &"") -> Stage:
+	var out := Stage.new()
+	out.do = do
+	out.places = places
+	out.tag = tag
 	return out
 
 

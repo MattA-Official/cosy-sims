@@ -7,6 +7,9 @@ extends Node3D
 
 ## The most shown in one pile, in layers of four.
 const SHOWN := 8
+## How big item models are drawn in piles, so a few fit on top of
+## something.
+const PILED_SCALE := 0.55
 ## Half the size of an item drawn as a box.
 const BOX := Vector3(0.11, 0.06, 0.09)
 ## Where a carried item sits on someone, in their body's frame (which faces
@@ -58,7 +61,7 @@ func _redraw() -> void:
 	for key: Vector2i in items.held:
 		var map := building.levels.get(key.x) as BuildingMap
 		var placed: BuildingMap.PlacedObject = map.objects.get(key.y) if map != null else null
-		if placed == null or key.x > building.active:
+		if placed == null or key.x > building.active or not placed.def.shows_held:
 			continue
 		var top := map.floor_height(Vector2i(placed.centre.floor())) + placed.def.height
 		drawn = _pile(items.held[key], Vector3(placed.centre.x, top, placed.centre.y), drawn)
@@ -84,6 +87,7 @@ func _pile(pile: Dictionary, base: Vector3, drawn: bool) -> bool:
 			if item.model != null:
 				var model := item.model.instantiate() as Node3D
 				model.position = at - Vector3.UP * BOX.y
+				model.scale = Vector3.ONE * PILED_SCALE
 				_models.add_child(model)
 			else:
 				if not drawn:
