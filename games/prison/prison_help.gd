@@ -30,9 +30,13 @@ const SECTIONS := [
 		[", / .", "Slower or faster (up to 4×)"],
 		["T", "The timetable"],
 		["P", "Staff and work programmes"],
+		["M", "Money"],
+		["O", "Warden's office: intake, goals, grade"],
 	]],
 	["Other", [
 		["F1", "This card"],
+		["F2", "Save and load"],
+		["Ctrl+Z / Ctrl+Y", "Undo or redo building"],
 		["F3", "Debug view and inspector"],
 	]],
 ]

@@ -35,16 +35,17 @@ Built with [Godot 4.7](https://godotengine.org/).
 | 2 Wall | Drag from corner to corner to build or restyle; snaps straight or to 45°, or pick Any angle (or hold Alt); hold Ctrl to remove. Paint mode: click or drag along walls to paint the side you can see; Shift-click paints every wall round the room; Ctrl takes paint off |
 | 3 Floor | Drag to lay or restyle floor on the side of any walls where you start; Shift-click floors or restyles the whole room; hold Ctrl to remove. Stairs: click the foot, move the way they climb, click short of the top for a landing, at the top to build; choose square or rounded landings |
 | 4 Doors and windows | Pick a door, staff door, glass window or barred window, then click a wall; click it again to fill it in. A door can't join floors more than a step apart (see Door Steps below) |
-| 5 Objects | Click to place; R turns by 45° and [ / ] change the step (90° down to 1°); hold F to pin it and turn it to face the mouse; hold Alt to place freely. Lifts link with a lift in the same spot upstairs |
+| 5 Objects | Click to place; R turns by 45° and [ / ] change the step (90° down to 1°); hold F to pin it and turn it to face the mouse; hold Alt to place freely; V changes its look (pine, metal, painted and so on, or Mixed). Small things such as a chess board or a monitor go on a table, desk or counter top, and chairs face the nearest table. Lifts link with a lift in the same spot upstairs |
 | 6 Room type | Click a room to mark it as a cell, canteen and so on |
-| 7 Paths | Straight: click each end. Curved: click the start, a bend and the end. Freehand: drag. Points snap to the middle of tiles (bends don't); hold Alt to swap that for one point, or turn Snap to grid off. Page Up / Down while placing builds stairs, a ramp or a bridge and raises its far end. Esc stops; Ctrl-click removes a path |
+| 7 Paths | Pick a path or road style. Straight: click each end. Curved: click the start, a bend and the end. Freehand: drag. Points snap to the middle of tiles (bends don't); hold Alt to swap that for one point, or turn Snap to grid off. Page Up / Down while placing builds stairs, a ramp or a bridge and raises its far end. Esc stops; Ctrl-click removes a path |
 | 8 Plants | Hold to plant trees, bushes or flowers; hold Ctrl to clear them. The Size slider goes down to Single, which places one plant per click; Density spaces them out |
-| 9 Terrain | Hold to raise, lower, flatten or smooth the ground, with sliders for size and strength; or add water to a hollow, or drain a pond |
+| 9 Terrain | Hold to raise, lower, flatten or smooth the ground, with sliders for size and strength; or add water to a hollow, or drain a pond. **Buy land** shows the plots for sale next to your land: click one to buy it, ticking **Flatten when bought** to level it with your land for a fee |
 | 0 Demolish | Click an object or wall to remove it, or drag to clear an area |
 | Z Zones | Rooms tint by who may be in them. Pick a zone (Prisoners and staff, Staff only, Visitors and staff, Everyone) and click a room to paint it, or pick Room type's to go back to its default. Click a door to lock or unlock it until the block changes; Shift-click to pin it that way |
 | X Patrol routes | Click points to draw a loop for guards to walk; click the first point or press Enter to close it, Esc to stop. Ctrl-click a route to remove it. Put guards on it in the Staff window |
 | [ / ] | Brush size, for terrain and plants |
 | Tab | Loops through the wall views: Walls up; Cutaway (walls in front of rooms drop, following the camera round); Walls down; Roofs on (every level with its roofs, as from outside) |
+| Ctrl+Z / Ctrl+Y | Undo or redo building and landscaping (Ctrl+Shift+Z redoes too) |
 | Esc | Put the tool away |
 | F1 | The controls card |
 | F3 | Debug view: rooms tinted and labelled, and details of the tile under the mouse. With no build tool (Esc), click a person, object, room or tile to inspect it: set a person's needs, send them somewhere, add or remove prisoners, pause everyone |
@@ -55,6 +56,9 @@ Built with [Godot 4.7](https://godotengine.org/).
 | , / . | Slower or faster: 1×, 2× or 4× |
 | T | The timetable |
 | P | Staff and work programmes |
+| M | Money: the balance, today's and yesterday's lines, and Sandbox |
+| O | The warden's office: intake, grant goals, the grade and the daily report |
+| F2 | Save and load: three slots and the morning autosave |
 
 Hover any button in the build menu to see what it is. The room, floor and
 wall tools let you pick a style from the picture tiles above the toolbar;
@@ -180,8 +184,10 @@ set how many cooks, cleaners, handymen and guards work days (06:00 to
 18:00) and nights (18:00 to 06:00), put guards on patrol routes, and put
 prisoners on or off a work programme (kitchen, laundry, cleaning,
 workshop). Staff arrive at the edge of the land early enough to walk in
-before their shift, and go home when it ends. They are free until wages
-come with M6; nights will pay half as much again.
+before their shift, and go home when it ends: by car when there is a car
+park (pairs of car park tiles) near the road, otherwise on foot from the
+edge of the land. Each is paid a wage as their shift starts, with nights
+paying half as much again.
 
 With Staff needs on (the default, in the Staff window), staff get
 hungry, need the toilet and run low on energy over a shift; a coffee
@@ -213,6 +219,36 @@ waiting), the stock of every item and anything that stops the kitchen or
 laundry working and anything broken, and dotted lines show where each
 worker is heading. Patrol routes show as dotted loops too.
 
+### Money, the warden and new arrivals
+
+You start with £20,000 (press M). Building costs money as you build and
+gives three quarters back when you demolish (all of it if you undo).
+Each midnight the prison is paid a grant for every prisoner, wages go out
+as each shift starts, the lorry buys food and takes the workshop's goods
+to sell, and each new prisoner brings a fee. Out of money, building and
+hiring stop until the balance is back above zero. Tick **Sandbox** in the
+Money window to build for free.
+
+Every map has a road in from its edge. Each morning at 09:00 a bus drives
+in to the bus stop (or the entrance), and the day's arrivals walk to
+reception to be searched, then a guard walks them to a free bed. Nobody
+comes without a reception or a free bed. Hire a warden and give them an
+office with an office desk to choose how many come and which security
+categories you accept (press O); they also unlock grant goals that pay
+out when done and a report each morning. Each midnight the prison is
+graded from one to five stars on safety, wellbeing, reform and money; a
+better grade means a bigger grant.
+
+Press F2 to save into one of three slots, or load one; the game also saves
+itself each morning. A save keeps everyone in the middle of what they
+were doing: walking somewhere, eating, at work.
+
+More land is for sale in plots of 8 × 8 tiles next to your own, in any
+direction (the Terrain tool's **Buy land**). Flat, dry plots cost the most;
+hills and water make them cheaper. Tick **Flatten when bought** to level
+the plot with your land along their shared edge, for a fee by how much
+ground moves. Buying land can't be undone.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one
@@ -232,6 +268,7 @@ how prisoners find their way:
 | Staff wing | A staff room behind a staff door, and an office zoned staff only |
 | Working prison | The staff wing with a kitchen, laundry and workshop, three staff and prisoners on work programmes |
 | Guarded prison | The working prison with a guard post and a security gate to the yard, two guards by day and one by night |
+| Paying prison | The guarded prison with a warden in an office, a reception, a car park and a bus stop on the road |
 
 See [docs/design/building.md](docs/design/building.md) for the design
 decisions behind all this.

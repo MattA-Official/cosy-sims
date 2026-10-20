@@ -26,7 +26,17 @@ evening-sized chunks.
    staff energy and the needs setting, guards with guard posts, security
    gates and patrol routes (`games/prison/guarding.gd`,
    `core/jobs/patrol_routes.gd`), and wear and repair
-   (`core/jobs/wear.gd`).*
+   (`core/jobs/wear.gd`). M6 added money (`core/money/`: a ledger,
+   building costs, wages, grants), the bus and new arrivals through
+   reception (`games/prison/intake.gd`), the warden's office with grant
+   goals, a daily grade and report (`games/prison/office.gd`,
+   `games/prison/standing.gd`), undo and saving
+   (`core/save/undo_history.gd`, `games/prison/prison_save.gd`),
+   flexible objects (chairs and small things on tables and desks, looks
+   and staff dressing their own desk), roads with vehicles and car parks
+   (`core/paths/roads.gd`, `core/paths/vehicles.gd`,
+   `games/prison/car_park.gd`), and buying land
+   (`core/building/land_plots.gd`).*
 4. **Review and extract the core.** Note what is prison-specific and what is
    generic (camera, grid, building, agents, needs, schedules), then move the
    generic parts into `core/`.
