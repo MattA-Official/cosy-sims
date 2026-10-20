@@ -110,6 +110,10 @@ PALETTE = dict(
     lorry=("#f2efe6", 0.5, 0),
     stripe=("#8aa98a", 0.6, 0),
     blue_stripe=("#7d93ad", 0.6, 0),
+    pine=("#e2b47a", 0.6, 0),           # solid pine furniture
+    painted=("#b9c7b4", 0.5, 0),        # painted wooden furniture, soft sage
+    cushion=("#8a9bb5", 0.85, 0),       # chair cushions
+    coffee=("#6b4a36", 0.3, 0),
     gold=("#e0b65a", 0.35, 0.6),        # staff badge
     trunk=("#ffffff", 0.9, 0),
     canopy=("#ffffff", 0.9, 0),
@@ -337,11 +341,150 @@ def table():
     return p
 
 
-def desk():
-    p = Prop("desk", 180)  # 1 x 0.5, bolted to the wall behind
-    p.box("wood", (0.95, 0.46, 0.06), (0, 0, 0.5), 0.025, 3)
+# Surfaces: plain tops with nothing on them. Things go on them as their own
+# props, and chairs stand beside them. Each comes in looks that share one
+# shape: the default (beech laminate on painted metal), pine, metal and
+# painted, exported as <name>, <name>_pine, <name>_metal and <name>_painted.
+LOOKS = {"": ("wood", "paint"), "pine": ("pine", "pine"), "metal": ("steel", "steel_dark"),
+         "painted": ("painted", "painted")}
+
+
+def _looks(make):
+    """One builder per look: make(name, top, legs) -> Prop."""
+    out = {}
+    for look, (top, legs) in LOOKS.items():
+        name = make.__name__ + ("_" + look if look else "")
+        out[name] = (lambda name=name, top=top, legs=legs: make(name, top, legs))
+    return out
+
+
+def desk(name="desk", top="wood", legs="paint"):
+    p = Prop(name, 180)  # 1 x 0.5, bolted to the wall behind; top at 0.53
+    p.box(top, (0.95, 0.46, 0.06), (0, 0, 0.5), 0.025, 3)
     for x in (-0.4, 0.4):
-        p.tube("paint", [(x, -0.2, 0.47), (x, 0.15, 0.47), (x, 0.15, 0)], 0.025, 0.1, n=10)
+        p.tube(legs, [(x, -0.2, 0.47), (x, 0.15, 0.47), (x, 0.15, 0)], 0.025, 0.1, n=10)
+    return p
+
+
+def office_desk(name="office_desk", top="wood", legs="paint", back=0.0):
+    """1.5 x 0.75 desk with drawers, top at 0.53. `back` moves it towards
+    the back of a deeper footprint."""
+    p = Prop(name)
+    y = back
+    p.box(top, (1.45, 0.7, 0.06), (0, y, 0.5), 0.025, 3)
+    for x in (-0.66, 0.66):
+        p.box(legs, (0.06, 0.62, 0.47), (x, y, 0.235), 0.015, 2)
+    p.box(legs, (0.4, 0.62, 0.42), (0.42, y, 0.26), 0.02, 2)
+    for z in (0.16, 0.34):
+        p.box("steel", (0.12, 0.02, 0.03), (0.42, y - 0.32, z), 0.008, 1)
+    p.box(legs, (0.8, 0.03, 0.3), (-0.2, y + 0.3, 0.3), 0.01, 1)  # modesty panel
+    return p
+
+
+def games_table(name="games_table", top="wood", legs="paint"):
+    p = Prop(name)  # 1 x 1 small table, top at 0.725
+    p.box(top, (0.9, 0.9, 0.05), (0, 0, 0.7), 0.03, 3)
+    p.tube(legs, [(0, 0, 0), (0, 0, 0.68)], 0.04, 0, n=12)
+    p.cyl(legs, 0.25, 0.03, (0, 0, 0.015), bevel=0.012, n=24)
+    return p
+
+
+# Chairs: 0.5 x 0.5, the sitter faces the front (Godot +z); seat top 0.32.
+
+def chair(name="chair", seat="paint", frame="steel_dark"):
+    p = Prop(name)
+    p.box(seat, (0.4, 0.38, 0.04), (0, 0, 0.3), 0.015, 2)
+    p.box(seat, (0.4, 0.04, 0.26), (0, 0.19, 0.5), 0.015, 2)
+    for x in (-0.17, 0.17):
+        for y in (-0.15, 0.17):
+            p.tube(frame, [(x, y, 0.0), (x, y, 0.29)], 0.014, 0, n=8)
+        p.tube(frame, [(x, 0.17, 0.29), (x, 0.19, 0.62)], 0.014, 0, n=8)
+    return p
+
+
+def chair_cushioned():
+    p = chair("chair_cushioned", seat="wood", frame="wood")
+    p.box("cushion", (0.38, 0.36, 0.05), (0, -0.01, 0.345), 0.022, 3)
+    return p
+
+
+def chair_pine():
+    return chair("chair_pine", seat="pine", frame="pine")
+
+
+def office_chair():
+    p = Prop("office_chair")  # swivel chair
+    p.box("vinyl", (0.38, 0.36, 0.07), (0, 0, 0.31), 0.03, 3)
+    p.box("vinyl", (0.36, 0.06, 0.32), (0, 0.19, 0.52), 0.03, 3)
+    p.tube("steel_dark", [(0, 0.17, 0.33), (0, 0.2, 0.4)], 0.02, 0, n=8)
+    p.tube("steel_dark", [(0, 0, 0.28), (0, 0, 0.06)], 0.025, 0, n=10)
+    for a in range(5):
+        ang = math.radians(a * 72)
+        p.tube("steel_dark", [(0, 0, 0.06), (math.sin(ang) * 0.2, math.cos(ang) * 0.2, 0.05)], 0.018, 0, n=8)
+        p.ball("rubber", 0.025, (math.sin(ang) * 0.2, math.cos(ang) * 0.2, 0.025), u=8, v=6)
+    return p
+
+
+# Small things that sit on a surface: origin at the middle of the bottom,
+# front towards Godot's +z.
+
+def chess_board():
+    p = Prop("chess_board")  # 0.4 x 0.4 board with a few pieces
+    p.box("cream", (0.4, 0.4, 0.02), (0, 0, 0.01), 0.006, 1)
+    for i in range(4):
+        for j in range(4):
+            if (i + j) % 2 == 0:
+                p.box("book_c", (0.09, 0.09, 0.006), (-0.15 + i * 0.1, -0.15 + j * 0.1, 0.022), 0, 0)
+    for k, (x, y) in enumerate(((-0.15, -0.15), (0.05, -0.15), (-0.05, 0.15), (0.15, 0.05))):
+        p.cyl("rubber" if k % 2 else "sheet", 0.03, 0.02, (x, y, 0.035), bevel=0.006, n=14)
+        p.ball("rubber" if k % 2 else "sheet", 0.022, (x, y, 0.06), u=10, v=6)
+    return p
+
+
+def cctv_monitor():
+    p = Prop("cctv_monitor")  # 0.5 x 0.25 monitor and keyboard, screen to the front
+    p.box("steel_dark", (0.52, 0.12, 0.36), (0, 0.06, 0.3), 0.04, 3)
+    p.box("screen", (0.44, 0.02, 0.28), (0, -0.005, 0.3), 0.01, 1)
+    p.box("light", (0.004, 0.022, 0.28), (0, -0.005, 0.3), 0, 0)
+    p.box("light", (0.44, 0.022, 0.004), (0, -0.005, 0.3), 0, 0)
+    p.box("steel_dark", (0.08, 0.08, 0.1), (0, 0.08, 0.06), 0.02, 2)
+    p.box("steel_dark", (0.2, 0.14, 0.015), (0, 0.08, 0.0075), 0.006, 1)
+    p.box("steel_dark", (0.36, 0.12, 0.02), (0, -0.1, 0.01), 0.008, 1)  # keyboard
+    return p
+
+
+def nameplate():
+    p = Prop("nameplate")  # a little wooden block with a brass plate
+    p.taper("wood", (0.22, 0.06), (0.22, 0.03), 0.06, (0, 0, 0.03), 0.008, 1)
+    p.box("gold", (0.18, 0.01, 0.035), (0, -0.026, 0.032), 0.003, 1, rot=(-15, 0, 0))
+    return p
+
+
+def in_tray():
+    p = Prop("in_tray")  # two stacked wire trays with papers
+    for z in (0.0, 0.07):
+        p.box("steel", (0.3, 0.24, 0.012), (0, 0, z + 0.006), 0.004, 1)
+        for x in (-0.15, 0.15):
+            p.box("steel", (0.012, 0.24, 0.04), (x, 0, z + 0.02), 0.003, 1)
+        p.box("paper", (0.26, 0.2, 0.02), (0, 0.01, z + 0.022), 0.004, 1)
+    for x in (-0.13, 0.13):
+        p.tube("steel", [(x, 0.1, 0.0), (x, 0.1, 0.08)], 0.006, 0, n=6)
+    return p
+
+
+def desk_plant():
+    p = Prop("desk_plant")  # a little pot plant
+    p.cyl("pot", 0.06, 0.09, (0, 0, 0.045), r2=0.075, bevel=0.012, n=18)
+    for loc, r in (((0, 0, 0.13), 0.07), ((0.04, 0.02, 0.17), 0.05), ((-0.04, -0.01, 0.16), 0.05)):
+        p.ball("leaf", r, loc, u=12, v=8)
+    return p
+
+
+def mug():
+    p = Prop("mug")
+    p.cyl("cream", 0.04, 0.09, (0, 0, 0.045), bevel=0.012, n=18)
+    p.tube("cream", [(0.04, 0, 0.07), (0.07, 0, 0.065), (0.07, 0, 0.03), (0.04, 0, 0.025)], 0.01, 0.015, n=8)
+    p.cyl("coffee", 0.034, 0.005, (0, 0, 0.085), bevel=0, n=16)
     return p
 
 
@@ -367,31 +510,9 @@ def coffee_machine():
 
 
 def guard_desk():
-    """1.5 x 1 guard post: desk against the wall behind, a CCTV monitor
-    facing the chair at the front."""
-    p = Prop("guard_desk")
-    p.box("wood", (1.45, 0.55, 0.06), (0, 0.2, 0.5), 0.025, 3)
-    for x in (-0.66, 0.66):
-        p.box("paint", (0.06, 0.5, 0.47), (x, 0.2, 0.235), 0.015, 2)
-    p.box("paint", (0.4, 0.5, 0.42), (0.42, 0.2, 0.26), 0.02, 2)  # drawers
-    for z in (0.16, 0.34):
-        p.box("steel", (0.12, 0.02, 0.03), (0.42, -0.06, z), 0.008, 1)
-    # Monitor with a split CCTV picture.
-    p.box("steel_dark", (0.52, 0.12, 0.36), (-0.1, 0.32, 0.79), 0.04, 3)
-    p.box("screen", (0.44, 0.02, 0.28), (-0.1, 0.255, 0.79), 0.01, 1)
-    p.box("light", (0.004, 0.022, 0.28), (-0.1, 0.255, 0.79), 0, 0)
-    p.box("light", (0.44, 0.022, 0.004), (-0.1, 0.255, 0.79), 0, 0)
-    p.box("steel_dark", (0.08, 0.08, 0.1), (-0.1, 0.34, 0.58), 0.02, 2)
-    p.box("steel_dark", (0.36, 0.14, 0.02), (-0.1, 0.0, 0.54), 0.008, 1)  # keyboard
-    p.box("paper", (0.18, 0.24, 0.01), (0.35, 0.05, 0.535), 0.003, 1, rot=(0, 0, -12))
-    # Swivel chair at the front, facing the desk.
-    p.box("vinyl", (0.38, 0.36, 0.07), (0, -0.25, 0.33), 0.03, 3)
-    p.box("vinyl", (0.36, 0.06, 0.32), (0, -0.44, 0.52), 0.03, 3)
-    p.tube("steel_dark", [(0, -0.25, 0.3), (0, -0.25, 0.06)], 0.025, 0, n=10)
-    for a in range(5):
-        ang = math.radians(a * 72)
-        p.tube("steel_dark", [(0, -0.25, 0.06), (math.sin(ang) * 0.2, -0.25 + math.cos(ang) * 0.2, 0.05)], 0.018, 0, n=8)
-    return p
+    """1.5 x 1 guard post: a plain office desk at the back of the footprint,
+    room for a chair at the front. The monitor and chair are their own."""
+    return office_desk("guard_desk", back=0.12)
 
 
 def reception_desk():
@@ -663,21 +784,6 @@ def bookshelf():
         if row == 1:  # a few lying flat at the end
             for i in range(3):
                 p.box(colours[(i + 1) % 4], (0.22, 0.26, 0.045), (0.3, 0.06, z + 0.045 + i * 0.047), 0.012, 2)
-    return p
-
-
-def games_table():
-    p = Prop("games_table")  # 1 x 1 small table with a board game on it
-    p.box("wood", (0.9, 0.9, 0.05), (0, 0, 0.7), 0.03, 3)
-    p.tube("paint", [(0, 0, 0), (0, 0, 0.68)], 0.04, 0, n=12)
-    p.cyl("paint", 0.25, 0.03, (0, 0, 0.015), bevel=0.012, n=24)
-    p.box("cream", (0.4, 0.4, 0.02), (0, 0, 0.735), 0.006, 1)
-    for i in range(4):
-        for j in range(4):
-            if (i + j) % 2 == 0:
-                p.box("book_c", (0.09, 0.09, 0.006), (-0.15 + i * 0.1, -0.15 + j * 0.1, 0.747), 0, 0)
-    for k, (x, y) in enumerate(((-0.15, -0.15), (0.05, -0.15), (-0.05, 0.15), (0.15, 0.05))):
-        p.cyl("rubber" if k % 2 else "sheet", 0.03, 0.02, (x, y, 0.76), bevel=0.006, n=14)
     return p
 
 
@@ -1065,9 +1171,13 @@ def lorry():
     return p
 
 
-MODELS = dict(bed=bed, toilet=toilet, shower=shower, table=table, desk=desk, lift=lift, door=door,
+MODELS = dict(**_looks(desk), **_looks(office_desk), **_looks(games_table),
+              chair=chair, chair_cushioned=chair_cushioned, chair_pine=chair_pine,
+              office_chair=office_chair, chess_board=chess_board, cctv_monitor=cctv_monitor,
+              nameplate=nameplate, in_tray=in_tray, desk_plant=desk_plant, mug=mug,
+              bed=bed, toilet=toilet, shower=shower, table=table, lift=lift, door=door,
               cell_door=cell_door, person=person, tree=tree, bush=bush, flower=flower,
-              radio=radio, tv=tv, bookshelf=bookshelf, games_table=games_table,
+              radio=radio, tv=tv, bookshelf=bookshelf,
               weights_bench=weights_bench, basketball_hoop=basketball_hoop, bench=bench, sink=sink,
               rug=rug, poster=poster, plant_pot=plant_pot, wall_shelf=wall_shelf,
               cooker=cooker, fridge=fridge, serving_counter=serving_counter,

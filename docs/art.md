@@ -28,13 +28,11 @@ colours a real prison would plausibly use.
 
 ## What there is
 
-- Objects: bed, toilet, sink, shower, table (canteen), games_table, desk,
-  lift, tv, radio, bookshelf, wall_shelf, poster, rug, plant_pot, bench,
+- Objects: bed, toilet, sink, shower, table (canteen), lift, tv, radio, bookshelf, wall_shelf, poster, rug, plant_pot, bench,
   weights_bench, basketball_hoop.
 - Jobs: cooker, fridge, serving_counter, washing_machine, ironing_board,
   laundry_basket, clothes_shelf, workbench, storage_shelf, table_trolley,
-  bin, skip (outdoor), coffee_machine, guard_desk (1.5 x 1, chair at the
-  front facing the monitor), reception_desk (2 x 1 counter, staff side at
+  bin, skip (outdoor), coffee_machine, reception_desk (2 x 1 counter, staff side at
   the back).
 - Carried items (about 0.4 m, origin at the middle of the bottom):
   food_crate, meal_tray, dirty_laundry, clean_laundry, rubbish_bag,
@@ -52,6 +50,32 @@ colours a real prison would plausibly use.
 The poster and wall shelf are wall-hung: their footprint is on the floor
 against the wall, and the model is raised (poster middle about 1 m up,
 shelf top about 1.1 m).
+
+## Surfaces, chairs and small things
+
+Tables and desks are plain surfaces: chairs and the things on them are
+separate models, so the game can put them together (see "Flexible objects"
+on the future features doc). Positions below are in Godot metres, in the
+surface's own frame (front is +z, as for every object).
+
+| Surface | Footprint | Top | Spots for small things | Chair sides |
+| --- | --- | --- | --- | --- |
+| `games_table` | 1 x 1 | 0.725 | four at (±0.2, ±0.2), or one board in the middle | front and back at z ±0.65, also x ±0.65 |
+| `desk` (cell desk, against a wall) | 1 x 0.5 | 0.53 | two at x ±0.25, z 0 | front, z +0.5 |
+| `office_desk` | 1.5 x 0.75 | 0.53 | three at x -0.5, 0, +0.5, z -0.05 | front, z +0.6 |
+| `guard_desk` (office desk at the back of 1.5 x 1) | 1.5 x 1 | 0.53 | three at x -0.5, 0, +0.5, z -0.17 | front, z +0.3 |
+
+- **Looks**: each surface also comes as `<name>_pine`, `<name>_metal` and
+  `<name>_painted`, the same shape and size, so one definition can pick
+  any of them.
+- **Chairs** (0.5 x 0.5, seat top 0.32, the sitter faces +z, so turn a
+  chair half round to face a table from its front): `chair` (painted
+  metal), `chair_cushioned`, `chair_pine`, `office_chair` (swivel).
+- **Small things** (origin at the middle of the bottom; the front faces
+  +z, towards whoever sits at the front): `chess_board` (0.4 x 0.4),
+  `cctv_monitor` (0.5 x 0.25, with keyboard), `radio`, and the warden's desk
+  dressing `nameplate` (turn it to face visitors), `in_tray`,
+  `desk_plant`, `mug`.
 
 ## Scale and orientation
 
