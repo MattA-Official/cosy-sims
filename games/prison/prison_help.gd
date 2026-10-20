@@ -14,8 +14,9 @@ const SECTIONS := [
 	]],
 	["Building", [
 		["1 to 0", "Pick a tool"],
+		["Z", "Zones: who may go where, and door locks"],
 		["Esc", "Put the tool away"],
-		["Shift", "Floor: the whole room"],
+		["Shift", "Floor: the whole room; Zones: pin a lock"],
 		["Ctrl", "Remove instead"],
 		["Alt", "Place freely, or any angle"],
 		["R", "Turn an object"],

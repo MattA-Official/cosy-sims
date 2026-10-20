@@ -4,7 +4,8 @@ extends Node3D
 ## shows a see-through preview of what will happen before you commit.
 ##
 ## Drag tools (room, floor, wall, demolish) act when you let go of the left
-## mouse button. Click tools (openings, object, room type) act on click. Brush
+## mouse button. Click tools (openings, object, room type, zones) act on
+## click. Brush
 ## tools (terrain, plants) act for as long as the button is held.
 
 signal tool_changed(tool: Tool)
@@ -13,6 +14,9 @@ signal hint_changed
 ## The brush size or plant density changed.
 signal brush_changed
 signal wall_view_changed(mode: WallView)
+## The zones tool clicked a door, to lock or unlock it by hand; with `pin`
+## (Shift held) it stays that way past the block.
+signal door_lock_clicked(level: int, edge: Vector3i, pin: bool)
 
 ## What Tab loops through, like The Sims: walls up; cutaway (walls in front
 ## of rooms drop, as the camera looks); every wall down; and roofs on, for
@@ -27,7 +31,7 @@ var wall_view := WallView.UP:
 		wall_view = value
 		wall_view_changed.emit(value)
 
-enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH }
+enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE }
 enum WaterMode { NONE, ADD, REMOVE }
 ## What the floor tool does: lay floor, or nudge existing floor up or down.
 enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS }
@@ -54,6 +58,7 @@ const HINTS := {
 	Tool.TERRAIN: "Hold the mouse to shape your land. [ and ] change the brush size.",
 	Tool.PLANTS: "Hold the mouse to plant, or click to place one at the smallest size. Hold Ctrl to clear. [ and ] change the size.",
 	Tool.PATH: "",
+	Tool.ZONE: "Click a room to say who may be in it. Click a door to lock or unlock it until the next block; Shift-click to keep it so.",
 }
 
 const PATH_HINTS := {
@@ -151,6 +156,11 @@ var room_type: RoomTypeDef
 ## of window.
 var opening := BuildingMap.Wall.DOOR
 var window_kind := BuildingMap.WINDOW_GLASS
+## The kind of door the opening tool puts in, such as &"staff", or empty
+## for a plain door.
+var door_kind: StringName = &""
+## The zone the zones tool paints. Null goes back to the room type's.
+var zone: ZoneDef
 var terrain_brush := Terrain.Brush.RAISE
 ## When not NONE, the terrain tool adds or removes water instead of sculpting.
 var water_mode := WaterMode.NONE
@@ -341,7 +351,7 @@ func _on_press() -> void:
 			if _has_chosen_opening(edge):
 				map.set_opening(edge, BuildingMap.Wall.WALL)
 			else:
-				map.set_opening(edge, opening, window_kind)
+				map.set_opening(edge, opening, window_kind, door_kind)
 		Tool.OBJECT:
 			if object_def != null and _can_place(_object_centre()):
 				map.place_object_at(object_def, _object_centre(), object_angle)
@@ -349,6 +359,13 @@ func _on_press() -> void:
 			var room := map.room_at_point(_hover_point)
 			if room != null:
 				map.set_room_type(room, room_type.id if room_type != null else &"")
+		Tool.ZONE:
+			if _hover_door() != NO_DOOR:
+				door_lock_clicked.emit(_level(), _hover_door(), Input.is_action_pressed("build_whole_room"))
+				return
+			var room := map.room_at_point(_hover_point)
+			if room != null:
+				map.set_room_zone(room, zone.id if zone != null else &"")
 		Tool.PATH:
 			if paths == null:
 				return
@@ -691,7 +708,20 @@ func _ground_only(t: Tool) -> bool:
 func _has_chosen_opening(edge: Vector3i) -> bool:
 	if map.wall_at(edge) != opening:
 		return false
+	if opening == BuildingMap.Wall.DOOR:
+		return map.door_kind_at(edge) == door_kind
 	return opening != BuildingMap.Wall.WINDOW or map.window_kind(edge) == window_kind
+
+
+const NO_DOOR := Vector3i(0, 0, -1)
+
+
+## The door on a straight wall right by the mouse, or NO_DOOR.
+func _hover_door() -> Vector3i:
+	var edge := _hover_edge()
+	if _edge_distance() < 0.3 and map.wall_at(edge) == BuildingMap.Wall.DOOR:
+		return edge
+	return NO_DOOR
 
 
 ## Plants go down to single placement; terrain keeps a real brush.
@@ -1062,6 +1092,15 @@ func _draw_preview() -> void:
 				var colour := room_type.colour if room_type != null else Color.WHITE
 				colour.a = 0.45
 				_shapes.cells(room.cells, colour)
+		Tool.ZONE:
+			if _hover_door() != NO_DOOR:
+				_shapes.edge(_hover_door(), ok_colour)
+			else:
+				var room := map.room_at_point(_hover_point)
+				if room != null:
+					var colour := zone.colour if zone != null else Color.WHITE
+					colour.a = 0.45
+					_shapes.cells(room.cells, colour)
 	_shapes.draw(_preview_mesh, _preview_material)
 
 

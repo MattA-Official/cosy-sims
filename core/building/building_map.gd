@@ -104,6 +104,11 @@ var holes: Dictionary[Vector2i, bool] = {}
 ## Room types are stored per cell, so they survive rooms being split, merged
 ## or extended: each room takes the type most of its cells carry.
 var _room_types: Dictionary[Vector2i, StringName] = {}
+## Zones painted onto rooms (ZoneDef ids), stored per cell like room types.
+var _room_zones: Dictionary[Vector2i, StringName] = {}
+## The DoorKindDef id of each door that has one, such as a staff door.
+## Plain doors have none.
+var door_kinds: Dictionary[Vector3i, StringName] = {}
 var _next_object_id := 1
 var _next_stairs_id := 1
 var _rooms: Array[Room] = []
@@ -322,6 +327,7 @@ func remove_walls(edges: Array[Vector3i]) -> int:
 			wall_styles.erase(edge)
 			window_kinds.erase(edge)
 			wall_paints.erase(edge)
+			door_kinds.erase(edge)
 			count += 1
 	if count > 0:
 		_changed()
@@ -375,29 +381,43 @@ func door_steps() -> Dictionary[Vector3i, Vector2i]:
 	return found
 
 
-## Turns a wall into a door, or a door back into a wall.
-func set_door(edge: Vector3i, is_door: bool) -> bool:
-	return set_opening(edge, Wall.DOOR if is_door else Wall.WALL)
+## Turns a wall into a door, or a door back into a wall. `door_kind` makes
+## it a staff door and so on.
+func set_door(edge: Vector3i, is_door: bool, door_kind: StringName = &"") -> bool:
+	return set_opening(edge, Wall.DOOR if is_door else Wall.WALL, WINDOW_GLASS, door_kind)
 
 
 ## Makes a wall piece plain, a door or a window. Windows need a kind, and
-## can't go in outdoor walls such as fences. Returns whether anything changed.
-func set_opening(edge: Vector3i, kind: Wall, window: StringName = WINDOW_GLASS) -> bool:
+## can't go in outdoor walls such as fences; doors can have a kind, such
+## as a staff door. Returns whether anything changed.
+func set_opening(edge: Vector3i, kind: Wall, window: StringName = WINDOW_GLASS,
+		door_kind: StringName = &"") -> bool:
 	if wall_at(edge) == Wall.NONE or kind == Wall.NONE:
 		return false
 	if kind == Wall.WINDOW and is_outdoor_wall(edge):
 		return false
 	if kind == Wall.DOOR and not can_put_door(edge):
 		return false
-	if walls[edge] == kind and (kind != Wall.WINDOW or window_kind(edge) == window):
+	if walls[edge] == kind and (kind != Wall.WINDOW or window_kind(edge) == window) \
+			and (kind != Wall.DOOR or door_kind_at(edge) == door_kind):
 		return false
 	walls[edge] = kind
 	if kind == Wall.WINDOW:
 		window_kinds[edge] = window
 	else:
 		window_kinds.erase(edge)
+	if kind == Wall.DOOR and not door_kind.is_empty():
+		door_kinds[edge] = door_kind
+	else:
+		door_kinds.erase(edge)
 	_changed()
 	return true
+
+
+## The kind of door in a wall, such as &"staff", or empty for a plain door
+## or no door at all.
+func door_kind_at(edge: Vector3i) -> StringName:
+	return door_kinds.get(edge, &"") if wall_at(edge) == Wall.DOOR else &""
 
 #endregion
 
@@ -977,11 +997,21 @@ func room_at_point(point: Vector2) -> Room:
 
 ## Marks a room as a type. An empty type clears it.
 func set_room_type(room: Room, type: StringName) -> void:
+	_mark_cells(_room_types, room, type)
+
+
+## Paints a zone (who may be in it) onto a room. An empty zone goes back to
+## the room type's.
+func set_room_zone(room: Room, zone: StringName) -> void:
+	_mark_cells(_room_zones, room, zone)
+
+
+func _mark_cells(marks: Dictionary[Vector2i, StringName], room: Room, value: StringName) -> void:
 	for cell in room.cells:
-		if type.is_empty():
-			_room_types.erase(cell)
+		if value.is_empty():
+			marks.erase(cell)
 		else:
-			_room_types[cell] = type
+			marks[cell] = value
 	_changed()
 
 #endregion
@@ -1062,6 +1092,7 @@ func _clear_floor(rect: Rect2i) -> int:
 		if floors.erase(cell):
 			count += 1
 		_room_types.erase(cell)
+		_room_zones.erase(cell)
 	return count
 
 
@@ -1147,7 +1178,8 @@ func _update_rooms() -> void:
 							_piece_rooms[_piece_id(next)] = room
 							stack.append(next)
 			room.indoor = room.enclosed and not fenced
-			_settle_room_type(room)
+			room.type = _settle(_room_types, room)
+			room.zone = _settle(_room_zones, room)
 			_rooms.append(room)
 
 
@@ -1155,19 +1187,19 @@ static func _piece_id(piece: TilePiece) -> Vector3i:
 	return Vector3i(piece.cell.x, piece.cell.y, piece.index)
 
 
-## Gives a room the type most of its cells carry, and spreads it to the rest.
-func _settle_room_type(room: Room) -> void:
+## The mark (type or zone) most of a room's cells carry, spread to the
+## rest of its cells.
+func _settle(marks: Dictionary[Vector2i, StringName], room: Room) -> StringName:
 	var votes := {}
 	for cell in room.cells:
-		var type: StringName = _room_types.get(cell, &"")
-		if not type.is_empty():
-			votes[type] = votes.get(type, 0) + 1
+		var mark: StringName = marks.get(cell, &"")
+		if not mark.is_empty():
+			votes[mark] = votes.get(mark, 0) + 1
 	var best: StringName = &""
-	for type: StringName in votes:
-		if best.is_empty() or votes[type] > votes[best]:
-			best = type
-	room.type = best
-	if best.is_empty():
-		return
-	for cell in room.cells:
-		_room_types[cell] = best
+	for mark: StringName in votes:
+		if best.is_empty() or votes[mark] > votes[best]:
+			best = mark
+	if not best.is_empty():
+		for cell in room.cells:
+			marks[cell] = best
+	return best

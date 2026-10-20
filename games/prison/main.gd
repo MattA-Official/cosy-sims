@@ -7,7 +7,7 @@ extends Node3D
 @export var build_sample_layout := true
 ## Which sample prison to start with. The F3 inspector can switch to another.
 @export_enum("Starter block", "Two storeys", "Hillside", "Island", "Long way round", "Basement",
-		"Crowded canteen", "Locked out") var sample := 0
+		"Crowded canteen", "Locked out", "Staff wing") var sample := 0
 ## Split levels: floors nudged within their storey, and ramps between
 ## them. Off keeps every floor a whole storey above the one below.
 @export var split_levels := false
@@ -43,6 +43,8 @@ var schedule: Schedule = PrisonCatalogue.SCHEDULE.copy()
 var runner := ScheduleRunner.new()
 var day_night := DayNight.new()
 var door_lights := DoorLights.new()
+## Tints rooms by who may be in them while the zones tool is open.
+var zone_tints := ZoneTints.new()
 ## The day, time, block and speed, top left.
 var clock_bar := ClockBar.new()
 ## Painting the timetable, on T.
@@ -103,6 +105,7 @@ func _ready() -> void:
 	people.moodlet_defs = PrisonCatalogue.moodlets()
 	people.room_types = PrisonCatalogue.ROOM_TYPES
 	people.home_room_types = PrisonCatalogue.HOME_ROOM_TYPES
+	people.access = PrisonCatalogue.access()
 	people.building = building
 	people.paths = paths
 	people.clock = clock
@@ -117,7 +120,15 @@ func _ready() -> void:
 	door_lights.cell_size = grid.cell_size
 	door_lights.building = building
 	door_lights.runner = runner
+	door_lights.door_kinds = people.access.door_kinds
 	grid.add_child(door_lights)
+	controller.door_lock_clicked.connect(runner.toggle_lock)
+	zone_tints.name = "ZoneTints"
+	zone_tints.cell_size = grid.cell_size
+	zone_tints.access = people.access
+	zone_tints.controller = controller
+	zone_tints.building = building
+	grid.add_child(zone_tints)
 	day_night.name = "DayNight"
 	day_night.sun = sun
 	day_night.environment = world_environment.environment

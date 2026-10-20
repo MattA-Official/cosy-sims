@@ -1,11 +1,11 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [sample=N] [inspect=N]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [sample=N] [inspect=N] [zones]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
-## person.
+## person; "zones" opens the zones tool.
 
 const FRAMES_TO_WAIT := 90
 
@@ -35,6 +35,8 @@ func _process(_delta: float) -> bool:
 			clock.advance(minf(0.5, target - clock.total_minutes))
 		if args.has("timetable"):
 			_main.timetable.toggle()
+		if args.has("zones"):
+			_main.controller.tool = BuildController.Tool.ZONE
 		var inspect := _option("inspect")
 		if inspect >= 0 and inspect < _main.people.people.size():
 			_main.debug_overlay.visible = true

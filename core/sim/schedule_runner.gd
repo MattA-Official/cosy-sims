@@ -31,8 +31,17 @@ var schedules: Dictionary[StringName, Schedule] = {}:
 		for schedule: Schedule in schedules.values():
 			schedule.edited.connect(refresh)
 ## The doors the timetable controls, as (level, edge x, edge y, edge axis),
-## and whether each is locked: the doors of rooms people sleep in.
+## and whether each is locked: the doors of rooms people sleep in, and any
+## locked or unlocked by hand.
 var doors: Dictionary[Vector4i, bool] = {}
+## Doors locked (true) or unlocked (false) by hand, whatever the timetable
+## says. They go back to the timetable when the block changes, unless
+## pinned.
+var overrides: Dictionary[Vector4i, bool] = {}
+var pinned: Dictionary[Vector4i, bool] = {}
+
+## What the timetable alone wants each door it controls to be.
+var _planned: Dictionary[Vector4i, bool] = {}
 
 var _current: Dictionary[StringName, ActivityDef] = {}
 ## Game minutes on the clock when each group's block began.
@@ -62,6 +71,9 @@ func refresh() -> void:
 			_current[group] = def
 			_started[group] = clock.total_minutes
 			block_changed.emit(group, def)
+			for key: Vector4i in overrides.keys():
+				if not pinned.has(key):
+					overrides.erase(key)
 	for person in people.people:
 		people.set_block(person, current(person.group))
 	_every_minute()
@@ -107,6 +119,14 @@ func _update_doors() -> void:
 			for edge in room_doors(map, room):
 				var key := Vector4i(n, edge.x, edge.y, edge.z)
 				wanted[key] = wanted.get(key, false) or lock
+	_planned = wanted.duplicate()
+	for key: Vector4i in overrides.keys():
+		var map := building.levels.get(key.x) as BuildingMap
+		if map == null or map.wall_at(Vector3i(key.y, key.z, key.w)) != BuildingMap.Wall.DOOR:
+			overrides.erase(key)
+			pinned.erase(key)
+		else:
+			wanted[key] = overrides[key]
 	var changed := wanted.size() != doors.size()
 	for key: Vector4i in doors:
 		if not wanted.has(key):
@@ -117,6 +137,28 @@ func _update_doors() -> void:
 	doors = wanted
 	if changed:
 		doors_changed.emit()
+
+
+## Locks a door by hand if it is open, or unlocks it if locked, until the
+## block changes. With `pin`, it stays that way until clicked again.
+func toggle_lock(level: int, edge: Vector3i, pin := false) -> void:
+	var key := Vector4i(level, edge.x, edge.y, edge.z)
+	if pin and overrides.has(key):
+		# Pinning (or unpinning) keeps the door as it is.
+		if pinned.has(key):
+			pinned.erase(key)
+			overrides.erase(key)
+		else:
+			pinned[key] = true
+	else:
+		overrides[key] = not people.is_door_locked(level, edge)
+		if pin:
+			pinned[key] = true
+		elif not pinned.has(key) and overrides[key] == _planned.get(key, false):
+			# Back to what the timetable wants, so no longer overridden.
+			overrides.erase(key)
+	_update_doors()
+	doors_changed.emit()
 
 
 func _update_lateness() -> void:

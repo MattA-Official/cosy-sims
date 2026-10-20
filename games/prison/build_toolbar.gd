@@ -3,7 +3,7 @@ extends VBoxContainer
 ## bar of choices for the current tool above it, and a hint. Choices from the
 ## catalogue (objects, floors, walls, rooms, plants, paths) are picture tiles
 ## with their name on hover, so new entries slot in without new code.
-## Number keys 1 to 9, then 0, pick tools.
+## Number keys 1 to 9, then 0, pick tools, and Z the zones tool.
 
 @export var controller: BuildController
 
@@ -21,10 +21,13 @@ const TOOLS := [
 	[BuildController.Tool.PLANTS, "Plants", "Plant trees, bushes and flowers.", "tool_plants"],
 	[BuildController.Tool.TERRAIN, "Terrain", "Shape the ground, or add and drain water.", "tool_terrain"],
 	[BuildController.Tool.DEMOLISH, "Demolish", "Remove objects and walls, or clear an area.", "tool_demolish"],
+	[BuildController.Tool.ZONE, "Zones", "Say who may go where, and lock doors by hand.", "tool_zones"],
 ]
-## A divider goes before each of these tools, grouping building, grounds
-## and demolish.
-const GROUP_STARTS: Array[int] = [6, 9]
+## A divider goes before each of these tools, grouping building, grounds,
+## demolish and running the prison.
+const GROUP_STARTS: Array[int] = [6, 9, 10]
+## Keys for tools past the tenth, which have no number.
+const EXTRA_KEYS: Array[String] = ["Z"]
 
 const ICONS := "res://core/ui/icons/%s.svg"
 
@@ -74,6 +77,7 @@ const WATER_MODES := [
 ## Each is [wall kind, window kind, name, icon, what it does].
 const OPENINGS := [
 	[BuildingMap.Wall.DOOR, &"", "Door", "opening_door", "A door people can walk through."],
+	[BuildingMap.Wall.DOOR, &"staff", "Staff door", "opening_staff_door", "Only staff walk through, whatever the rooms either side allow."],
 	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_GLASS, "Glass window", "opening_glass", "Lets light in."],
 	[BuildingMap.Wall.WINDOW, BuildingMap.WINDOW_BARS, "Barred window", "opening_bars", "For cells and secure rooms."],
 ]
@@ -113,7 +117,8 @@ func _ready() -> void:
 	tools_bar.add_child(tools)
 	for i in TOOLS.size():
 		var tool: BuildController.Tool = TOOLS[i][0]
-		var button := _make_tool_button(str((i + 1) % 10), TOOLS[i][1], TOOLS[i][2], TOOLS[i][3], _tool_group)
+		var key := str((i + 1) % 10) if i < 10 else EXTRA_KEYS[i - 10]
+		var button := _make_tool_button(key, TOOLS[i][1], TOOLS[i][2], TOOLS[i][3], _tool_group)
 		button.toggled.connect(func(on: bool) -> void:
 			if on:
 				controller.tool = tool
@@ -136,6 +141,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if key == null or not key.pressed or key.echo:
 		return
 	var index := 9 if key.physical_keycode == KEY_0 else key.physical_keycode - KEY_1
+	if key.physical_keycode == KEY_Z:
+		index = 10
+	elif index > 9:
+		index = -1
 	if index >= 0 and index < TOOLS.size():
 		var tool: BuildController.Tool = TOOLS[index][0]
 		controller.tool = BuildController.Tool.NONE if controller.tool == tool else tool
@@ -177,6 +186,9 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 					func(def: Resource) -> void: controller.room_type = def, "Clear")
 		BuildController.Tool.OPENING:
 			_add_opening_choices()
+		BuildController.Tool.ZONE:
+			_add_choices("Who may be here", PrisonCatalogue.ZONES, controller.zone,
+					func(def: Resource) -> void: controller.zone = def, "Room type's")
 		BuildController.Tool.TERRAIN:
 			_add_brush_choices()
 		BuildController.Tool.PATH:
@@ -311,14 +323,18 @@ func _add_opening_choices() -> void:
 		var kind: BuildingMap.Wall = entry[0]
 		var window: StringName = entry[1]
 		var button := CosyButton.tile(entry[2], entry[4], load(ICONS % entry[3]), true, group)
+		# For doors, the second entry is the kind of door.
 		button.button_pressed = controller.opening == kind \
-				and (kind != BuildingMap.Wall.WINDOW or controller.window_kind == window)
+				and (kind != BuildingMap.Wall.WINDOW or controller.window_kind == window) \
+				and (kind != BuildingMap.Wall.DOOR or controller.door_kind == window)
 		button.toggled.connect(func(on: bool) -> void:
 			if not on:
 				return
 			controller.opening = kind
 			if kind == BuildingMap.Wall.WINDOW:
-				controller.window_kind = window)
+				controller.window_kind = window
+			else:
+				controller.door_kind = window)
 		row.add_child(button)
 
 
@@ -454,8 +470,9 @@ func _add_choices(title: String, defs: Array, current: Resource, pick: Callable,
 	for def: Resource in entries:
 		var button: CosyButton
 		if def == null:
-			button = CosyButton.tile(none_label, "Unmark a room.", load(ICONS % "clear"), true, group)
-		elif def is RoomTypeDef:
+			var what := "Go back to who the room type lets in." if title == "Who may be here" else "Unmark a room."
+			button = CosyButton.tile(none_label, what, load(ICONS % "clear"), true, group)
+		elif def is RoomTypeDef or def is ZoneDef:
 			button = CosyButton.tile(def.display_name, _describe(def), def.icon, true, group)
 		elif def is ObjectDef:
 			button = CosyButton.tile(def.display_name, _describe(def), _thumbnails.object(def), false, group)
@@ -499,6 +516,8 @@ func _describe(def: Resource) -> String:
 		var kind := "Outdoor" if def.outdoor else "Indoor"
 		return "%s, %s m high\n%s" % [kind, _number(def.height),
 				"Leaves rooms outdoors" if def.outdoor else "Makes rooms indoors"]
+	if def is ZoneDef:
+		return def.description
 	if def is RoomTypeDef:
 		var where: String = ["Indoors", "Outdoors", "Indoors or outdoors"][def.location]
 		if def.required_tags.is_empty():

@@ -25,6 +25,9 @@ enum Location { INDOORS, OUTDOORS, EITHER }
 ## privacy.
 @export var quality_bonus := 0.0
 @export var quality_bonus_text := ""
+## The ZoneDef id of who may be in it until the player paints another, such
+## as staff only for a staff room. Empty takes the game's usual zone.
+@export var zone: StringName
 
 
 ## What is stopping this room from working, in words. Empty means it is fine.

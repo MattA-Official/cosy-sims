@@ -5,7 +5,7 @@ class_name SamplePrisons
 ## Main node (Sample) or from the F3 inspector.
 
 const NAMES: Array[String] = ["Starter block", "Two storeys", "Hillside", "Island", "Long way round",
-		"Basement", "Crowded canteen", "Locked out"]
+		"Basement", "Crowded canteen", "Locked out", "Staff wing"]
 
 ## What each one tests, shown in the inspector.
 const CHALLENGES: Array[String] = [
@@ -17,6 +17,7 @@ const CHALLENGES: Array[String] = [
 	"The canteen and showers are in the basement, down stairs that turn at a landing.",
 	"Twenty-four hungry prisoners, a dorm of sixteen beds, two tables and two showers: they queue, give up and try again.",
 	"The showers have no door, and the canteen is 0.75 m up. With Door Steps on its door gets steps; with it off, nobody can eat.",
+	"A staff room behind a staff door and an office zoned staff only: staff come and go, prisoners keep out.",
 ]
 
 ## Set before reloading the scene to start in a different sample.
@@ -54,6 +55,7 @@ static func build(index: int, site: Site) -> bool:
 		5: _basement(site)
 		6: _crowded(site)
 		7: _locked_out(site)
+		8: _staff_wing(site)
 		_: return false
 	return true
 
@@ -325,6 +327,59 @@ static func _locked_out(site: Site) -> void:
 	_plant(site)
 	for i in 4:
 		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
+
+static func _staff_wing(site: Site) -> void:
+	_landscape(site)
+	var o := site.land().get_center() - Vector2i(10, 8)
+	var ground := site.map()
+	# A yard off the canteen, built first so the canteen and showers swap
+	# the shared fence for proper walls.
+	var yard := Rect2i(o + Vector2i(0, 10), Vector2i(12, 5))
+	ground.build_room(yard, &"lawn", &"fence")
+	ground.set_room_type(ground.room_at(yard.position), &"yard")
+	for i in 4:
+		var cell := o + Vector2i(i * 3, 0)
+		_cell(ground, Rect2i(cell, Vector2i(3, 3)))
+		_door(ground, cell + Vector2i(1, 2), Vector2i.DOWN)
+	var corridor := Rect2i(o + Vector2i(0, 3), Vector2i(16, 2))
+	_room(ground, corridor)
+	_door(ground, corridor.position, Vector2i.LEFT)
+	var canteen := Rect2i(o + Vector2i(0, 5), Vector2i(8, 5))
+	_room(ground, canteen, &"wood", &"brick", &"canteen")
+	_door(ground, canteen.position + Vector2i(3, 0), Vector2i.UP)
+	_tables(ground, canteen.position + Vector2i(1, 2), 2, 1)
+	var showers := Rect2i(o + Vector2i(8, 5), Vector2i(4, 5))
+	_room(ground, showers, &"tiles", &"brick", &"shower")
+	_door(ground, showers.position + Vector2i(1, 0), Vector2i.UP)
+	_showers(ground, showers.position + Vector2i(0, 4), 3)
+	# The staff room: only staff get through its door.
+	var staff_room := Rect2i(o + Vector2i(12, 5), Vector2i(4, 5))
+	_room(ground, staff_room, &"wood", &"plaster")
+	var staff_door := BuildingMap.edge_between(staff_room.position + Vector2i(1, 0), staff_room.position + Vector2i(1, -1))
+	ground.set_door(staff_door, true, &"staff")
+	var corner := Vector2(staff_room.position)
+	ground.place_object(PrisonCatalogue.object(&"tv"), corner + Vector2(3, 0), 0)
+	ground.place_object(PrisonCatalogue.object(&"table"), corner + Vector2(2, 2), 0)
+	ground.place_object(PrisonCatalogue.object(&"bench"), corner + Vector2(2.5, 4.5), 2)
+	ground.place_object(PrisonCatalogue.object(&"toilet"), corner + Vector2(0, 4.25), 2)
+	ground.place_object(PrisonCatalogue.object(&"plant_pot"), corner, 0)
+	ground.set_room_zone(ground.room_at(staff_room.position), &"staff")
+	# An office off the end of the corridor, with a plain door: zoned staff
+	# only, so prisoners keep out all the same.
+	var office := Rect2i(o + Vector2i(16, 2), Vector2i(4, 4))
+	_room(ground, office, &"wood", &"plaster")
+	_door(ground, office.position + Vector2i(0, 2), Vector2i.LEFT)
+	ground.place_object(PrisonCatalogue.object(&"desk"), Vector2(office.position) + Vector2(1, 0), 0)
+	ground.place_object(PrisonCatalogue.object(&"bookshelf"), Vector2(office.position) + Vector2(3, 0), 0)
+	ground.set_room_zone(ground.room_at(office.position), &"staff")
+	_door(ground, canteen.position + Vector2i(5, 4), Vector2i.DOWN)
+	ground.place_object(PrisonCatalogue.object(&"bench"), Vector2(yard.position) + Vector2(1, 4.5), 2)
+	ground.place_object(PrisonCatalogue.object(&"basketball_hoop"), Vector2(yard.position) + Vector2(10, 0.5), 0)
+	_plant(site)
+	for i in 6:
+		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
+	for i in 2:
+		site.people.add_person(0, Vector2(staff_room.position) + Vector2(1.5 - i, 3.5 - i), "", &"staff")
 
 #endregion
 

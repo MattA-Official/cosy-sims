@@ -54,6 +54,26 @@ const PATHS: Array[PathStyleDef] = [
 	preload("res://games/prison/catalogue/path_road.tres"),
 ]
 
+## The kinds of people, and who may go where.
+const GROUPS: Array[GroupDef] = [
+	preload("res://games/prison/catalogue/group_prisoner.tres"),
+	preload("res://games/prison/catalogue/group_staff.tres"),
+	preload("res://games/prison/catalogue/group_visitor.tres"),
+]
+
+const ZONES: Array[ZoneDef] = [
+	preload("res://games/prison/catalogue/zone_shared.tres"),
+	preload("res://games/prison/catalogue/zone_staff.tres"),
+	preload("res://games/prison/catalogue/zone_visitors.tres"),
+	preload("res://games/prison/catalogue/zone_everyone.tres"),
+]
+## Rooms nobody has painted, and whose type names no zone.
+const DEFAULT_ZONE := &"shared"
+
+const DOOR_KINDS: Array[DoorKindDef] = [
+	preload("res://games/prison/catalogue/door_staff.tres"),
+]
+
 ## What prisoners need, and what sees to it.
 const NEEDS: Array[NeedDef] = [
 	preload("res://games/prison/catalogue/need_sleep.tres"),
@@ -143,6 +163,21 @@ static func object(id: StringName) -> ObjectDef:
 
 
 ## Every moodlet, by id, as People wants them.
+## Who may go where, set up with the prison's groups, zones and doors.
+static func access() -> Access:
+	var out := Access.new()
+	for def in GROUPS:
+		out.groups[def.id] = def
+	for def in ZONES:
+		out.zones[def.id] = def
+	for def in DOOR_KINDS:
+		out.door_kinds[def.id] = def
+	for def in ROOM_TYPES:
+		out.room_types[def.id] = def
+	out.default_zone = DEFAULT_ZONE
+	return out
+
+
 static func moodlets() -> Dictionary[StringName, MoodletDef]:
 	var out: Dictionary[StringName, MoodletDef] = {}
 	for def in MOODLETS:

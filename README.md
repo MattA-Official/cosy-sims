@@ -34,13 +34,14 @@ Built with [Godot 4.7](https://godotengine.org/).
 | 1 Room | Drag to build a floor with walls all round |
 | 2 Wall | Drag from corner to corner to build or restyle; snaps straight or to 45°, or pick Any angle (or hold Alt); hold Ctrl to remove. Paint mode: click or drag along walls to paint the side you can see; Shift-click paints every wall round the room; Ctrl takes paint off |
 | 3 Floor | Drag to lay or restyle floor on the side of any walls where you start; Shift-click floors or restyles the whole room; hold Ctrl to remove. Stairs: click the foot, move the way they climb, click short of the top for a landing, at the top to build; choose square or rounded landings |
-| 4 Doors and windows | Pick a door, glass window or barred window, then click a wall; click it again to fill it in. A door can't join floors more than a step apart (see Door Steps below) |
+| 4 Doors and windows | Pick a door, staff door, glass window or barred window, then click a wall; click it again to fill it in. A door can't join floors more than a step apart (see Door Steps below) |
 | 5 Objects | Click to place; R turns by 45° and [ / ] change the step (90° down to 1°); hold F to pin it and turn it to face the mouse; hold Alt to place freely. Lifts link with a lift in the same spot upstairs |
 | 6 Room type | Click a room to mark it as a cell, canteen and so on |
 | 7 Paths | Straight: click each end. Curved: click the start, a bend and the end. Freehand: drag. Points snap to the middle of tiles (bends don't); hold Alt to swap that for one point, or turn Snap to grid off. Page Up / Down while placing builds stairs, a ramp or a bridge and raises its far end. Esc stops; Ctrl-click removes a path |
 | 8 Plants | Hold to plant trees, bushes or flowers; hold Ctrl to clear them. The Size slider goes down to Single, which places one plant per click; Density spaces them out |
 | 9 Terrain | Hold to raise, lower, flatten or smooth the ground, with sliders for size and strength; or add water to a hollow, or drain a pond |
 | 0 Demolish | Click an object or wall to remove it, or drag to clear an area |
+| Z Zones | Rooms tint by who may be in them. Pick a zone (Prisoners and staff, Staff only, Visitors and staff, Everyone) and click a room to paint it, or pick Room type's to go back to its default. Click a door to lock or unlock it until the block changes; Shift-click to pin it that way |
 | [ / ] | Brush size, for terrain and plants |
 | Tab | Loops through the wall views: Walls up; Cutaway (walls in front of rooms drop, following the camera round); Walls down; Roofs on (every level with its roofs, as from outside) |
 | Esc | Put the tool away |
@@ -153,6 +154,23 @@ Rooms get a quality score from -10 to +10: space per bed, windows, decor
 (rugs, posters, plants), and nicer floors and walls. A dorm sleeps four
 or more but costs a little mood for the lack of privacy.
 
+### Zones and doors
+
+Every room has a zone saying who may be in it. Rooms start in their
+type's zone, which for all of today's rooms is Prisoners and staff;
+the Zones tool (Z) paints a different one on, such as Staff only for an
+office. Ground outside any room is open to everyone. Staff doors let only
+staff through, whatever the rooms either side allow, and show a blue plate
+over them. Staff carry keys, so locked doors only stop prisoners (and
+visitors, later).
+
+Click a door with the Zones tool to lock or unlock it by hand: a padlock
+shows over it, and it goes back to the timetable when the block changes.
+Shift-click pins it that way (a red pin on the padlock) until you
+Shift-click it again. Prisoners caught in a room they may not be in walk
+out of it. In the F3 inspector, a room or tile can also take a member of
+staff, who wanders, eats and chats where staff may go.
+
 ### Sample prisons
 
 Pick a sample with **Sample** on the Main node, or press F3 and choose one
@@ -169,6 +187,7 @@ how prisoners find their way:
 | Basement | Canteen and showers in the basement, down stairs with a landing |
 | Crowded canteen | 24 prisoners in a dorm with too few beds, toilets and showers: a stress test for mood |
 | Locked out | Showers with no door, and a raised canteen that needs Door Steps |
+| Staff wing | A staff room behind a staff door, and an office zoned staff only |
 
 See [docs/design/building.md](docs/design/building.md) for the design
 decisions behind all this.

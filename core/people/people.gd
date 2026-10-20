@@ -120,8 +120,8 @@ var people: Array[Person] = []
 var graph: NavGraph
 ## Stops everyone, for looking at things in the inspector.
 var paused := false
-## Locked doors, as (level, edge x, edge y, edge axis).
-var locked_doors: Dictionary[Vector4i, bool] = {}
+## Who may go where: zones, staff doors and locked doors.
+var access := Access.new()
 
 var _dirty := true
 ## Whether the ground under the building has changed too (terrain, water or
@@ -139,8 +139,9 @@ var _claimed: Dictionary[Vector2i, Person] = {}
 var _bed_owners: Dictionary[Vector2i, Person] = {}
 var _bodies: Dictionary[Person, Node3D] = {}
 var _materials: Dictionary[Color, StandardMaterial3D] = {}
-## Rooms of the types each block sends people to, worked out once a step.
-var _rooms_for: Dictionary[ActivityDef, Array] = {}
+## Rooms of the types each block sends people to, by group (as zones
+## keep some groups out), worked out when first wanted.
+var _rooms_for: Dictionary[ActivityDef, Dictionary] = {}
 ## Each room's quality, worked out when first wanted after a build change.
 var _qualities: Dictionary[Room, RoomQuality] = {}
 ## People by (level, x, z) in squares NEARBY tiles across, for finding
@@ -185,6 +186,7 @@ func mark_dirty() -> void:
 	_qualities.clear()
 	_where.clear()
 	_by_tag.clear()
+	access.changed()
 
 
 ## Like mark_dirty, for changes to the ground itself, which cost more to
@@ -210,14 +212,24 @@ func nav() -> NavGraph:
 		var ground := graph.ground_layer if graph != null and not _ground_dirty else null
 		_ground_dirty = false
 		graph = NavGraph.build(building, paths, terrain, ground)
-		for key: Vector4i in locked_doors:
-			graph.set_door_locked(key.x, Vector3i(key.y, key.z, key.w), true)
 	return graph
 
 
-## Adds someone standing at a spot on a level. Returns null if nobody can
-## stand there.
-func add_person(level: int, spot: Vector2, person_name := "") -> Person:
+## Can someone get to a spot from where they are, minding where they may
+## go?
+func can_reach(person: Person, level: int, spot: Vector2) -> bool:
+	_set_up_access(person)
+	return not nav().find_path(person.level, person.flat(), level, spot).is_empty()
+
+
+## May someone be in a room? Anyone may be outside one.
+func may_enter(person: Person, room: Room) -> bool:
+	return access.may_enter(person.group, room)
+
+
+## Adds someone of a group (a prisoner unless told otherwise) standing at
+## a spot on a level. Returns null if nobody can stand there.
+func add_person(level: int, spot: Vector2, person_name := "", group: StringName = &"prisoner") -> Person:
 	var height := nav().height_at(level, spot)
 	if is_nan(height):
 		return null
@@ -226,10 +238,12 @@ func add_person(level: int, spot: Vector2, person_name := "") -> Person:
 	_next_id += 1
 	person.name = person_name if not person_name.is_empty() else "%s %s" % [
 			FIRST_NAMES[_rng.randi() % FIRST_NAMES.size()], SURNAMES[_rng.randi() % SURNAMES.size()]]
+	person.group = group
 	person.level = level
 	person.position = Vector3(spot.x, height, spot.y)
 	for def in needs:
-		person.needs[def.id] = _rng.randf_range(55.0, 100.0)
+		if access.has_need(group, def.id):
+			person.needs[def.id] = _rng.randf_range(55.0, 100.0)
 	person.traits = _pick_traits()
 	person.think_wait = _rng.randf_range(0.0, THINK_MINUTES)
 	person.mood_wait = _rng.randf_range(0.0, MOOD_MINUTES)
@@ -409,13 +423,14 @@ func place_rooms(person: Person) -> Array:
 		if not home.is_empty():
 			out.append(home)
 		return out
-	if not _rooms_for.has(block):
+	var by_group: Dictionary = _rooms_for.get_or_add(block, {})
+	if not by_group.has(person.group):
 		for n: int in building.levels:
 			for room: Room in building.levels[n].rooms():
-				if block.room_types.has(room.type):
+				if block.room_types.has(room.type) and may_enter(person, room):
 					out.append([n, room])
-		_rooms_for[block] = out
-	return _rooms_for[block]
+		by_group[person.group] = out
+	return by_group[person.group]
 
 
 ## The room someone is in, as [level, Room], or [] if they are not in one.
@@ -472,7 +487,7 @@ func assign_beds() -> void:
 		if not _bed_owners.has(key):
 			free.append(key)
 	for person in people:
-		if person.has_bed() or free.is_empty():
+		if person.has_bed() or free.is_empty() or not access.gets_bed(person.group):
 			continue
 		var best := 0
 		var best_score := INF
@@ -497,22 +512,14 @@ func assign_beds() -> void:
 		_sleepers.get_or_add(room, []).append(person)
 
 
-## Locks or unlocks a door on a straight wall, for everyone.
+## Locks or unlocks a door on a straight wall, for everyone without keys.
 func set_door_locked(level: int, edge: Vector3i, locked: bool) -> void:
-	var key := Vector4i(level, edge.x, edge.y, edge.z)
-	if locked_doors.has(key) == locked:
-		return
-	if locked:
-		locked_doors[key] = true
-	else:
-		locked_doors.erase(key)
-	if graph != null and not _dirty:
-		graph.set_door_locked(level, edge, locked)
-	doors_changed.emit()
+	if access.set_locked(Vector4i(level, edge.x, edge.y, edge.z), locked):
+		doors_changed.emit()
 
 
 func is_door_locked(level: int, edge: Vector3i) -> bool:
-	return locked_doors.has(Vector4i(level, edge.x, edge.y, edge.z))
+	return access.locked.has(Vector4i(level, edge.x, edge.y, edge.z))
 
 #endregion
 
@@ -763,6 +770,8 @@ func _has_errand(person: Person) -> bool:
 ## Works out what someone does next, in the order the class comment gives.
 func _decide(person: Person, may_wander: bool) -> void:
 	var block := person.block
+	if _leave_if_kept_out(person):
+		return
 	var urgent := _urgent_need(person)
 	if urgent != &"" and _see_to(person, urgent, true):
 		person.reason = "%s has nearly run out" % need_def(urgent).display_name
@@ -957,7 +966,8 @@ func _candidates(person: Person, tags: Array[StringName], unrestricted := false)
 			var n: int = entry[0]
 			var placed: BuildingMap.PlacedObject = entry[1]
 			var room: Room = entry[2]
-			if seen.has(placed) or _claimed.has(Vector2i(n, placed.id)) or not _may_use(person, n, placed):
+			if seen.has(placed) or _claimed.has(Vector2i(n, placed.id)) or not _may_use(person, n, placed) \
+					or not may_enter(person, room):
 				continue
 			seen[placed] = true
 			if restricted and not _room_listed(allowed_rooms, n, room):
@@ -991,7 +1001,8 @@ func _outdoor_rooms(person: Person, unrestricted := false) -> Array:
 	var out: Array = []
 	for pair: Array in (place_rooms(person) if restricted else _all_rooms()):
 		var room: Room = pair[1]
-		if room.enclosed and not room.indoor and not _someone_elses(person, pair[0], room):
+		if room.enclosed and not room.indoor and not _someone_elses(person, pair[0], room) \
+				and may_enter(person, room):
 			out.append(pair)
 	out.sort_custom(func(a: Array, b: Array) -> bool: return _room_score(person, a) < _room_score(person, b))
 	return out
@@ -1114,6 +1125,9 @@ func _why_not_in_place(person: Person) -> String:
 	if block.place == ActivityDef.Place.OWN_ROOM and home_room(person).is_empty():
 		return "Has no bed of their own"
 	if place_rooms(person).is_empty():
+		for pair: Array in _all_rooms():
+			if block.room_types.has(pair[1].type):
+				return "Not allowed anywhere for %s" % block.display_name
 		return "There's nowhere to go for %s" % block.display_name
 	return "Can't get to where %s should be" % block.display_name
 
@@ -1194,12 +1208,12 @@ func _wander(person: Person) -> void:
 	if _restricted(person) and is_in_place(person) and not here.is_empty():
 		spot = _spot_in_room(here[0], here[1])
 	elif not here.is_empty():
-		# Indoors or in the yard, they keep to rooms rather than drifting off
-		# across the land; access zones will say where they may go.
+		# Indoors or in the yard, they keep to rooms they may be in rather
+		# than drifting off across the land.
 		for attempt in 4:
 			var near: Variant = nav().random_spot(person.level, person.flat(), 6.0, _rng)
 			var room := building.levels[person.level].room_at_point(near) if near != null else null
-			if room != null and not _someone_elses(person, person.level, room):
+			if room != null and not _someone_elses(person, person.level, room) and may_enter(person, room):
 				spot = near
 				break
 	else:
@@ -1230,9 +1244,46 @@ func _spots_beside(level: int, placed: BuildingMap.PlacedObject, from: Vector2) 
 	return out.slice(0, 4)
 
 
+## Someone in a room they may not be in (painted staff only while they
+## were there, say) heads out through the nearest door they can. Returns
+## whether they are on their way.
+func _leave_if_kept_out(person: Person) -> bool:
+	var here := room_of(person)
+	if here.is_empty() or may_enter(person, here[1]):
+		return false
+	person.reason = "Not allowed in here"
+	if person.state == Person.State.WALKING and person.activity == "Leaving":
+		return true
+	var map := building.levels[here[0]]
+	var doors := ScheduleRunner.room_doors(map, here[1])
+	doors.sort_custom(func(a: Vector3i, b: Vector3i) -> bool:
+		return _door_middle(a).distance_to(person.flat()) < _door_middle(b).distance_to(person.flat()))
+	for edge in doors:
+		for cell in BuildingMap.edge_cells(edge):
+			var room := map.room_at(cell)
+			if room != here[1] and may_enter(person, room) \
+					and _walk_to(person, here[0], Vector2(cell) + Vector2(0.5, 0.5)):
+				person.activity = "Leaving"
+				return true
+	person.activity = "Can't get out"
+	return false
+
+
+static func _door_middle(edge: Vector3i) -> Vector2:
+	var ends := BuildingMap.edge_ends(edge)
+	return (ends[0] + ends[1]) * 0.5
+
+
+func _set_up_access(person: Person) -> void:
+	var here := room_of(person)
+	access.set_up(nav(), building, person.group, here[1] if not here.is_empty() else null,
+			person.level)
+
+
 func _walk_to(person: Person, level: int, spot: Vector2) -> bool:
 	var levels: Array[int] = []
 	var surface: Array[bool] = []
+	_set_up_access(person)
 	var route := nav().find_path(person.level, person.flat(), level, spot, levels, surface)
 	if route.is_empty():
 		return false
@@ -1395,7 +1446,7 @@ func _make_body(person: Person) -> Node3D:
 		for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 			var part := mesh.name.get_slice("_", 0).to_lower()
 			match part:
-				"outfit": mesh.material_override = _flat_material(body_colour)
+				"outfit": mesh.material_override = _flat_material(_outfit(person))
 				"skin": mesh.material_override = _flat_material(skin)
 				"hair": mesh.material_override = _flat_material(hair)
 		_add_flag(model)
@@ -1407,7 +1458,7 @@ func _make_body(person: Person) -> Node3D:
 	capsule.height = 0.62
 	body.mesh = capsule
 	body.position.y = 0.31
-	body.material_override = _flat_material(body_colour)
+	body.material_override = _flat_material(_outfit(person))
 	root.add_child(body)
 	var head := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
@@ -1448,6 +1499,12 @@ func _add_flag(root: Node3D) -> void:
 
 
 ## Shared between everyone of the same colour.
+## The colour of someone's clothes: their group's, else everyone's.
+func _outfit(person: Person) -> Color:
+	var group: GroupDef = access.groups.get(person.group)
+	return group.outfit_colour if group != null else body_colour
+
+
 func _flat_material(colour: Color) -> StandardMaterial3D:
 	if not _materials.has(colour):
 		var material := StandardMaterial3D.new()

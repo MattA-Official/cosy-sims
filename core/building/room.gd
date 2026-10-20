@@ -16,6 +16,8 @@ var enclosed := true
 var indoor := false
 ## The RoomTypeDef id, or empty when the player has not chosen one.
 var type: StringName = &""
+## The ZoneDef id painted onto it, or empty to go by its type.
+var zone: StringName = &""
 
 
 ## The middle of the room, in cell units (cell (0, 0) spans 0 to 1).

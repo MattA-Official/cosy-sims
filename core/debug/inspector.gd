@@ -236,6 +236,8 @@ func _show_person(person: Person) -> void:
 	_box.add_child(mood_row)
 	_live_text = _text("")
 	for def in people.needs:
+		if not person.needs.has(def.id):
+			continue
 		var row := HBoxContainer.new()
 		var label := Label.new()
 		label.text = def.display_name
@@ -272,7 +274,9 @@ func _refresh_person(person: Person) -> void:
 	_mood_text.text = "%s, mood %d\nWhy? %s" % [MoodModel.FACE_NAMES[face], roundi(person.mood),
 			", ".join(why) if not why.is_empty() else "nothing much"]
 	var target := people.target_object(person)
+	var group: GroupDef = people.access.groups.get(person.group)
 	var lines := PackedStringArray([
+		"Group: %s" % (group.display_name if group != null else String(person.group)),
 		"Doing: %s" % person.activity,
 		"Because: %s" % (person.reason if not person.reason.is_empty() else "-"),
 		"State: %s" % ["idle", "walking", "using an object"][person.state],
@@ -347,6 +351,11 @@ func _show_room(room: Room) -> void:
 			room.cells.size(), "indoors" if room.indoor else ("outdoors" if room.enclosed else "not closed in"),
 			", ".join(names) if not names.is_empty() else "none"])
 	if people != null:
+		var zone := people.access.zone_of(room)
+		if zone != null:
+			_text("Who may be here: %s%s" % [zone.display_name,
+					"" if room.zone.is_empty() else " (painted)"])
+	if people != null:
 		var quality := people.quality(_selected_level, room)
 		var parts := PackedStringArray()
 		for part: Array in quality.parts:
@@ -357,15 +366,17 @@ func _show_room(room: Room) -> void:
 			_text("Sleeps here: %s" % ", ".join(sleepers.map(func(p: Person) -> String: return p.name)))
 	var inside := room.cells[0]
 	_button("Add a prisoner here", func() -> void: _add_prisoner(inside))
+	_button("Add a member of staff here", func() -> void: _add_prisoner(inside, &"staff"))
 
 
 func _show_tile(cell: Vector2i) -> void:
 	_text("Tile %d, %d on the %s" % [cell.x, cell.y, Building.level_name(_selected_level).to_lower()])
 	_button("Add a prisoner here", func() -> void: _add_prisoner(cell))
+	_button("Add a member of staff here", func() -> void: _add_prisoner(cell, &"staff"))
 
 
-func _add_prisoner(cell: Vector2i) -> void:
-	var person := people.add_person(_selected_level, Vector2(cell) + Vector2(0.5, 0.5))
+func _add_prisoner(cell: Vector2i, group: StringName = &"prisoner") -> void:
+	var person := people.add_person(_selected_level, Vector2(cell) + Vector2(0.5, 0.5), "", group)
 	if person != null:
 		select(person)
 	else:

@@ -39,6 +39,7 @@ func _process(_delta: float) -> bool:
 	_test_room_quality()
 	_test_traits_and_choices()
 	_test_needs_in_a_day()
+	_test_zones_and_doors()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -322,7 +323,9 @@ func _test_daily_routine() -> void:
 			"03:00":
 				if not checked.has("asleep"):
 					checked["asleep"] = true
-					_check(people.people.all(func(p: Person) -> bool: return p.activity == "Sleeping"),
+					# Bar anyone up for the toilet.
+					_check(people.people.all(func(p: Person) -> bool:
+							return p.activity == "Sleeping" or p.target_tag == &"toilet"),
 							"in the night everyone is asleep")
 	_check(checked.size() == 4, "the day ran through (checked %s)" % [checked.keys()])
 	_check(not runner.doors.values().has(true), "in the morning the cell doors open again (%s at %s: %s)" % [
@@ -545,6 +548,101 @@ func _test_needs_in_a_day() -> void:
 
 ## The basic needs (sleep, hunger, hygiene and bladder) every person in
 ## the build can reach an object for.
+## The Staff wing sample: zones keep prisoners out of the staff room and
+## office, a staff door lets only staff through, locked doors stop all but
+## staff, and the zones tool locks doors by hand until the block changes.
+func _test_zones_and_doors() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 8
+	root.add_child(main)
+	var people: People = main.people
+	var runner: ScheduleRunner = main.runner
+	var map: BuildingMap = main.map
+	var clock: GameClock = main.clock
+	clock.speed_index = 0
+	var o: Vector2i = main.building.land[0].get_center() - Vector2i(10, 8)
+	var at := func(x: int, z: int) -> Vector2: return Vector2(o + Vector2i(x, z)) + Vector2(0.5, 0.5)
+	var prisoner: Person = people.people[0]
+	var staff: Person = people.people[6]
+	_check(staff.group == &"staff" and not staff.needs.has(&"sleep") and not staff.has_bed(),
+			"staff have their own needs and no bed")
+	var staff_room := map.room_at(o + Vector2i(13, 8))
+	var office := map.room_at(o + Vector2i(17, 3))
+	_check(people.access.zone_of(staff_room).id == &"staff" and people.access.zone_of(office).id == &"staff",
+			"the staff room and office are staff only")
+	_check(people.access.zone_of(map.room_at(o + Vector2i(1, 1))).id == &"shared",
+			"cells go by the usual zone")
+	_check(not people.can_reach(prisoner, 0, at.call(17, 3)), "prisoners can't get into the office")
+	_check(people.can_reach(staff, 0, at.call(17, 3)), "staff can")
+	_check(people.can_reach(prisoner, 0, at.call(6, 7)), "prisoners can get to the canteen")
+
+	# The staff door keeps prisoners out even of a room they may be in.
+	map.set_room_zone(staff_room, &"everyone")
+	staff_room = map.room_at(o + Vector2i(13, 8))
+	_check(not people.can_reach(prisoner, 0, at.call(13, 8)), "a staff door stops prisoners")
+	_check(people.can_reach(staff, 0, at.call(13, 8)), "but not staff")
+	var staff_door := BuildingMap.edge_between(o + Vector2i(13, 5), o + Vector2i(13, 4))
+	map.set_door(staff_door, true)
+	_check(map.door_kind_at(staff_door) == &"", "a door put back in plain forgets it was a staff door")
+	_check(people.can_reach(prisoner, 0, at.call(13, 8)), "a plain door lets prisoners into a room open to them")
+	map.set_door(staff_door, true, &"staff")
+	map.set_room_zone(map.room_at(o + Vector2i(13, 8)), &"staff")
+
+	# Locked by hand from the zones tool, until the block changes.
+	var canteen_door := BuildingMap.edge_between(o + Vector2i(3, 5), o + Vector2i(3, 4))
+	var controller: BuildController = main.controller
+	controller.tool = BuildController.Tool.ZONE
+	controller._has_hover = true
+	controller._hover_point = Vector2(o + Vector2i(3, 5)) + Vector2(0.5, 0.1)
+	controller._on_press()
+	_check(people.is_door_locked(0, canteen_door), "clicking a door with the zones tool locks it")
+	_check(runner.overrides.has(Vector4i(0, canteen_door.x, canteen_door.y, canteen_door.z)),
+			"as an override, with a padlock")
+	_check(not people.can_reach(prisoner, 0, at.call(6, 7)), "prisoners can't get through a locked door")
+	_check(people.can_reach(staff, 0, at.call(6, 7)), "staff have keys")
+	var block := runner.current()
+	while runner.current() == block:
+		clock.advance(1.0)
+	_check(not people.is_door_locked(0, canteen_door), "a door locked by hand opens when the block changes")
+	runner.toggle_lock(0, canteen_door, true)
+	block = runner.current()
+	while runner.current() == block:
+		clock.advance(1.0)
+	_check(people.is_door_locked(0, canteen_door), "unless it was pinned")
+	runner.toggle_lock(0, canteen_door, true)
+	_check(not people.is_door_locked(0, canteen_door) and runner.overrides.is_empty(),
+			"Shift-clicking a pinned door lets it go back to the timetable")
+
+	# Someone caught in a room painted staff only walks out of it.
+	var caught: Person = people.people[1]
+	people.send(caught, 0, at.call(16, 3))
+	for i in 60:
+		clock.advance(0.5)
+	people._stop(caught)
+	caught.position = Vector3(at.call(17, 4).x, 0.0, at.call(17, 4).y)
+	var left := false
+	for i in 120:
+		clock.advance(0.5)
+		var here := people.room_of(caught)
+		if here.is_empty() or here[1] != map.room_at(o + Vector2i(17, 3)):
+			left = true
+			break
+	_check(left, "a prisoner in a staff-only room leaves it (%s, %s)" % [caught.activity, caught.reason])
+
+	# A whole day: prisoners never set foot in the staff rooms.
+	var trespass := []
+	for i in 24 * 60:
+		clock.advance(1.0)
+		for person in people.people:
+			var here := people.room_of(person)
+			if person.group == &"prisoner" and not here.is_empty() \
+					and not people.may_enter(person, here[1]) and not trespass.has(person.name):
+				trespass.append(person.name)
+	_check(trespass.is_empty(), "over a day, no prisoner goes where they may not (%s)" % [trespass])
+	root.remove_child(main)
+	main.free()
+
+
 func _reachable_needs(people: People) -> Array[StringName]:
 	var out: Array[StringName] = []
 	for def in people.needs:
@@ -552,13 +650,15 @@ func _reachable_needs(people: People) -> Array[StringName]:
 			continue
 		var everyone := true
 		for person in people.people:
+			if not person.needs.has(def.id):
+				continue
 			var found := false
 			for n: int in people.building.levels:
 				for placed: BuildingMap.PlacedObject in people.building.levels[n].objects.values():
 					if found or not placed.def.tags.any(def.met_by):
 						continue
 					for spot in people._spots_beside(n, placed, person.flat()):
-						if not people.nav().find_path(person.level, person.flat(), n, spot).is_empty():
+						if people.can_reach(person, n, spot):
 							found = true
 							break
 			everyone = everyone and found
@@ -764,6 +864,15 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	controller.room_type = PrisonCatalogue.room_type(&"cell")
 	controller._on_press()
 	_check(map.room_at(cell.call(2, 2)).type == &"cell", "room type tool marks the room")
+
+	controller.tool = BuildController.Tool.ZONE
+	controller.zone = PrisonCatalogue.ZONES[1]
+	controller._draw_preview()
+	controller._on_press()
+	_check(map.room_at(cell.call(2, 2)).zone == &"staff", "zones tool paints a room")
+	controller.zone = null
+	controller._on_press()
+	_check(map.room_at(cell.call(2, 2)).zone == &"", "and clears it back to the room type's")
 
 	controller.tool = BuildController.Tool.DEMOLISH
 	controller._draw_preview()

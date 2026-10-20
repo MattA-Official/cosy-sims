@@ -175,7 +175,8 @@ func _clear_between(a: int, b: int) -> bool:
 		if here == -1:
 			return false
 		if here != previous:
-			if _stepped.has(here) or not astar.are_points_connected(previous, here):
+			if _stepped.has(here) or astar.is_point_disabled(here) \
+					or not astar.are_points_connected(previous, here):
 				return false
 			previous = here
 	return previous == b
@@ -450,6 +451,27 @@ func set_door_locked(level: int, edge: Vector3i, locked: bool) -> void:
 				astar.disconnect_points(pair.x, pair.y)
 		else:
 			_join(pair.x, pair.y)
+
+
+## Every door on a straight wall that joins anything, as (level, edge x,
+## edge y, edge axis).
+func doors() -> Array[Vector4i]:
+	return _door_links.keys()
+
+
+## The points on a room's floor, for shutting it to people not allowed in.
+func points_in(level: int, room: Room) -> Array[int]:
+	var out: Array[int] = []
+	for piece in room.pieces:
+		var id: int = _ids.get(Vector4i(level, piece.x, piece.y, piece.z), -1)
+		if id != -1:
+			out.append(id)
+	return out
+
+
+## Shuts a point so routes go round it, or opens it again.
+func set_point_shut(id: int, shut: bool) -> void:
+	astar.set_point_disabled(id, shut)
 
 
 func is_door_locked(level: int, edge: Vector3i) -> bool:
