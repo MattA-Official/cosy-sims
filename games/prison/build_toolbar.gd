@@ -76,6 +76,10 @@ const WATER_MODES := [
 	[BuildController.WaterMode.REMOVE, "Drain water", "water_drain", "Click a pond to drain it."],
 ]
 
+const LAND_MODES := [
+	[true, "Buy land", "money", "Buy a plot next to your land."],
+]
+
 ## Each is [wall kind, window kind, name, icon, what it does].
 const OPENINGS := [
 	[BuildingMap.Wall.DOOR, &"", "Door", "opening_door", "A door people can walk through."],
@@ -347,16 +351,39 @@ func _add_opening_choices() -> void:
 ## the brush size.
 func _add_brush_choices() -> void:
 	var group := ButtonGroup.new()
-	var sculpting := controller.water_mode == BuildController.WaterMode.NONE
+	var buying := controller.buying_land
+	var sculpting := controller.water_mode == BuildController.WaterMode.NONE and not buying
 	_icon_tiles("Brushes", BRUSHES, controller.terrain_brush if sculpting else null,
 			func(brush: Terrain.Brush) -> void:
 				controller.terrain_brush = brush
-				controller.water_mode = BuildController.WaterMode.NONE
-				_hint.text = controller.hint(), group)
-	_icon_tiles("Water", WATER_MODES, controller.water_mode, func(mode: BuildController.WaterMode) -> void:
-		controller.water_mode = mode
-		_hint.text = controller.hint(), group)
-	_add_brush_sliders(false)
+				_terrain_mode(BuildController.WaterMode.NONE, false), group)
+	_icon_tiles("Water", WATER_MODES, controller.water_mode if not buying else null,
+			func(mode: BuildController.WaterMode) -> void: _terrain_mode(mode, false), group)
+	if controller.land_plots != null:
+		_icon_tiles("Land", LAND_MODES, buying if buying else null,
+				func(_buy: bool) -> void: _terrain_mode(BuildController.WaterMode.NONE, true), group)
+	if buying:
+		var flatten := CheckBox.new()
+		flatten.text = "Flatten when bought"
+		flatten.tooltip_text = "Level the new plot with your land along their shared edge, for a fee."
+		flatten.button_pressed = controller.flatten_land
+		flatten.toggled.connect(func(on: bool) -> void:
+			controller.flatten_land = on
+			_hint.text = controller.hint())
+		_section("Groundworks").add_child(flatten)
+	else:
+		_add_brush_sliders(false)
+
+
+## Switches the terrain tool between sculpting, water and buying land, laying
+## the options out again when buying land comes or goes.
+func _terrain_mode(water: BuildController.WaterMode, buy: bool) -> void:
+	var relay := buy != controller.buying_land
+	controller.water_mode = water
+	controller.buying_land = buy
+	_hint.text = controller.hint()
+	if relay:
+		_on_tool_changed.call_deferred(controller.tool)
 
 
 ## One big tile per entry of a mode list ([value, name, icon, what it

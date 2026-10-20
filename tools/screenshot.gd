@@ -1,11 +1,12 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [loop=X,Z,...] [break=TAG] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
-## person; "zones" opens the zones tool; "staff" opens the staff window;
+## person; "zones" opens the zones tool; "land" buys a plot and shows the
+## plots for sale; "staff" opens the staff window;
 ## "money" and "office" open those windows; "bus" brings the morning bus;
 ## "debug" turns on the debug view (F3); "route" opens the patrol route
 ## tool; loop=X,Z,X,Z,... draws a patrol route with a guard on it;
@@ -52,6 +53,13 @@ func _process(_delta: float) -> bool:
 			_main.intake.bus()
 		if args.has("debug"):
 			_main.debug_overlay.visible = true
+		if args.has("land"):
+			var land: Rect2i = _main.building.land[0]
+			var plots: LandPlots = _main.land_plots
+			plots.buy(plots.plot_at(Vector2i(land.end.x + 1, land.position.y + 9)), true)
+			_main.controller.buying_land = true
+			_main.controller.flatten_land = true
+			_main.controller.tool = BuildController.Tool.TERRAIN
 		if args.has("route"):
 			_main.controller.tool = BuildController.Tool.ROUTE
 		for arg in args:

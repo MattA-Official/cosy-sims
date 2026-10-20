@@ -11,6 +11,8 @@ extends Node3D
 signal tool_changed(tool: Tool)
 ## The hint text has changed without the tool changing.
 signal hint_changed
+## A click would have bought land you can't afford.
+signal land_refused
 ## The brush size or plant density changed.
 signal brush_changed
 signal wall_view_changed(mode: WallView)
@@ -85,6 +87,8 @@ const FLOOR_HINTS := {
 
 const WALL_PAINT_HINT := "Click or drag along walls to paint the side you can see. Shift-click paints every wall round the room, Ctrl takes paint off."
 
+const LAND_HINT := "Click a plot next to your land to buy it. Tick flatten to level it with your land, for a fee."
+
 const WATER_HINTS := {
 	WaterMode.ADD: "Click a hollow to fill it with water. Digging deeper or cutting the rim moves the water.",
 	WaterMode.REMOVE: "Click a pond or lake to drain it.",
@@ -115,6 +119,8 @@ const MIN_PLANT_DENSITY := 0.25
 @export_group("Preview colours")
 @export var ok_colour := Color(0.45, 0.95, 0.55, 0.45)
 @export var bad_colour := Color(1.0, 0.4, 0.4, 0.45)
+## Outlines plots of land for sale.
+@export var land_colour := Color(1.0, 0.85, 0.4, 0.5)
 @export var demolish_colour := Color(1.0, 0.3, 0.25, 0.4)
 @export var preview_wall_height := 1.0
 
@@ -176,6 +182,11 @@ var zone: ZoneDef
 var terrain_brush := Terrain.Brush.RAISE
 ## When not NONE, the terrain tool adds or removes water instead of sculpting.
 var water_mode := WaterMode.NONE
+## Plots of land for sale, or null where land can't be bought.
+var land_plots: LandPlots
+## The terrain tool buys land instead of sculpting, flattening it if asked.
+var buying_land := false
+var flatten_land := false
 var floor_mode := FloorMode.LAY:
 	set(value):
 		if not Building.split_levels and value in [FloorMode.RAISE, FloorMode.LOWER, FloorMode.RAMP]:
@@ -228,6 +239,7 @@ var _rotate_anchor := Vector2.ZERO
 var _path_preview := MeshInstance3D.new()
 var _path_status := ""
 var _door_status_shown := ""
+var _land_status_shown := ""
 var _brushing := false
 var _flatten_target := 0.0
 var _plant_cooldown := 0.0
@@ -271,6 +283,10 @@ func _process(delta: float) -> void:
 	var door_status := _door_status() if tool == Tool.OPENING and _has_hover else ""
 	if door_status != _door_status_shown:
 		_door_status_shown = door_status
+		hint_changed.emit()
+	var land_status := _land_status() if _buying() and _has_hover else ""
+	if land_status != _land_status_shown:
+		_land_status_shown = land_status
 		hint_changed.emit()
 	_draw_preview()
 
@@ -403,6 +419,10 @@ func _on_press() -> void:
 				path_tool.begin_trail(_hover_point)
 			else:
 				path_tool.press(_hover_point, _erasing())
+		Tool.TERRAIN when _buying():
+			var plot := land_plots.plot_at(_hover_cell())
+			if plot.has_area() and not land_plots.buy(plot, flatten_land):
+				land_refused.emit()
 		Tool.TERRAIN when water_mode != WaterMode.NONE:
 			if water != null and water_mode == WaterMode.ADD:
 				water.fill_at(_hover_cell())
@@ -542,6 +562,8 @@ func hint() -> String:
 		return WALL_PAINT_HINT
 	if _ground_only(tool) and _level() != 0:
 		return "This tool works on the ground floor. Page Down to go back to it."
+	if _buying():
+		return (LAND_HINT + "\n" + _land_status_shown).strip_edges()
 	if tool == Tool.TERRAIN and water_mode != WaterMode.NONE:
 		return WATER_HINTS[water_mode]
 	if tool == Tool.PATH:
@@ -1129,6 +1151,8 @@ func _draw_preview() -> void:
 			else:
 				var height := NAN if _erasing() else _preview_height(_pieces_bounds(chosen))
 				_shapes.pieces(chosen, demolish_colour if _erasing() else ok_colour, height)
+		Tool.TERRAIN when _buying():
+			_preview_land()
 		Tool.TERRAIN when water_mode != WaterMode.NONE:
 			_preview_water()
 		Tool.TERRAIN, Tool.PLANTS:
@@ -1220,6 +1244,38 @@ func _is_dry(rect: Rect2i) -> bool:
 		if terrain.water_surface(Vector2(cell) + Vector2(0.5, 0.5)) > height:
 			return false
 	return true
+
+
+func _buying() -> bool:
+	return tool == Tool.TERRAIN and buying_land and land_plots != null
+
+
+## Outlines every plot for sale, filling the one under the mouse: green if
+## you can pay for it, red if not.
+func _preview_land() -> void:
+	var hovered := land_plots.plot_at(_hover_cell()) if _has_hover else Rect2i()
+	for plot in land_plots.plots():
+		if plot == hovered:
+			var colour := ok_colour if land_plots.can_afford(plot, flatten_land) else bad_colour
+			_shapes.cells(BuildingMap.cells_in(plot), colour)
+			continue
+		for cell in BuildingMap.cells_in(plot):
+			if cell.x == plot.position.x or cell.y == plot.position.y \
+					or cell.x == plot.end.x - 1 or cell.y == plot.end.y - 1:
+				_shapes.cells([cell], land_colour, NAN, 0.03)
+
+
+## The price of the plot under the mouse, with flattening.
+func _land_status() -> String:
+	var plot := land_plots.plot_at(_hover_cell())
+	if not plot.has_area():
+		return "Point at a plot next to your land."
+	var text := "%d × %d plot: %s" % [plot.size.x, plot.size.y, Ledger.text(land_plots.price(plot))]
+	if flatten_land:
+		text += ", plus %s to flatten" % Ledger.text(land_plots.flatten_price(plot))
+	if not land_plots.can_afford(plot, flatten_land):
+		text += ". You can't afford it yet."
+	return text
 
 
 ## Shows the water a click would add (or a red tile if there is no hollow),

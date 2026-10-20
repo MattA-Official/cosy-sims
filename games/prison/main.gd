@@ -84,6 +84,7 @@ var claims := Claims.new()
 var standing := Standing.new()
 ## Ctrl+Z and Ctrl+Y for building and landscaping.
 var undo := UndoHistory.new()
+var land_plots := LandPlots.new()
 ## Open jobs and stock, with the debug view.
 var jobs_panel := JobsPanel.new()
 ## Game time. Everything that happens over time listens to it.
@@ -345,6 +346,13 @@ func _ready() -> void:
 	add_child(build_costs)
 	build_costs.start()
 	controller.spending_allowed = ledger.can_spend
+	land_plots.building = building
+	land_plots.terrain = terrain
+	land_plots.water = water
+	land_plots.ledger = ledger
+	controller.land_plots = land_plots
+	controller.land_refused.connect(func() -> void:
+		Toasts.post("Not enough money", "That plot costs more than you have."))
 	controller.spending_refused.connect(func() -> void:
 		Toasts.post("Out of money", "Building is paused until the balance is back above zero. "
 				+ "Demolishing still gives some money back."))
@@ -421,6 +429,8 @@ func _ready() -> void:
 		build_costs.refund_all = false
 	add_child(undo)
 	undo.start([building.changed, terrain.changed, water.changed, foliage.changed, paths.changed] as Array[Signal])
+	# Land bought stays bought: undo starts again from the new boundary.
+	land_plots.bought.connect(func(_plot: Rect2i) -> void: undo.reset())
 	jobs_panel.name = "JobsPanel"
 	jobs_panel.debug_overlay = debug_overlay
 	jobs_panel.jobs = jobs

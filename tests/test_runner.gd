@@ -56,6 +56,7 @@ func _process(_delta: float) -> bool:
 	_test_saving()
 	_test_flexible_objects()
 	_test_roads()
+	_test_buying_land()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1344,6 +1345,55 @@ func _test_flexible_objects() -> void:
 	people.remove_person(warden)
 	claims.refresh()
 	_check(not office_map.dressing.has(key.y), "an unclaimed desk is bare")
+	main.queue_free()
+
+
+func _test_buying_land() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var plots: LandPlots = main.land_plots
+	var building: Building = main.building
+	var terrain: Terrain = main.terrain
+	var ledger: Ledger = main.ledger
+	var land := building.land[0]
+	var for_sale := plots.plots()
+	_check(not for_sale.is_empty(), "plots next to your land are for sale")
+	_check(for_sale.all(func(p: Rect2i) -> bool: return not p.intersects(land) and p.grow(1).intersects(land)),
+			"plots for sale touch your land without overlapping it")
+	# A bumpy plot to the right of the land.
+	var plot := plots.plot_at(Vector2i(land.end.x + 1, land.position.y + 1))
+	_check(plot.has_area(), "a plot to the side can be bought")
+	var flat_price := plots.price(plot)
+	for corner in plots._corners(plot):
+		terrain.set_corner_height(corner, 1.0 if (corner.x + corner.y) % 2 == 0 else 0.0)
+	_check(plots.price(plot) < flat_price, "hilly land is cheaper")
+	var edge_height := plots.flatten_height(plot)
+	var fee := plots.flatten_price(plot)
+	_check(fee > 0, "flattening a hilly plot costs something")
+	ledger.sandbox = false
+	ledger.balance = 10
+	_check(not plots.buy(plot, true) and not building.ground().owns(plot.position), "you can't buy land you can't afford")
+	ledger.balance = 100000
+	var cost := plots.price(plot) + fee
+	_check(plots.buy(plot, true), "buying a plot")
+	_check(ledger.balance == 100000 - cost, "buying charges the price and the flattening fee")
+	_check(building.ground().owns(plot.position) and building.ground().owns(plot.end - Vector2i.ONE),
+			"bought land is yours to build on")
+	_check(is_equal_approx(terrain.corner_height(plot.get_center()), edge_height),
+			"flattening levels the plot with your land")
+	_check(not plot in plots.plots(), "a bought plot isn't for sale any more")
+	_check(plots.plot_at(Vector2i(plot.end.x + 1, plot.position.y + 1)).has_area(), "the next plot out is for sale now")
+	var bumpy := plots.plot_at(Vector2i(land.position.x - 2, land.position.y + 1))
+	terrain.set_corner_height(bumpy.get_center(), 2.0)
+	_check(plots.buy(bumpy, false) and is_equal_approx(terrain.corner_height(bumpy.get_center()), 2.0),
+			"without flatten the hills stay")
+	var saved := PrisonSave.capture(main)
+	main.queue_free()
+	main = load("res://games/prison/main.tscn").instantiate()
+	PrisonSave.pending = saved
+	root.add_child(main)
+	_check((main.building as Building).ground().owns(plot.position), "bought land is kept in saves")
 	main.queue_free()
 
 
