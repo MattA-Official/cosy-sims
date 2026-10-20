@@ -625,6 +625,9 @@ def lineup(folder, names=None):
     cam = bpy.data.objects.new("cam", cam_d)
     scene.collection.objects.link(cam)
     target, yaw, pitch, dist = Vector((0.2, 0.9, 0.4)), -90, 35, 9.0
+    if names:
+        rows = (len(names) + 3) // 4
+        target, dist = Vector((0.0, -0.4 + (rows - 1) * 0.95, 0.4)), 7.5 + rows * 1.8
     d = Vector((math.cos(math.radians(yaw)) * math.cos(math.radians(pitch)),
                 math.sin(math.radians(yaw)) * math.cos(math.radians(pitch)), math.sin(math.radians(pitch))))
     cam.location = target + d * dist
