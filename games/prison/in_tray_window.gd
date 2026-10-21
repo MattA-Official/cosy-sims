@@ -5,8 +5,9 @@ extends PanelContainer
 ## kind of card; and what happened to recent cards. Toggle with J.
 
 const KINDS := [[&"prisoner_request", "Prisoner requests"], [&"staff_request", "Staff requests"],
-		[&"memo", "Memos"], [&"complaint", "Complaints"]]
-const RULES := [[&"", "Ask me"], [&"approve", "Approve"], [&"decline", "Decline"]]
+		[&"memo", "Memos"], [&"complaint", "Complaints"], [&"suggestion", "Staff suggestions"]]
+const RULES := [[&"", "Ask me"], [&"approve", "Approve"], [&"approve_50", "Approve up to £50"],
+		[&"approve_100", "Approve up to £100"], [&"decline", "Decline"]]
 
 var in_tray: InTray
 var clock: GameClock

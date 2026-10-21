@@ -55,7 +55,11 @@ var apply: Callable
 var prisoners: Callable
 ## () -> bool: a clerk is on the staff.
 var has_clerk: Callable
-## Kind -> &"approve", &"decline" or missing to ask the player.
+## (choice: TrayChoiceDef) -> int: what a choice costs, for rules with a
+## limit. Optional.
+var cost_of: Callable
+## Kind -> &"approve", &"decline" or missing to ask the player; or
+## &"approve_<n>" to approve only when it costs n or less, else ask.
 var rules: Dictionary[StringName, StringName] = {}
 var cards: Array[Card] = []
 ## Card def id -> day it was last posted.
@@ -181,7 +185,13 @@ func rule_choice(card: Card) -> int:
 	var tag: StringName = rules.get(card.def.kind, &"")
 	if tag.is_empty():
 		return -1
+	var limit := -1
+	if String(tag).begins_with("approve_"):
+		limit = String(tag).get_slice("_", 1).to_int()
+		tag = &"approve"
 	for i in card.def.choices.size():
+		if limit >= 0 and card.def.choices[i].tags.has(tag) and cost_of.is_valid() and cost_of.call(card.def.choices[i]) > limit:
+			return -1
 		if card.def.choices[i].tags.has(tag):
 			return i
 	return -1

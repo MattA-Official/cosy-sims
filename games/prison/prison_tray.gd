@@ -11,6 +11,7 @@ extends Node
 ##   {"day_off": true}                    they stay home tomorrow
 ##   {"paperwork": 60}                    on the warden's desk
 ##   {"resign": &"raise"}                 answers a resignation (StaffRoster.resign_answer)
+##   {"hire": [&"security", 0]}           takes on a department's first applicant
 
 const PRISONER := &"prisoner"
 
@@ -150,6 +151,30 @@ static func review() -> TrayCardDef:
 	return def
 
 
+## The card for a department's applicants, once its hire card is done:
+## take on the first or the second, or think about it (they wait on the
+## Heads page). Its words are filled in with who they are.
+static func applicants(department: DepartmentDef) -> TrayCardDef:
+	var def := TrayCardDef.make(StringName("applicants_%s" % department.id), &"applicants", &"",
+			"Applicants: %s" % department.head_role.display_name,
+			"Two people have applied to be %s: {who}." % department.head_role.display_name,
+			[TrayCardDef.choice("Take on the first", [{"hire": [department.id, 0]}], []),
+			TrayCardDef.choice("Take on the second", [{"hire": [department.id, 1]}], []),
+			TrayCardDef.choice("Think about it", [], [], "The applicants wait on the Heads page.")], 2)
+	def.weight = 0.0
+	def.deadline_days = Heads.APPLY_DAYS
+	return def
+
+
+## What a choice costs: the money it pays out.
+static func cost(choice: TrayChoiceDef) -> int:
+	var out := 0
+	for effect: Dictionary in choice.effects:
+		if effect.has("money") and effect.money < 0:
+			out -= effect.money
+	return out
+
+
 ## Words for a member of staff, such as "Dot the cook".
 func staff_words(record: StaffRoster.Record) -> String:
 	var role := roster._role(record.role)
@@ -199,6 +224,11 @@ func apply(card: InTray.Card, choice: TrayChoiceDef) -> void:
 			_record(card.subject).off_until = clock.day() + 1 if clock != null else 2
 		if effect.has("resign") and _record(card.subject) != null:
 			roster.resign_answer(_record(card.subject), effect.resign)
+		if effect.has("hire") and heads != null:
+			var department := heads.find(StringName(effect.hire[0]))
+			var waiting := heads.applicants(department) if department != null else ([] as Array[StaffRoster.Record])
+			if effect.hire[1] < waiting.size():
+				heads.hire(waiting[effect.hire[1]])
 		if effect.has("paperwork") and heads != null and heads.warden() != null:
 			desk_work.add_paperwork(heads.warden().id, effect.paperwork)
 

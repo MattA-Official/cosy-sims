@@ -4703,6 +4703,23 @@ func _test_perks() -> void:
 	_check(review_tray.cards.any(func(c: InTray.Card) -> bool: return c.def.id == &"annual_review"),
 			"an unhappy warden's annual review comes to the in-tray")
 	review_tray.cards.clear()
+	roster.take_on(&"clerk", &"day")
+	review_tray.set_rule(&"prisoner_request", &"approve_50")
+	var cheap := review_tray.post(review_tray.find(&"pot_plant"))
+	var dear := review_tray.post(review_tray.find(&"blankets"))
+	_check(cheap.queued >= 0 and dear.queued < 0, "a clerk approves cheap requests and asks about dear ones")
+	review_tray.set_rule(&"prisoner_request", &"")
+	review_tray.cards.clear()
+	var heads: Heads = main.heads
+	var security: DepartmentDef = heads.find(&"security")
+	heads.start_hire(security)
+	(main.desk_work as DeskWork).work(warden.id, (main.desk_work as DeskWork).pile_minutes(warden.id))
+	var offer: Array = review_tray.cards.filter(func(c: InTray.Card) -> bool: return c.def.kind == &"applicants")
+	_check(offer.size() == 1, "applicants for a head come to the in-tray")
+	if offer.size() == 1:
+		review_tray.answer(offer[0], 1)
+	_check(heads.head(security) != null, "and can be taken on from there")
+	review_tray.cards.clear()
 	var box: Suggestions = main.suggestions
 	var tray: InTray = main.in_tray
 	tray.cards.clear()

@@ -751,9 +751,14 @@ func _ready() -> void:
 	add_child(heads)
 	heads.start()
 	heads.applicants_ready.connect(func(department: DepartmentDef) -> void:
+		var card := in_tray.find(StringName("applicants_%s" % department.id))
+		if card != null:
+			var words := " or ".join(heads.applicants(department).map(func(a: StaffRoster.Record) -> String:
+				return "%s (%s)" % [a.name, roster.work_trait_words(a)] if not a.work_traits.is_empty() else a.name))
+			in_tray.post_about(card, 0, words)
 		if not attract:
 			Toasts.post("Applicants for %s" % department.head_role.display_name,
-					"The hire card is done: pick one on the Heads page (H)."))
+					"The hire card is done: pick one in the in-tray (J) or on the Heads page (H)."))
 	for system: Object in [people, searching, infirmary, courses, workshop, finances]:
 		system.set(&"modifiers", modifiers)
 	jobs.job_finished.connect(roster.job_done)
@@ -771,12 +776,15 @@ func _ready() -> void:
 	in_tray.defs = PrisonTray.cards()
 	in_tray.defs.append(PrisonTray.resignation())
 	in_tray.defs.append(PrisonTray.review())
+	for department in heads.departments:
+		in_tray.defs.append(PrisonTray.applicants(department))
 	in_tray.desk_work = desk_work
 	in_tray.prisoners = heads.prisoners
 	in_tray.has_clerk = func() -> bool: return roster.records.any(func(r: StaffRoster.Record) -> bool:
 			return Office.CLERKS.has(r.role))
 	in_tray.pick_subject = prison_tray.pick_subject
 	in_tray.apply = prison_tray.apply
+	in_tray.cost_of = PrisonTray.cost
 	in_tray.clock = clock
 	add_child(in_tray)
 	in_tray.start()
