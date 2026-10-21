@@ -8,9 +8,15 @@ extends Node
 ## fills the need, lifts reform and cheers them up, but now and then a
 ## visitor slips them something (SMUGGLE_CHANCE).
 
+## With a road, visitors come together on a bus at visiting hours.
+
 ## A visitor slipped someone contraband.
 signal smuggled(person: Person, item: ItemDef)
 signal visited(person: Person)
+## A visit ended, with who came.
+signal visited_by(person: Person, visitor: Person)
+## A letter came, and who it was from.
+signal letter(person: Person, from: String)
 
 const POST_HOUR := 7
 const LETTER_CHANCE := 0.2
@@ -25,6 +31,8 @@ const VISITOR_MINUTES := 120.0
 const MOST_VISITS := 6
 const VISIT_GAP_DAYS := 3
 const SMUGGLE_CHANCE := 0.1
+## Game minutes the visitors' bus waits before driving off.
+const BUS_STAY := 30.0
 ## Game minutes a visitor may take to walk out before they simply go.
 const LEAVE_MINUTES := 60.0
 const OUT_DISTANCE := 1.5
@@ -46,6 +54,19 @@ var progress: Progress
 var contraband: Array[ItemDef] = []
 ## () -> [level, spot]: where visitors come in from the road and leave.
 var entrance: Callable
+## (prisoner) -> {name, title}: who comes to see them, or {} for nobody.
+## Optional; someone always comes otherwise.
+var visitor_for: Callable
+## (prisoner) -> String: who writes to them, or "" for nobody. Optional.
+var letter_from: Callable
+## () -> bool: a family day, when visits don't wait their turn and twice as
+## many come. Optional.
+var family_day: Callable
+## The visitors' bus: it drives in to bus_stop () -> Vector2 when there's a
+## road. Optional.
+var vehicles: Vehicles
+var bus_model: PackedScene
+var bus_stop: Callable
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -53,7 +74,7 @@ var clock: GameClock:
 			if hour == POST_HOUR:
 				post()
 			if hour == VISIT_HOURS.x:
-				start_visits()
+				visiting_hours()
 			if hour == VISIT_HOURS.y:
 				end_visits())
 		clock.minute_passed.connect(func(_minute: int) -> void: tick())
@@ -82,10 +103,14 @@ func post() -> int:
 		var homesick := person.traits.any(func(t: TraitDef) -> bool: return t.id == &"homesick")
 		if _rng.randf() >= (HOMESICK_CHANCE if homesick else LETTER_CHANCE):
 			continue
+		var from: String = letter_from.call(person) if letter_from.is_valid() else "home"
+		if from.is_empty():
+			continue
 		person.needs[NEED] = minf(100.0, person.needs[NEED] + LETTER_FAMILY)
 		people.add_moodlet(person, &"letter_from_home")
 		if progress != null:
 			progress.add(person, &"letter")
+		letter.emit(person, from)
 		count += 1
 	return count
 
@@ -112,20 +137,39 @@ func seat_pairs() -> Array:
 	return out
 
 
-## Visiting hours begin: family come for those who miss them most. Returns
-## how many visits are on.
+## Visiting hours begin: the visitors' bus drives in and they get off,
+## or without a road they walk in at once.
+func visiting_hours() -> void:
+	if vehicles != null and bus_model != null and bus_stop.is_valid() and not seat_pairs().is_empty() \
+			and not waiting().is_empty():
+		if vehicles.drive_in(bus_model, bus_stop.call(), func(_bus: Node3D) -> void: start_visits(), BUS_STAY) != null:
+			return
+	start_visits()
+
+
+## Prisoners due a visit who someone would come to see, loneliest first.
+func waiting() -> Array:
+	var today := _day()
+	var gap := 0 if _family_day() else VISIT_GAP_DAYS
+	var out := people.people.filter(func(p: Person) -> bool:
+		return p.group == PRISONER and p.needs.has(NEED) and not p.led and not p.going_home \
+				and today - last_visit.get(p.id, -VISIT_GAP_DAYS) >= gap)
+	out.sort_custom(func(a: Person, b: Person) -> bool: return a.needs[NEED] < b.needs[NEED])
+	return out
+
+
+## Family come for those who miss them most. Returns how many visits are
+## on.
 func start_visits() -> int:
 	var spot: Array = entrance.call() if entrance.is_valid() else []
 	var pairs := seat_pairs()
 	if spot.is_empty() or pairs.is_empty():
 		return 0
-	var today := _day()
-	var waiting := people.people.filter(func(p: Person) -> bool:
-		return p.group == PRISONER and p.needs.has(NEED) and not p.led and not p.going_home \
-				and today - last_visit.get(p.id, -VISIT_GAP_DAYS) >= VISIT_GAP_DAYS)
-	waiting.sort_custom(func(a: Person, b: Person) -> bool: return a.needs[NEED] < b.needs[NEED])
+	var most := MOST_VISITS * (2 if _family_day() else 1)
 	var count := 0
-	for prisoner: Person in waiting.slice(0, mini(pairs.size(), MOST_VISITS)):
+	for prisoner: Person in waiting():
+		if count >= mini(pairs.size(), most):
+			break
 		if visit(prisoner, pairs[count], spot) != null:
 			count += 1
 	return count
@@ -134,15 +178,24 @@ func start_visits() -> int:
 ## A visitor comes in for someone, to a pair of chairs. Returns the
 ## visitor, or null.
 func visit(prisoner: Person, seats: Array, spot: Array) -> Person:
+	var who: Dictionary = visitor_for.call(prisoner) if visitor_for.is_valid() else {}
+	if visitor_for.is_valid() and who.is_empty():
+		return null
 	var family := prisoner.name.get_slice(" ", 1)
-	var visitor := people.add_person(spot[0], spot[1], "%s %s" % [people.random_name().get_slice(" ", 0), family], VISITOR)
+	var first: String = who.get("name", people.random_name().get_slice(" ", 0))
+	var visitor := people.add_person(spot[0], spot[1], "%s %s" % [first, family], VISITOR)
 	if visitor == null:
 		return null
+	visitor.profile["relative"] = first
+	visitor.profile["relation"] = who.get("title", "")
+	var doing := "Visiting %s" % prisoner.name.get_slice(" ", 0)
+	if not String(who.get("title", "")).is_empty():
+		doing = "%s, visiting %s" % [who.title, prisoner.name.get_slice(" ", 0)]
 	_visitors[visitor] = prisoner
 	last_visit[prisoner.id] = _day()
 	jobs.post(_job(prisoner, seats[0], "Having a visit", VISIT_MINUTES * Modifiers.scale(modifiers, &"visit_length"), func(_stage: Job.Stage, _worker: Person) -> void:
 		visit_done(prisoner)))
-	jobs.post(_job(visitor, seats[1], "Visiting %s" % prisoner.name.get_slice(" ", 0), VISITOR_MINUTES,
+	jobs.post(_job(visitor, seats[1], doing, VISITOR_MINUTES,
 			func(_stage: Job.Stage, _worker: Person) -> void: send_home(visitor)))
 	return visitor
 
@@ -152,6 +205,7 @@ func visit(prisoner: Person, seats: Array, spot: Array) -> Person:
 func visit_done(prisoner: Person) -> void:
 	for visitor: Person in _visitors.keys():
 		if _visitors[visitor] == prisoner:
+			visited_by.emit(prisoner, visitor)
 			_call_off(visitor)
 			send_home(visitor)
 	if prisoner.needs.has(NEED):
@@ -265,6 +319,10 @@ func restore(data: Dictionary) -> void:
 	var saved: Dictionary = data.get("last_visit", {})
 	for id: Variant in saved:
 		last_visit[int(id)] = int(saved[id])
+
+
+func _family_day() -> bool:
+	return family_day.is_valid() and family_day.call()
 
 
 func _day() -> int:

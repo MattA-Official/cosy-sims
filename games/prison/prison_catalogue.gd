@@ -304,6 +304,7 @@ const EVENTS: Array[EventDef] = [
 	preload("res://games/prison/catalogue/event_chess_tournament.tres"),
 	preload("res://games/prison/catalogue/event_art_show.tres"),
 	preload("res://games/prison/catalogue/event_veg_show.tres"),
+	preload("res://games/prison/catalogue/event_family_day.tres"),
 ]
 
 const MOODLETS: Array[MoodletDef] = [

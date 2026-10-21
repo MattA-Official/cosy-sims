@@ -314,6 +314,9 @@
   {
    "modifier": "prisoner_mood",
    "amount": 1
+  },
+  {
+   "flag": "family_day"
   }
  ],
  "prison-council": [

@@ -39,6 +39,7 @@ const RETURN_MIN := 0.02
 const RETURN_MAX := 0.9
 ## Postcards shown on a board.
 const BOARD_CARDS := 6
+const HALL_OF_FAME := 10
 const WEEK := 7
 
 enum Stage { TO_RECEPTION, SIGNING, TO_EXIT, AT_STOP }
@@ -55,6 +56,9 @@ var return_scale := 1.0
 ## (person) -> float: taken off the reoffending chance, such as savings
 ## to go home with.
 var return_cuts: Array[Callable] = []
+## (person, entry) -> void: adds to a leaver's record whatever else should
+## come back with them, such as hobbies, family and friends.
+var recording: Array[Callable] = []
 ## When set, its operation times are used instead of the hour above (main
 ## passes on Regime.operation_due).
 var regime: Regime
@@ -131,6 +135,23 @@ func bring_back(person: Person, entry: Dictionary) -> void:
 	today_lines.append("%s is back, %d %s after leaving." % [person.name, clock.day() - entry.left_day,
 			"day" if clock.day() - entry.left_day == 1 else "days"])
 	returned.emit(person, entry)
+
+
+## The best reformed leavers, most reformed first, each with the postcard
+## they sent if any: [entry, card or {}].
+func hall_of_fame(count := HALL_OF_FAME) -> Array:
+	var best := alumni.filter(func(e: Dictionary) -> bool:
+		return float(e.reform) >= Reform.REFORMED_LINE and not e.get("returned", false))
+	best.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.reform) > float(b.reform))
+	var out: Array = []
+	for entry: Dictionary in best.slice(0, count):
+		var card: Dictionary = {}
+		for c: Dictionary in postcards:
+			if c.get("id", -1) == entry.id:
+				card = c
+				break
+		out.append([entry, card])
+	return out
 
 
 ## Left, reformed and came back in the last week.
@@ -311,6 +332,8 @@ func _record(person: Person) -> Dictionary:
 			entry.postcard_day = today + _rng.randi_range(POSTCARD_DAYS.x, POSTCARD_DAYS.y)
 	if _rng.randf() < return_chance(person):
 		entry.will_return_day = today + _rng.randi_range(RETURN_DAYS.x, RETURN_DAYS.y)
+	for extra in recording:
+		extra.call(person, entry)
 	alumni.push_front(entry)
 	if alumni.size() > ALUMNI_KEPT:
 		alumni.resize(ALUMNI_KEPT)

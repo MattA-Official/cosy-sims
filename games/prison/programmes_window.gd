@@ -300,6 +300,14 @@ func release_text() -> String:
 		lines.append("Day %d, from %s: \"%s\"" % [card.day, card.from, card.text])
 	if release.postcards.is_empty():
 		lines.append("No postcards yet. Reformed leavers sometimes write.")
+	var hall := release.hall_of_fame()
+	if not hall.is_empty():
+		lines.append("Hall of fame:")
+		for pair: Array in hall:
+			var entry: Dictionary = pair[0]
+			var card: Dictionary = pair[1]
+			lines.append("  %s, reform %d, went home to %s%s" % [entry.name, roundi(float(entry.reform)), entry.plan,
+					". \"%s\"" % card.text if not card.is_empty() else ""])
 	return "\n".join(lines)
 
 

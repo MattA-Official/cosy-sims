@@ -1,7 +1,7 @@
 class_name PrisonLife
 ## Wires M11's prisoner life into the prison: friends and rivals, staff
 ## rapport, hobbies, clubs, events, cliques, tokens and the shop, and
-## colds, fitness and age, and pets.
+## colds, fitness and age, pets, named families, and old faces.
 ## Each system keeps to its own node; this only connects them.
 
 ## Bond changes from things that happen.
@@ -70,6 +70,11 @@ const CATCH_MINUTES := 10.0
 ## The therapy dog's visit, on days someone is on Calm Minds.
 const DOG_HOURS := Vector2i(14, 17)
 const DOG_REACH := 1.5
+const FAMILY_DAY := &"family_day"
+## What a prisoner who comes back still has, and bonds strong enough to
+## remember.
+const OLD_FACE_KEYS: Array[String] = ["hobbies", "hobby_skill", "family", "age", "fitness"]
+const OLD_FACE_BOND := 20.0
 
 
 static func setup(main: Node) -> void:
@@ -81,7 +86,113 @@ static func setup(main: Node) -> void:
 	_shop(main)
 	_health(main)
 	_pets(main)
+	_families(main)
+	_old_faces(main)
 	_news(main)
+
+
+## Each prisoner's small named family: who writes, who visits, fondness
+## kept up by letters, calls and visits, and family days when children
+## bring drawings for the cell wall.
+static func _families(main: Node) -> void:
+	var people: People = main.people
+	var visits: Visits = main.visits
+	var events: Events = main.events
+	var research: Research = main.research
+	var clock: GameClock = main.clock
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var is_prisoner := func(p: Person) -> bool: return p.group == &"prisoner"
+	for person: Person in people.people:
+		if is_prisoner.call(person):
+			Families.make(person, rng)
+	people.person_added.connect(func(person: Person) -> void:
+		if is_prisoner.call(person):
+			Families.make(person, rng))
+	var family_day := func() -> bool:
+		var today := events.today()
+		return today != null and today.id == FAMILY_DAY
+	events.allowed = func(def: EventDef) -> bool:
+		return def.id != FAMILY_DAY or research.mode == Research.Mode.OFF or research.has_flag(&"family_day")
+	visits.family_day = family_day
+	visits.visitor_for = func(prisoner: Person) -> Dictionary:
+		Families.make(prisoner, rng)
+		var least := Families.LETTER_FONDNESS if family_day.call() else Families.VISIT_FONDNESS
+		var relative := Families.any(prisoner, least, rng)
+		return {} if relative.is_empty() else {"name": relative.name, "title": Families.title(relative)}
+	visits.letter_from = func(prisoner: Person) -> String:
+		Families.make(prisoner, rng)
+		var relative := Families.any(prisoner, Families.LETTER_FONDNESS, rng)
+		return "" if relative.is_empty() else "%s %s" % [Families.title(relative), relative.name]
+	visits.letter.connect(func(prisoner: Person, from: String) -> void:
+		var file := PrisonerFile.of(prisoner)
+		if file != null:
+			file.add_log(clock.day(), "A letter from %s" % from))
+	visits.visited_by.connect(func(prisoner: Person, visitor: Person) -> void:
+		var relative: Dictionary = {}
+		for r: Dictionary in Families.of(prisoner):
+			if r.name == visitor.profile.get("relative", ""):
+				relative = r
+		Families.warm(relative, Families.VISIT)
+		if not family_day.call():
+			return
+		events.attended[prisoner.id] = true
+		var child := Families.child(prisoner)
+		if not child.is_empty():
+			prisoner.profile["drawing"] = {"from": child.name, "day": clock.day()}
+			people.quality_changed()
+			var file := PrisonerFile.of(prisoner)
+			if file != null:
+				file.add_log(clock.day(), "%s drew them a picture" % child.name))
+	people.moodlet_added.connect(func(person: Person, id: StringName) -> void:
+		if id == &"rang_home":
+			Families.warm(Families.fondest(person), Families.CALL))
+	clock.day_changed.connect(func(day: int) -> void:
+		var had := people.people.any(func(p: Person) -> bool: return p.profile.has("drawing"))
+		for person: Person in people.people:
+			if is_prisoner.call(person):
+				Families.new_day(person, day)
+		if had:
+			people.quality_changed())
+	# A drawing on the wall makes the cell a little nicer.
+	people.quality_extras.append(func(level: int, room: Room) -> Array:
+		for owner: Person in people.owners_in(level, room):
+			if owner.profile.has("drawing"):
+				return [["A drawing on the wall", Families.DRAWING_QUALITY]]
+		return [])
+	(main.inspector as Inspector).person_lines.append(Families.words)
+
+
+## Prisoners who come back are the same people: their hobbies, family,
+## age and fitness, and a friend or rival or two, who remember them.
+static func _old_faces(main: Node) -> void:
+	var release: Release = main.release
+	var relationships: Relationships = main.relationships
+	var people: People = main.people
+	release.recording.append(func(person: Person, entry: Dictionary) -> void:
+		var kept := {}
+		for key: String in OLD_FACE_KEYS:
+			if person.profile.has(key):
+				kept[key] = person.profile[key].duplicate(true) if person.profile[key] is Dictionary \
+						or person.profile[key] is Array else person.profile[key]
+		entry["kept"] = kept
+		var bonds := {}
+		for other: Person in people.people:
+			if other != person and other.group == person.group:
+				var value := relationships.bond(person, other)
+				if absf(value) >= OLD_FACE_BOND:
+					bonds[other.id] = value
+		entry["bonds"] = bonds)
+	release.returned.connect(func(person: Person, entry: Dictionary) -> void:
+		var kept: Dictionary = entry.get("kept", {})
+		for key: String in kept:
+			person.profile[key] = kept[key].duplicate(true) if kept[key] is Dictionary or kept[key] is Array else kept[key]
+		var bonds: Dictionary = entry.get("bonds", {})
+		for other: Person in people.people:
+			if bonds.has(other.id):
+				relationships.change(person, other, float(bonds[other.id]) - relationships.bond(person, other))
+			elif bonds.has(str(other.id)):
+				relationships.change(person, other, float(bonds[str(other.id)]) - relationships.bond(person, other)))
 
 
 ## A cat or two that wander the wings, rabbits and budgies kept in cells by
@@ -514,6 +625,7 @@ static func _use_bought(people: People, relationships: Relationships, person: Pe
 			if person.needs.has(&"family"):
 				person.needs[&"family"] = minf(person.needs[&"family"] + STAMP_FAMILY, 100.0)
 			people.add_moodlet(person, &"wrote_home")
+			Families.warm(Families.fondest(person), Families.WRITE_BACK)
 		&"radio":
 			person.profile["has_radio"] = true
 		&"hobby_kit":

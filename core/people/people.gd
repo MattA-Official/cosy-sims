@@ -258,6 +258,10 @@ var custom_bodies: Array[Callable] = []
 const PULL_NEAR := 3.0
 const PULL_SCALE := 1.2
 var _qualities: Dictionary[Room, RoomQuality] = {}
+## (level, room) -> Array of [words, amount]: more parts of a room's
+## quality, such as a drawing pinned up. Call quality_changed() when they
+## change.
+var quality_extras: Array[Callable] = []
 ## People by (level, x, z) in squares NEARBY tiles across, for finding
 ## who is close, refilled when first wanted each step.
 var _buckets: Dictionary[Vector3i, Array] = {}
@@ -605,8 +609,16 @@ func quality(level: int, room: Room) -> RoomQuality:
 		var litter_count := _litter_in(level, room)
 		if litter_count > 0:
 			out.add_part("Litter about", -minf(litter_count * LITTER_EACH, LITTER_MOST))
+		for extra in quality_extras:
+			for part: Array in extra.call(level, room):
+				out.add_part(part[0], part[1])
 		_qualities[room] = out
 	return _qualities[room]
+
+
+## Rooms' quality is worked out again next time it's needed.
+func quality_changed() -> void:
+	_qualities.clear()
 
 
 ## How many pieces of litter lie in a room.

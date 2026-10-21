@@ -982,7 +982,12 @@ func _ready() -> void:
 	visits.progress = reform.progress
 	visits.contraband.assign(PrisonCatalogue.CONTRABAND.filter(func(d: ItemDef) -> bool:
 			return d.id in [&"biscuit", &"spoon", &"screwdriver", &"sweets", &"phone"]))
-	visits.entrance = func() -> Array: return shifts.entrance
+	# Visitors come and go by the bus stop when there is one.
+	visits.entrance = func() -> Array:
+		return intake.arrival_spot() if not building.objects_tagged([Intake.BUS_STOP]).is_empty() else shifts.entrance
+	visits.vehicles = vehicles
+	visits.bus_model = BUS
+	visits.bus_stop = intake.stop_point
 	visits.clock = clock
 	add_child(visits)
 	visits.start()

@@ -20,6 +20,9 @@ var groups: Array[StringName] = [&"prisoner"]
 ## Lets a resident take part, if set: (person, def) -> bool, such as
 ## having the hobby.
 var may_take_part: Callable
+## (def) -> bool: whether an event may be put on, such as once researched.
+## Optional.
+var allowed: Callable
 ## The need taking part fills (Fun).
 var fun_need: StringName = &"recreation"
 ## Day -> event id. One event a day.
@@ -58,7 +61,7 @@ func today() -> EventDef:
 ## Puts an event on a day, paying for it. False if that day is taken, it
 ## is in the past, or there isn't the money.
 func schedule(def: EventDef, day: int) -> bool:
-	if scheduled.has(day) or day < _today():
+	if scheduled.has(day) or day < _today() or not may_put_on(def):
 		return false
 	if ledger != null:
 		if not ledger.can_spend():
@@ -67,6 +70,10 @@ func schedule(def: EventDef, day: int) -> bool:
 	scheduled[day] = def.id
 	scheduled_changed.emit()
 	return true
+
+
+func may_put_on(def: EventDef) -> bool:
+	return not allowed.is_valid() or allowed.call(def)
 
 
 ## Calls an event off, giving the money back if it hasn't started.

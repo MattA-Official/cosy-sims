@@ -130,6 +130,7 @@ func _process(_delta: float) -> bool:
 	_test_shop()
 	_test_health()
 	_test_pets()
+	_test_families()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -5689,9 +5690,11 @@ func _test_visits() -> void:
 	_check(visits.seat_pairs().size() == 1, "the classroom prison's visiting room has a table for one visit")
 	var lonely: Person = prisoners[0]
 	lonely.needs[&"family"] = 5.0
+	lonely.profile["family"] = [{"name": "Jean", "relation": "mum", "fondness": 80.0}]
 	_check(visits.start_visits() == 1 and visits.visitors().size() == 1, "family come to see whoever misses them most")
 	var visitor: Person = visits.visitors()[0]
 	_check(visitor.group == &"visitor" and jobs.of_kind(Visits.JOB).size() == 2, "the visitor and the prisoner each sit down for it")
+	_check(visitor.name.begins_with("Jean ") and visitor.profile.get("relation") == "Mum", "it's someone from their family")
 	visits.visit_done(lonely)
 	_check(is_equal_approx(lonely.needs[&"family"], 100.0) and lonely.moodlets.has(&"had_a_visit"), "a visit fills the family need")
 	visits.end_visits()
@@ -6643,4 +6646,87 @@ func _test_pets() -> void:
 	_check(b.moodlets.has(&"good_dog"), "and those near it are cheered")
 	clock.hour_changed.emit(PrisonLife.DOG_HOURS.y)
 	_check(animals.of_kind(&"therapy_dog").is_empty(), "then goes home")
+	main.queue_free()
+
+
+func _test_families() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var visits: Visits = main.visits
+	var events: Events = main.events
+	var research: Research = main.research
+	var release: Release = main.release
+	var relationships: Relationships = main.relationships
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	_check(prisoners.all(func(p: Person) -> bool:
+			return Families.of(p).size() >= 1 and Families.of(p).size() <= Families.MOST), "every prisoner has a small family")
+	var a: Person = prisoners[0]
+	a.profile["family"] = [{"name": "Jean", "relation": "mum", "fondness": 60.0},
+			{"name": "Archie", "relation": "son", "fondness": 10.0}]
+	_check(Families.words(a).begins_with("Family: Mum Jean ♥♥♥♡♡"), "the inspector shows them with hearts")
+	# Letters only from the fond.
+	var froms: Array[String] = []
+	visits.letter.connect(func(p: Person, from: String) -> void:
+		if p == a:
+			froms.append(from))
+	for p: Person in prisoners:
+		if p != a:
+			p.profile["family"] = []
+	for i in 40:
+		visits.post()
+	_check(not froms.is_empty() and froms.all(func(f: String) -> bool: return f == "Mum Jean"), "letters come from those fond of them")
+	# Fondness.
+	var mum: Dictionary = Families.of(a)[0]
+	clock.day_changed.emit(clock.day() + 1)
+	_check(is_equal_approx(float(mum.fondness), 60.0 - Families.FADE), "fondness fades a little each day")
+	people.add_moodlet(a, &"rang_home")
+	_check(is_equal_approx(float(mum.fondness), 60.0 - Families.FADE + Families.CALL), "and a call home warms it")
+	# A family day.
+	if research.mode != Research.Mode.OFF:
+		research.states[&"family-day"].state = Research.State.HIDDEN
+		_check(not events.may_put_on(events.def_of(&"family_day")), "family days need their card")
+		research.states[&"family-day"].state = Research.State.DONE
+	_check(events.schedule(events.def_of(&"family_day"), clock.day()), "a family day can be booked")
+	visits.last_visit[a.id] = clock.day()
+	a.needs[&"family"] = 1.0
+	_check(visits.waiting().has(a), "on a family day, visits don't wait their turn")
+	var visitor: Person = null
+	if visits.start_visits() > 0:
+		for v: Person in visits.visitors():
+			if visits._visitors[v] == a:
+				visitor = v
+	_check(visitor != null, "and family come")
+	_check(visitor != null and ["Jean", "Archie"].has(visitor.profile.get("relative")), "even those less fond")
+	visits.visit_done(a)
+	_check(a.profile.has("drawing") and a.profile["drawing"]["from"] == "Archie", "children bring a drawing")
+	var home: Array = people.home_room(a)
+	if not home.is_empty():
+		_check(people.quality(home[0], home[1]).parts.any(func(part: Array) -> bool:
+				return part[0] == "A drawing on the wall"), "pinned up in the cell")
+	_check(events.attended.has(a.id), "and they had a great family day")
+	clock.day_changed.emit(clock.day() + Families.DRAWING_DAYS + 1)
+	_check(not a.profile.has("drawing"), "drawings come down after a week")
+	# Old faces.
+	var b: Person = prisoners[1]
+	b.profile["hobbies"] = [&"chess"]
+	relationships.change(a, b, 50.0 - relationships.bond(a, b))
+	var entry := release._record(a)
+	people.remove_person(a)
+	_check(entry.has("kept") and entry.bonds.has(b.id), "a leaver's record keeps their family and friends")
+	var back := people.add_person(b.level, b.flat())
+	release.bring_back(back, entry)
+	_check(Families.of(back).size() == 2 and Families.of(back)[0].name == "Jean", "an old face comes back with the same family")
+	_check(is_equal_approx(relationships.bond(back, b), 50.0), "and old friends remember them")
+	# The hall of fame.
+	release.alumni.clear()
+	release.alumni.append({"id": 1, "name": "Dot Crumb", "reform": 90.0, "plan": "open a bakery"})
+	release.alumni.append({"id": 2, "name": "Gus Fitch", "reform": 10.0, "plan": "start again"})
+	release.postcards = [{"day": 1, "from": "Dot Crumb", "id": 1, "text": "Thank you!"}]
+	var hall := release.hall_of_fame()
+	_check(hall.size() == 1 and hall[0][0].name == "Dot Crumb" and hall[0][1].text == "Thank you!",
+			"the hall of fame lists the best reformed, with their postcards")
 	main.queue_free()

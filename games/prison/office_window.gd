@@ -375,9 +375,12 @@ func _add_events(box: VBoxContainer) -> void:
 func _show_events() -> void:
 	var today := events.clock.day()
 	var upcoming := events.upcoming()
-	var key := "%d %d %s" % [today, events.attended.size(), upcoming]
+	var open := events.defs.map(func(def: EventDef) -> bool: return events.may_put_on(def))
+	var key := "%d %d %s %s" % [today, events.attended.size(), upcoming, open]
 	if key == _event_key:
 		return
+	for i in events.defs.size():
+		_event_pick.set_item_disabled(i, not open[i])
 	_event_key = key
 	for child in _event_list.get_children():
 		child.queue_free()
