@@ -120,6 +120,7 @@ var desk_work := DeskWork.new()
 ## Bonuses, such as department heads'.
 var modifiers := Modifiers.new()
 var training := Training.new()
+var suggestions := Suggestions.new()
 ## Department heads, hired from the warden's desk.
 var heads := Heads.new()
 ## Request cards for the warden, and what their answers do.
@@ -774,6 +775,26 @@ func _ready() -> void:
 	in_tray.clock = clock
 	add_child(in_tray)
 	in_tray.start()
+	suggestions.name = "Suggestions"
+	suggestions.building = building
+	suggestions.people = people
+	suggestions.roster = roster
+	suggestions.prisoners = heads.prisoners
+	suggestions.clock = clock
+	add_child(suggestions)
+	suggestions.start()
+	for idea in suggestions.ideas:
+		in_tray.defs.append(PrisonTray.suggestion(idea))
+	suggestions.suggested.connect(func(idea: Dictionary, record: StaffRoster.Record) -> void:
+		var card := in_tray.find(StringName("suggest_%s" % idea["id"]))
+		if in_tray.cap() > 0 and card != null:
+			in_tray.post_about(card, record.id, prison_tray.staff_words(record))
+		if not attract:
+			Toasts.post("Suggestions box: %s" % idea["title"], "%s: \"%s\"" % [prison_tray.staff_words(record), idea["words"]]))
+	suggestions.taken_up.connect(func(idea: Dictionary, record: StaffRoster.Record) -> void:
+		in_tray.note("%s is chuffed you took up their idea: %s." % [record.first_name(), String(idea["title"]).to_lower()])
+		if not attract:
+			Toasts.post("A good idea", "%s is chuffed you took up their idea: %s." % [prison_tray.staff_words(record), String(idea["title"]).to_lower()]))
 	roster.resign = func(record: StaffRoster.Record) -> void:
 		in_tray.post_about(in_tray.find(&"resignation"), record.id, prison_tray.staff_words(record))
 		if not attract:

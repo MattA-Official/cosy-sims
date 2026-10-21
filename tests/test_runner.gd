@@ -4660,6 +4660,23 @@ func _test_perks() -> void:
 	var again: StaffRoster.Record = roster.records.filter(func(r: StaffRoster.Record) -> bool: return r.id == cook.id)[0]
 	_check(again.trained and again.training_day == cook.training_day, "training saves and loads")
 	_check(not (main.training as Training).has_room(), "no training room in the sample")
+	var box: Suggestions = main.suggestions
+	var tray: InTray = main.in_tray
+	tray.cards.clear()
+	box.last_day = -100
+	_check(not box.suggest().is_empty() and tray.cards.size() == 1 and tray.cards[0].def.kind == &"suggestion",
+			"a member of staff makes a suggestion, which comes in the in-tray")
+	var wanted := [true]
+	box.ideas = [box._idea(&"test", &"guard", "A test", "Test this.", func() -> bool: return wanted[0])]
+	box.open.clear()
+	box.recent.clear()
+	box.last_day = -100
+	box.suggest()
+	var suggester := box._record(box.open[0]["record"])
+	suggester.morale = 50.0
+	wanted[0] = false
+	box.morning()
+	_check(box.open.is_empty() and suggester.morale > 50.0, "taking up a suggestion cheers up whoever made it")
 	main.queue_free()
 
 

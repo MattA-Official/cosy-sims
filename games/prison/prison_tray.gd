@@ -125,6 +125,18 @@ static func resignation() -> TrayCardDef:
 	return def
 
 
+## The card for a staff suggestion (Suggestions), posted about whoever
+## suggested it.
+static func suggestion(idea: Dictionary) -> TrayCardDef:
+	var def := TrayCardDef.make(StringName("suggest_%s" % idea["id"]), &"suggestion", &"staff", idea["title"],
+			"{who} suggests: \"%s\"" % idea["words"],
+			[TrayCardDef.choice("Good idea", [{"morale": 5}], [&"approve"], "{who}'s idea: %s." % String(idea["title"]).to_lower()),
+			TrayCardDef.choice("Not now", [{"morale": -3}], [&"decline"], "{who}'s idea put aside.")], 0)
+	def.weight = 0.0
+	def.deadline_days = 3
+	return def
+
+
 ## Words for a member of staff, such as "Dot the cook".
 func staff_words(record: StaffRoster.Record) -> String:
 	var role := roster._role(record.role)
