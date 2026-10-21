@@ -6,17 +6,33 @@ extends Node
 ## they find their own way. Nobody comes without a reception, or without a
 ## free bed. The prison is paid a fee for each.
 ##
-## A warden sets how many come a day and which security categories are
-## accepted. Without one a couple of low or medium security prisoners come
-## each day.
+## You set the intake directly. Without a warden it is a simple number a
+## day of low or medium security prisoners, 0 for closed; a warden unlocks
+## an on/off switch and a daily cap for each category. Mondays bring the
+## full caps, other days a bit fewer. Now and then the Ministry offers a
+## transfer: extra prisoners on tomorrow's bus, for a bigger fee, only if
+## you accept.
 
 signal arrived(people: Array[Person])
+signal offer_made(offer: Dictionary)
 
 const BUS_HOUR := 9
 const RECEPTION := &"reception"
 ## Arrivals a day without a warden to set the limit.
 const WITHOUT_WARDEN := 2
 const FEE := 200
+## Per prisoner on a transfer.
+const TRANSFER_FEE := 500
+## The hour transfer offers come, and the chance of one on a day.
+const OFFER_HOUR := 10
+const OFFER_CHANCE := 0.3
+const OFFER_SIZE := Vector2i(2, 4)
+## The most a day without a warden, and each category's cap with one.
+const MOST_WITHOUT_WARDEN := 4
+const MOST_CAP := 12
+## Days other than Monday bring between these shares of the caps.
+const QUIET_DAY_SHARE := Vector2(0.6, 1.0)
+const FORECAST_DAYS := 7
 const SEARCH_MINUTES := 10.0
 ## Game minutes an arrival waits for a guard before finding their own way.
 const ESCORT_WAIT := 45.0
@@ -42,12 +58,15 @@ var prisoner_group: StringName = &"prisoner"
 var entrance: Array = []
 ## Whether a warden is running the prison, for the intake settings.
 var has_warden: Callable
-## How many arrive a day, with a warden, and the most that may (the
-## grade raises it).
-var limit := 4
-var max_limit := 8
-## Category ids a warden accepts.
+## How many arrive a day without a warden; 0 is closed.
+var limit := WITHOUT_WARDEN
+## With a warden: each category switched on or off, and its daily cap.
 var accepted: Dictionary[StringName, bool] = {&"low": true, &"medium": true, &"high": false}
+var caps: Dictionary[StringName, int] = {&"low": 2, &"medium": 2, &"high": 1}
+## A transfer on offer today: {category, count, fee}, or empty.
+var offer: Dictionary = {}
+## Accepted transfers by the day they come: {day: [category, count, fee]}.
+var transfers: Dictionary = {}
 ## For drawing the bus, optional: where to put it, the model, and the
 ## ground's height (Vector2 in tiles -> metres).
 ## Drives the bus in, when there's a road.
@@ -69,7 +88,11 @@ var clock: GameClock:
 			_bus_waits())
 		clock.hour_changed.connect(func(hour: int) -> void:
 			if hour == BUS_HOUR:
-				bus())
+				bus()
+			elif hour == OFFER_HOUR:
+				_maybe_offer()
+			elif hour == 0:
+				offer = {})
 
 ## Arrivals still being signed in: [stage, minutes in it].
 var _arriving: Dictionary[Person, Array] = {}
@@ -140,7 +163,25 @@ func _step_off(count: int) -> Array[Person]:
 	var at := arrival_spot()
 	if room.is_empty() or at.is_empty():
 		return came
-	var choices := _categories()
+	var plan := plan_for(_today())
+	var choices: Array[StringName] = []
+	var fees: Array[int] = []
+	var transfer: Array = transfers.get(_today(), [])
+	for id: StringName in plan:
+		for i in plan[id]:
+			choices.append(id)
+			fees.append(FEE)
+	if not transfer.is_empty():
+		# The transfer's places pay the transfer fee.
+		var marked := 0
+		for i in choices.size():
+			if choices[i] == transfer[0] and marked < transfer[1]:
+				fees[i] = transfer[2]
+				marked += 1
+		transfers.erase(_today())
+	if choices.is_empty():
+		choices = WITHOUT_WARDEN_CATEGORIES.duplicate()
+		fees.assign([FEE, FEE])
 	var back := _returners()
 	count = mini(maxi(count, back.size()), free_beds())
 	for i in count:
@@ -150,11 +191,11 @@ func _step_off(count: int) -> Array[Person]:
 			person = people.add_person(at[0], at[1], "", prisoner_group)
 		if person == null:
 			continue
-		person.category = choices[_rng.randi() % choices.size()]
+		person.category = choices[i % choices.size()]
 		if i < back.size() and on_return.is_valid():
 			on_return.call(person, back[i])
 		person.led = true
-		ledger.add(FEE, "Intake fees")
+		ledger.add(fees[i % fees.size()], "Intake fees")
 		people.add_moodlet(person, FIRST_NIGHT)
 		_arriving[person] = [Stage.WALKING, 0.0]
 		_head_in(person, room)
@@ -166,7 +207,85 @@ func _step_off(count: int) -> Array[Person]:
 
 ## How many come today, before free beds are counted.
 func todays_count() -> int:
-	return limit if warden_here() else WITHOUT_WARDEN
+	return _count_of(plan_for(_today()))
+
+
+## Who the bus brings on a day by category, before beds: the caps (fewer
+## on days other than Monday), plus any transfer accepted for it.
+func plan_for(day: int) -> Dictionary[StringName, int]:
+	var out: Dictionary[StringName, int] = {}
+	var share := _share(day)
+	if warden_here():
+		for id: StringName in caps:
+			if accepted.get(id, false) and caps[id] > 0:
+				out[id] = maxi(roundi(caps[id] * share), 1)
+	elif limit > 0:
+		var total := maxi(roundi(limit * share), 1)
+		for i in total:
+			var id: StringName = WITHOUT_WARDEN_CATEGORIES[i % WITHOUT_WARDEN_CATEGORIES.size()]
+			out[id] = out.get(id, 0) + 1
+	if transfers.has(day):
+		var transfer: Array = transfers[day]
+		out[transfer[0]] = out.get(transfer[0], 0) + transfer[1]
+	return out
+
+
+## The next week's arrivals: [day, weekday, count], from today if the bus
+## hasn't come yet.
+func forecast(days := FORECAST_DAYS) -> Array:
+	var out: Array = []
+	var first := _today() + (1 if clock != null and clock.hour() >= BUS_HOUR else 0)
+	for day in range(first, first + days):
+		out.append([day, GameClock.WEEKDAYS[(day - 1) % GameClock.WEEKDAYS.size()], _count_of(plan_for(day))])
+	return out
+
+
+## Takes today's transfer offer: they come on tomorrow's bus.
+func accept_offer() -> void:
+	if offer.is_empty():
+		return
+	transfers[_today() + 1] = [offer.category, offer.count, offer.fee]
+	offer = {}
+
+
+func decline_offer() -> void:
+	offer = {}
+
+
+## Makes a transfer offer, now and then, with a warden to take the call.
+func _maybe_offer(force := false) -> Dictionary:
+	if not warden_here() or not offer.is_empty() or (not force and _rng.randf() >= OFFER_CHANCE):
+		return {}
+	var ids: Array[StringName] = []
+	for def in categories:
+		ids.append(def.id)
+	if ids.is_empty():
+		ids = WITHOUT_WARDEN_CATEGORIES.duplicate()
+	offer = {"category": ids[_rng.randi() % ids.size()],
+			"count": _rng.randi_range(OFFER_SIZE.x, OFFER_SIZE.y), "fee": TRANSFER_FEE}
+	offer_made.emit(offer)
+	return offer
+
+
+func _count_of(plan: Dictionary[StringName, int]) -> int:
+	var sum := 0
+	for id: StringName in plan:
+		sum += plan[id]
+	return sum
+
+
+## Monday brings the full caps; other days a steady share, the same each
+## time it's asked.
+func _share(day: int) -> float:
+	if (day - 1) % GameClock.WEEKDAYS.size() == 0:
+		return 1.0
+	var roll := RandomNumberGenerator.new()
+	roll.seed = hash(day * 7919)
+	return roll.randf_range(QUIET_DAY_SHARE.x, QUIET_DAY_SHARE.y)
+
+
+func _today() -> int:
+	return clock.day() if clock != null else 1
 
 
 func warden_here() -> bool:
@@ -199,18 +318,6 @@ func warnings() -> Array[String]:
 		out.append("No reception: no new prisoners arrive")
 	elif free_beds() == 0:
 		out.append("No free beds: no new prisoners arrive")
-	return out
-
-
-## Category ids arrivals are picked from.
-func _categories() -> Array[StringName]:
-	var out: Array[StringName] = []
-	if warden_here():
-		for def in categories:
-			if accepted.get(def.id, false):
-				out.append(def.id)
-	if out.is_empty():
-		out = WITHOUT_WARDEN_CATEGORIES.duplicate()
 	return out
 
 

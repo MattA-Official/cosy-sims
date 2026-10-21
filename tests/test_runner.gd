@@ -1170,7 +1170,7 @@ func _test_intake() -> void:
 	clock.speed_index = 0
 	_check(main.office.has_warden() and intake.warden_here(), "the paying prison has a warden in an office")
 	_check(intake.warnings().is_empty() and intake.free_beds() == 4, "a reception and four free beds")
-	intake.limit = 3
+	intake.caps[&"high"] = 3
 	intake.accepted = {&"low": false, &"medium": false, &"high": true}
 	var fees: int = ledger.today.get("Intake fees", 0)
 	# The bus drives in along the road; they step off when it stops.
@@ -1195,7 +1195,7 @@ func _test_intake() -> void:
 		if people.people.size() > before:
 			came.assign(people.people.slice(before))
 			break
-	_check(came.size() == 3, "the bus brings the warden's limit")
+	_check(came.size() == 3, "Monday's bus brings the warden's cap")
 	_check(came.all(func(p: Person) -> bool: return p.category == &"high" and p.moodlets.has(Intake.FIRST_NIGHT)),
 			"of the categories accepted, each feeling their first night")
 	_check(ledger.today.get("Intake fees", 0) - fees == 3 * Intake.FEE, "and the prison is paid for each")
@@ -1215,6 +1215,22 @@ func _test_intake() -> void:
 	_check(ride.call().is_empty() and intake.warnings()[0].begins_with("No free beds"), "and none when the cells are full")
 	main.shifts.set_wanted(&"warden", &"day", 0)
 	_check(not intake.warden_here() and intake.todays_count() == Intake.WITHOUT_WARDEN, "without a warden a couple come")
+	intake.limit = 0
+	_check(intake.todays_count() == 0 and intake.forecast().all(func(e: Array) -> bool: return e[2] == 0),
+			"or none, closed")
+	main.shifts.set_wanted(&"warden", &"day", 1)
+	intake.caps = {&"low": 4, &"medium": 0, &"high": 0}
+	intake.accepted = {&"low": true, &"medium": true, &"high": false}
+	var week: Array = intake.forecast()
+	_check(week.size() == 7 and week.all(func(e: Array) -> bool: return e[2] >= 1 and e[2] <= 4)
+			and week.any(func(e: Array) -> bool: return e[1] == "Monday" and e[2] == 4), "a week ahead, Mondays full")
+	var offer: Dictionary = intake._maybe_offer(true)
+	_check(not offer.is_empty(), "the Ministry offers a transfer")
+	var tomorrow: int = main.clock.day() + 1
+	var before_plan: int = intake.plan_for(tomorrow).get(offer.category, 0)
+	intake.accept_offer()
+	_check(intake.offer.is_empty() and intake.plan_for(tomorrow).get(offer.category, 0) == before_plan + offer.count,
+			"accepted, they come on tomorrow's bus")
 	main.queue_free()
 
 
@@ -1235,7 +1251,6 @@ func _test_standing() -> void:
 	_check(standing.current_goals().size() == Standing.GOALS_SHOWN, "and the next goal comes up")
 	standing.grade_day()
 	_check(standing.measures.size() == 4 and standing.grade >= 1 and standing.grade <= 5, "each midnight it is graded")
-	_check(main.intake.max_limit == 2 + standing.grade * 2, "the grade sets the biggest intake")
 	var report := standing.write_report()
 	_check(report.contains("★") and report.contains("Money:"), "and the morning report sums up yesterday")
 	main.queue_free()
@@ -3863,6 +3878,7 @@ func _test_release() -> void:
 	var clock: GameClock = main.clock
 	(main.misconduct as Misconduct).enabled = false
 	(main.intake as Intake).limit = 0
+	(main.intake as Intake).accepted.clear()
 	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
 	for p: Person in prisoners:
 		PrisonerFile.of(p).release_day = clock.day() + 50
@@ -3949,8 +3965,16 @@ func _test_balanced_grade() -> void:
 	_check(standing.write_report().contains("Held to 3★ by Reform"), "the report says what held it")
 	standing.measure_value["Reform"] = func() -> Array: return [0.5, "fine"]
 	standing.grade_day()
-	_check(standing.grade == 5 and standing.held_by.is_empty() and standing.history.size() == 2,
-			"with Reform at 4 nothing holds it back, and both nights are kept")
+	_check(standing.measures["Reform"] == 3 and standing.grade == 4 and standing.held_by.is_empty()
+			and standing.history.size() == 2, "Reform averages 1 and 4 over two nights, and nothing holds it back")
+	standing.measure_value["Reform"] = weak
+	standing.grade_day()
+	_check(standing.measures["Reform"] == 2 and standing.grade == 4, "one bad night dents the grade rather than sinking it")
+	var ledger: Ledger = main.ledger
+	ledger.balance = 7000
+	ledger.spent.assign([1000, 1000, 1000])
+	_check(is_equal_approx(standing._money()[0], 7.0), "money counts days of costs in the bank")
+	ledger.balance = 7000
 	# The real Reform measure: half average reform, half this week's leavers.
 	standing.measure_value.erase("Reform")
 	standing.start()

@@ -110,9 +110,12 @@ static func capture(main: Node) -> Dictionary:
 		"entrance": (main.shifts as Shifts).entrance.duplicate(),
 		"routes": routes,
 		"money": {"balance": ledger.balance, "sandbox": ledger.sandbox, "today": ledger.today.duplicate(),
-				"yesterday": ledger.yesterday.duplicate(), "closing": ledger.closing.duplicate()},
+				"yesterday": ledger.yesterday.duplicate(), "closing": ledger.closing.duplicate(),
+				"spent": ledger.spent.duplicate()},
 		"sold": (main.workshop as Workshop).sold,
 		"intake": {"limit": (main.intake as Intake).limit, "accepted": (main.intake as Intake).accepted.duplicate(),
+				"caps": (main.intake as Intake).caps.duplicate(), "offer": (main.intake as Intake).offer.duplicate(),
+				"transfers": (main.intake as Intake).transfers.duplicate(true),
 				"arriving": (main.intake as Intake).arriving_ids()},
 		"standing": {"grade": standing.grade, "measures": standing.measures.duplicate(), "goals_done": goals_done,
 				"report": standing.report, "graded": standing.measures_known(),
@@ -264,11 +267,16 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	ledger.today.assign(money.get("today", {}))
 	ledger.yesterday.assign(money.get("yesterday", {}))
 	ledger.closing.assign(money.get("closing", []))
+	ledger.spent.assign(money.get("spent", []))
 	ledger.changed.emit()
 	(main.workshop as Workshop).sold = data.get("sold", 0)
 	var intake: Dictionary = data.get("intake", {})
-	(main.intake as Intake).limit = intake.get("limit", 4)
+	(main.intake as Intake).limit = mini(intake.get("limit", Intake.WITHOUT_WARDEN), Intake.MOST_WITHOUT_WARDEN)
 	(main.intake as Intake).accepted.assign(intake.get("accepted", {}))
+	if intake.has("caps"):
+		(main.intake as Intake).caps.assign(intake.caps)
+	(main.intake as Intake).offer = intake.get("offer", {})
+	(main.intake as Intake).transfers = intake.get("transfers", {})
 	var saved: Dictionary = data.get("standing", {})
 	(main.standing as Standing).restore(saved)
 	(main.intake as Intake).restore_arriving(intake.get("arriving", {}))

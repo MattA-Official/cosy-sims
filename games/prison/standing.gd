@@ -28,8 +28,10 @@ const DIFFICULTIES: Array[DifficultyDef] = [
 	preload("res://games/prison/catalogue/difficulty_standard.tres"),
 	preload("res://games/prison/catalogue/difficulty_tough.tres"),
 ]
-## Days of money the Money measure looks back over.
+## Days of costs the Money measure averages over.
 const MONEY_DAYS := 3
+## Nights each measure's stars are averaged over.
+const AVERAGE_NIGHTS := 3
 ## The Money value for being in debt: below every line.
 const IN_DEBT := -1e12
 
@@ -295,28 +297,38 @@ func grade_day() -> void:
 	for step in nightly:
 		step.call()
 	_graded = true
+	var tonight: Dictionary[String, int] = {}
+	for def in measure_defs:
+		var got: Array = measure_value[def.display_name].call()
+		values[def.display_name] = got[0]
+		why[def.display_name] = got[1]
+		tonight[def.display_name] = def.stars(got[0])
+	if security != null:
+		security.end_day()
+	# Each measure is its stars averaged over the last few nights, so one
+	# bad night dents the grade rather than sinking it.
+	var recent := history.slice(maxi(history.size() - (AVERAGE_NIGHTS - 1), 0))
 	var weighted := 0.0
 	var weights := 0.0
 	var lowest := 6
 	var lowest_name := ""
 	for def in measure_defs:
-		var got: Array = measure_value[def.display_name].call()
-		values[def.display_name] = got[0]
-		why[def.display_name] = got[1]
-		var stars := def.stars(got[0])
+		var sum := float(tonight[def.display_name])
+		for night in recent:
+			sum += night.stars.get(def.display_name, tonight[def.display_name])
+		var average := sum / (recent.size() + 1)
+		var stars := clampi(roundi(average), 1, 5)
 		measures[def.display_name] = stars
-		weighted += stars * def.weight
+		weighted += average * def.weight
 		weights += def.weight
 		if stars < lowest:
 			lowest = stars
 			lowest_name = def.display_name
-	if security != null:
-		security.end_day()
 	var mean := clampi(roundi(weighted / maxf(weights, 0.001)), 1, 5)
 	grade = mini(mean, lowest + SPREAD)
 	held_by = lowest_name if grade < mean else ""
 	history.append({"day": clock.day() - 1 if clock != null else 0, "grade": grade,
-			"stars": measures.duplicate(), "values": values.duplicate()})
+			"stars": tonight, "values": values.duplicate()})
 	if history.size() > HISTORY_NIGHTS:
 		history = history.slice(history.size() - HISTORY_NIGHTS)
 	_apply()
@@ -427,24 +439,19 @@ func _reform() -> Array:
 			week.reformed, leavers]]
 
 
-## In debt is one star; otherwise the last few days' takings.
+## In debt is one star; otherwise how many days of costs are in the bank.
 func _money() -> Array:
 	if ledger.balance < 0 and not ledger.sandbox:
 		return [IN_DEBT, "in debt"]
-	var net := Ledger.total(ledger.yesterday)
-	var days := 1
-	if ledger.closing.size() >= 2:
-		var back := mini(MONEY_DAYS, ledger.closing.size() - 1)
-		net = ledger.closing[-1] - ledger.closing[-1 - back]
-		days = back
-	return [float(net), "%s%s over the last %s" % ["+" if net > 0 else "", Ledger.text(net),
-			"day" if days == 1 else "%d days" % days]]
+	var costs := ledger.daily_costs(MONEY_DAYS)
+	if costs <= 0.0:
+		return [99.0, "no costs yet"]
+	var days := ledger.balance / costs
+	return [days, "%s in the bank, %d days of costs" % [Ledger.text(ledger.balance), floori(days)]]
 
 
 func _apply() -> void:
 	finances.grant_scale = (0.8 + 0.1 * (grade - 1)) * difficulty.grant_scale
-	intake.max_limit = 2 + grade * 2
-	intake.limit = mini(intake.limit, intake.max_limit)
 
 
 func _prisoners() -> int:
