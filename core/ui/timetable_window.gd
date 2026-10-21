@@ -85,6 +85,8 @@ class Lanes:
 		top += maxi(_session_rows(), 1) * TimetableWindow.SESSION_HEIGHT + TimetableWindow.LANE_GAP
 		out[&"rota"] = top
 		top += maxi(_rota().size(), 1) * TimetableWindow.ROTA_HEIGHT + TimetableWindow.LANE_GAP
+		# Room above the operations for their heading.
+		top += OPERATIONS_HEADING
 		out[&"operations"] = top
 		top += window.regime.operations.size() * TimetableWindow.OPERATION_HEIGHT
 		out[&"end"] = top
@@ -216,6 +218,14 @@ class Lanes:
 		var now := -1
 		if window.clock != null and Schedule.weekday_of(window.clock.total_minutes) == window.day:
 			now = Schedule.slot_of(window.clock.total_minutes) % Schedule.SLOTS_PER_DAY
+		# A soft band behind every other lane, so the four read apart.
+		var lanes := [&"timetable", &"sessions", &"rota", &"operations"].filter(func(k: StringName) -> bool:
+				return tops.has(k))
+		for i in lanes.size():
+			var top: float = _lane_top(tops, lanes[i])
+			var bottom: float = _lane_top(tops, lanes[i + 1]) if i + 1 < lanes.size() else tops[&"end"] + 4.0
+			if i % 2 == 1:
+				draw_style_box(_band(Color(ink, 0.045)), Rect2(0, top, size.x, bottom - top))
 		# The hours along the top, and faint lines down every lane.
 		for hour in Schedule.HOURS:
 			var x := left + hour * 2 * w
@@ -287,15 +297,22 @@ class Lanes:
 			var y: float = tops[&"rota"] + i * TimetableWindow.ROTA_HEIGHT
 			var first: int = row[1]
 			var length: int = row[2]
-			for part in [[first, mini(length, Schedule.SLOTS_PER_DAY - first)], [0, first + length - Schedule.SLOTS_PER_DAY]]:
+			# A shift past midnight wraps round to the start of the day, open
+			# ended where it wraps, and named on both parts.
+			var wraps := first + length > Schedule.SLOTS_PER_DAY
+			for part in [[first, mini(length, Schedule.SLOTS_PER_DAY - first), true, not wraps],
+					[0, first + length - Schedule.SLOTS_PER_DAY, false, true]]:
 				if part[1] <= 0:
 					continue
 				var rect := Rect2(left + part[0] * w + 1, y + 2, part[1] * w - 2, TimetableWindow.ROTA_HEIGHT - 4)
-				draw_style_box(_box(Color(0.72, 0.8, 0.86), true, true), rect)
-			draw_string(font, Vector2(left + first * w + 5, y + 13), row[0], HORIZONTAL_ALIGNMENT_LEFT,
-					mini(length, Schedule.SLOTS_PER_DAY - first) * w - 8, 11, TimetableWindow.INK)
+				draw_style_box(_box(Color(0.72, 0.8, 0.86), part[2], part[3]), rect)
+				draw_string(font, rect.position + Vector2(5, 11), row[0] if part[2] else "… " + row[0],
+						HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 8, 11, TimetableWindow.INK)
 
 		_operation_rects.clear()
+		if not window.regime.operations.is_empty():
+			draw_string(_LANE_FONT, Vector2(4, tops[&"operations"] - 4), "OPERATIONS",
+					HORIZONTAL_ALIGNMENT_LEFT, TimetableWindow.LABEL_WIDTH - 8, 11, faint)
 		for i in window.regime.operations.size():
 			var op := window.regime.operations[i]
 			var y: float = tops[&"operations"] + i * TimetableWindow.OPERATION_HEIGHT
@@ -319,10 +336,25 @@ class Lanes:
 				_operation_rects.append([op.id, index, rect])
 
 	const RULER_LINE := 16.0
+	const OPERATIONS_HEADING := 14.0
+	static var _LANE_FONT := CosyTheme.bold_font()
 
-	func _lane_label(font: Font, colour: Color, top: float, height: float, text: String) -> void:
-		draw_string(font, Vector2(4, top + minf(height, 26.0) * 0.5 + 5), text, HORIZONTAL_ALIGNMENT_LEFT,
-				TimetableWindow.LABEL_WIDTH - 8, 13, colour)
+	## A lane's name in small capitals down the left, like the book's other
+	## headings.
+	func _lane_label(_font: Font, colour: Color, top: float, height: float, text: String) -> void:
+		draw_string(_LANE_FONT, Vector2(4, top + minf(height, 26.0) * 0.5 + 4), text.to_upper(),
+				HORIZONTAL_ALIGNMENT_LEFT, TimetableWindow.LABEL_WIDTH - 8, 11, colour)
+
+	## Where a lane's band starts, its heading included.
+	func _lane_top(tops: Dictionary, lane: StringName) -> float:
+		var heading := OPERATIONS_HEADING if lane == &"operations" else 0.0
+		return tops[lane] - heading - TimetableWindow.LANE_GAP * 0.5
+
+	func _band(colour: Color) -> StyleBoxFlat:
+		var box := StyleBoxFlat.new()
+		box.bg_color = colour
+		box.set_corner_radius_all(8)
+		return box
 
 	func _box(colour: Color, round_left: bool, round_right: bool) -> StyleBoxFlat:
 		var box := StyleBoxFlat.new()
@@ -396,7 +428,8 @@ func _ready() -> void:
 	box.add_child(_note)
 	if regime != null:
 		var offers_title := Label.new()
-		offers_title.text = "Sessions a week"
+		offers_title.text = "SESSIONS A WEEK"
+		offers_title.theme_type_variation = &"TitleLabel"
 		box.add_child(offers_title)
 		_offers.add_theme_constant_override(&"h_separation", 14)
 		box.add_child(_offers)
@@ -468,14 +501,23 @@ func _build_offers() -> void:
 		var name_label := Label.new()
 		name_label.text = def.display_name
 		cell.add_child(name_label)
-		var count := SpinBox.new()
-		count.min_value = 0
-		count.max_value = 14
-		count.value = regime.offered.get(def.id, def.per_week)
-		count.focus_mode = FOCUS_NONE
-		count.get_line_edit().focus_mode = FOCUS_CLICK
-		count.value_changed.connect(func(value: float) -> void: regime.set_offered(def.id, int(value)))
-		cell.add_child(count)
+		# − n + like the office's steppers, rather than a typed box.
+		var count := Label.new()
+		count.text = str(regime.offered.get(def.id, def.per_week))
+		count.custom_minimum_size.x = 26
+		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		for step in [-1, 1]:
+			var button := Button.new()
+			button.text = "−" if step < 0 else "+"
+			button.focus_mode = FOCUS_NONE
+			button.custom_minimum_size = Vector2(32, 0)
+			button.pressed.connect(func() -> void:
+				var value := clampi(int(regime.offered.get(def.id, def.per_week)) + step, 0, 14)
+				regime.set_offered(def.id, value)
+				count.text = str(value))
+			cell.add_child(button)
+			if step < 0:
+				cell.add_child(count)
 		_offers.add_child(cell)
 
 
