@@ -4667,6 +4667,8 @@ func _test_perks() -> void:
 	_check(not box.suggest().is_empty() and tray.cards.size() == 1 and tray.cards[0].def.kind == &"suggestion",
 			"a member of staff makes a suggestion, which comes in the in-tray")
 	var wanted := [true]
+	var files: MissingFiles = main.missing_files
+	_check(files.file_minutes() == MissingFiles.FILE_MINUTES * 2.0, "without a filing cabinet, a missing file takes twice as long")
 	box.ideas = [box._idea(&"test", &"guard", "A test", "Test this.", func() -> bool: return wanted[0])]
 	box.open.clear()
 	box.recent.clear()

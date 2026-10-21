@@ -3,15 +3,19 @@ extends Node
 ## Some arrivals come without their paperwork (MISSING_CHANCE, unless red
 ## tape is Off). Their file says "Awaiting paperwork" and they can't go up
 ## for parole until FILE_MINUTES of desk work fills it in: a clerk's job
-## if there is one, otherwise the warden's.
+## if there is one, otherwise the warden's. Without a filing cabinet
+## anywhere, it takes twice as long.
 
 const MISSING_CHANCE := 0.1
 const FILE_MINUTES := 60.0
 const KIND := &"file"
+const CABINETS: Array[StringName] = [&"filing_cabinet"]
 
 var desk_work: DeskWork
 var heads: Heads
 var people: People
+## Optional: for looking for a filing cabinet.
+var building: Building
 ## () -> bool: a clerk is on the staff.
 var has_clerk: Callable
 var intake: Intake:
@@ -46,7 +50,7 @@ func lose(person: Person) -> bool:
 	if owner == 0:
 		return false
 	person.profile["file_missing"] = true
-	desk_work.add(owner, KIND, "File for %s" % person.name, FILE_MINUTES, person.id)
+	desk_work.add(owner, KIND, "File for %s" % person.name, file_minutes(), person.id)
 	return true
 
 
@@ -55,3 +59,9 @@ func _found(id: int) -> void:
 		if person.id == id:
 			person.profile.erase("file_missing")
 			return
+
+
+## Desk minutes to sort a missing file: double without a filing cabinet.
+func file_minutes() -> float:
+	var cabinet := building == null or not building.objects_tagged(CABINETS).is_empty()
+	return FILE_MINUTES if cabinet else FILE_MINUTES * 2.0

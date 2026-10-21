@@ -53,6 +53,7 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/bus_stop.tres"),
 	preload("res://games/prison/catalogue/infirmary_bed.tres"),
 	preload("res://games/prison/catalogue/medicine_cabinet.tres"),
+	preload("res://games/prison/catalogue/filing_cabinet.tres"),
 	preload("res://games/prison/catalogue/class_desk.tres"),
 	preload("res://games/prison/catalogue/whiteboard.tres"),
 	preload("res://games/prison/catalogue/postcard_board.tres"),

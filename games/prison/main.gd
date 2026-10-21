@@ -801,6 +801,7 @@ func _ready() -> void:
 			Toasts.post("A resignation letter", "%s wants to leave. Answer in the in-tray (J)." % record.name)
 	roster.charge = func(amount: int, line: String) -> void: ledger.add(-amount, line)
 	missing_files.name = "MissingFiles"
+	missing_files.building = building
 	missing_files.desk_work = desk_work
 	missing_files.heads = heads
 	missing_files.people = people
