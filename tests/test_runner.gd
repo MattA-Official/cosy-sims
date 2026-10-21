@@ -88,6 +88,7 @@ func _process(_delta: float) -> bool:
 	_test_parole()
 	_test_release()
 	_test_balanced_grade()
+	_test_goals_and_difficulty()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3961,4 +3962,60 @@ func _test_balanced_grade() -> void:
 	release.alumni.append({"left_day": main.clock.day(), "reform": 20.0, "will_return_day": main.clock.day(), "returned": true})
 	got = standing.measure_value["Reform"].call()
 	_check(is_equal_approx(got[0], 0.2 + 0.5 / 3.0), "a comeback counts twice against the leavers' share")
+	main.free()
+
+
+func _test_goals_and_difficulty() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var standing: Standing = main.standing
+	var ledger: Ledger = main.ledger
+	var clock: GameClock = main.clock
+	_check(standing.goals.size() == 12, "a dozen sandbox goals")
+	for goal in standing.goals.slice(0, 4):
+		standing.goals_done[goal.id] = true
+	var current := standing.current_goals()
+	_check(current[0].id == &"pass_3_courses" and standing.goal_progress(current[0]) == "0 of 3",
+			"counted goals count from when they come up")
+	standing.count(&"courses_passed", 3)
+	var finished := standing.check_goals()
+	_check(finished.any(func(g: GoalDef) -> bool: return g.id == &"pass_3_courses"), "three passes win the grant")
+	for goal in standing.goals:
+		if goal.id != &"five_nights_4":
+			standing.goals_done[goal.id] = true
+	for measure: String in Standing.MEASURES:
+		standing.measure_value[measure] = func() -> Array: return [0.0 if measure == "Safety" else 1e6, ""]
+	for night in 4:
+		standing.grade_day()
+	_check(not standing.goals_done.has(&"five_nights_4") and standing.goal_progress(standing.goals[-1]) == "4 of 5 nights",
+			"held goals count nights in a row")
+	standing.grade_day()
+	_check(standing.goals_done.has(&"five_nights_4"), "and pay on the fifth")
+	# Difficulty.
+	var tough: DifficultyDef = Standing.DIFFICULTIES[3]
+	standing.set_difficulty(tough)
+	_check(is_equal_approx(main.finances.wage_scale, 1.15) and is_equal_approx(main.release.return_scale, 1.5)
+			and is_equal_approx(main.finances.grant_scale, (0.8 + 0.1 * (standing.grade - 1)) * 0.85),
+			"Tough scales wages, comebacks and grants")
+	var lost: Array = []
+	standing.failed.connect(func(rule: FailRule) -> void: lost.append(rule))
+	ledger.balance = -6000
+	standing.grade_day()
+	_check(standing.warnings.any(func(line: String) -> bool: return line.contains("2 nights")),
+			"deep in debt, the Ministry warns")
+	standing.grade_day()
+	_check(lost.is_empty(), "not lost yet")
+	standing.grade_day()
+	_check(lost.size() == 1 and lost[0].kind == &"debt" and clock.paused() and (main.fail_card as FailCard).visible,
+			"three nights in deep debt loses the prison")
+	(main.fail_card as FailCard).keep_playing.call()
+	_check(standing.difficulty.id == &"sandbox" and not clock.paused() and not standing.lost, "keep playing as Sandbox")
+	standing.set_difficulty(Standing.DIFFICULTIES[2])
+	standing.grade_day()
+	standing.grade_day()
+	standing.grade_day()
+	_check(lost.size() == 1 and standing.warnings.size() == 1 and not standing.warnings[0].contains("nights"),
+			"Standard only warns")
+	_check(PrisonSave.capture(main)["standing"]["difficulty"] == &"standard", "the difficulty saves")
 	main.free()

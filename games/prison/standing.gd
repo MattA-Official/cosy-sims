@@ -8,7 +8,10 @@ extends Node
 ## daily report each morning.
 
 signal report_ready(text: String)
-signal goal_done(goal: Goal)
+signal goal_done(goal: GoalDef)
+## A fail rule ran out on a difficulty that can be lost.
+signal failed(rule: FailRule)
+signal difficulty_changed(def: DifficultyDef)
 
 const REPORT_HOUR := 6
 ## Grant goals shown at once.
@@ -17,27 +20,18 @@ const MEASURES: Array[String] = ["Safety", "Wellbeing", "Reform", "Money"]
 ## The grade is at most the lowest measure plus this.
 const SPREAD := 2
 const HISTORY_NIGHTS := 7
+## The difficulty a new game starts on, once one has been picked.
+static var next_difficulty: StringName = &""
+const DIFFICULTIES: Array[DifficultyDef] = [
+	preload("res://games/prison/catalogue/difficulty_sandbox.tres"),
+	preload("res://games/prison/catalogue/difficulty_cosy.tres"),
+	preload("res://games/prison/catalogue/difficulty_standard.tres"),
+	preload("res://games/prison/catalogue/difficulty_tough.tres"),
+]
 ## Days of money the Money measure looks back over.
 const MONEY_DAYS := 3
 ## The Money value for being in debt: below every line.
 const IN_DEBT := -1e12
-
-## A grant goal: done when `check` says so, paying `grant`.
-class Goal:
-	var title: String
-	var grant: int
-	## () -> bool
-	var check: Callable
-	## () -> String, such as "7 of 12". Optional.
-	var progress: Callable
-	var done := false
-
-	func _init(goal_title: String, goal_grant: int, goal_check: Callable, goal_progress := Callable()) -> void:
-		title = goal_title
-		grant = goal_grant
-		check = goal_check
-		progress = goal_progress
-
 
 var people: People
 var ledger: Ledger
@@ -80,7 +74,22 @@ var clock: GameClock:
 var grade := 3
 ## Each measure's stars, by name, as of last midnight.
 var measures: Dictionary[String, int] = {}
-var goals: Array[Goal] = []
+var goals: Array[GoalDef] = []
+## Goal ids done.
+var goals_done: Dictionary[StringName, bool] = {}
+## Events counted for goals, such as &"parole_granted", since the start.
+var counts: Dictionary[StringName, int] = {}
+## (goal) -> float for goal kinds the prison adds.
+var goal_kinds: Dictionary[StringName, Callable] = {}
+var difficulty: DifficultyDef = preload("res://games/prison/catalogue/difficulty_standard.tres")
+## Nights in a row each fail rule has held, by kind.
+var fail_counts: Dictionary[StringName, int] = {}
+## The Ministry's worries right now, for the report and clock bar.
+var warnings: Array[String] = []
+## Optional: () -> float, the longest sit-in going on now in game hours.
+var longest_sit_in: Callable
+## The game was lost (on a difficulty that can be).
+var lost := false
 ## Each measure's value and why line as of last midnight, by name.
 var values: Dictionary[String, float] = {}
 var why: Dictionary[String, String] = {}
@@ -91,6 +100,10 @@ var history: Array[Dictionary] = []
 ## The last daily report, or "".
 var report := ""
 
+## Counts at the moment each counted goal came up, by goal id.
+var _baselines: Dictionary[StringName, int] = {}
+## Midnights in a row each held goal has been met, by goal id.
+var _held: Dictionary[StringName, int] = {}
 ## Today so far: moodlets given out, by id, and arrivals.
 var _moodlets: Dictionary[StringName, int] = {}
 var _arrivals := 0
@@ -107,29 +120,16 @@ func start() -> void:
 	intake.arrived.connect(func(came: Array[Person]) -> void: _arrivals += came.size())
 	for measure in MEASURES:
 		measures[measure] = 3
+	for def in DIFFICULTIES:
+		if def.id == next_difficulty:
+			difficulty = def
 	var defaults: Dictionary[String, Callable] = {"Safety": _safety, "Wellbeing": _wellbeing,
 			"Reform": _reform, "Money": _money}
 	for measure: String in defaults:
 		if not measure_value.has(measure):
 			measure_value[measure] = defaults[measure]
 	_apply()
-	goals = [
-		Goal.new("House 12 prisoners", 1000, func() -> bool: return _prisoners() >= 12,
-				func() -> String: return "%d of 12" % _prisoners()),
-		Goal.new("Open a workshop", 1500, func() -> bool: return _has_room(&"workshop"),
-				Callable()),
-		Goal.new("Sell 20 goods from the workshop", 1000, func() -> bool: return workshop.sold >= 20,
-				func() -> String: return "%d of 20" % workshop.sold),
-		Goal.new("Reach a three-star grade", 2000, func() -> bool: return grade >= 3 and measures_known(),
-				Callable()),
-		Goal.new("House 20 prisoners", 2500, func() -> bool: return _prisoners() >= 20,
-				func() -> String: return "%d of 20" % _prisoners()),
-		Goal.new("Keep average mood over 60 at midnight", 2000,
-				func() -> bool: return measures_known() and _average_mood() > 60.0,
-				func() -> String: return "now %d" % roundi(_average_mood())),
-		Goal.new("Reach a four-star grade", 4000, func() -> bool: return grade >= 4 and measures_known(),
-				Callable()),
-	]
+	goals.assign((preload("res://games/prison/catalogue/goals_sandbox.tres") as GoalListDef).goals)
 
 
 ## Puts back the grade and goals from a save.
@@ -142,40 +142,152 @@ func restore(saved: Dictionary) -> void:
 	held_by = saved.get("held_by", "")
 	history.assign(saved.get("history", []))
 	_graded = saved.get("graded", false)
+	# Older saves list goals done by title.
 	var done: Array = saved.get("goals_done", [])
+	goals_done.clear()
 	for goal in goals:
-		goal.done = done.has(goal.title)
+		if done.has(goal.id) or done.has(goal.title):
+			goals_done[goal.id] = true
+	counts.assign(saved.get("counts", {}))
+	_baselines.assign(saved.get("baselines", {}))
+	_held.assign(saved.get("held", {}))
+	fail_counts.assign(saved.get("fail_counts", {}))
+	warnings.assign(saved.get("warnings", []))
+	var difficulty_id: StringName = saved.get("difficulty", difficulty.id)
+	for def in DIFFICULTIES:
+		if def.id == difficulty_id:
+			difficulty = def
 	_apply()
 
 
 ## Goals being worked towards now: the first few not done.
-func current_goals() -> Array[Goal]:
-	var out: Array[Goal] = []
+func current_goals() -> Array[GoalDef]:
+	var out: Array[GoalDef] = []
 	for goal in goals:
-		if not goal.done:
+		if not goals_done.has(goal.id):
 			out.append(goal)
+			if goal.counted and not _baselines.has(goal.id):
+				_baselines[goal.id] = counts.get(goal.kind, 0)
 		if out.size() == GOALS_SHOWN:
 			break
 	return out
 
 
-## Whether the prison has been graded on a real day yet.
+func is_done(goal: GoalDef) -> bool:
+	return goals_done.has(goal.id)
+
+
+## Counts something goals may ask for, such as a course passed.
+func count(kind: StringName, times := 1) -> void:
+	counts[kind] = counts.get(kind, 0) + times
+
+
+## Where a goal stands now, in the units of its amount.
+func goal_value(goal: GoalDef) -> float:
+	if goal.counted:
+		return counts.get(goal.kind, 0) - _baselines.get(goal.id, counts.get(goal.kind, 0))
+	match goal.kind:
+		&"prisoners": return _prisoners()
+		&"has_room": return 1.0 if _has_room(goal.target) else 0.0
+		&"goods_sold": return workshop.sold if workshop != null else 0.0
+		&"grade": return grade if measures_known() else 0.0
+		&"measure": return measures.get(String(goal.target), 0) if measures_known() else 0.0
+		&"average_mood": return _average_mood()
+	if goal_kinds.has(goal.kind):
+		return goal_kinds[goal.kind].call(goal)
+	return 0.0
+
+
+## "7 of 12", "now 54" or "2 of 5 nights", or "" when there's nothing to
+## count.
+func goal_progress(goal: GoalDef) -> String:
+	if goal.hold_days > 1:
+		return "%d of %d nights" % [_held.get(goal.id, 0), goal.hold_days]
+	if goal.kind == &"average_mood":
+		return "now %d" % roundi(_average_mood())
+	if goal.kind in [&"has_room", &"grade", &"measure"]:
+		return ""
+	return "%d of %d" % [roundi(goal_value(goal)), roundi(goal.amount)]
+
+
+## Whether the game was graded on a real day yet.
 func measures_known() -> bool:
 	return _graded
 
 
-## Pays out any goal done, if a warden is here to claim it.
-func check_goals() -> Array[Goal]:
-	var finished: Array[Goal] = []
+## Pays out any goal done, if a warden is here to claim it. Goals that
+## must hold for some nights are only counted at midnight.
+func check_goals(midnight := false) -> Array[GoalDef]:
+	var finished: Array[GoalDef] = []
+	for goal in current_goals():
+		if goal.hold_days > 0 and midnight:
+			_held[goal.id] = _held.get(goal.id, 0) + 1 if goal_value(goal) >= goal.amount else 0
 	if not office.has_warden():
 		return finished
 	for goal in current_goals():
-		if goal.check.call():
-			goal.done = true
+		var met: bool = _held.get(goal.id, 0) >= goal.hold_days if goal.hold_days > 0 \
+				else goal_value(goal) >= goal.amount
+		if met:
+			goals_done[goal.id] = true
 			ledger.add(goal.grant, "Grants")
 			finished.append(goal)
 			goal_done.emit(goal)
 	return finished
+
+
+## Changes how kind the game is; the Ministry's counts start again.
+func set_difficulty(def: DifficultyDef) -> void:
+	difficulty = def
+	fail_counts.clear()
+	warnings.clear()
+	_apply()
+	difficulty_changed.emit(def)
+
+
+## At midnight: counts the nights each fail rule has held, and warns or
+## loses the game.
+func check_fail_rules() -> void:
+	warnings.clear()
+	for rule in difficulty.fail_rules:
+		if rule.kind == &"sit_in":
+			continue
+		var met := false
+		match rule.kind:
+			&"debt": met = ledger.balance < -rule.amount and not ledger.sandbox
+			&"grade": met = float(grade) <= rule.amount
+		if not met:
+			fail_counts.erase(rule.kind)
+			continue
+		fail_counts[rule.kind] = fail_counts.get(rule.kind, 0) + 1
+		_warn_or_fail(rule, rule.days - fail_counts[rule.kind])
+
+
+## Hourly: a sit-in going on too long.
+func _check_sit_in() -> void:
+	if not longest_sit_in.is_valid():
+		return
+	var hours: float = longest_sit_in.call()
+	for rule in difficulty.fail_rules:
+		if rule.kind != &"sit_in":
+			continue
+		var line_index := warnings.find_custom(func(line: String) -> bool:
+			return line.begins_with(rule.warning.get_slice(".", 0)))
+		if line_index != -1:
+			warnings.remove_at(line_index)
+		if hours >= rule.amount * 0.5:
+			_warn_or_fail(rule, ceili(rule.amount - hours))
+
+
+func _warn_or_fail(rule: FailRule, left: int) -> void:
+	if not difficulty.can_fail:
+		# Only a warning: no count of nights left.
+		warnings.append(rule.warning.get_slice(".", 0) + ".")
+	elif left <= 0:
+		if not lost:
+			lost = true
+			failed.emit(rule)
+	else:
+		warnings.append(rule.warning % left)
 
 
 ## Grades the day just gone. Called at midnight.
@@ -212,7 +324,8 @@ func grade_day() -> void:
 	_yesterday_arrivals = _arrivals
 	_moodlets = {}
 	_arrivals = 0
-	check_goals()
+	check_goals(true)
+	check_fail_rules()
 
 
 ## The morning paper: yesterday in a few lines.
@@ -221,6 +334,8 @@ func write_report() -> String:
 	lines.append("%s  %d-star prison" % ["★".repeat(grade) + "☆".repeat(5 - grade), grade])
 	if not held_by.is_empty():
 		lines.append("Held to %d★ by %s." % [grade, held_by])
+	for line in warnings:
+		lines.append(line)
 	var good: int = _yesterday_moodlets.get(&"good_meal", 0) + _yesterday_moodlets.get(&"lovely_meal", 0)
 	var missed: int = _yesterday_moodlets.get(&"missed_meal", 0)
 	lines.append("%d good meals, %d missed." % [good, missed])
@@ -249,6 +364,7 @@ func write_report() -> String:
 
 func _on_hour(hour: int) -> void:
 	check_goals()
+	_check_sit_in()
 	if hour == REPORT_HOUR and _graded and office.has_warden():
 		report = write_report()
 		report_ready.emit(report)
@@ -326,7 +442,7 @@ func _money() -> Array:
 
 
 func _apply() -> void:
-	finances.grant_scale = 0.8 + 0.1 * (grade - 1)
+	finances.grant_scale = (0.8 + 0.1 * (grade - 1)) * difficulty.grant_scale
 	intake.max_limit = 2 + grade * 2
 	intake.limit = mini(intake.limit, intake.max_limit)
 

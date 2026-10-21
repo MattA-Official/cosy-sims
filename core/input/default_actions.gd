@@ -38,6 +38,7 @@ const KEY_ACTIONS := {
 	"security_toggle": [KEY_K],
 	"programmes_toggle": [KEY_L],
 	"saves_toggle": [KEY_F2],
+	"settings_toggle": [KEY_F4],
 }
 
 

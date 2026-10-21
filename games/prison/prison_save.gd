@@ -58,10 +58,7 @@ static func capture(main: Node) -> Dictionary:
 		routes.append([route.level, route.points.duplicate(), route.guards, route.name])
 	var ledger: Ledger = main.ledger
 	var standing: Standing = main.standing
-	var goals_done: Array = []
-	for goal in standing.goals:
-		if goal.done:
-			goals_done.append(goal.title)
+	var goals_done: Array = standing.goals_done.keys()
 	return {
 		"version": VERSION,
 		"title": main.title,
@@ -119,7 +116,10 @@ static func capture(main: Node) -> Dictionary:
 		"standing": {"grade": standing.grade, "measures": standing.measures.duplicate(), "goals_done": goals_done,
 				"report": standing.report, "graded": standing.measures_known(),
 				"values": standing.values.duplicate(), "why": standing.why.duplicate(),
-				"held_by": standing.held_by, "history": standing.history.duplicate(true)},
+				"held_by": standing.held_by, "history": standing.history.duplicate(true),
+				"counts": standing.counts.duplicate(), "baselines": standing._baselines.duplicate(),
+				"held": standing._held.duplicate(), "fail_counts": standing.fail_counts.duplicate(),
+				"warnings": standing.warnings.duplicate(), "difficulty": standing.difficulty.id},
 	}
 
 

@@ -37,6 +37,7 @@ const SECTIONS := [
 	["Other", [
 		["F1", "This card"],
 		["F2", "Save and load"],
+		["F4", "Game settings: difficulty, sentence length"],
 		["Ctrl+Z / Ctrl+Y", "Undo or redo building"],
 		["F3", "Debug view and inspector"],
 	]],

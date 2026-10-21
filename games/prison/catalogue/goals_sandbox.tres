@@ -1,0 +1,140 @@
+[gd_resource type="Resource" script_class="GoalListDef" load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="1_goal"]
+[ext_resource type="Script" path="res://core/sim/goal_list_def.gd" id="2_list"]
+
+[sub_resource type="Resource" id="house_12"]
+script = ExtResource("1_goal")
+id = &"house_12"
+title = "House 12 prisoners"
+grant = 1000
+kind = &"prisoners"
+amount = 12.0
+target = &""
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="open_workshop"]
+script = ExtResource("1_goal")
+id = &"open_workshop"
+title = "Open a workshop"
+grant = 1500
+kind = &"has_room"
+amount = 1.0
+target = &"workshop"
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="sell_20"]
+script = ExtResource("1_goal")
+id = &"sell_20"
+title = "Sell 20 goods from the workshop"
+grant = 1000
+kind = &"goods_sold"
+amount = 20.0
+target = &""
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="grade_3"]
+script = ExtResource("1_goal")
+id = &"grade_3"
+title = "Reach a three-star grade"
+grant = 2000
+kind = &"grade"
+amount = 3.0
+target = &""
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="pass_3_courses"]
+script = ExtResource("1_goal")
+id = &"pass_3_courses"
+title = "Pass 3 courses"
+grant = 1500
+kind = &"courses_passed"
+amount = 3.0
+target = &""
+hold_days = 0
+counted = true
+
+[sub_resource type="Resource" id="house_20"]
+script = ExtResource("1_goal")
+id = &"house_20"
+title = "House 20 prisoners"
+grant = 2500
+kind = &"prisoners"
+amount = 20.0
+target = &""
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="mood_60"]
+script = ExtResource("1_goal")
+id = &"mood_60"
+title = "Keep average mood over 60 at midnight"
+grant = 2000
+kind = &"average_mood"
+amount = 60.0
+target = &""
+hold_days = 1
+counted = false
+
+[sub_resource type="Resource" id="parole_5"]
+script = ExtResource("1_goal")
+id = &"parole_5"
+title = "Grant parole 5 times"
+grant = 2000
+kind = &"parole_granted"
+amount = 5.0
+target = &""
+hold_days = 0
+counted = true
+
+[sub_resource type="Resource" id="grade_4"]
+script = ExtResource("1_goal")
+id = &"grade_4"
+title = "Reach a four-star grade"
+grant = 4000
+kind = &"grade"
+amount = 4.0
+target = &""
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="release_reformed_5"]
+script = ExtResource("1_goal")
+id = &"release_reformed_5"
+title = "Release 5 prisoners reformed"
+grant = 3000
+kind = &"released_reformed"
+amount = 5.0
+target = &""
+hold_days = 0
+counted = true
+
+[sub_resource type="Resource" id="reform_4"]
+script = ExtResource("1_goal")
+id = &"reform_4"
+title = "Reach 4★ Reform"
+grant = 3000
+kind = &"measure"
+amount = 4.0
+target = &"Reform"
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="five_nights_4"]
+script = ExtResource("1_goal")
+id = &"five_nights_4"
+title = "Five nights at 4★ or better"
+grant = 5000
+kind = &"grade"
+amount = 4.0
+target = &""
+hold_days = 5
+counted = false
+
+[resource]
+script = ExtResource("2_list")
+goals = Array[ExtResource("1_goal")]([SubResource("house_12"), SubResource("open_workshop"), SubResource("sell_20"), SubResource("grade_3"), SubResource("pass_3_courses"), SubResource("house_20"), SubResource("mood_60"), SubResource("parole_5"), SubResource("grade_4"), SubResource("release_reformed_5"), SubResource("reform_4"), SubResource("five_nights_4")])

@@ -210,6 +210,8 @@ func measures_text() -> String:
 		lines.append(words)
 	if not standing.held_by.is_empty():
 		lines.append("Held to %d★ by %s." % [standing.grade, standing.held_by])
+	for line in standing.warnings:
+		lines.append(line)
 	if standing.history.size() > 1:
 		lines.append("Last %d nights: %s" % [standing.history.size(), " ".join(standing.history.map(
 				func(night: Dictionary) -> String: return "%d★" % night.grade))])
@@ -231,7 +233,8 @@ func _show_standing(warden: bool) -> void:
 		for goal in standing.current_goals():
 			var row := HBoxContainer.new()
 			var title := Label.new()
-			title.text = goal.title + (" (%s)" % goal.progress.call() if goal.progress.is_valid() else "")
+			var progress := standing.goal_progress(goal)
+			title.text = goal.title + (" (%s)" % progress if not progress.is_empty() else "")
 			title.size_flags_horizontal = SIZE_EXPAND_FILL
 			row.add_child(title)
 			var grant := Label.new()

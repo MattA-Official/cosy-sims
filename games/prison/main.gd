@@ -118,6 +118,9 @@ var parole := Parole.new()
 ## Going home, postcards and those who come back.
 var release := Release.new()
 var programmes_window := ProgrammesWindow.new()
+## Difficulty and sentence length, on F4.
+var settings_window := SettingsWindow.new()
+var fail_card := FailCard.new()
 ## Ctrl+Z and Ctrl+Y for building and landscaping.
 var undo := UndoHistory.new()
 var land_plots := LandPlots.new()
@@ -724,6 +727,25 @@ func _ready() -> void:
 	standing.report_lines.append(release.report_lines)
 	standing.reform = reform
 	standing.release = release
+	courses.passed.connect(func(_person: Person, _def: CourseDef) -> void: standing.count(&"courses_passed"))
+	parole.heard.connect(func(_person: Person, granted: bool) -> void:
+		if granted:
+			standing.count(&"parole_granted"))
+	release.left.connect(func(entry: Dictionary) -> void:
+		if entry.reform >= Reform.REFORMED_LINE:
+			standing.count(&"released_reformed"))
+	misconduct.temper_scales.append(func(_person: Person) -> float: return standing.difficulty.misconduct_scale)
+	standing.longest_sit_in = func() -> float:
+		var longest := 0.0
+		for sit_in in sit_ins.sit_ins:
+			longest = maxf(longest, sit_in.minutes / 60.0)
+		return longest
+	standing.difficulty_changed.connect(func(_def: DifficultyDef) -> void: _apply_difficulty())
+	standing.failed.connect(func(rule: FailRule) -> void:
+		if not clock.paused():
+			clock.toggle_pause()
+		fail_card.show_for(rule.reason, standing.history))
+	_apply_difficulty()
 	inspector.person_lines.append(func(person: Person) -> String:
 		if person.group != &"prisoner":
 			return ""
@@ -731,7 +753,7 @@ func _ready() -> void:
 		var lines := PackedStringArray([file, reform.summary(person), courses.summary(person), parole.summary(person)])
 		return "\n".join(Array(lines).filter(func(line: String) -> bool: return not line.is_empty())))
 	standing.report_ready.connect(func(text: String) -> void: Toasts.post("Daily report", text, 12.0))
-	standing.goal_done.connect(func(goal: Standing.Goal) -> void:
+	standing.goal_done.connect(func(goal: GoalDef) -> void:
 		Toasts.post("Goal done: " + goal.title, "A grant of %s came in." % Ledger.text(goal.grant)))
 	# The lorry brings the morning delivery and takes the rubbish and goods.
 	kitchen.delivered.connect(func(_crates: int) -> void:
@@ -747,6 +769,7 @@ func _ready() -> void:
 	if not saved.is_empty():
 		PrisonSave.apply_rest(self, saved)
 		build_costs.start_from_now()
+		_apply_difficulty()
 	clock.hour_changed.connect(func(hour: int) -> void:
 		if hour == AUTOSAVE_HOUR:
 			PrisonSave.write(PrisonSave.AUTOSAVE, PrisonSave.capture(self)))
@@ -870,6 +893,21 @@ func _add_hud() -> void:
 		PrisonSave.pending = PrisonSave.read(slot)
 		get_tree().reload_current_scene()
 	hud.add_child(saves_window)
+	settings_window.standing = standing
+	settings_window.sentences = sentences
+	hud.add_child(settings_window)
+	view_bar.settings_pressed.connect(settings_window.toggle)
+	fail_card.keep_playing = func() -> void:
+		standing.lost = false
+		standing.set_difficulty(Standing.DIFFICULTIES[0])
+		fail_card.hide()
+		if clock.paused():
+			clock.toggle_pause()
+	fail_card.load_autosave = func() -> void: saves_window.load_slot.call(PrisonSave.AUTOSAVE)
+	fail_card.start_again = func() -> void:
+		SamplePrisons.next = sample
+		get_tree().reload_current_scene()
+	hud.add_child(fail_card)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("level_up"):
@@ -895,6 +933,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("money_toggle"):
 		finance_window.toggle()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("settings_toggle"):
+		settings_window.toggle()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("saves_toggle"):
 		saves_window.toggle()
@@ -928,6 +969,14 @@ func _ghost(level: int, point: Vector2) -> void:
 	tween.tween_property(ghost, "position", at + Vector3.UP * 2.5, 6.0)
 	tween.tween_property(ghost, "modulate:a", 0.0, 6.0)
 	tween.chain().tween_callback(ghost.queue_free)
+
+
+## Difficulty's scales on wages, reform, reoffending and grants.
+func _apply_difficulty() -> void:
+	var def := standing.difficulty
+	finances.wage_scale = def.wage_scale
+	reform.loss_scale = def.reform_loss_scale
+	release.return_scale = def.reoffend_scale
 
 
 ## Postcard boards show the latest cards that came.

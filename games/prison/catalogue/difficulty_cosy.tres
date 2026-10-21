@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="DifficultyDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/sim/difficulty_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/fail_rule.gd" id="2_rule"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"cosy"
+display_name = "Cosy"
+description = "Bigger grants, cheaper staff, calmer prisoners, and fewer leavers come back. You can't lose."
+grant_scale = 1.2
+wage_scale = 0.8
+misconduct_scale = 0.7
+reform_loss_scale = 0.7
+reoffend_scale = 0.5
+can_fail = false
+fail_rules = Array[ExtResource("2_rule")]([])

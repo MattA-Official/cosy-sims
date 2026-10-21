@@ -22,6 +22,8 @@ var categories: Dictionary[StringName, CategoryDef] = {}
 var prisoner_group: StringName = &"prisoner"
 ## Multiplies the daily grant: the grade's bonus, 1 for none.
 var grant_scale := 1.0
+## Multiplies wages (difficulty).
+var wage_scale := 1.0
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -42,7 +44,7 @@ func shift_wages(shift: ShiftDef) -> int:
 	var sum := 0.0
 	for role: StringName in roles:
 		sum += roles[role].wage * shift.pay_scale * shifts.wanted_for(role, shift.id)
-	return roundi(sum)
+	return roundi(sum * wage_scale)
 
 
 ## The grant for today's prisoners, by their category.

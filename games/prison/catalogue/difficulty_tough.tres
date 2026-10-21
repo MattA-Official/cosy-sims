@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="DifficultyDef" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://core/sim/difficulty_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/fail_rule.gd" id="2_rule"]
+
+[sub_resource type="Resource" id="debt"]
+script = ExtResource("2_rule")
+kind = &"debt"
+amount = 5000.0
+days = 3
+warning = "The Ministry is worried about your debts. %d nights to get above -£5,000."
+reason = "The prison ran too far into debt for too long."
+
+[sub_resource type="Resource" id="grade"]
+script = ExtResource("2_rule")
+kind = &"grade"
+amount = 1.0
+days = 5
+warning = "The Ministry is worried about the one-star grade. %d nights to lift it."
+reason = "The prison stayed at one star for too long."
+
+[sub_resource type="Resource" id="sit_in"]
+script = ExtResource("2_rule")
+kind = &"sit_in"
+amount = 12.0
+days = 1
+warning = "The Ministry wants the sit-in over. %d hours to end it."
+reason = "A sit-in dragged on for half a day."
+
+[resource]
+script = ExtResource("1_def")
+id = &"tough"
+display_name = "Tough"
+description = "Smaller grants, dearer staff, quicker tempers and more comebacks. Stay in deep debt, stay at one star or let a sit-in drag on, and the Ministry takes the prison away."
+grant_scale = 0.85
+wage_scale = 1.15
+misconduct_scale = 1.3
+reform_loss_scale = 1.3
+reoffend_scale = 1.5
+can_fail = true
+fail_rules = Array[ExtResource("2_rule")]([SubResource("debt"), SubResource("grade"), SubResource("sit_in")])
