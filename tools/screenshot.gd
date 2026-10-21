@@ -94,6 +94,8 @@ func _process(_delta: float) -> bool:
 			heads.start_hire(heads.find(&"education"))
 			_main.desk_work.work(heads.warden().id, 150.0)
 			_main.heads_window.toggle()
+		if args.has("desks"):
+			_main.desk_tint.shown = true
 		if args.has("paper"):
 			var standing: Standing = _main.standing
 			standing.grade_day()

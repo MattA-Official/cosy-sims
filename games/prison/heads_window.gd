@@ -9,6 +9,8 @@ const REFRESH_SECONDS := 0.5
 var heads: Heads
 var desk_work: DeskWork
 var clock: GameClock
+## The Offices view, toggled from here. Optional.
+var desk_tint: DeskTint
 
 var _desk := Label.new()
 var _rows := VBoxContainer.new()
@@ -49,6 +51,13 @@ func _ready() -> void:
 	box.add_child(about)
 	_desk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_desk)
+	if desk_tint != null:
+		var show := CheckBox.new()
+		show.text = "Show desks by how much work is waiting"
+		show.tooltip_text = "Tints claimed desks green (clear), amber (busy) or red (overloaded)."
+		show.focus_mode = FOCUS_NONE
+		show.toggled.connect(func(on: bool) -> void: desk_tint.shown = on)
+		box.add_child(show)
 	box.add_child(HSeparator.new())
 	_rows.add_theme_constant_override(&"separation", 10)
 	box.add_child(_rows)

@@ -105,6 +105,7 @@ var searching := Searching.new()
 var security := Security.new()
 var sit_ins := SitIns.new()
 var coverage_tint := CoverageTint.new()
+var desk_tint := DeskTint.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
 ## Staff by name: who's hired, from which applicants.
@@ -692,6 +693,14 @@ func _ready() -> void:
 	coverage_tint.height_at = func(level: int, cell: Vector2i) -> float:
 		return people.nav().height_at(level, Vector2(cell) + Vector2(0.5, 0.5))
 	grid.add_child(coverage_tint)
+	desk_tint.name = "DeskTint"
+	desk_tint.cell_size = grid.cell_size
+	desk_tint.building = building
+	desk_tint.people = people
+	desk_tint.claims = claims
+	desk_tint.minutes_of = office.desk_minutes
+	desk_tint.overloaded = office.desk_overloaded
+	grid.add_child(desk_tint)
 	ledger.name = "Ledger"
 	ledger.balance = Finances.STARTING_MONEY
 	add_child(ledger)
@@ -1393,6 +1402,7 @@ func _add_hud() -> void:
 	heads_window.heads = heads
 	heads_window.desk_work = desk_work
 	heads_window.clock = clock
+	heads_window.desk_tint = desk_tint
 	in_tray_window.in_tray = in_tray
 	in_tray_window.clock = clock
 	book.add_page(&"in_tray", "In-tray", "Requests and letters waiting for an answer. J", "in_tray", in_tray_window)

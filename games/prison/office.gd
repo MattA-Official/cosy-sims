@@ -117,6 +117,26 @@ func office_factor(desk: Vector2i) -> float:
 	return clampf(1.0 + OFFICE_QUALITY * people.quality(desk.x, room).score, 0.7, 1.3)
 
 
+## Minutes of desk work waiting for someone (the shared pile for clerks),
+## or -1 for someone with no desk work.
+func desk_minutes(person: Person) -> float:
+	var record := roster.record_of(person) if roster != null else null
+	if desk_work == null or (record == null and not CLERKS.has(person.role)):
+		return -1.0
+	if CLERKS.has(person.role):
+		return desk_work.all_paperwork()
+	return desk_work.pile_minutes(record.id)
+
+
+func desk_overloaded(person: Person) -> bool:
+	var record := roster.record_of(person) if roster != null else null
+	if desk_work == null:
+		return false
+	if CLERKS.has(person.role):
+		return desk_work.all_paperwork() > DeskWork.OVERLOAD
+	return record != null and desk_work.is_overloaded(record.id)
+
+
 ## The paper stack on someone's desk: none for an empty pile, small under
 ## DeskWork.CLEAR minutes, tall up to DeskWork.OVERLOAD, teetering when
 ## overloaded. Clerks show the shared pile.

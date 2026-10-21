@@ -117,6 +117,7 @@ func _process(_delta: float) -> bool:
 	_test_supplies()
 	_test_moving_cells()
 	_test_regime_extras()
+	_test_desk_tint()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1796,6 +1797,30 @@ func _test_regime_extras() -> void:
 	if not take_on.is_empty():
 		(take_on[0][1] as Callable).call()
 	_check(roster.on(&"guard", &"day").size() == before + 1, "which takes one on")
+	main.queue_free()
+
+
+func _test_desk_tint() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var tint: DeskTint = main.desk_tint
+	var heads: Heads = main.heads
+	var desk_work: DeskWork = main.desk_work
+	var claims: Claims = main.claims
+	var people: People = main.people
+	claims.refresh()
+	var warden: Person = people.people.filter(func(p: Person) -> bool: return p.role == &"warden")[0]
+	_check(claims.claim_of(warden) != Person.NO_OBJECT, "the warden has a desk")
+	var id := heads.warden().id
+	desk_work.piles.erase(id)
+	var of_warden := func() -> Array:
+		return tint.desks().filter(func(e: Array) -> bool: return (e[1] as BuildingMap.PlacedObject).id == claims.claim_of(warden).y)
+	_check((of_warden.call() as Array).size() == 1 and of_warden.call()[0][2] == DeskTint.CLEAR, "a clear desk is green")
+	desk_work.add_paperwork(id, DeskWork.CLEAR + 10.0)
+	_check(of_warden.call()[0][2] == DeskTint.BUSY, "a busy one amber")
+	desk_work.overloaded[id] = true
+	_check(of_warden.call()[0][2] == DeskTint.OVERLOADED, "an overloaded one red")
 	main.queue_free()
 
 
