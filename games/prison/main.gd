@@ -474,6 +474,8 @@ func _ready() -> void:
 	routes.height_at = func(level: int, point: Vector2) -> float: return people.nav().height_at(level, point)
 	grid.add_child(routes)
 	guarding.routes = routes
+	guarding.area_weight = func(level: int, point: Vector2) -> float:
+		return Security.ALERT_PATROL if security.alert_level(level, point) > 0 else 1.0
 	add_child(guarding)
 	runner.other_locks = guarding.gate_locks
 	runner.refresh()
@@ -538,7 +540,19 @@ func _ready() -> void:
 	add_child(escapes)
 	escapes.start()
 	escapes.running.connect(func(person: Person) -> void:
-		Toasts.post("Escape!", "%s is making a run for it. The nearest guards are giving chase." % person.name))
+		Toasts.post_with("Escape!", "%s is making a run for it. The guards are giving chase." % person.name, "Follow",
+				func() -> void:
+					camera_rig.follow = func() -> Variant:
+						if not escapes.runners.has(person):
+							return null
+						var at := person.flat()
+						return Vector3(at.x * grid.cell_size, 0.0, at.y * grid.cell_size)))
+	escapes.alarm_changed.connect(func(on: bool) -> void:
+		runner.lockdown = on
+		if on:
+			Toasts.post("Alarm", "Every cell door is locked until it's over.")
+		else:
+			Toasts.post("All clear", "The alarm is off and the cells open as usual."))
 	escapes.caught.connect(func(person: Person, by: Person) -> void:
 		Toasts.post("Caught", "%s caught %s." % [by.name, person.name]))
 	escapes.got_away.connect(func(person: Person) -> void:
@@ -553,6 +567,8 @@ func _ready() -> void:
 	contraband.start()
 	searching.name = "Searching"
 	searching.people = people
+	searching.area_weight = func(level: int, point: Vector2) -> float:
+		return Security.ALERT_SEARCH if security.alert_level(level, point) > 0 else 1.0
 	searching.jobs = jobs
 	searching.items = items
 	searching.clock = clock
@@ -600,7 +616,7 @@ func _ready() -> void:
 		var words := SitIns.words(sit_in, room_name.call(sit_in))
 		Toasts.post("Sit-in!", "%s. To end it, %s, or send someone to talk them round (Security window, K)." % [words, sit_in.hint])
 		security.count(&"sit_in", null, "", true)
-		security.alert_at(words, sit_in.level, sit_in.room.centre()))
+		security.alert_at(words, sit_in.level, sit_in.room.centre(), 3))
 	sit_ins.ended.connect(func(sit_in: SitIns.SitIn, how: String) -> void:
 		var endings := {"fixed": "They've stood up: whatever it was is sorted.",
 				"talked": "They've been talked round and gone back to the timetable.",
@@ -622,7 +638,7 @@ func _ready() -> void:
 		var words := "A %s is missing from the %s" % [def.display_name.to_lower(),
 				type.display_name.to_lower() if type != null else "room"]
 		security.count(&"missing_tool", null, "", true)
-		security.alert_at(words, level, room.centre())
+		security.alert_at(words, level, room.centre(), 1)
 		Toasts.post("Tool missing", words + ". A search might turn it up."))
 	contraband.detected.connect(func(person: Person, def: ItemDef) -> void:
 		security.count(&"metal_detector", person, "Set off the metal detector")
@@ -631,7 +647,7 @@ func _ready() -> void:
 		Toasts.post("Shakedown", "Guards are turning over %d cells. Nobody's happy about it." % cells))
 	infirmary.died.connect(func(person: Person, level: int, point: Vector2) -> void:
 		security.count(&"death", null, "", true)
-		security.alert_at("%s died" % person.name, level, point)
+		security.alert_at("%s died" % person.name, level, point, 3)
 		Toasts.post("A death", "%s didn't make it. A plaque marks the spot." % person.name)
 		_ghost(level, point)
 		var map: BuildingMap = building.levels.get(level)
@@ -965,6 +981,8 @@ func _ready() -> void:
 	for system: Object in [kitchen, cleaning, workshop, budget, release, intake, parole, contraband, searching]:
 		system.set(&"regime", regime)
 	misconduct.temper_scales.append(courses.calm_scale)
+	misconduct.temper_scales.append(func(person: Person) -> float:
+		return Security.ALERT_TEMPER if security.alert_level(person.level, person.flat()) > 0 else 1.0)
 	inspector.person_pickers.append(["Course", "Put them on a course now, or take them off one.",
 		func(_person: Person) -> Array:
 			var out: Array = [[&"", "None"]]

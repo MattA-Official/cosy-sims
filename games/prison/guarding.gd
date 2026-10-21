@@ -47,6 +47,9 @@ var clock: GameClock:
 var routes: PatrolRoutes
 ## Who is a prisoner, and the moodlet for being walked back.
 var prisoner_group: StringName = &"prisoner"
+## (level, point) -> float: how much more a place needs watching, such as
+## an area on alert. Optional.
+var area_weight: Callable
 var walked_back_moodlet: StringName = &"walked_back"
 
 ## Desks, as (level, object id), with the game minute a guard last sat
@@ -194,10 +197,11 @@ func _patrol() -> void:
 
 
 ## A tile, as [level, tile], somewhere in the room with the most
-## prisoners in it, or near a prisoner out on the ground. Null with no
+## prisoners in it (an area on alert counting extra), or near a prisoner
+## out on the ground. Null with no
 ## prisoners about.
 func _busy_spot() -> Variant:
-	var counts: Dictionary[Room, int] = {}
+	var counts: Dictionary[Room, float] = {}
 	var levels: Dictionary[Room, int] = {}
 	var outside: Array[Person] = []
 	for person in people.people:
@@ -207,8 +211,11 @@ func _busy_spot() -> Variant:
 		if here.is_empty():
 			outside.append(person)
 			continue
-		counts[here[1]] = counts.get(here[1], 0) + 1
+		counts[here[1]] = counts.get(here[1], 0.0) + 1.0
 		levels[here[1]] = here[0]
+	if area_weight.is_valid():
+		for room: Room in counts:
+			counts[room] *= area_weight.call(levels[room], room.centre())
 	var best: Room = null
 	for room: Room in counts:
 		if best == null or counts[room] > counts[best] or (counts[room] == counts[best] and _rng.randf() < 0.5):

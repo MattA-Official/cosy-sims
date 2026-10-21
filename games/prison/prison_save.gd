@@ -81,7 +81,8 @@ static func capture(main: Node) -> Dictionary:
 			return [entry[0], (entry[1] as Room).cells[0], (entry[2] as ItemDef).id]),
 		"security": {"today": (main.security as Security).today.duplicate(),
 				"yesterday": (main.security as Security).yesterday.duplicate(),
-				"alerts": (main.security as Security).alerts.duplicate(true)},
+				"alerts": (main.security as Security).alerts.duplicate(true),
+				"areas": (main.security as Security).areas.duplicate(true)},
 		"policies": {"privilege_days": (main.consequences as Consequences).privilege_days,
 				"quiet_room": (main.consequences as Consequences).quiet_room_on},
 		"deaths": (main.infirmary as Infirmary).deaths,
@@ -255,6 +256,7 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	(main.security as Security).today.assign(security_data.get("today", {}))
 	(main.security as Security).yesterday.assign(security_data.get("yesterday", {}))
 	(main.security as Security).alerts.assign(security_data.get("alerts", []))
+	(main.security as Security).areas.assign(security_data.get("areas", []))
 	var policies: Dictionary = data.get("policies", {})
 	(main.consequences as Consequences).privilege_days = policies.get("privilege_days", 2.0)
 	(main.consequences as Consequences).quiet_room_on = policies.get("quiet_room", true)

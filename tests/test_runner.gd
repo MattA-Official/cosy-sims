@@ -105,6 +105,8 @@ func _process(_delta: float) -> bool:
 	_test_garden_and_library()
 	_test_prisoner_files()
 	_test_scenarios()
+	_test_alert_areas()
+	_test_alarm()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4897,6 +4899,59 @@ func _test_scenarios() -> void:
 	root.add_child(main)
 	Standing.next_scenario = &""
 	_check((main.standing as Standing).grade == 1 and (main.ledger as Ledger).balance == 3000, "run-down: one star and £3,000")
+	main.queue_free()
+
+
+func _test_alert_areas() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var security: Security = main.security
+	var people: People = main.people
+	var building: Building = main.building
+	var map: BuildingMap = building.levels[0]
+	var canteen: Room = map.rooms().filter(func(r: Room) -> bool: return r.type == &"canteen")[0]
+	var yard: Room = map.rooms().filter(func(r: Room) -> bool: return r.type == &"yard")[0]
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	prisoner.level = 0
+	prisoner.position = Vector3(canteen.centre().x, 0.0, canteen.centre().y)
+	security.count(&"fight", prisoner, "Started a fight")
+	_check(security.alert_level(0, prisoner.flat()) == 2 and security.alert_level(0, canteen.centre() + Vector2(0.5, 0.5)) == 2,
+			"a fight puts the canteen on alert")
+	_check(security.alert_level(0, yard.centre()) == 0, "but not the yard")
+	security.count(&"contraband", prisoner, "Found with a spoon")
+	_check(security.areas.size() == 1 and security.alert_level(0, prisoner.flat()) == 2, "a lesser incident there keeps the worse level")
+	_check((main.guarding as Guarding).area_weight.call(0, canteen.centre()) > 1.0
+			and (main.searching as Searching).area_weight.call(0, canteen.centre()) > 1.0, "patrols and searches lean towards it")
+	_check(not security.area_words().is_empty() and security.area_words()[0].begins_with("Canteen"), "the Security window names it")
+	var saved := PrisonSave.capture(main)
+	_check((saved.security.areas as Array).size() == 1, "alerts save")
+	for i in Security.AREA_HOURS:
+		security._age_areas()
+	_check(security.areas.is_empty(), "a day later it calms down")
+	main.queue_free()
+
+
+func _test_alarm() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var escapes: Escapes = main.escapes
+	var runner: ScheduleRunner = main.runner
+	var people: People = main.people
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	var guards := people.people.filter(func(p: Person) -> bool: return p.role == &"guard" and not p.going_home)
+	escapes.without_perimeter = true
+	_check(escapes.run(prisoner), "someone makes a run for it")
+	_check(escapes.alarm and runner.lockdown, "the alarm sounds")
+	_check(escapes.chasers.size() == guards.size(), "every free guard gives chase (%d of %d)" % [escapes.chasers.size(), guards.size()])
+	var ground: BuildingMap = main.building.levels[0]
+	var cells := ground.rooms().filter(func(r: Room) -> bool: return r.type == &"cell")
+	_check(not cells.is_empty() and cells.all(func(r: Room) -> bool:
+		return runner.room_doors(ground, r).all(func(edge: Vector3i) -> bool: return people.is_door_locked(0, edge))), "every cell door locks")
+	escapes._caught(prisoner, guards[0])
+	escapes._catch_up()
+	_check(not escapes.alarm and not runner.lockdown, "caught: all clear")
 	main.queue_free()
 
 

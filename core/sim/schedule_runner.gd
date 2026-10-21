@@ -43,6 +43,12 @@ var doors: Dictionary[Vector4i, bool] = {}
 ## pinned.
 var overrides: Dictionary[Vector4i, bool] = {}
 var pinned: Dictionary[Vector4i, bool] = {}
+## An alarm: every bedroom door locks at once, whoever is in or out. Hand
+## locks still win.
+var lockdown := false:
+	set(value):
+		lockdown = value
+		_update_doors()
 ## Other doors something else controls, such as security gates: returns
 ## each one's key and whether it should be locked. Hand locks still win.
 ## Optional.
@@ -175,6 +181,7 @@ func _update_doors() -> void:
 							or here.is_empty() or here[1] != room:
 						lock = false
 						break
+			lock = lock or lockdown
 			for edge in room_doors(map, room):
 				var key := Vector4i(n, edge.x, edge.y, edge.z)
 				wanted[key] = wanted.get(key, false) or lock

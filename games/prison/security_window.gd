@@ -23,6 +23,7 @@ var _show := CheckBox.new()
 var _status := Label.new()
 var _today := Label.new()
 var _alerts := VBoxContainer.new()
+var _areas := Label.new()
 var _sit_ins := VBoxContainer.new()
 var _shown_sit_ins: Array = []
 var _wait := 0.0
@@ -86,6 +87,10 @@ func _ready() -> void:
 	alerts_heading.text = "Alerts"
 	alerts_heading.theme_type_variation = &"HeaderLabel"
 	box.add_child(alerts_heading)
+	_areas.tooltip_text = "An area on alert gets more patrols and more cell searches, and tempers there cool off."
+	_areas.mouse_filter = MOUSE_FILTER_PASS
+	_areas.add_theme_color_override(&"font_color", Color(0.75, 0.3, 0.28))
+	box.add_child(_areas)
 	_alerts.add_theme_constant_override(&"separation", 0)
 	box.add_child(_alerts)
 	box.add_child(HSeparator.new())
@@ -119,6 +124,8 @@ func refresh() -> void:
 	_show.set_pressed_no_signal(coverage_tint != null and coverage_tint.shown)
 	_status.text = "\n".join(status_lines())
 	_today.text = "\n".join(today_lines())
+	_areas.text = "\n".join(security.area_words())
+	_areas.visible = not security.areas.is_empty()
 	_show_sit_ins()
 	_shakedown.visible = searching != null
 	if searching != null:

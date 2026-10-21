@@ -41,6 +41,23 @@ const NAMES: Dictionary[StringName, String] = {
 	&"death": "Deaths",
 }
 const ALERTS_KEPT := 40
+## How serious each kind of incident is for the area it happened in: 1
+## for a missing tool or found contraband, 2 for a fight or a tunnel, 3
+## for an escape, a sit-in or a death.
+const SEVERITY: Dictionary[StringName, int] = {
+	&"contraband": 1, &"missing_tool": 1, &"vandalism": 1, &"metal_detector": 1,
+	&"fight": 2, &"knocked_out": 2, &"escape_plan": 2,
+	&"escape": 3, &"sit_in": 3, &"death": 3,
+}
+## Game hours an area stays on alert.
+const AREA_HOURS := 24.0
+## Out in the open, how near counts as the same area.
+const OPEN_AREA := 10.0
+## While an area is on alert: guards patrol it this much more, searches
+## pick its cells this much more, and tempers there rise this much.
+const ALERT_PATROL := 3.0
+const ALERT_SEARCH := 3.0
+const ALERT_TEMPER := 0.7
 
 signal alerted(words: String, level: int, point: Vector2)
 ## An incident was counted.
@@ -62,6 +79,9 @@ var today: Dictionary[StringName, int] = {}
 var yesterday: Dictionary[StringName, int] = {}
 ## Newest first: [day, minute of the day, words, level, point].
 var alerts: Array = []
+## Areas on alert: each {level, point, severity, hours}, the area being
+## the room at the point (or open ground near it).
+var areas: Array[Dictionary] = []
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -73,6 +93,7 @@ var clock: GameClock:
 
 func start() -> void:
 	coverage.building = building
+	clock.hour_changed.connect(func(_hour: int) -> void: _age_areas())
 	people.moodlet_added.connect(func(person: Person, id: StringName) -> void:
 		if id == &"walked_back":
 			count(&"walk_back", person))
@@ -170,11 +191,76 @@ func count(kind: StringName, person: Person = null, words := "", quiet := false)
 	var level := person.level if person != null else 0
 	var point := person.flat() if person != null else Vector2.ZERO
 	_alert(text, level, point)
+	if person != null and SEVERITY.has(kind):
+		raise(level, point, SEVERITY[kind])
 
 
-## Puts up an alert without counting anything, such as for a room.
-func alert_at(text: String, level: int, point: Vector2) -> void:
+## Puts up an alert without counting anything, such as for a room, and
+## puts the area on alert at `severity` (0 for not).
+func alert_at(text: String, level: int, point: Vector2, severity := 0) -> void:
 	_alert(text, level, point)
+	if severity > 0:
+		raise(level, point, severity)
+
+
+## Puts the area at a point on alert, or keeps it there at the higher
+## severity, for another AREA_HOURS.
+func raise(level: int, point: Vector2, severity: int) -> void:
+	for area in areas:
+		if _same_area(area, level, point):
+			area.severity = maxi(area.severity, severity)
+			area.hours = AREA_HOURS
+			return
+	areas.append({"level": level, "point": point, "severity": severity, "hours": AREA_HOURS})
+
+
+## How serious the alert on the area at a point is: 0 for none, up to 3.
+func alert_level(level: int, point: Vector2) -> int:
+	var worst := 0
+	for area in areas:
+		if area.severity > worst and _same_area(area, level, point):
+			worst = area.severity
+	return worst
+
+
+## The areas on alert in words, worst first, for the Security window.
+func area_words() -> Array[String]:
+	var sorted := areas.duplicate()
+	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.severity > b.severity)
+	var out: Array[String] = []
+	for area: Dictionary in sorted:
+		out.append("%s: %s, %d h left" % [_area_name(area), ["", "watchful", "on alert", "alarm"][area.severity],
+				ceili(area.hours)])
+	return out
+
+
+func _same_area(area: Dictionary, level: int, point: Vector2) -> bool:
+	if area.level != level:
+		return false
+	var room := _room_at(level, area.point)
+	if room != null:
+		return _room_at(level, point) == room
+	return _room_at(level, point) == null and (area.point as Vector2).distance_to(point) <= OPEN_AREA
+
+
+func _room_at(level: int, point: Vector2) -> Room:
+	var map := building.levels.get(level) as BuildingMap
+	return map.room_at_point(point) if map != null else null
+
+
+func _area_name(area: Dictionary) -> String:
+	var room := _room_at(area.level, area.point)
+	if room == null:
+		return "Outside"
+	var type := people.room_type(room.type) if people != null else null
+	return type.display_name if type != null else "A room"
+
+
+func _age_areas() -> void:
+	for area in areas.duplicate():
+		area.hours -= 1.0
+		if area.hours <= 0.0:
+			areas.erase(area)
 
 
 func _alert(text: String, level: int, point: Vector2) -> void:

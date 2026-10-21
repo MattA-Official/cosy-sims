@@ -26,6 +26,9 @@ const AWAY := 0.8
 signal got_away(person: Person)
 signal caught(person: Person, by: Person)
 signal running(person: Person)
+## The alarm went off with someone running, or stopped with nobody left
+## running.
+signal alarm_changed(on: bool)
 
 var people: People
 var jobs: JobBoard
@@ -49,6 +52,8 @@ var clock: GameClock:
 var runners: Dictionary[Person, Vector2] = {}
 ## Guards chasing, and who.
 var chasers: Dictionary[Person, Person] = {}
+## Sounding while anyone is running: every free guard gives chase.
+var alarm := false
 var _rng := RandomNumberGenerator.new()
 
 
@@ -96,8 +101,12 @@ func run(person: Person) -> bool:
 	person.bubble = "Legging it!"
 	person.bubble_minutes = 0.0
 	person.pace = 1.0
+	var sounding := alarm
+	alarm = true
 	_send_chasers(person)
 	running.emit(person)
+	if not sounding:
+		alarm_changed.emit(true)
 	return true
 
 
@@ -132,7 +141,8 @@ func _send_chasers(person: Person) -> void:
 				and Health.injury(p.health) < Health.Injury.HURT)
 	guards.sort_custom(func(a: Person, b: Person) -> bool:
 		return a.flat().distance_squared_to(person.flat()) < b.flat().distance_squared_to(person.flat()))
-	for guard: Person in guards.slice(0, CHASERS):
+	# With the alarm going, every free guard gives chase.
+	for guard: Person in guards.slice(0, guards.size() if alarm else CHASERS):
 		if guard.job != null:
 			jobs.abandon(guard)
 		people.stop(guard)
@@ -157,6 +167,9 @@ func _catch_up() -> void:
 			_stop_chasing(guard)
 		else:
 			people.walk_to(guard, target.level, target.flat(), "Chasing %s" % target.name.get_slice(" ", 0))
+	if alarm and runners.is_empty():
+		alarm = false
+		alarm_changed.emit(false)
 
 
 func _caught_by(person: Person) -> Person:
