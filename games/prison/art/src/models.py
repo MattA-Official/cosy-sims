@@ -1582,6 +1582,26 @@ def budgie():
     return p
 
 
+def hen():
+    p = Prop("hen")  # a plump white hen, about 0.3 m to the comb
+    p.ball("sheet", 0.1, (0, 0.02, 0.12), scale=(0.85, 1.15, 0.9), u=16, v=10)
+    p.ball("sheet", 0.06, (0, -0.08, 0.22), u=14, v=10)
+    p.taper("sheet", (0.08, 0.04), (0.04, 0.02), 0.1, (0, 0.13, 0.17), 0.02, 2)  # tail
+    for k, (y, z, r) in enumerate(((-0.1, 0.285, 0.018), (-0.075, 0.29, 0.022), (-0.05, 0.28, 0.018))):
+        p.ball("food_c", r, (0, y, z), scale=(0.5, 1, 1), u=10, v=6)  # comb
+    p.ball("food_c", 0.014, (0, -0.135, 0.19), scale=(0.6, 0.8, 1.4), u=8, v=6)  # wattle
+    p.cyl("uniform", 0.016, 0.04, (0, -0.15, 0.215), r2=0.0, bevel=0.0, n=8, rot=(90, 0, 0))  # beak
+    _eyes(p, 0.04, -0.115, 0.235, r=0.01)
+    for side in (-1, 1):
+        p.ball("sheet", 0.06, (side * 0.075, 0.03, 0.13), scale=(0.35, 1.2, 0.8), u=12, v=8)  # wings
+        x = side * 0.04
+        p.tube("uniform", [(x, 0.0, 0.05), (x, 0.0, 0.0)], 0.008, 0, n=6)
+        for a in (-25, 0, 25):
+            t = math.radians(a)
+            p.tube("uniform", [(x, 0.0, 0.004), (x + 0.03 * math.sin(t), -0.03 * math.cos(t), 0.004)], 0.005, 0, n=6)
+    return p
+
+
 def therapy_dog():
     """A friendly golden dog in a little blue therapy vest, about 0.45 m."""
     p = Prop("therapy_dog")
@@ -2131,7 +2151,7 @@ def lorry():
 
 
 MODELS = dict(easel=easel, piano=piano, knitting_chair=knitting_chair, till=till,
-              pet_cage=pet_cage, visit_table=visit_table, cat=cat, rabbit=rabbit, budgie=budgie,
+              pet_cage=pet_cage, visit_table=visit_table, cat=cat, rabbit=rabbit, budgie=budgie, hen=hen,
               therapy_dog=therapy_dog, **_looks(meeting_table), snack_machine=snack_machine, mobile_phone=mobile_phone, sweets=sweets,
               fruit=fruit, fizzy_pop=fizzy_pop,
               payphone=payphone, planter=planter, veg_bed=veg_bed,

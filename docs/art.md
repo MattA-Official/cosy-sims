@@ -48,7 +48,7 @@ colours a real prison would plausibly use.
   with a wool basket), till (1 x 1 shop counter, shopkeeper at -z), pet_cage
   (1 x 1 hutch on legs, wire front at +z), visit_table (2 x 1, top 0.53,
   divider along x). Animals, built at size 1 facing +z with the origin under
-  the body: cat (0.3 m), rabbit (0.32 m), budgie (0.16 m), therapy_dog
+  the body: cat (0.3 m), rabbit (0.32 m), budgie (0.16 m), hen (0.3 m), therapy_dog
   (0.45 m, blue vest).
 - Meetings: meeting_table (2 x 1 oval on two pedestals, top 0.53, chairs fit
   all round; looks _pine, _metal, _painted).
