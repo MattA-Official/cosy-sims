@@ -1,8 +1,9 @@
 class_name BondLines
 extends Node3D
 ## While the inspector has someone picked, thin lines run from them to
-## their friends (green) and rivals (red) on the level in view. A child of
-## the inspector, so it shares its space.
+## their friends (green), rivals (red) and fellow clique members (in the
+## clique's colour) on the level in view. A child of the inspector, so it
+## shares its space.
 
 const FRIEND := Color(0.35, 0.75, 0.4, 0.85)
 const RIVAL := Color(0.85, 0.3, 0.3, 0.85)
@@ -11,6 +12,8 @@ const REFRESH_SECONDS := 0.25
 
 var inspector: Inspector
 var relationships: Relationships
+## Optional.
+var cliques: Cliques
 var building: Building
 
 var _mesh := ImmediateMesh.new()
@@ -56,6 +59,11 @@ func lines_for(person: Person) -> Array:
 	for pair: Array in relationships.rivals_of(person):
 		if (pair[0] as Person).level == level:
 			out.append([pair[0], RIVAL])
+	var clique := cliques.clique_of(person) if cliques != null else null
+	if clique != null:
+		for member in cliques.members_of(clique):
+			if member != person and member.level == level and not relationships.is_friend(person, member):
+				out.append([member, clique.colour])
 	return out
 
 

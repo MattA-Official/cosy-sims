@@ -236,6 +236,27 @@ var mood_extras: Array[Callable] = []
 ## something keeps proper bonds (Relationships), which start from the same
 ## rule.
 var cellmate_moods := true
+## (person, tag or need) -> float: how much more someone likes something,
+## beyond their traits, such as their hobby. Multiplied together.
+var likings: Array[Callable] = []
+## (person, need, PlacedObject) -> float: how much faster using an object
+## fills a need, such as Fun doing a hobby. Multiplied together.
+var fill_scales: Array[Callable] = []
+## (person, tag) -> Array[Vector2]: places on their level they'd like to
+## sit near, such as friends in their clique. Seats within PULL_NEAR of one
+## are judged by that distance instead, and liked PULL_SCALE more.
+var pulls: Array[Callable] = []
+## (person, need) -> float: how much faster a need runs down for them
+## beyond their traits, such as being ill. Multiplied together.
+var rate_scales: Array[Callable] = []
+## (person) -> float: how much faster someone walks, such as slower with a
+## cold or in old age. Multiplied together.
+var walk_scales: Array[Callable] = []
+## (person) -> PackedScene or null: a model to draw someone with instead
+## of the usual body, such as a cat.
+var custom_bodies: Array[Callable] = []
+const PULL_NEAR := 3.0
+const PULL_SCALE := 1.2
 var _qualities: Dictionary[Room, RoomQuality] = {}
 ## People by (level, x, z) in squares NEARBY tiles across, for finding
 ## who is close, refilled when first wanted each step.
@@ -338,6 +359,14 @@ func walk_to(person: Person, level: int, spot: Vector2, doing: String) -> bool:
 		return false
 	person.activity = doing
 	return true
+
+
+## How fast someone walks, against everyone's usual pace.
+func walk_pace(person: Person) -> float:
+	var pace := person.pace * Health.pace(person.health)
+	for scale in walk_scales:
+		pace *= scale.call(person)
+	return pace
 
 
 ## How fast someone works: slower when worn out.
@@ -994,6 +1023,9 @@ func _run_down_needs(person: Person, minutes: float) -> void:
 			var fill := 100.0 / maxf(def.use_minutes, 0.1) * minutes
 			if asleep and need == tired_need:
 				fill *= Modifiers.scale(modifiers, &"sleep_rate")
+			if def == seeing_to:
+				for extra in fill_scales:
+					fill *= extra.call(person, need, target_object(person))
 			person.needs[need] = minf(100.0, before + fill)
 			if before < 99.9 and person.needs[need] >= 99.9 and def.met_moodlet != &"":
 				add_moodlet(person, def.met_moodlet)
@@ -1010,6 +1042,8 @@ func _need_rate(person: Person, need: StringName) -> float:
 	var rate := maxf(0.1, Modifiers.scale(modifiers, StringName("%s_need_rate" % person.group)))
 	for t in person.traits:
 		rate *= t.need_rates.get(need, 1.0)
+	for extra in rate_scales:
+		rate *= extra.call(person, need)
 	return rate
 
 
@@ -1343,6 +1377,8 @@ func _liking(person: Person, key: StringName) -> float:
 	var like := 1.0
 	for t in person.traits:
 		like *= t.likes.get(key, 1.0)
+	for extra in likings:
+		like *= extra.call(person, key)
 	return like
 
 
@@ -1378,6 +1414,12 @@ func _see_to(person: Person, need: StringName, urgent := false) -> bool:
 ## Heads for the nearest free object with one of the tags, where the block
 ## allows (anywhere it allows the tag, if `unrestricted`). Returns false,
 ## and gives up on the tags for a while, if none can be reached.
+## Sends someone to use the nearest free object with one of the tags, for
+## a need. Returns whether they're going.
+func seek(person: Person, tags: Array[StringName], need: StringName = &"") -> bool:
+	return _seek(person, tags, need)
+
+
 func _seek(person: Person, tags: Array[StringName], need: StringName = &"", unrestricted := false) -> bool:
 	if need == &"":
 		need = _need_for_tag(tags[0])
@@ -1508,6 +1550,9 @@ func _candidates(person: Person, tags: Array[StringName], unrestricted := false)
 	for tag in tags:
 		if person.block != null and not person.block.allows(tag):
 			continue
+		var near: Array[Vector2] = []
+		for pull in pulls:
+			near.append_array(pull.call(person, tag))
 		for entry: Array in _objects_tagged(tag):
 			var n: int = entry[0]
 			var placed: BuildingMap.PlacedObject = entry[1]
@@ -1522,6 +1567,11 @@ func _candidates(person: Person, tags: Array[StringName], unrestricted := false)
 			if room != null and not unrestricted and _someone_elses(person, n, room):
 				continue
 			var distance := placed.centre.distance_to(person.flat()) + absi(n - person.level) * 12.0
+			if n == person.level:
+				for point in near:
+					if placed.centre.distance_to(point) <= PULL_NEAR:
+						distance = minf(distance, placed.centre.distance_to(point)) / PULL_SCALE
+						break
 			out.append([distance / _liking(person, tag), n, placed, tag])
 	out.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
 	return out
@@ -1927,7 +1977,7 @@ func _walk_to(person: Person, level: int, spot: Vector2) -> bool:
 
 
 func _walk(person: Person, minutes: float) -> void:
-	var budget := speed * person.pace * Health.pace(person.health) * minutes
+	var budget := speed * walk_pace(person) * minutes
 	if person.role != &"":
 		# Such as &"guard_walk_speed" from a research card.
 		budget *= Modifiers.scale(modifiers, StringName("%s_walk_speed" % person.role))
@@ -1991,7 +2041,7 @@ func _arrive(person: Person) -> void:
 		items.put_down(person) # Their tray, eaten.
 	person.stand_spot = person.position
 	person.state = Person.State.USING
-	person.timer = USE_MINUTES
+	person.timer = placed.def.use_minutes if placed.def.use_minutes > 0.0 else USE_MINUTES
 	var map := building.levels[person.target.x]
 	person.position = Vector3(placed.centre.x, map.floor_height(Vector2i(placed.centre.floor()))
 			+ placed.def.height * 0.6, placed.centre.y)
@@ -2286,6 +2336,12 @@ func _update_visibility() -> void:
 ## colours, or a placeholder rounded body and head, with a flag over them
 ## for being out of place.
 func _make_body(person: Person) -> Node3D:
+	for custom in custom_bodies:
+		var scene: PackedScene = custom.call(person)
+		if scene != null:
+			var root := scene.instantiate() as Node3D
+			_add_flag(root)
+			return root
 	if body_model != null:
 		var model := body_model.instantiate() as Node3D
 		var rng := RandomNumberGenerator.new()

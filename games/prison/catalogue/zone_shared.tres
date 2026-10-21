@@ -8,6 +8,6 @@ script = ExtResource("1_def")
 id = &"shared"
 display_name = "Prisoners and staff"
 description = "The usual: cells, canteens, yards and corridors."
-groups = Array[StringName]([&"prisoner", &"staff"])
+groups = Array[StringName]([&"prisoner", &"staff", &"animal"])
 colour = Color(0.98, 0.72, 0.4, 1)
 icon = ExtResource("2_icon")

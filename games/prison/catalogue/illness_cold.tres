@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="IllnessDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/people/illness_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"cold"
+display_name = "Cold"
+need_rates = Dictionary[StringName, float]({&"energy": 1.5, &"recreation": 0.5})

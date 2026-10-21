@@ -16,6 +16,10 @@ var finances: Finances
 var supplies: Supplies
 ## Opens the research board. Optional.
 var open_research: Callable
+## For the Events section. Optional.
+var events: Events
+## For the Shop section. Optional.
+var shop: Shop
 
 var _missing := Label.new()
 var _limit := Label.new()
@@ -41,6 +45,16 @@ var _days := OptionButton.new()
 var _quiet := CheckBox.new()
 var _meals := OptionButton.new()
 var _stock := Label.new()
+var _event_pick := OptionButton.new()
+var _event_day := OptionButton.new()
+var _event_list := VBoxContainer.new()
+## What the event list last showed, so it is only rebuilt when it changes.
+var _event_key := ""
+var _shop_words := Label.new()
+var _shop_box := VBoxContainer.new()
+var _savings := OptionButton.new()
+## Item id -> [CheckBox, Label] for each thing the shop sells.
+var _shop_rows: Dictionary[StringName, Array] = {}
 
 
 func _ready() -> void:
@@ -143,6 +157,10 @@ func _ready() -> void:
 		_add_policies(box)
 	if kitchen != null:
 		_add_stores(box)
+	if events != null:
+		_add_events(box)
+	if shop != null:
+		_add_shop(box)
 	if standing != null:
 		box.add_child(HSeparator.new())
 		_grade.theme_type_variation = &"HeaderLabel"
@@ -211,6 +229,10 @@ func refresh() -> void:
 		_meals.disabled = not warden
 		_meals.selected = maxi(PrisonCatalogue.MEALS.find(kitchen.meal), 0)
 		_stock.text = stock_text()
+	if events != null:
+		_show_events()
+	if shop != null:
+		_show_shop()
 	if searching != null:
 		_searches.selected = maxi(Searching.POLICIES.find(searching.random_per_day), 0)
 		_days.selected = maxi(DAYS.find(roundi(consequences.privilege_days)), 0)
@@ -265,6 +287,126 @@ func _add_stores(box: VBoxContainer) -> void:
 	_stock.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_stock.theme_type_variation = &"SubtleLabel"
 	box.add_child(_stock)
+
+
+func _add_shop(box: VBoxContainer) -> void:
+	box.add_child(HSeparator.new())
+	var heading := Label.new()
+	heading.text = "Shop"
+	heading.theme_type_variation = &"HeaderLabel"
+	box.add_child(heading)
+	_shop_words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_shop_words.theme_type_variation = &"SubtleLabel"
+	box.add_child(_shop_words)
+	for share in PrisonLife.SAVE_SHARES:
+		_savings.add_item("None" if share == 0.0 else "%d%%" % roundi(share * 100.0))
+	_savings.tooltip_text = "Pay put aside for release. Every 50 tokens saved makes coming back a little less likely."
+	_savings.item_selected.connect(func(index: int) -> void: shop.save_share = PrisonLife.SAVE_SHARES[index])
+	_shop_box.add_child(_row("Savings from pay", _savings))
+	for def in shop.items:
+		var row := HBoxContainer.new()
+		var check := CheckBox.new()
+		check.text = "%s, %d token%s" % [def.display_name if def.pack == 1 else "%s (%d)" % [def.display_name, def.pack],
+				def.price_tokens, "" if def.price_tokens == 1 else "s"]
+		check.tooltip_text = "Untick to stop selling it. Stocking one costs %s." % Ledger.text(def.cost)
+		check.focus_mode = FOCUS_NONE
+		check.size_flags_horizontal = SIZE_EXPAND_FILL
+		var id := def.id
+		check.toggled.connect(func(on: bool) -> void: shop.on[id] = on)
+		row.add_child(check)
+		var numbers := Label.new()
+		numbers.theme_type_variation = &"SubtleLabel"
+		row.add_child(numbers)
+		_shop_rows[def.id] = [check, numbers]
+		_shop_box.add_child(row)
+	box.add_child(_shop_box)
+
+
+func _show_shop() -> void:
+	_shop_box.visible = shop.exists()
+	if not shop.exists():
+		_shop_words.text = "Research the Prison shop card to pay prisoners tokens for work and open a shop."
+		return
+	var sold := 0
+	for id: StringName in shop.sold_today:
+		sold += shop.sold_today[id]
+	_shop_words.text = "Prisoners earn tokens on work programmes and spend them at the till in a shop room, while someone on the Shop programme works it. Shelves are filled at %02d:00. %s today: %d sold." \
+			% [Shop.STOCK_HOUR, "Open" if shop.open() else "Closed (nobody at the till)", sold]
+	_savings.selected = maxi(PrisonLife.SAVE_SHARES.find(shop.save_share), 0)
+	for id: StringName in _shop_rows:
+		(_shop_rows[id][0] as CheckBox).set_pressed_no_signal(shop.on.get(id, true))
+		(_shop_rows[id][1] as Label).text = "%d in stock, %d sold" % [shop.stock.get(id, 0), shop.sold_today.get(id, 0)]
+
+
+## How many days ahead an event can be booked.
+const EVENT_DAYS_AHEAD := 7
+
+
+func _add_events(box: VBoxContainer) -> void:
+	box.add_child(HSeparator.new())
+	var heading := Label.new()
+	heading.text = "Events"
+	heading.theme_type_variation = &"HeaderLabel"
+	box.add_child(heading)
+	var words := Label.new()
+	words.text = "Put on a one-day event. Prisoners free to go take part, and everyone who does has a great day."
+	words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	words.theme_type_variation = &"SubtleLabel"
+	box.add_child(words)
+	var tips := PackedStringArray()
+	for def in events.defs:
+		_event_pick.add_item("%s (%s)" % [def.display_name, Ledger.text(def.cost)])
+		tips.append("%s: %s" % [def.display_name, def.description])
+	_event_pick.tooltip_text = "\n".join(tips)
+	_event_pick.focus_mode = FOCUS_NONE
+	for ahead in range(1, EVENT_DAYS_AHEAD + 1):
+		_event_day.add_item("Tomorrow" if ahead == 1 else "In %d days" % ahead)
+	var row := _row("Event", _event_pick)
+	_event_day.focus_mode = FOCUS_NONE
+	row.add_child(_event_day)
+	row.add_child(_button("Book", func() -> void:
+		var day := events.clock.day() + _event_day.selected + 1
+		events.schedule(events.defs[_event_pick.selected], day)))
+	box.add_child(row)
+	_event_list.add_theme_constant_override(&"separation", 2)
+	box.add_child(_event_list)
+
+
+func _show_events() -> void:
+	var today := events.clock.day()
+	var upcoming := events.upcoming()
+	var key := "%d %d %s" % [today, events.attended.size(), upcoming]
+	if key == _event_key:
+		return
+	_event_key = key
+	for child in _event_list.get_children():
+		child.queue_free()
+	if upcoming.is_empty():
+		var none := Label.new()
+		none.text = "Nothing booked."
+		none.theme_type_variation = &"SubtleLabel"
+		_event_list.add_child(none)
+	for entry: Array in upcoming:
+		var day: int = entry[0]
+		var def: EventDef = entry[1]
+		var when := "Today" if day == today else "Tomorrow" if day == today + 1 else "Day %d" % day
+		var row := HBoxContainer.new()
+		var label := Label.new()
+		label.text = "%s: %s" % [when, def.display_name]
+		if day == today:
+			label.text += " (%d taking part so far)" % events.attended.size()
+		label.size_flags_horizontal = SIZE_EXPAND_FILL
+		row.add_child(label)
+		if day > today:
+			var cancel := Button.new()
+			cancel.text = "Cancel"
+			cancel.theme_type_variation = &"FlatButton"
+			cancel.focus_mode = FOCUS_NONE
+			cancel.pressed.connect(func() -> void:
+				events.cancel(day)
+				refresh())
+			row.add_child(cancel)
+		_event_list.add_child(row)
 
 
 ## What's in the stores, and whether there's enough food for tomorrow.

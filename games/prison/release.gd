@@ -52,6 +52,9 @@ var postcard_defs: Array[PostcardDef] = []
 var prisoner_group: StringName = &"prisoner"
 ## Scales the reoffending chance (difficulty).
 var return_scale := 1.0
+## (person) -> float: taken off the reoffending chance, such as savings
+## to go home with.
+var return_cuts: Array[Callable] = []
 ## When set, its operation times are used instead of the hour above (main
 ## passes on Regime.operation_due).
 var regime: Regime
@@ -93,6 +96,8 @@ func waiting_for_bus() -> int:
 func return_chance(person: Person) -> float:
 	var courses := mini(PrisonerFile.of(person).passed.size(), RETURN_COURSES_MAX)
 	var chance := RETURN_BASE - RETURN_PER_REFORM * reform.value(person) - RETURN_PER_COURSE * courses
+	for cut in return_cuts:
+		chance -= cut.call(person)
 	return clampf(chance * return_scale, RETURN_MIN, RETURN_MAX)
 
 

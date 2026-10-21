@@ -3,7 +3,7 @@ class_name PrisonCatalogue
 ## in the inspector to tweak sizes and colours.
 
 ## Tabs of the objects menu, in order (see ObjectDef.category).
-const OBJECT_CATEGORIES: Array[String] = ["Cells", "Kitchen", "Work", "Leisure",
+const OBJECT_CATEGORIES: Array[String] = ["Cells", "Kitchen", "Work", "Leisure", "Hobbies",
 		"Classes", "Staff", "Decoration"]
 const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/bed.tres"),
@@ -57,6 +57,11 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/filing_cabinet.tres"),
 	preload("res://games/prison/catalogue/payphone.tres"),
 	preload("res://games/prison/catalogue/planter.tres"),
+	preload("res://games/prison/catalogue/easel.tres"),
+	preload("res://games/prison/catalogue/piano.tres"),
+	preload("res://games/prison/catalogue/knitting_chair.tres"),
+	preload("res://games/prison/catalogue/till.tres"),
+	preload("res://games/prison/catalogue/pet_cage.tres"),
 	preload("res://games/prison/catalogue/snack_machine.tres"),
 	preload("res://games/prison/catalogue/veg_bed.tres"),
 	preload("res://games/prison/catalogue/class_desk.tres"),
@@ -124,6 +129,7 @@ const GROUPS: Array[GroupDef] = [
 	preload("res://games/prison/catalogue/group_prisoner.tres"),
 	preload("res://games/prison/catalogue/group_staff.tres"),
 	preload("res://games/prison/catalogue/group_visitor.tres"),
+	preload("res://games/prison/catalogue/group_animal.tres"),
 ]
 
 const ZONES: Array[ZoneDef] = [
@@ -181,6 +187,8 @@ const PROGRAMMES: Array[WorkProgrammeDef] = [
 	preload("res://games/prison/catalogue/programme_garden.tres"),
 	preload("res://games/prison/catalogue/programme_cleaning.tres"),
 	preload("res://games/prison/catalogue/programme_workshop.tres"),
+	preload("res://games/prison/catalogue/programme_shop.tres"),
+	preload("res://games/prison/catalogue/programme_pet_care.tres"),
 ]
 
 const DOOR_KINDS: Array[DoorKindDef] = [
@@ -246,6 +254,7 @@ const PRIVILEGES: Array[PrivilegeDef] = [
 	preload("res://games/prison/catalogue/privilege_yard.tres"),
 	preload("res://games/prison/catalogue/privilege_tv.tres"),
 	preload("res://games/prison/catalogue/privilege_games.tres"),
+	preload("res://games/prison/catalogue/privilege_shop.tres"),
 ]
 
 ## The misconduct ladder, mildest first.
@@ -256,7 +265,60 @@ const MISCONDUCT: Array[MisconductDef] = [
 	preload("res://games/prison/catalogue/misconduct_fight.tres"),
 ]
 
+## What prisoners love doing (M11).
+const HOBBIES: Array[HobbyDef] = [
+	preload("res://games/prison/catalogue/hobby_chess.tres"),
+	preload("res://games/prison/catalogue/hobby_painting.tres"),
+	preload("res://games/prison/catalogue/hobby_singing.tres"),
+	preload("res://games/prison/catalogue/hobby_knitting.tres"),
+	preload("res://games/prison/catalogue/hobby_gardening.tres"),
+	preload("res://games/prison/catalogue/hobby_sport.tres"),
+	preload("res://games/prison/catalogue/hobby_reading.tres"),
+]
+
+## What the prison shop sells (M11), in tokens.
+const SHOP_ITEMS: Array[ItemDef] = [
+	preload("res://games/prison/catalogue/item_biscuit.tres"),
+	preload("res://games/prison/catalogue/item_chocolate.tres"),
+	preload("res://games/prison/catalogue/item_stamp.tres"),
+	preload("res://games/prison/catalogue/item_radio.tres"),
+	preload("res://games/prison/catalogue/item_hobby_kit.tres"),
+	preload("res://games/prison/catalogue/item_gift.tres"),
+]
+
+## Animals about the prison (M11).
+const ANIMALS: Array[AnimalDef] = [
+	preload("res://games/prison/catalogue/animal_cat.tres"),
+	preload("res://games/prison/catalogue/animal_therapy_dog.tres"),
+	preload("res://games/prison/catalogue/animal_rabbit.tres"),
+	preload("res://games/prison/catalogue/animal_budgie.tres"),
+]
+
+## What prisoners catch (M11): colds only.
+const ILLNESSES: Array[IllnessDef] = [
+	preload("res://games/prison/catalogue/illness_cold.tres"),
+]
+
+const EVENTS: Array[EventDef] = [
+	preload("res://games/prison/catalogue/event_talent_show.tres"),
+	preload("res://games/prison/catalogue/event_chess_tournament.tres"),
+	preload("res://games/prison/catalogue/event_art_show.tres"),
+	preload("res://games/prison/catalogue/event_veg_show.tres"),
+]
+
 const MOODLETS: Array[MoodletDef] = [
+	preload("res://games/prison/catalogue/moodlet_cat_about.tres"),
+	preload("res://games/prison/catalogue/moodlet_cat_on_lap.tres"),
+	preload("res://games/prison/catalogue/moodlet_my_pet.tres"),
+	preload("res://games/prison/catalogue/moodlet_lost_my_pet.tres"),
+	preload("res://games/prison/catalogue/moodlet_rabbit_chaos.tres"),
+	preload("res://games/prison/catalogue/moodlet_good_dog.tres"),
+	preload("res://games/prison/catalogue/moodlet_chocolate.tres"),
+	preload("res://games/prison/catalogue/moodlet_got_a_gift.tres"),
+	preload("res://games/prison/catalogue/moodlet_wrote_home.tres"),
+	preload("res://games/prison/catalogue/moodlet_did_my_hobby.tres"),
+	preload("res://games/prison/catalogue/moodlet_club_spirit.tres"),
+	preload("res://games/prison/catalogue/moodlet_great_day.tres"),
 	preload("res://games/prison/catalogue/moodlet_missing_friend.tres"),
 	preload("res://games/prison/catalogue/moodlet_proud.tres"),
 	preload("res://games/prison/catalogue/moodlet_parole_granted.tres"),
@@ -319,6 +381,7 @@ const ACTIVITIES: Array[ActivityDef] = [
 	preload("res://games/prison/catalogue/activity_free.tres"),
 	preload("res://games/prison/catalogue/activity_work.tres"),
 	preload("res://games/prison/catalogue/activity_learn.tres"),
+	preload("res://games/prison/catalogue/activity_club.tres"),
 ]
 
 ## The prisoners' day: 11 hours in their cells overnight, three meals, a
@@ -348,6 +411,7 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_staff.tres"),
 	preload("res://games/prison/catalogue/room_visiting.tres"),
 	preload("res://games/prison/catalogue/room_library.tres"),
+	preload("res://games/prison/catalogue/room_shop.tres"),
 	preload("res://games/prison/catalogue/room_garden.tres"),
 	preload("res://games/prison/catalogue/room_storeroom.tres"),
 	preload("res://games/prison/catalogue/room_delivery_bay.tres"),

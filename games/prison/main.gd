@@ -137,6 +137,13 @@ var in_tray := InTray.new()
 ## What has happened, for know-how and research reveals.
 var counters := Counters.new()
 var relationships := Relationships.new()
+var hobbies := Hobbies.new()
+var events := Events.new()
+var cliques := Cliques.new()
+var shop := Shop.new()
+var illnesses := Illnesses.new()
+var animals := Animals.new()
+var health_tint := HealthTint.new()
 var knowhow := Knowhow.new()
 ## The research board in play.
 var research := Research.new()
@@ -1416,6 +1423,8 @@ func _add_hud() -> void:
 	office_window.finances = finances
 	office_window.supplies = supplies
 	office_window.open_research = book.open.bind(&"research")
+	office_window.events = events
+	office_window.shop = shop
 	book.add_page(&"office", "Office", "The warden's office: intake, goals and the grade. O", "office",
 			office_window)
 	heads_window.heads = heads
@@ -1451,6 +1460,13 @@ func _add_hud() -> void:
 	programmes_window.reform = reform
 	programmes_window.parole = parole
 	programmes_window.release = release
+	programmes_window.cliques = cliques
+	programmes_window.illnesses = illnesses
+	programmes_window.health_tint = health_tint
+	programmes_window.pick_person = func(person: Person) -> void:
+		inspector.select(person, person.level)
+		if inspector.debug_overlay != null:
+			inspector.debug_overlay.visible = true
 	book.add_page(&"programmes", "Programmes", "Courses, therapy, parole and how reformed everyone is. L",
 			"programmes", programmes_window)
 
@@ -1494,6 +1510,7 @@ func _add_hud() -> void:
 	settings_window.blueprints = blueprints
 	settings_window.desk_work = desk_work
 	settings_window.research = research
+	settings_window.illnesses = illnesses
 	pause_menu.clock = clock
 	pause_menu.subtitle = title
 	pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")

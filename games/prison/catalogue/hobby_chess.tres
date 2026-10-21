@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="HobbyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/hobby_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"chess"
+display_name = "Chess"
+object_tags = Array[StringName]([&"game"])
+likes_traits = Array[StringName]([&"bookworm", &"loner"])
+club_name = "The Chess Club"

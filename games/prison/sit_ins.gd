@@ -63,6 +63,9 @@ var sit_ins: Array[SitIn] = []
 ## (talker, sit-in) -> float: how much faster someone talks them round,
 ## such as a guard they know well. Optional.
 var talk_speed: Callable
+## (crowd) -> int: the fewest who can start a sit-in in this crowd, such
+## as a clique needing fewer. Optional; MIN_CROWD otherwise.
+var crowd_least: Callable
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -117,7 +120,8 @@ func check() -> Array[SitIn]:
 
 ## Starts a sit-in if enough of this crowd are unhappy about the same thing.
 func try_start(level: int, room: Room, crowd: Array) -> SitIn:
-	if crowd.size() < MIN_CROWD:
+	var least: int = crowd_least.call(crowd) if crowd_least.is_valid() else MIN_CROWD
+	if crowd.size() < least:
 		return null
 	var unhappy: Array = crowd.filter(func(p: Person) -> bool: return p.mood < MOOD_UNDER)
 	if unhappy.size() < crowd.size() * SHARE:
@@ -136,7 +140,7 @@ func try_start(level: int, room: Room, crowd: Array) -> SitIn:
 		if person.traits.any(func(t: TraitDef) -> bool: return t.id == gentle):
 			continue
 		_join(sit_in, person)
-	if sit_in.members.size() < MIN_CROWD * SHARE:
+	if sit_in.members.size() < least * SHARE:
 		for person in sit_in.members:
 			_stand_up(person)
 		return null

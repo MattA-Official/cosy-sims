@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/event_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"talent_show"
+display_name = "Talent show"
+description = "Anyone can have a go at the piano, the easels or the knitting chairs."
+hobby = &""
+object_tags = Array[StringName]([&"piano", &"easel", &"knitting"])
+cost = 150

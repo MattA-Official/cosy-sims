@@ -14,3 +14,5 @@ extends Resource
 ## adds (0 to 100). Skill speeds the work up, half as fast again at 100.
 @export var skill: StringName
 @export var skill_per_job := 1
+## Tokens a game hour worked, where there is a shop to spend them in.
+@export var wage := 2

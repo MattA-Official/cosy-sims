@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="WorkProgrammeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/jobs/work_programme_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"pet_care"
+display_name = "Pet care"
+description = "Look after a rabbit or budgie in a cage in their cell. Needs a clean week, and a pet cage in the cell."
+job_kinds = Array[StringName]([&"pet_care"])
+skill = &"pet_care"

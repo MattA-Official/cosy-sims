@@ -125,6 +125,11 @@ func _process(_delta: float) -> bool:
 	_test_research_slots()
 	_test_research_trials()
 	_test_relationships()
+	_test_hobbies()
+	_test_cliques()
+	_test_shop()
+	_test_health()
+	_test_pets()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -6086,3 +6091,556 @@ func _test_budget() -> void:
 		clock.jump_to_hour(0)
 	_check(budget.contract.is_empty(), "late, a contract lapses")
 	main.free()
+
+
+func _test_hobbies() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var hobbies: Hobbies = main.hobbies
+	var events: Events = main.events
+	(main.misconduct as Misconduct).enabled = false
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	_check(prisoners.all(func(p: Person) -> bool: return hobbies.hobbies_of(p).size() in [1, 2]),
+			"every prisoner has one or two hobbies")
+	_check(people.people.filter(func(p: Person) -> bool: return p.group != &"prisoner").all(
+			func(p: Person) -> bool: return hobbies.hobbies_of(p).is_empty()), "staff don't")
+	var a: Person = prisoners[0]
+	var b: Person = prisoners[1]
+	var c: Person = prisoners[2]
+	var d: Person = prisoners[3]
+	for p: Person in [a, b, c, d]:
+		people.stop(p)
+		hobbies.set_hobbies(p, [&"reading"])
+		for need: StringName in p.needs:
+			p.needs[need] = 90.0
+	hobbies.set_hobbies(d, [&"painting"])
+	_check(hobbies.liking(a, &"book") == Hobbies.LIKE and hobbies.liking(d, &"book") == 1.0,
+			"they like their hobby's objects more")
+	_check(people._liking(a, &"book") >= Hobbies.LIKE, "which is how they choose")
+	_check((main.relationships as Relationships).share_scale.call(a, b) == Relationships.SHARED_SCALE
+			and (main.relationships as Relationships).share_scale.call(a, d) == 1.0, "a shared hobby helps a bond grow")
+	# Find a bookcase and sit three readers at it.
+	var table: BuildingMap.PlacedObject = null
+	var level := 0
+	for n: int in (main.building as Building).levels:
+		for placed: BuildingMap.PlacedObject in ((main.building as Building).levels[n] as BuildingMap).objects.values():
+			if placed.def.tags.has(&"book"):
+				table = placed
+				level = n
+	_check(table != null, "the sample has books")
+	if table == null:
+		main.free()
+		return
+	var club_def: ActivityDef = PrisonCatalogue.ACTIVITIES.filter(func(def: ActivityDef) -> bool: return def.id == &"club")[0]
+	var i := 0
+	for p: Person in [a, b, c]:
+		p.level = level
+		p.position = Vector3(table.centre.x + 0.2 * i, p.position.y, table.centre.y)
+		p.target = Vector2i(level, table.id)
+		p.target_tag = &"book"
+		p.target_need = &"recreation"
+		p.state = Person.State.USING
+		p.block = club_def
+		i += 1
+	people._buckets_fresh = false
+	_check(hobbies.doing(a) != null and hobbies.doing(a).id == &"reading", "using a bookcase is doing reading")
+	_check(hobbies.fill_scale(a, &"recreation", table) == 2.0 and hobbies.fill_scale(d, &"recreation", table) == 1.0,
+			"it fills Fun twice as fast")
+	hobbies.set_skill(a, &"reading", 1.0)
+	hobbies.tick(60.0)
+	_check(is_equal_approx(hobbies.skill(a, &"reading"), 1.0 + Hobbies.SKILL_PER_HOUR), "skill grows doing it")
+	_check(a.moodlets.has(&"did_my_hobby"), "and it cheers them up")
+	_check(hobbies.mood_parts(a, []).is_empty(), "they don't miss it")
+	d.profile["hobby_day"] = {"painting": (main.clock as GameClock).day() - Hobbies.MISS_DAYS}
+	var parts := hobbies.mood_parts(d, [])
+	_check(parts.size() == 1 and parts[0][0] == "Misses painting" and parts[0][1] == Hobbies.MISS_MOOD,
+			"three days without it, they miss it")
+	# Clubs.
+	for p: Person in [a, b, c]:
+		hobbies.set_skill(p, &"reading", 1.0)
+	_check(hobbies.run_clubs().is_empty(), "no club without a skilled leader")
+	hobbies.set_skill(b, &"reading", Hobbies.LEADER_SKILL)
+	var research: Research = main.research
+	if research.mode != Research.Mode.OFF:
+		research.states[&"hobby-clubs"].state = Research.State.HIDDEN
+		_check(hobbies.run_clubs().is_empty(), "no clubs before the Hobby clubs card")
+		research.states[&"hobby-clubs"].state = Research.State.DONE
+	var reform: Progress = (main.reform as Reform).progress
+	var before := reform.value(a)
+	var met := hobbies.run_clubs()
+	_check(met.size() == 1 and met[0][2] == b, "three with a leader make a club")
+	_check(reform.value(a) > before and a.moodlets.has(&"club_spirit")
+			and (b.moodlets.has(&"useful_day") or b.moodlets.has(&"made_to_work")),
+			"a club gives reform, club spirit, and the leader a useful day")
+	_check(PrisonerFile.of(b) == null or String(PrisonerFile.of(b).log[-1][1]) == "Led The Book Club",
+			"the leader's file says so")
+	c.block = null
+	_check(hobbies.run_clubs().is_empty(), "only those in the Clubs block count")
+	# The Clubs block sends them to their hobby.
+	people.stop(d)
+	hobbies.set_hobbies(d, [&"reading"])
+	d.block = club_def
+	_check(hobbies.decide(d, true) and d.target_tag == &"book", "in Clubs they go and do their hobby")
+	# Things they make.
+	var ledger: Ledger = main.ledger
+	var money := ledger.balance
+	hobbies.made.emit(a, hobbies.def_of(&"painting"))
+	_check(ledger.balance == money + PrisonLife.MADE_PRICE, "what they make is sold")
+	# Events.
+	var today := (main.clock as GameClock).day()
+	var chess: EventDef = events.def_of(&"veg_show")
+	var planter: BuildingMap.PlacedObject = null
+	for n: int in (main.building as Building).levels:
+		for placed: BuildingMap.PlacedObject in ((main.building as Building).levels[n] as BuildingMap).objects.values():
+			if placed.def.tags.has(&"planter"):
+				planter = placed
+				a.target = Vector2i(n, placed.id)
+	hobbies.set_hobbies(a, [&"reading", &"gardening"])
+	money = ledger.balance
+	_check(events.schedule(chess, today + 1) and ledger.balance == money - chess.cost, "booking an event costs money")
+	_check(not events.schedule(events.def_of(&"art_show"), today + 1), "one event a day")
+	events.cancel(today + 1)
+	_check(ledger.balance == money and events.upcoming().is_empty(), "cancelling gives it back")
+	events.scheduled[today] = &"veg_show"
+	_check(events.may_take_part.call(a, chess) and events.may_take_part.call(prisoners[4], chess)
+			== hobbies.hobbies_of(prisoners[4]).any(func(h: HobbyDef) -> bool: return h.id == &"gardening"),
+			"only gardeners show veg")
+	events.tick()
+	_check(events.attended.has(a.id) and not events.attended.has(d.id), "those at the planters take part")
+	var saved := events.capture()
+	events.scheduled.clear()
+	events.attended.clear()
+	events.restore(saved)
+	_check(events.today() == chess and events.attended.has(a.id), "events save")
+	var came := []
+	events.finished.connect(func(_def: EventDef, list: Array[Person]) -> void: came.assign(list))
+	events.end_day(today)
+	_check(a.moodlets.has(&"great_day") and came.has(a) and events.today() == null, "taking part makes a great day")
+	_check(hobbies.words(a).begins_with("Hobbies: Reading"), "the inspector lists hobbies")
+	main.free()
+
+
+func _test_cliques() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var hobbies: Hobbies = main.hobbies
+	var cliques: Cliques = main.cliques
+	var relationships: Relationships = main.relationships
+	var misconduct: Misconduct = main.misconduct
+	misconduct.enabled = false
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	for p: Person in prisoners:
+		people.stop(p)
+		hobbies.set_hobbies(p, [&"chess"])
+	var a: Person = prisoners[0]
+	var b: Person = prisoners[1]
+	var c: Person = prisoners[2]
+	var d: Person = prisoners[3]
+	for p: Person in [a, b, c, d]:
+		hobbies.set_hobbies(p, [&"reading"])
+		p.level = a.level
+		p.position = a.position + Vector3(0.3 * prisoners.find(p), 0.0, 0.0)
+	people._buckets_fresh = false
+	relationships.bonds.clear()
+	for pair: Array in [[a, b], [a, c], [b, c], [a, d]]:
+		relationships.change(pair[0], pair[1], 50.0)
+	var formed := []
+	cliques.formed.connect(func(clique: Cliques.Clique) -> void: formed.append(clique))
+	cliques.update()
+	_check(cliques.cliques.size() == 1 and formed.size() == 1, "friends who share a hobby form a clique")
+	var clique: Cliques.Clique = cliques.cliques[0] if not cliques.cliques.is_empty() else null
+	if clique == null:
+		main.free()
+		return
+	_check(clique.name == "The Book Club" and clique.members.size() == 3 and not clique.members.has(d.id),
+			"named for the hobby, with only those friends with two others")
+	_check(PrisonerFile.of(a) == null or String(PrisonerFile.of(a).log[-1][1]) == "Joined The Book Club",
+			"which goes in their file")
+	relationships.change(b, d, 50.0)
+	cliques.update()
+	_check(clique.members.has(d.id), "a friend of two members joins")
+	_check(cliques.words(a).begins_with("The Book Club (with "), "the inspector names the clique")
+	var lines: BondLines = (main.inspector as Inspector).get_node("BondLines")
+	_check(lines.lines_for(c).any(func(l: Array) -> bool: return l[0] == d and l[1] == clique.colour),
+			"lines run to fellow members in the clique's colour")
+	# Sitting together.
+	b.state = Person.State.USING
+	_check(cliques.pulls(a, &"table") == [b.flat()] and cliques.pulls(a, &"bed").is_empty(),
+			"members look for seats near each other")
+	b.state = Person.State.IDLE
+	# Acting up together.
+	var acted := []
+	misconduct.acted.connect(func(p: Person, rung: MisconductDef, _w: String) -> void: acted.append([p, rung.id]))
+	for p: Person in [a, b, c, d]:
+		p.temper = 30.0
+	misconduct.act(a, misconduct.rung(&"mischief"))
+	_check(acted.size() == 1, "content members don't join in")
+	acted.clear()
+	for p: Person in [a, b, c, d]:
+		p.temper = 75.0
+	misconduct.act(a, misconduct.rung(&"vandalism"))
+	_check(acted.size() == 4 and acted.filter(func(e: Array) -> bool: return e[1] == &"mischief").size() == 3,
+			"fed-up members join in, at mischief at most")
+	_check((main.sit_ins as SitIns).crowd_least.call([a, b, c, d]) == PrisonLife.CLIQUE_SIT_IN
+			and (main.sit_ins as SitIns).crowd_least.call([a, b, prisoners[5]]) == SitIns.MIN_CROWD,
+			"a clique sits in with fewer")
+	# Saving.
+	var saved := cliques.capture()
+	cliques.cliques.clear()
+	cliques.restore(saved)
+	_check(cliques.clique_of(a) != null and cliques.clique_of(a).name == "The Book Club"
+			and cliques.clique_of(a).colour.to_html() == clique.colour.to_html(), "cliques save")
+	clique = cliques.clique_of(a)
+	# Drifting apart and breaking up.
+	for other: Person in [a, b, d]:
+		relationships.bonds.erase(Relationships.key(c, other))
+	cliques.update()
+	_check(not clique.members.has(c.id) and cliques.cliques.size() == 1, "a member who drifts from everyone leaves")
+	var ended := []
+	cliques.ended.connect(func(gone: Cliques.Clique) -> void: ended.append(gone))
+	relationships.bonds.clear()
+	cliques.update()
+	_check(cliques.cliques.is_empty() and ended.size() == 1, "under three, the clique ends")
+	var report: String = (main.standing as Standing).report_lines[-1].call().reduce(
+			func(all: String, line: String) -> String: return all + line, "")
+	_check(report.contains("The Book Club formed") or (main.clock as GameClock).day() <= 1,
+			"the morning report says so")
+	main.free()
+
+
+func _test_shop() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var shop: Shop = main.shop
+	var research: Research = main.research
+	var ledger: Ledger = main.ledger
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	if research.mode != Research.Mode.OFF:
+		research.states[&"prison-shop"].state = Research.State.HIDDEN
+		_check(not shop.exists() and not research.unlocked("object", &"till"), "no shop before the Prison shop card")
+		research.states[&"prison-shop"].state = Research.State.DONE
+	_check(shop.exists() and research.unlocked("object", &"till"), "the card opens the shop and the till")
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	var p: Person = prisoners[0]
+	var q: Person = prisoners[1]
+	for x: Person in [p, q]:
+		people.stop(x)
+		x.traits.clear()
+		x.mood = 80.0
+		for need: StringName in x.needs:
+			x.needs[need] = 100.0
+	# Wages.
+	p.programme = &"kitchen"
+	p.job = Job.new()
+	shop.save_share = 0.5
+	clock.hour_changed.emit(10)
+	_check(Purse.tokens(p) == 1 and Purse.savings(p) == 1, "an hour's work pays, with some put aside")
+	p.job = null
+	p.programme = &""
+	# A till, worked by someone.
+	var till_def := PrisonCatalogue.object(&"till")
+	var table: BuildingMap.PlacedObject = null
+	var level := 0
+	for n: int in (main.building as Building).levels:
+		for placed: BuildingMap.PlacedObject in ((main.building as Building).levels[n] as BuildingMap).objects.values():
+			var room := ((main.building as Building).levels[n] as BuildingMap).room_at_point(placed.centre)
+			if placed.def.tags.has(&"table") and room != null and people.may_enter(p, room):
+				table = placed
+				level = n
+	var map := (main.building as Building).levels[level] as BuildingMap
+	var till_id := 0
+	for dx in range(-6, 7):
+		for dy in range(-6, 7):
+			var spot := table.centre.floor() + Vector2(dx, dy)
+			if till_id == 0 and map.room_at_point(spot + Vector2(1.0, 0.5)) == map.room_at_point(table.centre):
+				till_id = map.place_object(till_def, spot, 0)
+	_check(till_id != 0, "a till can be placed")
+	if till_id == 0:
+		main.free()
+		return
+	var till := map.objects[till_id] as BuildingMap.PlacedObject
+	PrisonLife.man_tills(main.jobs, main.building)
+	var jobs: Array = (main.jobs as JobBoard).of_kind(&"till")
+	_check(jobs.size() == 1, "a till puts a job on the board")
+	_check(not shop.open(), "with nobody at the till, it's shut")
+	var job: Job = jobs[0]
+	job.worker = q
+	q.level = level
+	q.position = Vector3(job.stages[0].tile.x + 0.5, q.position.y, job.stages[0].tile.y + 0.5)
+	_check(shop.open(), "someone at the till opens it")
+	var money := ledger.balance
+	var cost := shop.restock()
+	_check(cost > 0 and ledger.balance == money - cost and shop.stock[&"biscuit"] == shop.target(), "the shelves are filled at cost")
+	# Buying.
+	p.profile["tokens"] = 10
+	var biscuits := p.pocket.size()
+	people.used.emit(p, till)
+	_check(Purse.tokens(p) == 6 and p.pocket.size() == biscuits + 5 and shop.sold_today.get(&"biscuit", 0) == 1,
+			"a visit to the till buys biscuits")
+	shop.on[&"biscuit"] = false
+	_check(PrisonLife.want(shop, main.hobbies, main.relationships, p, RandomNumberGenerator.new()) == null,
+			"nothing they can afford is on sale")
+	shop.on[&"biscuit"] = true
+	p.profile["tokens"] = 40
+	people.used.emit(p, till)
+	_check(p.profile.get("has_radio", false) and Purse.tokens(p) == 0, "a radio first, if they can afford one")
+	var parts: Array = []
+	for extra in people.mood_extras:
+		parts.append_array(extra.call(p, []))
+	_check(parts.any(func(part: Array) -> bool: return part[0] == "Has a radio"), "which cheers them up")
+	p.profile["tokens"] = 15
+	people.used.emit(p, till)
+	_check(p.profile.get("hobby_kit", false), "a kit for their hobby")
+	(main.hobbies as Hobbies)._last_days(p)[String((main.hobbies as Hobbies).hobbies_of(p)[0].id)] = 0
+	clock.day_changed.emit(clock.day())
+	_check((main.hobbies as Hobbies).mood_parts(p, []).is_empty(), "so they don't miss it")
+	# Going shopping in free time.
+	p.profile["tokens"] = 20
+	p.profile.erase("shopped_day")
+	p.block = PrisonCatalogue.ACTIVITIES.filter(func(def: ActivityDef) -> bool: return def.id == &"free")[0]
+	p.level = level
+	p.position = q.position
+	var went := false
+	for i in 200:
+		people.stop(p)
+		for decider in people.deciders:
+			if decider.call(p, true):
+				went = p.target_tag == &"till"
+				break
+		if went or p.profile.has("shopped_day"):
+			break
+	_check(went, "in free time, prisoners with tokens go shopping")
+	p.restrictions[&"shop"] = 2.0
+	_check(people.restricted_from(p, till), "losing the shop privilege keeps them away")
+	p.restrictions.clear()
+	# Savings at release.
+	var release: Release = main.release
+	var chance := release.return_chance(p)
+	p.profile["savings"] = 100
+	_check(is_equal_approx(chance - release.return_chance(p), 2 * PrisonLife.SAVINGS_CUT) or release.return_chance(p) == Release.RETURN_MIN,
+			"savings make coming back less likely")
+	# Saving.
+	var saved := shop.capture()
+	shop.stock.clear()
+	shop.save_share = 0.0
+	shop.restore(saved)
+	_check(shop.stock[&"biscuit"] == shop.target() - 1 and shop.save_share == 0.5, "the shop saves")
+	_check(Purse.words(p) == "0 tokens, 100 saved" or Purse.words(p).ends_with("100 saved"), "the inspector shows tokens")
+	main.free()
+
+
+func _test_health() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var illnesses: Illnesses = main.illnesses
+	var research: Research = main.research
+	(main.misconduct as Misconduct).enabled = false
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	_check(prisoners.all(func(p: Person) -> bool:
+			return illnesses.age(p) >= Illnesses.AGE_LEAST and illnesses.age(p) <= Illnesses.AGE_MOST), "every prisoner has an age")
+	var a: Person = prisoners[0]
+	var b: Person = prisoners[1]
+	for p: Person in prisoners:
+		illnesses.recover(p)
+		people.stop(p)
+	b.level = a.level
+	b.position = a.position + Vector3(0.5, 0.0, 0.0)
+	people._buckets_fresh = false
+	var cold: IllnessDef = illnesses.defs[0]
+	illnesses.catch(a, cold)
+	_check(illnesses.illness_of(a) == cold and illnesses.days_left(a) >= cold.days_least, "someone can catch a cold")
+	_check(people._need_rate(a, &"energy") > people._need_rate(b, &"energy") * 1.4, "which tires them faster")
+	_check(people.walk_pace(a) < people.walk_pace(b) or illnesses.is_old(b), "and slows them")
+	var parts := illnesses.mood_parts(a, [])
+	_check(parts.any(func(part: Array) -> bool: return part[0] == "Under the weather"), "and gets them down")
+	# Catching it from someone close.
+	var tries := 0
+	while illnesses.illness_of(b) == null and tries < 2000:
+		illnesses.spread()
+		tries += 1
+	_check(illnesses.illness_of(b) == cold, "colds spread to those close by")
+	illnesses.recover(b)
+	b.position = a.position + Vector3(20.0, 0.0, 0.0)
+	people._buckets_fresh = false
+	for i in 300:
+		illnesses.spread()
+	_check(illnesses.illness_of(b) == null, "but not far")
+	# What makes it likelier.
+	illnesses.set_up(b)
+	b.profile["fitness"] = 100.0
+	b.profile["age"] = 30
+	b.moodlets.clear()
+	var fit := illnesses.catch_scale(b, false)
+	b.profile["fitness"] = 0.0
+	_check(illnesses.catch_scale(b, false) > fit * 2.5, "the unfit catch more")
+	_check(illnesses.catch_scale(b, true) > illnesses.catch_scale(b, false), "and crowded rooms spread it")
+	b.moodlets[&"good_meal"] = 60.0
+	_check(illnesses.catch_scale(b, false) < illnesses.catch_scale(b, true) / Illnesses.CROWD_SCALE + 0.001, "good meals help")
+	if research.mode != Research.Mode.OFF:
+		var before := illnesses.catch_scale(b, false)
+		research.states[&"vaccinations"].state = Research.State.DONE
+		_check(is_equal_approx(illnesses.catch_scale(b, false), before * PrisonLife.VACCINE_SCALE), "vaccinations cut it")
+	# Getting better.
+	illnesses.treat(a)
+	_check(illnesses.is_treated(a) and illnesses.days_left(a) <= cold.treated_days, "seeing the nurse shortens it")
+	var recovered := []
+	illnesses.recovered.connect(func(p: Person) -> void: recovered.append(p))
+	illnesses.new_day()
+	_check(illnesses.illness_of(a) == null and recovered.has(a), "and it passes")
+	_check(a.health == 100.0 or a.health > 50.0, "nobody's health suffers")
+	# Fitness and age.
+	b.profile["fitness"] = 50.0
+	illnesses.new_day()
+	_check(illnesses.fitness(b) == 50.0 - Illnesses.FIT_FADE, "fitness fades a day")
+	b.profile["fitness"] = 70.0
+	_check(illnesses.mood_parts(b, []).any(func(part: Array) -> bool: return part[0] == "Feeling fit"), "the fit feel it")
+	b.profile["age"] = 30
+	var middle_aged := illnesses.catch_scale(b, false)
+	b.profile["age"] = 70
+	_check(illnesses.catch_scale(b, false) > middle_aged and people._liking(b, &"book") >= Illnesses.OLD_BOOK - 0.01,
+			"the old catch more and like a book")
+	b.profile["age"] = 20
+	var reform: Progress = (main.reform as Reform).progress
+	var young: float = reform.source_scales[-1].call(b, &"course_session")
+	b.profile["age"] = 40
+	_check(young == PrisonLife.YOUNG_COURSES and reform.source_scales[-1].call(b, &"course_session") == 1.0
+			and reform.source_scales[-1].call(b, &"good_day") == 1.0, "the young take more from courses")
+	# Outbreaks and flu weeks.
+	var counters: Counters = main.counters
+	for p: Person in prisoners.slice(0, Illnesses.OUTBREAK):
+		illnesses.catch(p, cold)
+	_check(counters.total(&"cold_outbreak") >= 1, "an outbreak is noticed")
+	PrisonLife.start_flu_week(main)
+	_check(counters.total(&"flu_week") >= 1 and int(main.get_meta(&"flu_week_until")) >= (main.clock as GameClock).day(),
+			"a flu week starts")
+	var tint: HealthTint = main.health_tint
+	_check(not tint.ill_rooms(a.level).is_empty() or illnesses.ill().all(func(p: Person) -> bool: return people.room_of(p).is_empty()),
+			"the Health view finds rooms with the ill")
+	_check(illnesses.words(prisoners[0]).begins_with("Cold, "), "the inspector shows a cold")
+	illnesses.enabled = false
+	var none_ill := illnesses.ill().size()
+	illnesses.spread()
+	_check(illnesses.ill().size() == none_ill, "with illness off nothing spreads")
+	main.free()
+
+
+func _test_pets() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var animals: Animals = main.animals
+	var research: Research = main.research
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	var first: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	while people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size() < PrisonLife.CAT_FROM:
+		people.add_person(first.level, first.flat())
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	# Cats come with the card, one for every 40 prisoners, once there are a few.
+	if research.mode != Research.Mode.OFF:
+		research.states[&"prison-cat"].state = Research.State.HIDDEN
+		clock.day_changed.emit(clock.day())
+		_check(animals.of_kind(&"cat").is_empty(), "no cat before the Prison cat card")
+		research.states[&"prison-cat"].state = Research.State.DONE
+	clock.day_changed.emit(clock.day())
+	var want := maxi(1, prisoners.size() / PrisonLife.CAT_PRISONERS)
+	_check(animals.of_kind(&"cat").size() == want, "a cat once the card is done (%d)" % animals.of_kind(&"cat").size())
+	var cat: Person = animals.of_kind(&"cat")[0]
+	_check(not cat.name.is_empty() and people.needs_off.has(&"animal"), "with a name and no needs")
+	_check(animals.words(cat).begins_with(cat.name + " the cat"), "and words for the inspector")
+	# Wandering about.
+	var start := cat.flat()
+	for i in 60 * 3 * 2:
+		clock.advance(0.5)
+	_check(cat.flat().distance_to(start) > 0.5 or not cat.profile.get("spots", {}).is_empty(), "the cat wanders")
+	clock.hour_changed.emit(clock.hour())
+	_check(not animals.favourite_spot(cat).is_empty(), "and has a favourite spot")
+	# Calming those with it.
+	var a: Person = prisoners[0]
+	people.stop(a)
+	people.stop(cat)
+	cat.set_meta(&"stay", true)
+	var yard: Array = people._all_rooms().filter(func(pair: Array) -> bool: return (pair[1] as Room).type == &"yard")[0]
+	var yard_cat := animals.add_in(animals.def_by_id(&"cat"), yard[0], yard[1])
+	cat.level = yard_cat.level
+	cat.position = yard_cat.position
+	people.remove_person(yard_cat)
+	a.level = cat.level
+	a.position = cat.position
+	_check(animals.temper_scale(a) < 1.0, "tempers rise slower near a cat")
+	animals.hourly()
+	_check(a.moodlets.has(&"cat_about"), "and it cheers them up")
+	# Laps.
+	a.sitting = true
+	cat.remove_meta(&"stay")
+	cat.set_meta(&"lap", a)
+	cat.position = a.position
+	animals.next(cat)
+	_check(a.moodlets.has(&"cat_on_lap") and cat.activity.begins_with("Curled up"), "a cat curls up on a lap")
+	a.sitting = false
+	# Cage pets for a keeper with a clean week.
+	var keeper: Person = null
+	for p: Person in prisoners:
+		if not people.home_room(p).is_empty():
+			keeper = p
+			break
+	var home: Array = people.home_room(keeper)
+	var building: Building = main.building
+	var map: BuildingMap = building.levels[home[0]]
+	var room: Room = home[1]
+	var cage_def := PrisonCatalogue.object(&"pet_cage")
+	var cage_id := 0
+	for cell: Vector2i in room.cells:
+		cage_id = map.place_object(cage_def, Vector2(cell), 0)
+		if cage_id != 0:
+			break
+	_check(cage_id != 0, "a pet cage fits in a cell")
+	keeper.programme = &"pet_care"
+	keeper.record.clear()
+	PrisonLife.give_pets(main, RandomNumberGenerator.new())
+	var pet: Dictionary = keeper.profile.get("pet", {})
+	_check(not pet.is_empty() and ["rabbit", "budgie"].has(pet.get("kind")), "a keeper is given a pet")
+	PrisonLife.care_jobs(main)
+	var jobs: JobBoard = main.jobs
+	var care: Array = jobs.of_kind(&"pet_care")
+	_check(care.size() == 1 and (care[0] as Job).only_for == keeper, "with a job to look after it")
+	pet["cared"] = clock.day() - 1
+	((care[0] as Job).stages[0] as Job.Stage).finish.call(care[0].stages[0], keeper)
+	_check(int(keeper.profile["pet"]["cared"]) == clock.day() and keeper.moodlets.has(&"my_pet"), "looking after it cheers them")
+	keeper.profile["pet"]["cared"] = clock.day() - PrisonLife.PET_NEGLECT_DAYS - 1
+	clock.day_changed.emit(clock.day())
+	_check(not keeper.profile.has("pet") and keeper.moodlets.has(&"lost_my_pet"), "a neglected pet is taken away")
+	# A loose rabbit.
+	keeper.profile["pet"] = {"kind": "rabbit", "name": "Clover", "cared": clock.day(), "cage": [home[0], cage_id]}
+	var rabbit := PrisonLife.rabbit_loose(main, keeper)
+	_check(rabbit != null and rabbit.name == "Clover", "a rabbit can get loose in the canteen")
+	_check(jobs.of_kind(&"catch_rabbit").size() == 1, "and guards are sent to catch it")
+	var catch: Job = jobs.of_kind(&"catch_rabbit")[0]
+	catch.stages[0].finish.call(catch.stages[0], null)
+	_check(not people.people.has(rabbit), "caught, it goes back")
+	# The therapy dog.
+	if research.mode != Research.Mode.OFF:
+		research.states[&"therapy-dogs"].state = Research.State.DONE
+	a.profile["course"] = &"calm_minds"
+	var dog := PrisonLife.dog_visit(main)
+	_check(dog != null and animals.of_kind(&"therapy_dog").size() == 1, "the therapy dog visits")
+	var b: Person = prisoners[1]
+	people.stop(b)
+	b.level = dog.level
+	b.position = dog.position
+	people._buckets_fresh = false
+	clock.minute_passed.emit(0)
+	_check(b.moodlets.has(&"good_dog"), "and those near it are cheered")
+	clock.hour_changed.emit(PrisonLife.DOG_HOURS.y)
+	_check(animals.of_kind(&"therapy_dog").is_empty(), "then goes home")
+	main.queue_free()

@@ -11,3 +11,4 @@ description = "Make wooden toys and birdhouses at the workbenches, sold when the
 job_kinds = Array[StringName]([&"make"])
 icon = ExtResource("2_icon")
 skill = &"woodwork"
+wage = 3

@@ -267,6 +267,9 @@
   {
    "modifier": "prisoner_mood",
    "amount": 2
+  },
+  {
+   "flag": "therapy_dogs"
   }
  ],
  "talking-therapy": [
@@ -660,6 +663,14 @@
  "prison-shop": [
   {
    "flag": "prison_shop"
+  },
+  {
+   "unlock": "room",
+   "id": "shop"
+  },
+  {
+   "unlock": "object",
+   "id": "till"
   }
  ],
  "utility-contracts": [

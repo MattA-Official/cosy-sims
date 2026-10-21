@@ -13,6 +13,7 @@ var blueprints: Blueprints
 var desk_work: DeskWork
 var sentences: Sentences
 var research: Research
+var illnesses: Illnesses
 
 var _difficulty := OptionButton.new()
 var _about := Label.new()
@@ -21,6 +22,7 @@ var _worries := Label.new()
 var _instant := CheckButton.new()
 var _red_tape := OptionButton.new()
 var _research := OptionButton.new()
+var _illness := CheckButton.new()
 
 
 func _ready() -> void:
@@ -90,6 +92,12 @@ func _ready() -> void:
 		if research != null:
 			research.set_mode(index as Research.Mode))
 	box.add_child(_row("Research", _research))
+	_illness.focus_mode = FOCUS_NONE
+	_illness.tooltip_text = "On, prisoners catch colds from each other, more in crowded rooms. A cold passes in a few days, or one once a nurse sees to it. Nobody's health suffers."
+	_illness.toggled.connect(func(on: bool) -> void:
+		if illnesses != null:
+			illnesses.enabled = on)
+	box.add_child(_row("Illness", _illness))
 	box.add_child(HSeparator.new())
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()
@@ -137,3 +145,5 @@ func refresh() -> void:
 		_red_tape.select(desk_work.red_tape)
 	if research != null:
 		_research.select(research.mode)
+	if illnesses != null:
+		_illness.set_pressed_no_signal(illnesses.enabled)

@@ -15,3 +15,6 @@ trade_value = 1
 use = &"treat"
 use_moodlet = &"had_a_biscuit"
 model = ExtResource("2_model")
+price_tokens = 4
+pack = 5
+cost = 1

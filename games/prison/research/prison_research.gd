@@ -108,9 +108,8 @@ const SOURCES := [
 ## read. Every other flag, and every modifier key, must be read by a
 ## system now (a test checks).
 const FUTURE_FLAGS := {
-	&"petitions": "M11 prisoner life", &"hobby_clubs": "M11 hobbies", &"prison_cat": "M11 pets",
-	&"prison_shop": "M11 shop", &"phone_credit": "M11 privileges", &"earned_privileges": "M11 privileges",
-	&"hygiene_drive": "M11 colds", &"vaccinations": "M11 colds", &"isolation_ward": "M11 colds",
+	&"petitions": "M11 prisoner life",
+	&"phone_credit": "M11 privileges", &"earned_privileges": "M11 privileges",
 	&"town_meetings": "M12 reputation", &"open_day": "M12 reputation", &"public_relations": "M12 reputation",
 	&"open_books": "M12 reputation", &"lobbying": "M12 Ministry", &"long_term_plan": "M12 Ministry",
 	&"seasonal_days": "M12 seasons", &"inspection_prep": "M12 inspections", &"health_inspection_ready": "M12 inspections",

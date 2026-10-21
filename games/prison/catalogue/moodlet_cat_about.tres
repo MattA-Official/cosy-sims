@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="MoodletDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/moodlet_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"cat_about"
+display_name = "The cat came by"
+mood = 3.0
+hours = 1.0

@@ -114,6 +114,11 @@ static func capture(main: Node) -> Dictionary:
 		"knowhow": (main.knowhow as Knowhow).capture(),
 		"research": (main.research as Research).capture(),
 		"relationships": (main.relationships as Relationships).capture(),
+		"events": (main.events as Events).capture(),
+		"cliques": (main.cliques as Cliques).capture(),
+		"shop": (main.shop as Shop).capture(),
+		"illness_on": (main.illnesses as Illnesses).enabled,
+		"flu_week_until": main.get_meta(&"flu_week_until", -1),
 		"suggestions": (main.suggestions as Suggestions).capture(),
 		"visits": (main.visits as Visits).capture(),
 		"garden": (main.garden as Garden).capture(),
@@ -339,6 +344,13 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	if data.has("research"):
 		(main.research as Research).restore(data.research)
 	(main.relationships as Relationships).restore(data.get("relationships", {}))
+	(main.hobbies as Hobbies).fill_in()
+	(main.events as Events).restore(data.get("events", {}))
+	(main.cliques as Cliques).restore(data.get("cliques", []))
+	(main.shop as Shop).restore(data.get("shop", {}))
+	(main.illnesses as Illnesses).enabled = data.get("illness_on", true)
+	main.set_meta(&"flu_week_until", int(data.get("flu_week_until", -1)))
+	(main.illnesses as Illnesses).fill_in()
 	var parole_data: Dictionary = data.get("parole", {})
 	var parole: Parole = main.parole
 	parole.today = parole_data.get("today", [])

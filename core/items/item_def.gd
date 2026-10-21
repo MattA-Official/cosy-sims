@@ -38,3 +38,9 @@ func has_tag(tag: StringName) -> bool:
 ## How big it's drawn lying in a pile or on something, as items are about
 ## 0.4 m and a few should fit on a counter. Litter is drawn full size.
 @export var piled_scale := 0.55
+
+## The shop (M11): its price in tokens, 0 for not sold, how many come in
+## one purchase, and what the prison pays to stock one.
+@export var price_tokens := 0
+@export var pack := 1
+@export var cost := 0

@@ -14,6 +14,9 @@ var sources: Dictionary[StringName, ProgressSourceDef] = {}
 ## (person) -> float: multipliers on gains (not losses), such as research
 ## cards that speed reform.
 var gain_scales: Array[Callable] = []
+## (person, source id) -> float: multipliers on one source's gains, such
+## as the young taking more from courses.
+var source_scales: Array[Callable] = []
 
 
 func _init(progress_def: ProgressDef = null, source_defs: Array = []) -> void:
@@ -41,6 +44,8 @@ func add(person: Person, source_id: StringName, times := 1.0) -> float:
 	if amount > 0.0:
 		for scale in gain_scales:
 			amount *= scale.call(person)
+		for scale in source_scales:
+			amount *= scale.call(person, source_id)
 	var today := _today(person)
 	if amount > 0.0:
 		var given: float = today.get(source_id, 0.0)

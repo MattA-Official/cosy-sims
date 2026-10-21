@@ -71,6 +71,9 @@ enum Connects {
 ## What it costs to place, when money is on. Demolishing gives most of it
 ## back.
 @export var price := 0
+## Game minutes people use it for when it meets no need, such as a quick
+## stop at a shop till. 0 for the usual while.
+@export var use_minutes := 0.0
 
 ## Where it can stand: on the floor, only on a surface's spot (a chess
 ## board on a table), or either (a radio).

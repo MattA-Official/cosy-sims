@@ -5,7 +5,7 @@ extends PanelContainer
 ## waiting, and what's stopping it if it can't run; then today's parole
 ## list, with a chance for each and a box to hold someone back. Work
 ## programmes stay in the Staff window. Last, who went home this week and
-## the latest postcards. Toggle with L.
+## the latest postcards, and the prison's cliques. Toggle with L.
 
 const REFRESH_SECONDS := 0.5
 
@@ -13,6 +13,13 @@ var courses: Courses
 var reform: Reform
 var parole: Parole
 var release: Release
+## For the Cliques section. Optional.
+var cliques: Cliques
+## Picks a person in the inspector, for clique members.
+var pick_person: Callable
+## For the Health section. Optional.
+var illnesses: Illnesses
+var health_tint: HealthTint
 
 var _summary := Label.new()
 var _rows: Dictionary[StringName, Array] = {}
@@ -21,6 +28,10 @@ var _parole_words := Label.new()
 var _parole_rows := VBoxContainer.new()
 var _shown_parole: Array = []
 var _release_words := Label.new()
+var _clique_rows := VBoxContainer.new()
+var _health_words := Label.new()
+## What the clique list last showed, so it is only rebuilt when it changes.
+var _clique_key := ""
 
 
 func _ready() -> void:
@@ -91,6 +102,38 @@ func _ready() -> void:
 		box.add_child(release_heading)
 		_release_words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(_release_words)
+	if illnesses != null:
+		box.add_child(HSeparator.new())
+		var health_heading := HBoxContainer.new()
+		var health_label := Label.new()
+		health_label.text = "Health"
+		health_label.theme_type_variation = &"HeaderLabel"
+		health_label.size_flags_horizontal = SIZE_EXPAND_FILL
+		health_heading.add_child(health_label)
+		if health_tint != null:
+			var view := CheckButton.new()
+			view.text = "Health view"
+			view.tooltip_text = "Tints rooms by how many in them are ill."
+			view.focus_mode = FOCUS_NONE
+			view.toggled.connect(func(on: bool) -> void: health_tint.shown = on)
+			health_heading.add_child(view)
+		box.add_child(health_heading)
+		_health_words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_health_words.theme_type_variation = &"SubtleLabel"
+		box.add_child(_health_words)
+	if cliques != null:
+		box.add_child(HSeparator.new())
+		var cliques_heading := Label.new()
+		cliques_heading.text = "Cliques"
+		cliques_heading.theme_type_variation = &"HeaderLabel"
+		box.add_child(cliques_heading)
+		var about := Label.new()
+		about.text = "Friends who share a hobby band together. They sit together and do their hobby together, but act up together when fed up. Click a member to see the rest."
+		about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		about.theme_type_variation = &"SubtleLabel"
+		box.add_child(about)
+		_clique_rows.add_theme_constant_override(&"separation", 4)
+		box.add_child(_clique_rows)
 	visible = false
 
 
@@ -161,6 +204,69 @@ func refresh() -> void:
 		_show_parole()
 	if release != null:
 		_release_words.text = release_text()
+	if cliques != null:
+		_show_cliques()
+	if illnesses != null:
+		_health_words.text = health_text()
+
+
+## How many are ill, and how fit and old the prison is.
+func health_text() -> String:
+	if not illnesses.enabled:
+		return "Illness is off in the game settings."
+	var ill := illnesses.ill()
+	var treated := ill.filter(func(p: Person) -> bool: return illnesses.is_treated(p)).size()
+	var prisoners := illnesses.people.people.filter(func(p: Person) -> bool: return p.profile.has("age"))
+	var fit := 0.0
+	var old := 0
+	for person: Person in prisoners:
+		fit += illnesses.fitness(person)
+		if illnesses.is_old(person):
+			old += 1
+	return "%s · average fitness %d · %d over %d. Colds spread in crowded rooms; a nurse in the infirmary sees to them, and exercise and good meals keep them away." % [
+			"Nobody ill" if ill.is_empty() else "%d with a cold (%d seen to)" % [ill.size(), treated],
+			roundi(fit / maxf(prisoners.size(), 1.0)), old, Illnesses.OLD_FROM]
+
+
+func _show_cliques() -> void:
+	var key := ""
+	for clique in cliques.cliques:
+		key += "%s %s %d|" % [clique.name, clique.members, roundi(cliques.grievance(clique) / 5.0)]
+	if key == _clique_key:
+		return
+	_clique_key = key
+	for child in _clique_rows.get_children():
+		child.queue_free()
+	if cliques.cliques.is_empty():
+		var none := Label.new()
+		none.text = "None yet. Cliques form from friends who share a hobby."
+		none.theme_type_variation = &"SubtleLabel"
+		_clique_rows.add_child(none)
+		return
+	for clique in cliques.cliques:
+		var members := cliques.members_of(clique)
+		var mood := 0.0
+		for member in members:
+			mood += member.mood
+		mood /= maxf(members.size(), 1.0)
+		var grievance := cliques.grievance(clique)
+		var title := Label.new()
+		title.text = "● %s · %s · mood %d · grievance %d%s" % [clique.name,
+				cliques.hobbies.def_of(clique.hobby).display_name, roundi(mood), roundi(grievance),
+				" (will act up together)" if grievance > Cliques.GRIEVANCE_JOIN else ""]
+		title.modulate = clique.colour.lightened(0.3)
+		_clique_rows.add_child(title)
+		var flow := HFlowContainer.new()
+		for member in members:
+			var button := Button.new()
+			button.text = member.name
+			button.theme_type_variation = &"FlatButton"
+			button.focus_mode = FOCUS_NONE
+			button.pressed.connect(func() -> void:
+				if pick_person.is_valid():
+					pick_person.call(member))
+			flow.add_child(button)
+		_clique_rows.add_child(flow)
 
 
 ## Average reform and how many are over the line.
