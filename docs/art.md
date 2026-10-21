@@ -43,6 +43,10 @@ colours a real prison would plausibly use.
 - Office: filing_cabinet (1 x 1, 1.3 m, two four-drawer cabinets against
   the wall at -z, drawers to +z), paper_stack_small, paper_stack_tall and
   paper_stack_teetering (0.3 x 0.22 desk dressing, 0.06 / 0.16 / 0.3 m).
+- Family and garden: payphone (1 x 0.5, the phone at the back middle
+  against the wall at -z, a sign above, about 1.1 m), planter (1 x 1 pine
+  flower box, 0.6 m), veg_bed (2 x 1 timber bed, rows of cabbages, carrot
+  tops and lettuces, 0.35 m).
 - Reform and release: class_desk (1 x 0.5, top 0.5, sitter at +z), whiteboard
   (1.5 x 0.25, 1.1 m, writing at +z), armchair (0.75 x 0.75, seat 0.3),
   postcard_board (1 x 0.1 on the wall, 0.6 to 1.2 m up; cards are meshes

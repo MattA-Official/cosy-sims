@@ -132,6 +132,7 @@ PALETTE = dict(
     gold=("#e0b65a", 0.35, 0.6),        # staff badge
     fabric=("#93a48f", 1.0, 0),         # counselling armchair, soft sage
     cork=("#c8a275", 1.0, 0),
+    soil=("#6e5644", 1.0, 0),
     knit=("#bf9a66", 1.0, 0),           # teacher's cardigan, camel
     scarf=("#b06f5c", 1.0, 0),          # counsellor's scarf, muted rust
     trunk=("#ffffff", 0.9, 0),
@@ -1416,11 +1417,11 @@ def postcard_board():
     return p
 
 
-def phone():
+def phone(name="phone", yb=0.08):
     """0.4 x 0.2 wall payphone against the wall behind, about 0.9 m tall:
-    a steel phone in a little hood, handset on the left."""
-    p = Prop("phone")
-    yb = 0.08  # the wall face, behind
+    a steel phone in a little hood, handset on the left. `yb` is where the
+    wall face is, behind."""
+    p = Prop(name)
     p.box("steel_dark", (0.38, 0.03, 0.56), (0, yb, 0.62), 0.012, 2)  # back plate
     for x in (-0.18, 0.18):
         p.box("steel_dark", (0.025, 0.17, 0.5), (x, yb - 0.08, 0.64), 0.01, 1)  # hood sides
@@ -1441,6 +1442,67 @@ def phone():
     p.tube("steel_dark", pts + [(-0.04, yb - 0.04, 0.47)], 0.005, 0.0, n=6)
     return p
 
+
+
+def payphone():
+    """1 x 0.5: the wall payphone at the back middle of a footprint with room
+    to stand at it, and a little blue sign above."""
+    p = phone("payphone", yb=0.235)
+    p.box("sign_blue", (0.3, 0.02, 0.14), (0, 0.24, 1.04), 0.01, 2)
+    p.capsule("sheet", 0.02, 0.08, (0, 0.228, 1.04), scale=(1, 0.4, 1), rot=(0, 90, 0))
+    for x in (-0.06, 0.06):
+        p.ball("sheet", 0.026, (x, 0.228, 1.025), scale=(1, 0.4, 0.8), u=10, v=6)
+    return p
+
+
+def planter():
+    """1 x 1 raised flower box, about 0.6 m to the tops of the flowers: a
+    slatted pine box full of soil, leaves and a few plain flowers."""
+    p = Prop("planter")
+    h = 0.42
+    for k in range(3):  # slats round all four sides
+        z = 0.03 + k * 0.13 + 0.06
+        for sx, sy, w, d in ((0, -0.44, 0.9, 0.04), (0, 0.44, 0.9, 0.04),
+                             (-0.44, 0, 0.04, 0.84), (0.44, 0, 0.04, 0.84)):
+            p.box("pine", (w, d, 0.12), (sx, sy, z), 0.012, 2)
+    for x in (-0.44, 0.44):
+        for y in (-0.44, 0.44):
+            p.box("crate", (0.07, 0.07, h + 0.02), (x, y, (h + 0.02) / 2), 0.012, 2)
+    p.box("soil", (0.84, 0.84, 0.04), (0, 0, h - 0.04), 0.01, 1)
+    rng = random.Random(4)
+    for x in (-0.25, 0.0, 0.25):
+        for y in (-0.25, 0.0, 0.25):
+            cx, cy = x + rng.uniform(-0.04, 0.04), y + rng.uniform(-0.04, 0.04)
+            p.ball("leaf", rng.uniform(0.1, 0.13), (cx, cy, h + 0.03), scale=(1, 1, 0.6), u=12, v=8)
+            mat = rng.choice(("sheet", "poster_c", "food_c", "book_a"))
+            for j in range(rng.randint(2, 3)):
+                a = rng.uniform(0, math.tau)
+                p.ball(mat, 0.035, (cx + 0.06 * math.cos(a), cy + 0.06 * math.sin(a), h + 0.1 + 0.03 * j),
+                       scale=(1, 1, 0.7), u=10, v=6)
+    return p
+
+
+def veg_bed():
+    """2 x 1 raised timber bed, about 0.35 m to the tops of the veg: three
+    rows along its length, cabbages, carrot tops and lettuces."""
+    p = Prop("veg_bed")
+    h = 0.22
+    for sx, sy, w, d in ((0, -0.45, 1.94, 0.08), (0, 0.45, 1.94, 0.08),
+                         (-0.93, 0, 0.08, 0.82), (0.93, 0, 0.08, 0.82)):
+        p.box("crate", (w, d, h), (sx, sy, h / 2), 0.015, 2)
+    p.box("soil", (1.8, 0.84, 0.05), (0, 0, h - 0.04), 0.012, 1)
+    rng = random.Random(9)
+    for k in range(7):
+        x = -0.75 + k * 0.25
+        p.ball("leaf", 0.075, (x, -0.25, h + 0.04), scale=(1, 1, 0.8), u=12, v=8)  # cabbage
+        p.ball("food_b", 0.05, (x, -0.25, h + 0.07), u=10, v=8)
+        for j in range(3):  # carrot tops: little feathery tufts
+            a = rng.uniform(-0.4, 0.4) + (j - 1) * 0.5
+            p.tube("stem", [(x, 0, h - 0.01), (x + 0.07 * math.sin(a), 0.02 * j - 0.02, h + 0.1)], 0.01, 0, n=6)
+            p.ball("leaf", 0.022, (x + 0.07 * math.sin(a), 0.02 * j - 0.02, h + 0.1), u=8, v=6)
+        p.ball("food_b", 0.07, (x, 0.25, h + 0.03), scale=(1, 1, 0.65), u=12, v=8)  # lettuce
+        p.ball("leaf", 0.045, (x, 0.25, h + 0.06), scale=(1, 1, 0.8), u=10, v=6)
+    return p
 
 # ---------------------------------------------------------------- items and jobs (M4)
 
@@ -1722,7 +1784,8 @@ def lorry():
     return p
 
 
-MODELS = dict(filing_cabinet=filing_cabinet, paper_stack_small=paper_stack_small,
+MODELS = dict(payphone=payphone, planter=planter, veg_bed=veg_bed,
+              filing_cabinet=filing_cabinet, paper_stack_small=paper_stack_small,
               paper_stack_tall=paper_stack_tall, paper_stack_teetering=paper_stack_teetering,
               class_desk=class_desk, whiteboard=whiteboard, armchair=armchair,
               postcard_board=postcard_board, phone=phone,
