@@ -93,6 +93,8 @@ static func capture(main: Node) -> Dictionary:
 				"granted": (main.parole as Parole).granted_total},
 		"sentence_length": (main.sentences as Sentences).length,
 		"escape_plans": (main.escape_plans as EscapePlans).capture(),
+		"budget": {"offers": (main.budget as Budget).offers.duplicate(true),
+				"contract": (main.budget as Budget).contract.duplicate(), "loan": (main.budget as Budget).loan.duplicate()},
 		"release": {"alumni": (main.release as Release).alumni.duplicate(true),
 				"postcards": (main.release as Release).postcards.duplicate(true),
 				"today": (main.release as Release).today_lines.duplicate(),
@@ -302,6 +304,10 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 			parole.queue.append(by_id[id])
 	(main.sentences as Sentences).length = data.get("sentence_length", Sentences.Length.NORMAL)
 	(main.escape_plans as EscapePlans).restore(data.get("escape_plans", []))
+	var budget_data: Dictionary = data.get("budget", {})
+	(main.budget as Budget).offers.assign(budget_data.get("offers", []))
+	(main.budget as Budget).contract = budget_data.get("contract", {})
+	(main.budget as Budget).loan = budget_data.get("loan", {})
 	var release_data: Dictionary = data.get("release", {})
 	var release: Release = main.release
 	release.alumni.assign(release_data.get("alumni", []))

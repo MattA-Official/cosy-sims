@@ -119,6 +119,8 @@ var parole := Parole.new()
 var release := Release.new()
 ## Tunnels and fence cuts.
 var escape_plans := EscapePlans.new()
+## The week's forecast, contracts and loans.
+var budget := Budget.new()
 var programmes_window := ProgrammesWindow.new()
 ## Difficulty and sentence length, on F4.
 var settings_window := SettingsWindow.new()
@@ -760,6 +762,22 @@ func _ready() -> void:
 			longest = maxf(longest, sit_in.minutes / 60.0)
 		return longest
 	standing.difficulty_changed.connect(func(_def: DifficultyDef) -> void: _apply_difficulty())
+	if saved.is_empty() and not ledger.sandbox:
+		ledger.balance = standing.difficulty.starting_money
+	budget.name = "Budget"
+	budget.ledger = ledger
+	budget.finances = finances
+	budget.intake = intake
+	budget.workshop = workshop
+	budget.building = building
+	budget.clock = clock
+	add_child(budget)
+	budget.start()
+	budget.contract_done.connect(func(c: Dictionary) -> void:
+		Toasts.post("Contract done", "The %d goods for %s are delivered: %s on top." % [c.goods, c.client,
+				Ledger.text(c.pay)]))
+	budget.contract_missed.connect(func(c: Dictionary) -> void:
+		Toasts.post("Contract missed", "%s gave up waiting for their goods." % (c.client as String).capitalize()))
 	standing.failed.connect(func(rule: FailRule) -> void:
 		if not clock.paused():
 			clock.toggle_pause()
@@ -884,6 +902,9 @@ func _add_hud() -> void:
 		Toasts.post("Out of money", "Nobody new can be taken on until the balance is back above zero."))
 	hud.add_child(staff_window)
 	finance_window.ledger = ledger
+	var budget_panel := BudgetPanel.new()
+	budget_panel.budget = budget
+	finance_window.add_section(budget_panel)
 	hud.add_child(finance_window)
 	office_window.office = office
 	office_window.intake = intake

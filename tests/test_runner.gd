@@ -90,6 +90,7 @@ func _process(_delta: float) -> bool:
 	_test_balanced_grade()
 	_test_goals_and_difficulty()
 	_test_escape_plans()
+	_test_budget()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4113,4 +4114,34 @@ func _test_escape_plans() -> void:
 	_check(not plans.quiet_at(cut.spot), "a guard nearby stops the cutting")
 	clock.advance(5.0)
 	_check(not plans.plans.has(cutter), "and finds the cut")
+	main.free()
+
+
+func _test_budget() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var budget: Budget = main.budget
+	var ledger: Ledger = main.ledger
+	var clock: GameClock = main.clock
+	var week: Array = budget.forecast()
+	_check(week.size() == 7 and week.all(func(row: Array) -> bool: return row[1] > 0 and row[2] > 0),
+			"a week ahead of money in and out")
+	_check(budget.has_workshop() and budget.make_offers().size() == Budget.OFFERS, "contracts on offer for the workshop")
+	var offer: Dictionary = budget.offers[0]
+	_check(budget.accept(0) and budget.contract.goods == offer.goods and not budget.accept(0), "one contract at a time")
+	var before: int = ledger.today.get("Contracts", 0)
+	(main.workshop as Workshop).collected.emit(offer.goods)
+	_check(budget.contract.is_empty() and ledger.today.get("Contracts", 0) - before == offer.pay,
+			"made in time, it pays on top")
+	var balance := ledger.balance
+	_check(budget.borrow(5000) and ledger.balance == balance + 5000 and not budget.borrow(2000), "one loan at a time")
+	clock.jump_to_hour(0)
+	_check(budget.loan.left == 5500 - 550, "paid back a share each midnight, with interest")
+	budget.make_offers()
+	budget.accept(1)
+	var due: int = budget.contract.due
+	while clock.day() <= due:
+		clock.jump_to_hour(0)
+	_check(budget.contract.is_empty(), "late, a contract lapses")
 	main.free()
