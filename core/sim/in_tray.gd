@@ -45,6 +45,8 @@ class Card:
 		return def.body.replace("{who}", words)
 
 var defs: Array[TrayCardDef] = []
+## Research bonuses: tray_days. Optional.
+var modifiers: Modifiers
 var desk_work: DeskWork
 ## (card: Card) -> bool: picks the card's subject (setting subject and
 ## words); false when there's nobody suitable.
@@ -118,7 +120,8 @@ func post(def: TrayCardDef = null) -> Card:
 	if not def.subject.is_empty() and (not pick_subject.is_valid() or not pick_subject.call(card)):
 		return null
 	card.posted_day = _day()
-	card.due_day = card.posted_day + maxi(def.deadline_days - (1 if red_tape() == DeskWork.RedTape.FULL else 0), 1)
+	var days := maxi(def.deadline_days - (1 if red_tape() == DeskWork.RedTape.FULL else 0), 1)
+	card.due_day = card.posted_day + roundi(days * Modifiers.scale(modifiers, &"tray_days"))
 	cards.append(card)
 	recent[def.id] = card.posted_day
 	posted.emit(card)

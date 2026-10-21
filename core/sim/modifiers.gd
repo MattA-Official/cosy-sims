@@ -34,6 +34,11 @@ func value(modifier: StringName) -> float:
 	return sum
 
 
+## The modifier's sum, or 0 from a missing Modifiers node.
+static func amount(of: Modifiers, modifier: StringName) -> float:
+	return of.value(modifier) if of != null else 0.0
+
+
 ## 1 plus the modifier, for scaling a speed or an amount; a missing
 ## Modifiers node scales by 1.
 static func scale(of: Modifiers, modifier: StringName) -> float:

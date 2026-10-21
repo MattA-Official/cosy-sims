@@ -475,7 +475,7 @@ func nightly() -> void:
 		elif record.low_days >= QUIT_DAYS:
 			records.erase(record)
 			quit.emit(record)
-		elif not is_off(record) and _rng.randf() < maxf(0.0, (SICK_LINE - record.morale) * SICK_CHANCE):
+		elif not is_off(record) and _rng.randf() < maxf(0.0, (SICK_LINE - record.morale) * SICK_CHANCE * Modifiers.scale(modifiers, &"sick_rate")):
 			record.off_until = _day()
 			record.away = "off sick"
 			off_sick.emit(record)

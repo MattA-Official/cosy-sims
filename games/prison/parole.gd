@@ -37,6 +37,8 @@ const MOST := 0.9
 const GRANTED := &"parole_granted"
 const REFUSED := &"parole_refused"
 
+## Research bonuses: parole_chance. Optional.
+var modifiers: Modifiers
 var people: People
 var office: Office
 var jobs: JobBoard
@@ -126,6 +128,9 @@ func chance(person: Person) -> Array:
 		parts.append(["High security", -HIGH_SECURITY])
 	if not is_zero_approx(chance_shift):
 		parts.append(["Difficulty", chance_shift])
+	var prep := Modifiers.amount(modifiers, &"parole_chance")
+	if not is_zero_approx(prep):
+		parts.append(["Parole reports", prep])
 	var sum := BASE
 	for part: Array in parts:
 		sum += part[1]

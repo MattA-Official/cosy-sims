@@ -37,6 +37,8 @@ const FLATTEN_PRICE := 30
 ## Of what a plot cost, what selling it back brings.
 const SELL_SHARE := 0.5
 
+## Research bonuses: land_price and flatten_cost. Optional.
+var modifiers: Modifiers
 var building: Building
 var terrain: Terrain
 var water: WaterLayer
@@ -139,7 +141,7 @@ func price(plot: Rect2i) -> int:
 			wet += 1
 	var rough := clampf(_slope(plot) / ROUGHEST, 0.0, 1.0)
 	var share := lerpf(1.0, CHEAPEST, maxf(rough, float(wet) / tiles))
-	return int(snappedf(PLOT_PRICE * share, 10.0))
+	return int(snappedf(PLOT_PRICE * share * Modifiers.scale(modifiers, &"land_price"), 10.0))
 
 
 func price_of(chosen: Array[Rect2i], flatten := false) -> int:
@@ -155,7 +157,7 @@ func flatten_price(plot: Rect2i) -> int:
 	var moved := 0.0
 	for corner in _corners(plot):
 		moved += absf(terrain.corner_height(corner) - target)
-	return int(snappedf(moved * FLATTEN_PRICE, 10.0))
+	return int(snappedf(moved * FLATTEN_PRICE * Modifiers.scale(modifiers, &"flatten_cost"), 10.0))
 
 
 ## The height flattening levels the plot to: the average of your land's

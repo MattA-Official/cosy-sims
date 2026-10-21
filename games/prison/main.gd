@@ -1222,7 +1222,8 @@ func _ready() -> void:
 	standing.paper_ready.connect(func(paper: Dictionary) -> void:
 		Toasts.post_with(MorningPaper.MASTHEAD, paper.headline, "Read", func() -> void: morning_paper.show_paper(paper), 12.0))
 	standing.goal_done.connect(func(goal: GoalDef) -> void:
-		Toasts.post("Goal done: " + goal.title, "A grant of %s came in." % Ledger.text(goal.grant)))
+		Toasts.post("Goal done: " + goal.title, "A grant of %s came in." % Ledger.text(
+				roundi(goal.grant * Modifiers.scale(modifiers, &"grant_pay")))))
 	vehicle_gates.name = "VehicleGates"
 	vehicle_gates.building = building
 	vehicle_gates.people = people

@@ -41,6 +41,8 @@ signal started(fight: Fight)
 signal ended(fight: Fight)
 signal knocked_out(person: Person)
 
+## Research bonuses: fight_injury. Optional.
+var modifiers: Modifiers
 var people: People
 var jobs: JobBoard
 var prisoner_group: StringName = &"prisoner"
@@ -146,6 +148,7 @@ func tick() -> void:
 func hit(person: Person, target: Person) -> void:
 	var damage := BASE_HIT * _rng.randf_range(0.5, 1.5) + weapon_hit(person)
 	var was_out := Health.injury(target.health) == Health.Injury.KNOCKED_OUT
+	damage *= maxf(0.0, Modifiers.scale(modifiers, &"fight_injury"))
 	target.health = maxf(0.0, target.health - damage)
 	if not was_out and Health.injury(target.health) == Health.Injury.KNOCKED_OUT:
 		knocked_out.emit(target)

@@ -66,6 +66,8 @@ const CURRENCY := &"biscuit"
 const DETECT_DISTANCE := 0.45
 const DETECT_COOLDOWN := 30.0
 
+## Research bonuses: pocket_chance. Optional.
+var modifiers: Modifiers
 var people: People
 var items: ItemStore
 var misconduct: Misconduct
@@ -414,6 +416,7 @@ func _on_used(person: Person, placed: BuildingMap.PlacedObject) -> void:
 		return
 	var chance := LIGHT_FINGERED_CHANCE if person.traits.any(func(t: TraitDef) -> bool:
 		return t.id == light_fingered) else POCKET_CHANCE
+	chance *= maxf(0.0, Modifiers.scale(modifiers, &"pocket_chance"))
 	if _rng.randf() < chance:
 		pocket_from(person, placed)
 

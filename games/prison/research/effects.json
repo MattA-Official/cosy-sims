@@ -1,1 +1,699 @@
-{}
+{
+ "management-meeting": [
+  {
+   "flag": "joint_cards"
+  },
+  {
+   "unlock": "room",
+   "id": "meeting"
+  }
+ ],
+ "department-budgets": [
+  {
+   "flag": "department_budgets"
+  }
+ ],
+ "conferences": [
+  {
+   "flag": "conferences"
+  }
+ ],
+ "deputy-warden": [
+  {
+   "flag": "deputy_warden"
+  }
+ ],
+ "deputy-heads": [
+  {
+   "flag": "deputy_heads"
+  }
+ ],
+ "annual-review": [
+  {
+   "modifier": "staff_xp",
+   "amount": 0.2
+  }
+ ],
+ "headhunting": [
+  {
+   "modifier": "head_applicants",
+   "amount": 1
+  }
+ ],
+ "walkabouts": [
+  {
+   "modifier": "temper_rate",
+   "amount": -0.05
+  }
+ ],
+ "open-door-hour": [
+  {
+   "flag": "petitions"
+  }
+ ],
+ "emergency-fund": [
+  {
+   "money_per_day": 20,
+   "line": "Emergency fund"
+  }
+ ],
+ "town-meetings": [
+  {
+   "flag": "town_meetings"
+  }
+ ],
+ "long-term-plan": [
+  {
+   "flag": "long_term_plan"
+  }
+ ],
+ "warden-s-legacy": [
+  {
+   "modifier": "prisoner_mood",
+   "amount": 3
+  }
+ ],
+ "guard-training": [
+  {
+   "modifier": "guard_walk_speed",
+   "amount": 0.1
+  }
+ ],
+ "cell-searches": [
+  {
+   "modifier": "search_speed",
+   "amount": 0.1
+  }
+ ],
+ "escape-review": [
+  {
+   "flag": "escape_review"
+  }
+ ],
+ "patrol-planner": [
+  {
+   "flag": "patrol_planner"
+  }
+ ],
+ "night-watch": [
+  {
+   "modifier": "night_trouble",
+   "amount": -0.3
+  }
+ ],
+ "metal-detectors": [
+  {
+   "modifier": "search_speed",
+   "amount": 0.05
+  }
+ ],
+ "vehicle-checks": [
+  {
+   "modifier": "vehicle_search",
+   "amount": 0.5
+  }
+ ],
+ "visit-screening": [
+  {
+   "modifier": "visit_smuggle",
+   "amount": -0.6
+  }
+ ],
+ "sniffer-dogs": [
+  {
+   "modifier": "search_speed",
+   "amount": 0.05
+  },
+  {
+   "flag": "sniffer_dogs"
+  }
+ ],
+ "cctv-room": [
+  {
+   "flag": "cctv_room"
+  }
+ ],
+ "lockdown": [
+  {
+   "flag": "lockdown_button"
+  }
+ ],
+ "remote-doors": [
+  {
+   "flag": "remote_doors"
+  }
+ ],
+ "watchtowers": [
+  {
+   "flag": "watchtowers"
+  }
+ ],
+ "informants": [
+  {
+   "modifier": "search_speed",
+   "amount": 0.1
+  }
+ ],
+ "riot-kit": [
+  {
+   "modifier": "fight_injury",
+   "amount": -0.5
+  }
+ ],
+ "strict-rules": [
+  {
+   "modifier": "temper_rate",
+   "amount": -0.15
+  },
+  {
+   "modifier": "prisoner_mood",
+   "amount": -3
+  }
+ ],
+ "tactical-team": [
+  {
+   "flag": "tactical_team"
+  }
+ ],
+ "de-escalation-team": [
+  {
+   "modifier": "temper_rate",
+   "amount": -0.1
+  }
+ ],
+ "max-security-wing": [
+  {
+   "flag": "max_security_wing"
+  }
+ ],
+ "gang-intelligence": [
+  {
+   "flag": "gang_intelligence"
+  }
+ ],
+ "armoury": [
+  {
+   "flag": "armoury"
+  }
+ ],
+ "marksmen": [
+  {
+   "flag": "marksmen"
+  }
+ ],
+ "better-mattresses": [
+  {
+   "modifier": "sleep_rate",
+   "amount": 0.25
+  }
+ ],
+ "menu-planning": [
+  {
+   "modifier": "tasty_meals",
+   "amount": 0.1
+  }
+ ],
+ "family-visits": [
+  {
+   "modifier": "visit_length",
+   "amount": 0.5
+  }
+ ],
+ "phone-credit": [
+  {
+   "flag": "phone_credit"
+  }
+ ],
+ "yard-sports": [
+  {
+   "modifier": "prisoner_mood",
+   "amount": 1
+  }
+ ],
+ "staff-room-comforts": [
+  {
+   "modifier": "staff_need_rate",
+   "amount": -0.2
+  }
+ ],
+ "hobby-clubs": [
+  {
+   "flag": "hobby_clubs"
+  }
+ ],
+ "earned-privileges": [
+  {
+   "flag": "earned_privileges"
+  }
+ ],
+ "prison-cat": [
+  {
+   "flag": "prison_cat"
+  }
+ ],
+ "therapy-dogs": [
+  {
+   "modifier": "prisoner_mood",
+   "amount": 2
+  }
+ ],
+ "talking-therapy": [
+  {
+   "modifier": "temper_rate",
+   "amount": -0.15
+  }
+ ],
+ "quiet-rooms": [
+  {
+   "modifier": "temper_rate",
+   "amount": -0.05
+  }
+ ],
+ "garden": [
+  {
+   "modifier": "reform_gain",
+   "amount": 0.05
+  }
+ ],
+ "seasonal-days": [
+  {
+   "flag": "seasonal_days"
+  }
+ ],
+ "open-day": [
+  {
+   "flag": "open_day"
+  }
+ ],
+ "gourmet-kitchen": [
+  {
+   "modifier": "tasty_meals",
+   "amount": 0.2
+  }
+ ],
+ "family-day": [
+  {
+   "modifier": "reform_gain",
+   "amount": 0.05
+  },
+  {
+   "modifier": "prisoner_mood",
+   "amount": 1
+  }
+ ],
+ "prison-council": [
+  {
+   "modifier": "prisoner_mood",
+   "amount": 3
+  },
+  {
+   "modifier": "temper_rate",
+   "amount": -0.05
+  }
+ ],
+ "mediation": [
+  {
+   "flag": "mediation"
+  }
+ ],
+ "nurse-rounds": [
+  {
+   "modifier": "treat_speed",
+   "amount": 0.1
+  }
+ ],
+ "staff-health": [
+  {
+   "modifier": "sick_rate",
+   "amount": -0.5
+  }
+ ],
+ "hygiene-drive": [
+  {
+   "flag": "hygiene_drive"
+  }
+ ],
+ "vaccinations": [
+  {
+   "flag": "vaccinations"
+  }
+ ],
+ "isolation-ward": [
+  {
+   "flag": "isolation_ward"
+  }
+ ],
+ "pharmacy": [
+  {
+   "modifier": "treat_speed",
+   "amount": 0.1
+  }
+ ],
+ "dentist": [
+  {
+   "modifier": "prisoner_mood",
+   "amount": 1
+  }
+ ],
+ "first-aid-course": [
+  {
+   "modifier": "fight_injury",
+   "amount": -0.2
+  },
+  {
+   "modifier": "reform_gain",
+   "amount": 0.05
+  }
+ ],
+ "ambulance-bay": [
+  {
+   "flag": "ambulance_bay"
+  }
+ ],
+ "health-inspection-ready": [
+  {
+   "flag": "health_inspection_ready"
+  }
+ ],
+ "addiction-clinic": [
+  {
+   "modifier": "reform_gain",
+   "amount": 0.05
+  }
+ ],
+ "mental-health-ward": [
+  {
+   "modifier": "temper_rate",
+   "amount": -0.05
+  }
+ ],
+ "teaching-infirmary": [
+  {
+   "modifier": "treat_speed",
+   "amount": 0.1
+  },
+  {
+   "modifier": "reform_gain",
+   "amount": 0.05
+  }
+ ],
+ "exams": [
+  {
+   "modifier": "parole_chance",
+   "amount": 0.05
+  }
+ ],
+ "library": [
+  {
+   "modifier": "reform_gain",
+   "amount": 0.05
+  }
+ ],
+ "guest-speakers": [
+  {
+   "reveal": 2
+  }
+ ],
+ "language-classes": [
+  {
+   "modifier": "temper_rate",
+   "amount": -0.05
+  },
+  {
+   "modifier": "reform_gain",
+   "amount": 0.03
+  }
+ ],
+ "parole-prep": [
+  {
+   "modifier": "parole_chance",
+   "amount": 0.1
+  }
+ ],
+ "computer-room": [
+  {
+   "flag": "computer_room"
+  }
+ ],
+ "cooking-course": [
+  {
+   "modifier": "course_pass",
+   "amount": 0.05
+  }
+ ],
+ "woodwork-course": [
+  {
+   "modifier": "job_output",
+   "amount": 0.05
+  },
+  {
+   "modifier": "reform_gain",
+   "amount": 0.03
+  }
+ ],
+ "arts-programme": [
+  {
+   "modifier": "prisoner_mood",
+   "amount": 1
+  }
+ ],
+ "graduation-day": [
+  {
+   "modifier": "prisoner_mood",
+   "amount": 1
+  }
+ ],
+ "distance-learning": [
+  {
+   "modifier": "course_pass",
+   "amount": 0.05
+  }
+ ],
+ "prisoner-tutors": [
+  {
+   "modifier": "course_pass",
+   "amount": 0.1
+  }
+ ],
+ "research-assistants": [
+  {
+   "modifier": "research_speed",
+   "amount": 0.05
+  }
+ ],
+ "restorative-justice": [
+  {
+   "modifier": "reform_gain",
+   "amount": 0.2
+  }
+ ],
+ "day-release": [
+  {
+   "flag": "day_release"
+  }
+ ],
+ "university-link": [
+  {
+   "modifier": "research_speed",
+   "amount": 0.1
+  }
+ ],
+ "better-tools": [
+  {
+   "modifier": "job_output",
+   "amount": 0.15
+  }
+ ],
+ "repair-crew": [
+  {
+   "modifier": "repair_speed",
+   "amount": 0.25
+  },
+  {
+   "modifier": "wear_rate",
+   "amount": -0.25
+  }
+ ],
+ "recycling": [
+  {
+   "money_per_day": 15,
+   "line": "Recycling"
+  }
+ ],
+ "tool-control": [
+  {
+   "modifier": "pocket_chance",
+   "amount": -0.5
+  }
+ ],
+ "furniture-workshop": [
+  {
+   "modifier": "job_output",
+   "amount": 0.05
+  },
+  {
+   "flag": "furniture_workshop"
+  }
+ ],
+ "bakery": [
+  {
+   "modifier": "tasty_meals",
+   "amount": 0.05
+  },
+  {
+   "money_per_day": 10,
+   "line": "Bakery"
+  }
+ ],
+ "laundry-service": [
+  {
+   "money_per_day": 30,
+   "line": "Laundry service"
+  }
+ ],
+ "prisoner-maintenance": [
+  {
+   "modifier": "repair_speed",
+   "amount": 0.15
+  }
+ ],
+ "groundworks": [
+  {
+   "modifier": "flatten_cost",
+   "amount": -0.3
+  }
+ ],
+ "road-works": [
+  {
+   "flag": "road_works"
+  }
+ ],
+ "generators": [
+  {
+   "flag": "generators"
+  }
+ ],
+ "solar-and-water": [
+  {
+   "flag": "solar_and_water"
+  }
+ ],
+ "jetty-and-helipad": [
+  {
+   "flag": "jetty_and_helipad"
+  }
+ ],
+ "prison-farm": [
+  {
+   "flag": "prison_farm"
+  }
+ ],
+ "mass-production": [
+  {
+   "modifier": "job_output",
+   "amount": 0.2
+  }
+ ],
+ "bookkeeping": [
+  {
+   "modifier": "running_costs",
+   "amount": -0.02
+  },
+  {
+   "flag": "bookkeeping"
+  }
+ ],
+ "land-agent": [
+  {
+   "modifier": "land_price",
+   "amount": -0.15
+  }
+ ],
+ "bulk-buying": [
+  {
+   "modifier": "supply_price",
+   "amount": -0.1
+  }
+ ],
+ "grant-writing": [
+  {
+   "modifier": "grant_pay",
+   "amount": 0.2
+  }
+ ],
+ "intake-desk": [
+  {
+   "flag": "intake_desk"
+  }
+ ],
+ "inspection-prep": [
+  {
+   "flag": "inspection_prep"
+  }
+ ],
+ "filing-system": [
+  {
+   "modifier": "tray_days",
+   "amount": 1.0
+  }
+ ],
+ "prison-shop": [
+  {
+   "flag": "prison_shop"
+  }
+ ],
+ "utility-contracts": [
+  {
+   "modifier": "running_costs",
+   "amount": -0.05
+  }
+ ],
+ "logistics": [
+  {
+   "flag": "logistics"
+  }
+ ],
+ "typing-pool": [
+  {
+   "modifier": "paperwork",
+   "amount": -0.1
+  }
+ ],
+ "contract-labour": [
+  {
+   "money_per_day": 40,
+   "line": "Contract labour"
+  }
+ ],
+ "ministry-liaison": [
+  {
+   "modifier": "grant_pay",
+   "amount": 0.1
+  }
+ ],
+ "public-relations": [
+  {
+   "flag": "public_relations"
+  }
+ ],
+ "paperless-office": [
+  {
+   "modifier": "paperwork",
+   "amount": -0.5
+  }
+ ],
+ "lobbying": [
+  {
+   "modifier": "grant_pay",
+   "amount": 0.1
+  },
+  {
+   "flag": "lobbying"
+  }
+ ],
+ "open-books": [
+  {
+   "flag": "open_books"
+  }
+ ]
+}

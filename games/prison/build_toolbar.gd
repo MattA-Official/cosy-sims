@@ -7,6 +7,9 @@ extends VBoxContainer
 ## patrol route tool and B the move tool.
 
 @export var controller: BuildController
+## (kind: "room" or "object", id) -> bool: whether research has unlocked
+## it. Unset, everything shows.
+var allowed: Callable
 
 ## In the order they're used: put up rooms, then fit them out, then the
 ## grounds, with demolish set apart, then running the prison, then moving. Keys 1 to 9 then 0 follow
@@ -194,7 +197,8 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 		BuildController.Tool.OBJECT:
 			_add_object_choices()
 		BuildController.Tool.ROOM_TYPE:
-			_add_choices("Room types", PrisonCatalogue.ROOM_TYPES, controller.room_type,
+			_add_choices("Room types", PrisonCatalogue.ROOM_TYPES.filter(func(def: RoomTypeDef) -> bool:
+					return not allowed.is_valid() or allowed.call("room", def.id)), controller.room_type,
 					func(def: Resource) -> void: controller.room_type = def, "Clear")
 		BuildController.Tool.OPENING:
 			_add_opening_choices()
@@ -591,7 +595,7 @@ func _add_object_choices() -> void:
 		tabs.append(tab)
 	_columns("Kind", tabs)
 	var defs := PrisonCatalogue.OBJECTS.filter(func(def: ObjectDef) -> bool:
-		return def.category == _object_category)
+		return def.category == _object_category and (not allowed.is_valid() or allowed.call("object", def.id)))
 	var current: Resource = controller.object_def if defs.has(controller.object_def) else null
 	_add_choices("Objects", defs, current, func(def: Resource) -> void: controller.object_def = def)
 

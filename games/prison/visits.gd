@@ -35,6 +35,8 @@ const JOB := &"visit"
 const VISITOR := &"visitor"
 const PRISONER := &"prisoner"
 
+## Research bonuses: visit_length and visit_smuggle. Optional.
+var modifiers: Modifiers
 var people: People
 var jobs: JobBoard
 var building: Building
@@ -138,7 +140,7 @@ func visit(prisoner: Person, seats: Array, spot: Array) -> Person:
 		return null
 	_visitors[visitor] = prisoner
 	last_visit[prisoner.id] = _day()
-	jobs.post(_job(prisoner, seats[0], "Having a visit", VISIT_MINUTES, func(_stage: Job.Stage, _worker: Person) -> void:
+	jobs.post(_job(prisoner, seats[0], "Having a visit", VISIT_MINUTES * Modifiers.scale(modifiers, &"visit_length"), func(_stage: Job.Stage, _worker: Person) -> void:
 		visit_done(prisoner)))
 	jobs.post(_job(visitor, seats[1], "Visiting %s" % prisoner.name.get_slice(" ", 0), VISITOR_MINUTES,
 			func(_stage: Job.Stage, _worker: Person) -> void: send_home(visitor)))
@@ -157,7 +159,7 @@ func visit_done(prisoner: Person) -> void:
 	people.add_moodlet(prisoner, &"had_a_visit")
 	if progress != null:
 		progress.add(prisoner, &"visit")
-	if not contraband.is_empty() and _rng.randf() < SMUGGLE_CHANCE:
+	if not contraband.is_empty() and _rng.randf() < SMUGGLE_CHANCE * maxf(0.0, Modifiers.scale(modifiers, &"visit_smuggle")):
 		var item: ItemDef = contraband[_rng.randi() % contraband.size()]
 		prisoner.pocket.append(item)
 		smuggled.emit(prisoner, item)

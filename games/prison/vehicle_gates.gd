@@ -18,6 +18,8 @@ const SLIP_CHANCE := 0.1
 ## Tiles from an unmanned gate a prisoner must be to slip out.
 const SLIP_DISTANCE := 5.0
 
+## Research bonuses: vehicle_search. Optional.
+var modifiers: Modifiers
 var building: Building
 var people: People
 var guarding: Guarding
@@ -68,7 +70,7 @@ func delivery(force := false) -> ItemDef:
 	if contraband.is_empty() or (not force and _rng.randf() >= DELIVERY_CHANCE):
 		return null
 	var item: ItemDef = contraband[_rng.randi() % contraband.size()]
-	if checked():
+	if checked() or _rng.randf() < Modifiers.amount(modifiers, &"vehicle_search"):
 		found.emit(item)
 		return item
 	var prisoners := people.people.filter(func(p: Person) -> bool: return p.group == prisoner_group and not p.going_home)

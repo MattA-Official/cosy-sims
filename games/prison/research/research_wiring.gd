@@ -45,6 +45,7 @@ static func setup(main: Node) -> void:
 	main.add_child(research)
 	research.start()
 	_count(main)
+	_effects(main)
 	clock.hour_changed.connect(func(_hour: int) -> void: research.check_reveals())
 
 
@@ -134,3 +135,36 @@ static func _count(main: Node) -> void:
 		if counters.today.get(&"fight", 0) == 0 and standing._average_mood() >= CALM_MOOD \
 				and people.people.any(func(p: Person) -> bool: return p.group == &"prisoner"):
 			counters.add(&"calm_day"))
+
+
+## Hours when night_trouble counts.
+const NIGHT_FROM := 22
+const NIGHT_TO := 6
+
+
+## What cards done do: their modifiers summed into one Modifiers source,
+## a little money each day, and tempers.
+static func _effects(main: Node) -> void:
+	var research: Research = main.research
+	var modifiers: Modifiers = main.modifiers
+	for system: Object in [main.desk_work, main.in_tray, main.wear, main.contraband, main.visits, main.supplies,
+			main.parole, main.fights, main.vehicle_gates, main.land_plots, main.standing]:
+		system.set(&"modifiers", modifiers)
+	research.changed.connect(func() -> void: modifiers.set_source(&"research", research.modifier_sums()))
+	var toolbar := main.get_node_or_null("HUD/BuildToolbar")
+	if toolbar != null:
+		toolbar.allowed = research.unlocked
+	modifiers.set_source(&"research", research.modifier_sums())
+	var misconduct: Misconduct = main.misconduct
+	var clock: GameClock = main.clock
+	misconduct.temper_scales.append(func(_person: Person) -> float:
+		var scale := maxf(0.1, Modifiers.scale(modifiers, &"temper_rate"))
+		var hour := clock.hour()
+		if hour >= NIGHT_FROM or hour < NIGHT_TO:
+			scale *= maxf(0.1, Modifiers.scale(modifiers, &"night_trouble"))
+		return scale)
+	(main.reform as Reform).progress.gain_scales.append(func() -> float:
+		return Modifiers.scale(modifiers, &"reform_gain"))
+	(main.standing as Standing).nightly.append(func() -> void:
+		for entry: Array in research.daily_money():
+			(main.ledger as Ledger).add(entry[0], entry[1]))

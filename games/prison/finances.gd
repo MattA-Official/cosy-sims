@@ -44,7 +44,7 @@ var workshop: Workshop:
 ## What a crate of food costs, at the kitchen's meal quality.
 func crate_price() -> float:
 	var scale := kitchen.meal.cost_scale if kitchen != null and kitchen.meal != null else 1.0
-	return CRATE_PRICE * scale * Modifiers.scale(modifiers, &"running_costs")
+	return CRATE_PRICE * scale * Modifiers.scale(modifiers, &"running_costs") * Modifiers.scale(modifiers, &"supply_price")
 
 
 ## Wages for a shift's staff, as it starts.

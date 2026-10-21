@@ -37,6 +37,8 @@ class Item:
 		return 1.0 - minutes / total if total > 0.0 else 1.0
 
 var red_tape := RedTape.LIGHT
+## Research bonuses: paperwork. Optional.
+var modifiers: Modifiers
 ## Record id -> Array[Item], oldest first within each kind.
 var piles: Dictionary[int, Array] = {}
 ## Record ids overloaded since this morning.
@@ -168,10 +170,11 @@ func is_overloaded(owner: int) -> bool:
 ## The morning's paperwork: per prisoner, for the warden and each head.
 ## Then whoever is over OVERLOAD is overloaded.
 func morning(prisoners: int, warden: int, heads: Array[int]) -> void:
+	var scale := maxf(0.0, Modifiers.scale(modifiers, &"paperwork"))
 	if warden != 0:
-		add_paperwork(warden, prisoners * WARDEN_PAPER[red_tape])
+		add_paperwork(warden, prisoners * WARDEN_PAPER[red_tape] * scale)
 	for head in heads:
-		add_paperwork(head, prisoners * HEAD_PAPER[red_tape])
+		add_paperwork(head, prisoners * HEAD_PAPER[red_tape] * scale)
 	for owner: int in piles:
 		if pile_minutes(owner) > OVERLOAD:
 			overloaded[owner] = true

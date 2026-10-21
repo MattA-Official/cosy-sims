@@ -227,6 +227,6 @@ func _on_finished(owner: int, item: DeskWork.Item) -> void:
 	var department := find(StringName(item.ref)) if item.ref is String else null
 	if department == null:
 		return
-	for i in APPLICANTS:
+	for i in APPLICANTS + roundi(Modifiers.amount(modifiers, &"head_applicants")):
 		roster.add_applicant(department.head_role.id, SHIFT, APPLY_DAYS)
 	applicants_ready.emit(department)

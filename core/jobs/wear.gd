@@ -16,6 +16,8 @@ const MARKER_HEIGHT := 0.5
 ## object's uses.
 const SKILLED_MEND := 0.5
 
+## Research bonuses: wear_rate and repair_speed. Optional.
+var modifiers: Modifiers
 var people: People:
 	set(value):
 		people = value
@@ -49,7 +51,7 @@ func use(key: Vector2i) -> void:
 	if placed == null or placed.def.uses_before_breaking <= 0 or is_broken(key):
 		return
 	uses[key] = uses.get(key, 0) + 1
-	if uses[key] >= placed.def.uses_before_breaking:
+	if uses[key] >= placed.def.uses_before_breaking / maxf(0.1, Modifiers.scale(modifiers, &"wear_rate")):
 		break_object(key)
 
 
@@ -80,7 +82,7 @@ func break_object(key: Vector2i) -> void:
 	job.title = "Mend the %s" % placed.def.display_name.to_lower()
 	job.priority = 3
 	var mend := Job.at(Job.Do.WORK, key.x, key.y)
-	mend.minutes = REPAIR_MINUTES
+	mend.minutes = REPAIR_MINUTES / Modifiers.scale(modifiers, &"repair_speed")
 	mend.doing = "Mending the %s" % placed.def.display_name.to_lower()
 	mend.finish = func(_stage: Job.Stage, worker: Person) -> void:
 		fix(key)

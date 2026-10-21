@@ -984,7 +984,10 @@ func _run_down_needs(person: Person, minutes: float) -> void:
 			fills = fills or (def.source == NeedDef.Source.OUTDOORS and person.outdoors) \
 					or (def.source == NeedDef.Source.COMPANY and person.in_company)
 		if fills:
-			person.needs[need] = minf(100.0, before + 100.0 / maxf(def.use_minutes, 0.1) * minutes)
+			var fill := 100.0 / maxf(def.use_minutes, 0.1) * minutes
+			if asleep and need == tired_need:
+				fill *= Modifiers.scale(modifiers, &"sleep_rate")
+			person.needs[need] = minf(100.0, before + fill)
 			if before < 99.9 and person.needs[need] >= 99.9 and def.met_moodlet != &"":
 				add_moodlet(person, def.met_moodlet)
 			continue
@@ -996,7 +999,8 @@ func _run_down_needs(person: Person, minutes: float) -> void:
 
 ## How much faster someone's traits make a need run down.
 func _need_rate(person: Person, need: StringName) -> float:
-	var rate := 1.0
+	# Such as &"staff_need_rate" from a research card.
+	var rate := maxf(0.1, Modifiers.scale(modifiers, StringName("%s_need_rate" % person.group)))
 	for t in person.traits:
 		rate *= t.need_rates.get(need, 1.0)
 	return rate
@@ -1097,6 +1101,10 @@ func _mood_extras(person: Person, here: Array) -> Array:
 	for t in person.traits:
 		if not is_zero_approx(t.steady_mood):
 			out.append([t.steady_text, t.steady_mood])
+	# Such as &"prisoner_mood" from research cards.
+	var bonus := Modifiers.amount(modifiers, StringName("%s_mood" % person.group))
+	if not is_zero_approx(bonus):
+		out.append(["How the prison is run", bonus])
 	return out
 
 
@@ -1911,6 +1919,9 @@ func _walk_to(person: Person, level: int, spot: Vector2) -> bool:
 
 func _walk(person: Person, minutes: float) -> void:
 	var budget := speed * person.pace * Health.pace(person.health) * minutes
+	if person.role != &"":
+		# Such as &"guard_walk_speed" from a research card.
+		budget *= Modifiers.scale(modifiers, StringName("%s_walk_speed" % person.role))
 	while budget > 0.0 and not person.route.is_empty():
 		var next := person.route[0]
 		var here := person.flat()

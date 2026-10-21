@@ -41,6 +41,8 @@ const AVERAGE_NIGHTS := 3
 ## The Money value for being in debt: below every line.
 const IN_DEBT := -1e12
 
+## Research bonuses: grant_pay. Optional.
+var modifiers: Modifiers
 var people: People
 var ledger: Ledger
 var office: Office
@@ -260,7 +262,7 @@ func check_goals(midnight := false) -> Array[GoalDef]:
 				else goal_value(goal) >= goal.amount
 		if met:
 			goals_done[goal.id] = true
-			ledger.add(goal.grant, "Grants")
+			ledger.add(roundi(goal.grant * Modifiers.scale(modifiers, &"grant_pay")), "Grants")
 			finished.append(goal)
 			goal_done.emit(goal)
 	return finished

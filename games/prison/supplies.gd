@@ -20,6 +20,8 @@ const SOAPLESS_HYGIENE := 60.0
 const LINE := "Supplies"
 const DELIVERY_HOUR := 6
 
+## Research bonuses: supply_price. Optional.
+var modifiers: Modifiers
 var building: Building
 var ledger: Ledger
 var prisoner_group: StringName = &"prisoner"
@@ -67,7 +69,7 @@ func restock() -> int:
 	var order := maxf(target - stock, 0.0)
 	if order <= 0.0:
 		return 0
-	var cost := roundi(order * PRICE * (1.0 if room > 0.0 else SMALL_ORDER))
+	var cost := roundi(order * PRICE * (1.0 if room > 0.0 else SMALL_ORDER) * Modifiers.scale(modifiers, &"supply_price"))
 	stock += order
 	if ledger != null:
 		ledger.add(-cost, LINE)

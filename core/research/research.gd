@@ -74,8 +74,6 @@ var building: Building
 var grade: Callable
 ## (setting id) -> Variant: a setting's value, for SETTING reveals.
 var setting: Callable
-## (card, effect: Dictionary, on: bool) -> void: does or undoes an effect.
-var apply_effect: Callable
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -608,13 +606,10 @@ func _finish(def: ResearchCardDef, owner: int, announce: bool) -> void:
 	if def.pair != &"" and state_of(def.pair) != State.DONE:
 		states[def.pair].state = State.LOCKED_OUT
 		states[def.pair].double = true
-	for effect: Dictionary in def.effects:
-		if apply_effect.is_valid():
-			apply_effect.call(def, effect, true)
-	var record := _record(owner)
-	if record != null and heads != null and announce and record != heads.warden():
-		pass # Heads already gives xp for each card finished at a desk.
 	if announce:
+		for effect: Dictionary in def.effects:
+			if effect.has("reveal"):
+				reveal_in(def.department, int(effect.reveal), def.display_name)
 		finished.emit(def, owner)
 	changed.emit()
 
@@ -622,21 +617,61 @@ func _finish(def: ResearchCardDef, owner: int, announce: bool) -> void:
 ## Takes a card's effects away, such as when its partner is adopted.
 func _undo(def: ResearchCardDef) -> void:
 	var s: CardState = states[def.id]
-	for effect: Dictionary in def.effects:
-		if apply_effect.is_valid():
-			apply_effect.call(def, effect, false)
 	s.state = State.LOCKED_OUT
 	s.progress = 0.0
 	s.double = true
 
 
-## Re-applies the effects of every card done, after loading.
-func reapply() -> void:
+## The modifiers every card done adds up to, such as {&"job_output": 0.2}.
+## Effects aren't saved: they follow from which cards are done.
+func modifier_sums() -> Dictionary:
+	var out := {}
 	for def in board.cards:
 		if is_done(def.id):
 			for effect: Dictionary in def.effects:
-				if apply_effect.is_valid():
-					apply_effect.call(def, effect, true)
+				if effect.has("modifier"):
+					var key := StringName(effect.modifier)
+					out[key] = out.get(key, 0.0) + float(effect.amount)
+	return out
+
+
+## Whether a card done has switched on a flag, such as &"joint_cards".
+func has_flag(flag: StringName) -> bool:
+	for def in board.cards:
+		if is_done(def.id):
+			for effect: Dictionary in def.effects:
+				if effect.has("flag") and StringName(effect.flag) == flag:
+					return true
+	return false
+
+
+## Whether something a card unlocks (kind "room", "object" or "role") may
+## be used: anything no card unlocks always may.
+func unlocked(kind: String, id: StringName) -> bool:
+	if mode == Mode.OFF:
+		return true
+	var unlocker := unlocked_by(kind, id)
+	return unlocker == null or is_done(unlocker.id)
+
+
+## The card that unlocks something, or null.
+func unlocked_by(kind: String, id: StringName) -> ResearchCardDef:
+	for def in board.cards:
+		for effect: Dictionary in def.effects:
+			if effect.get("unlock", "") == kind and StringName(effect.id) == id:
+				return def
+	return null
+
+
+## Money cards done bring in each day, as [[amount, line], ...].
+func daily_money() -> Array:
+	var out: Array = []
+	for def in board.cards:
+		if is_done(def.id):
+			for effect: Dictionary in def.effects:
+				if effect.has("money_per_day"):
+					out.append([int(effect.money_per_day), String(effect.line)])
+	return out
 
 
 func capture() -> Dictionary:
@@ -680,5 +715,4 @@ func restore(data: Dictionary) -> void:
 	if knowhow != null:
 		knowhow.earning = mode != Mode.OFF
 	refresh_lean()
-	reapply()
 	changed.emit()

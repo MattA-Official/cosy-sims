@@ -103,6 +103,34 @@ const SOURCES := [
 	[&"grant_goal", &"admin", 5.0, "Grant goals"],
 ]
 
+## Flags cards switch on for systems still to come, and where they'll be
+## read. Every other flag, and every modifier key, must be read by a
+## system now (a test checks).
+const FUTURE_FLAGS := {
+	&"joint_cards": "M10 joint cards", &"department_budgets": "M10 budgets", &"conferences": "M10 conferences",
+	&"deputy_warden": "M10 deputies", &"deputy_heads": "M10 deputies",
+	&"petitions": "M11 prisoner life", &"hobby_clubs": "M11 hobbies", &"prison_cat": "M11 pets",
+	&"prison_shop": "M11 shop", &"phone_credit": "M11 privileges", &"earned_privileges": "M11 privileges",
+	&"hygiene_drive": "M11 colds", &"vaccinations": "M11 colds", &"isolation_ward": "M11 colds",
+	&"town_meetings": "M12 reputation", &"open_day": "M12 reputation", &"public_relations": "M12 reputation",
+	&"open_books": "M12 reputation", &"lobbying": "M12 Ministry", &"long_term_plan": "M12 Ministry",
+	&"seasonal_days": "M12 seasons", &"inspection_prep": "M12 inspections", &"health_inspection_ready": "M12 inspections",
+	&"escape_review": "Escape Mode", &"day_release": "Open Prison add-on", &"prison_farm": "Prison Farm add-on",
+	&"gang_intelligence": "Maximum Security add-on", &"armoury": "Maximum Security add-on",
+	&"marksmen": "Maximum Security add-on", &"mediation": "Maximum Security add-on",
+	&"max_security_wing": "Maximum Security add-on",
+	&"patrol_planner": "patrol planner", &"sniffer_dogs": "dog handler role", &"cctv_room": "camera cover",
+	&"lockdown_button": "lockdown button", &"remote_doors": "door control desk", &"watchtowers": "watchtowers",
+	&"tactical_team": "response squad", &"ambulance_bay": "ambulances", &"computer_room": "flexible objects",
+	&"furniture_workshop": "flexible objects", &"road_works": "roads", &"generators": "utilities",
+	&"solar_and_water": "utilities", &"jetty_and_helipad": "location packs", &"bookkeeping": "the daily report",
+	&"intake_desk": "intake choices", &"logistics": "deliveries",
+}
+## Modifier keys read with the group or role in front, and the pattern
+## the reading code uses.
+const GROUP_KEYS := {&"guard_walk_speed": "%s_walk_speed", &"staff_need_rate": "%s_need_rate",
+		&"prisoner_mood": "%s_mood"}
+
 static var _board: ResearchBoardDef
 
 

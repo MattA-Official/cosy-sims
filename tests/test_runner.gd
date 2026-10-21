@@ -121,6 +121,7 @@ func _process(_delta: float) -> bool:
 	_test_brains()
 	_test_research_board()
 	_test_research()
+	_test_research_effects()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1981,6 +1982,72 @@ func _test_research() -> void:
 	research.restore(saved)
 	_check(research.is_done(walk.id) and research.state_of(dogs.id) == Research.State.FACE_UP, "card states save and load")
 	main.queue_free()
+
+
+func _test_research_effects() -> void:
+	# Every modifier key a card uses is read by some system, and every flag
+	# is too or is waiting on a system still to come.
+	var source := _all_source("res://core") + _all_source("res://games")
+	var board := PrisonResearch.board()
+	var unread: Array[String] = []
+	for def in board.cards:
+		for effect: Dictionary in def.effects:
+			if effect.has("modifier"):
+				var key := StringName(effect.modifier)
+				var read: bool = source.contains(PrisonResearch.GROUP_KEYS[key]) if PrisonResearch.GROUP_KEYS.has(key) \
+						else source.contains('&"%s"' % key)
+				if not read:
+					unread.append(String(key))
+			elif effect.has("flag"):
+				var flag := StringName(effect.flag)
+				if not PrisonResearch.FUTURE_FLAGS.has(flag) and not source.contains('&"%s"' % flag):
+					unread.append(String(flag))
+	_check(unread.is_empty(), "every card's modifiers and flags are read (unread: %s)" % ", ".join(unread))
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var research: Research = main.research
+	var modifiers: Modifiers = main.modifiers
+	var plots: LandPlots = main.land_plots
+	var plot: Rect2i = plots.plots().filter(plots.for_sale)[0]
+	var before := plots.price(plot)
+	research._finish(research.card(&"land-agent"), 0, true)
+	_check(modifiers.value(&"land_price") == -0.15 and plots.price(plot) == int(snappedf(before * 0.85, 10.0)),
+			"Land agent makes land 15% cheaper")
+	_check(not research.unlocked("room", &"meeting"), "a meeting room needs the Management meeting card")
+	research._finish(research.card(&"management-meeting"), 0, true)
+	_check(research.unlocked("room", &"meeting") and research.has_flag(&"joint_cards"), "which unlocks it")
+	research._finish(research.card(&"recycling"), 0, true)
+	var ledger: Ledger = main.ledger
+	var money := ledger.balance
+	(main.standing as Standing).grade_day()
+	_check(ledger.balance - money >= 15 or ledger.today.get("Recycling", 0) == 15, "Recycling brings in a little each day")
+	var hidden := research.board.cards.filter(func(d: ResearchCardDef) -> bool:
+		return d.department == &"education" and research.state_of(d.id) == Research.State.HIDDEN).size()
+	research._finish(research.card(&"guest-speakers"), 0, true)
+	_check(research.board.cards.filter(func(d: ResearchCardDef) -> bool:
+		return d.department == &"education" and research.state_of(d.id) == Research.State.HIDDEN).size() == hidden - 2,
+			"Guest speakers turns two Education cards face up")
+	research.states[&"land-agent"].state = Research.State.FACE_UP
+	research.changed.emit()
+	_check(is_zero_approx(modifiers.value(&"land_price")), "a card no longer done takes its bonus with it")
+	main.queue_free()
+
+
+## Every .gd file's text under a folder, joined.
+func _all_source(folder: String) -> String:
+	var out := ""
+	for name in DirAccess.get_files_at(folder):
+		if name.ends_with(".gd"):
+			out += FileAccess.get_file_as_string(folder.path_join(name))
+	for dir in DirAccess.get_directories_at(folder):
+		if dir != "research" or not folder.ends_with("prison"):
+			out += _all_source(folder.path_join(dir))
+		else:
+			for name in DirAccess.get_files_at(folder.path_join(dir)):
+				if name.ends_with(".gd") and name != "prison_research.gd":
+					out += FileAccess.get_file_as_string(folder.path_join(dir).path_join(name))
+	return out
 
 
 func _test_roads() -> void:

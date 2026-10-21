@@ -11,6 +11,9 @@ signal changed(person: Person)
 
 var def: ProgressDef
 var sources: Dictionary[StringName, ProgressSourceDef] = {}
+## () -> float: multipliers on gains (not losses), such as research cards
+## that speed reform.
+var gain_scales: Array[Callable] = []
 
 
 func _init(progress_def: ProgressDef = null, source_defs: Array = []) -> void:
@@ -35,6 +38,9 @@ func add(person: Person, source_id: StringName, times := 1.0) -> float:
 		push_warning("No progress source %s" % source_id)
 		return 0.0
 	var amount := source.amount * times
+	if amount > 0.0:
+		for scale in gain_scales:
+			amount *= scale.call()
 	var today := _today(person)
 	if amount > 0.0:
 		var given: float = today.get(source_id, 0.0)
