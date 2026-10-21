@@ -474,6 +474,7 @@ func _ready() -> void:
 	routes.height_at = func(level: int, point: Vector2) -> float: return people.nav().height_at(level, point)
 	grid.add_child(routes)
 	guarding.routes = routes
+	people.led_group = &"staff"
 	guarding.area_weight = func(level: int, point: Vector2) -> float:
 		return Security.ALERT_PATROL if security.alert_level(level, point) > 0 else 1.0
 	add_child(guarding)

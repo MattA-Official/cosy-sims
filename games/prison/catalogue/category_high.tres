@@ -12,5 +12,6 @@ daily_grant = 70
 temper_scale = 1.2
 search_weight = 3.0
 watch_distance = 5.0
+escorted = true
 stay_days_min = 10
 stay_days_max = 20

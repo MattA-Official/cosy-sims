@@ -107,6 +107,7 @@ func _process(_delta: float) -> bool:
 	_test_scenarios()
 	_test_alert_areas()
 	_test_alarm()
+	_test_escorted_through_gates()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4952,6 +4953,44 @@ func _test_alarm() -> void:
 	escapes._caught(prisoner, guards[0])
 	escapes._catch_up()
 	_check(not escapes.alarm and not runner.lockdown, "caught: all clear")
+	main.queue_free()
+
+
+func _test_escorted_through_gates() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var runner: ScheduleRunner = main.runner
+	var guarding: Guarding = main.guarding
+	var jobs: JobBoard = main.jobs
+	var ground: BuildingMap = main.building.levels[0]
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	var corridor: Room = ground.rooms().filter(func(r: Room) -> bool: return r.type == &"" and r.cells.size() > 20)[0]
+	prisoner.position = Vector3(corridor.centre().x, 0.0, corridor.centre().y)
+	prisoner.level = 0
+	var cell: Room = ground.rooms().filter(func(r: Room) -> bool: return r.type == &"cell")[1]
+	var inside: Vector2 = people._spot_in_room(0, cell)
+	for edge in runner.room_doors(ground, cell):
+		people.set_door_locked(0, edge, true)
+	_check(not people.can_reach(prisoner, 0, inside), "a locked door stops a prisoner")
+	prisoner.led = true
+	_check(people.can_reach(prisoner, 0, inside), "but not one a guard is walking through it")
+	prisoner.led = false
+	for edge in runner.room_doors(ground, cell):
+		people.set_door_locked(0, edge, false)
+	prisoner.category = &"high"
+	prisoner.place_wait = 10.0
+	prisoner.block = load("res://games/prison/catalogue/activity_eat.tres")
+	_check(not people.is_in_place(prisoner), "a high-security prisoner stuck away from the canteen")
+	guarding._escort_stuck()
+	var escorts := jobs.of_kind(&"escort").filter(func(j: Job) -> bool: return j.get_meta(&"prisoner") == prisoner)
+	_check(escorts.size() == 1 and (escorts[0] as Job).title.ends_with("to the canteen"), "gets a guard to walk them there")
+	prisoner.category = &"medium"
+	jobs.cancel(escorts[0])
+	guarding._escort_stuck()
+	_check(jobs.of_kind(&"escort").filter(func(j: Job) -> bool: return j.get_meta(&"prisoner") == prisoner).is_empty(),
+			"others find their own way")
 	main.queue_free()
 
 

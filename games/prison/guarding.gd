@@ -31,6 +31,8 @@ const WATCH_DISTANCE := 3.0
 const FAR_WATCH_DISTANCE := 5.0
 ## Game minutes before the same prisoner is walked back again.
 const ESCORT_COOLDOWN := 30.0
+## Game minutes between looks for escorted prisoners who are stuck.
+const ESCORT_EVERY := 5
 ## Tiles tried in a room for somewhere to walk a prisoner back to.
 const PLACE_TRIES := 8
 ## Tiles a prisoner being walked somewhere keeps to behind their guard.
@@ -73,6 +75,8 @@ func look() -> void:
 	_walk_routes()
 	_patrol()
 	_spot_out_of_place()
+	if int(clock.total_minutes) % ESCORT_EVERY == 0:
+		_escort_stuck()
 	_lead()
 
 
@@ -339,6 +343,27 @@ func _lead() -> void:
 		if person.level != guard.level or person.flat().distance_to(guard.flat()) > FOLLOW_DISTANCE:
 			people.walk_to(person, guard.level, guard.flat(), _led_doing.get(person, "Being walked back"))
 			person.led = true
+
+
+## Prisoners whose category is walked about (high security) and who can't
+## get to where their block wants them get a guard to take them.
+func _escort_stuck() -> void:
+	var waiting: Array = jobs.of_kind(&"escort").map(func(j: Job) -> Person: return j.get_meta(&"prisoner"))
+	for person in people.people:
+		if person.group != prisoner_group or person.led or person.place_wait <= 0.0 or waiting.has(person) \
+				or person.going_home or person.quiet_room_hours > 0.0 or people.is_in_place(person):
+			continue
+		var category: CategoryDef = people.categories.get(person.category)
+		if category == null or not category.escorted:
+			continue
+		var spot := people.place_spot(person)
+		if spot.is_empty():
+			continue
+		var map: BuildingMap = building.levels[spot[0]]
+		var room := map.room_at_point(spot[1])
+		var type := people.room_type(room.type) if room != null else null
+		escort(person, [spot[0], Vector2i((spot[1] as Vector2).floor())],
+				"to the %s" % type.display_name.to_lower() if type != null else "over", &"")
 
 
 func _let_go(person: Person) -> void:
