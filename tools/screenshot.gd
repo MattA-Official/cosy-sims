@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [inspect=N] [zones] [at=X,Z] [zoom=F]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [settings] [graded] [inspect=N] [zones] [at=X,Z] [zoom=F]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
@@ -42,6 +42,20 @@ func _process(_delta: float) -> bool:
 			target += GameClock.MINUTES_PER_DAY
 		while clock.total_minutes < target:
 			clock.advance(minf(0.5, target - clock.total_minutes))
+		if args.has("graded"):
+			# A day's grading behind it, for the office window.
+			_main.standing.grade_day()
+			_main.standing.grade_day()
+		if args.has("programmes"):
+			# A couple of leavers and a postcard, for the Gone home section.
+			var release: Release = _main.release
+			release.alumni.append({"left_day": clock.day() - 1, "reform": 72.0, "will_return_day": -1})
+			release.alumni.append({"left_day": clock.day() - 2, "reform": 35.0, "will_return_day": -1})
+			release.postcards.append({"day": clock.day(), "from": "Dot Kettle", "id": 0,
+					"text": "Opened a little bakery. The scones are a hit! Thank you for the kitchen. Dot"})
+			_main.programmes_window.toggle()
+		if args.has("settings"):
+			_main.settings_window.toggle()
 		if args.has("timetable"):
 			_main.timetable.toggle()
 		if args.has("zones"):
