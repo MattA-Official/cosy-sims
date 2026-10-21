@@ -109,6 +109,8 @@ func _process(_delta: float) -> bool:
 	_test_alarm()
 	_test_escorted_through_gates()
 	_test_contraband_extras()
+	_test_planning_permission()
+	_test_morning_paper()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1431,6 +1433,8 @@ func _test_buying_land() -> void:
 	var terrain: Terrain = main.terrain
 	var ledger: Ledger = main.ledger
 	var land := building.land[0]
+	var desk_work: DeskWork = main.desk_work
+	desk_work.red_tape = DeskWork.RedTape.OFF
 	var for_sale := plots.plots()
 	_check(for_sale.size() == 8 and for_sale.all(func(p: Rect2i) -> bool:
 			return not p.intersects(land) and p.grow(1).intersects(land) and p.size == Vector2i(24, 24)),
@@ -1489,6 +1493,65 @@ func _test_buying_land() -> void:
 	PrisonSave.pending = saved
 	root.add_child(main)
 	_check((main.building as Building).ground().owns(plot.position), "bought land is kept in saves")
+	main.queue_free()
+
+
+func _test_planning_permission() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var plots: LandPlots = main.land_plots
+	var building: Building = main.building
+	var ledger: Ledger = main.ledger
+	var desk_work: DeskWork = main.desk_work
+	ledger.sandbox = false
+	ledger.balance = 100000
+	# With red tape on, land waits for planning permission.
+	desk_work.red_tape = DeskWork.RedTape.LIGHT
+	var heads: Heads = main.heads
+	_check(heads.warden() != null, "there's a warden to sign applications")
+	var warden := heads.warden().id
+	var wanted: Rect2i = plots.plots()[0]
+	var before := ledger.balance
+	_check(plots.buy(wanted, false) and not building.ground().owns(wanted.get_center()) and plots.is_pending(wanted)
+			and ledger.balance < before, "bought with red tape on, land is paid for but waits for permission")
+	_check(desk_work.items(warden, Planning.KIND).size() == 1, "an application lands on the warden's desk")
+	_check(not wanted in plots.plots(), "and isn't for sale meanwhile")
+	_check(plots.undo_last() and ledger.balance == before and not plots.is_pending(wanted)
+			and desk_work.items(warden, Planning.KIND).is_empty(), "undone, it's withdrawn and refunded")
+	plots.buy(wanted, false)
+	desk_work.work(warden, desk_work.pile_minutes(warden))
+	_check(building.ground().owns(wanted.get_center()) and not plots.is_pending(wanted), "once filled in, the land is yours")
+	var waiting: Rect2i = plots.plots()[0]
+	plots.buy(waiting, false)
+	var saved := PrisonSave.capture(main)
+	main.queue_free()
+	main = load("res://games/prison/main.tscn").instantiate()
+	PrisonSave.pending = saved
+	root.add_child(main)
+	_check((main.land_plots as LandPlots).is_pending(waiting) and not (main.building as Building).ground().owns(waiting.get_center()),
+			"land waiting for permission is kept in saves")
+	main.queue_free()
+
+
+func _test_morning_paper() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var standing: Standing = main.standing
+	var security: Security = main.security
+	var paper := standing.write_paper()
+	_check(String(paper.headline).begins_with("A quiet day"), "nothing happened: a quiet day")
+	_check((paper.sections as Array).any(func(s: Array) -> bool: return s[0] == "Accounts"), "with the accounts")
+	security.yesterday[&"fight"] = 2
+	security.yesterday[&"escape"] = 1
+	paper = standing.write_paper()
+	_check(paper.headline == "Prisoner on the run!", "the worst news makes the headline")
+	var trouble: Array = (paper.sections as Array).filter(func(s: Array) -> bool: return s[0] == "Trouble")
+	_check(trouble.size() == 1 and (trouble[0][1] as PackedStringArray).size() == 2, "and the trouble is listed")
+	var card: MorningPaper = main.morning_paper
+	card.show_paper(paper)
+	_check(card.visible, "the paper opens")
 	main.queue_free()
 
 

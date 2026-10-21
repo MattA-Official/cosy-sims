@@ -9,12 +9,19 @@ extends RefCounted
 ##
 ## Empty land sells back at SELL_SHARE of what it cost. A purchase can be
 ## undone for a full refund until the next game hour.
+##
+## With `hold` set, a purchase may have to wait for planning permission:
+## it's paid for, but stays off your land until grant() is called.
 
 ## Just before land is bought (the first plot of a batch), and just after.
 signal buying(plot: Rect2i)
 signal bought(plot: Rect2i)
 ## Land given back, by sale or undo.
 signal sold(plot: Rect2i)
+## A purchase is waiting for permission, filed under `key`.
+signal awaiting(key: Vector2i, plots: Array[Rect2i])
+## A purchase waiting for permission was undone.
+signal withdrawn(key: Vector2i)
 
 ## Tiles along each side of a plot.
 const SIZE := 24
@@ -47,6 +54,11 @@ var area := Rect2i()
 var paid: Dictionary[Vector2i, int] = {}
 ## The latest purchase while it can still be undone: {plots, cost, hour}.
 var last_purchase: Dictionary = {}
+## (plots: Array[Rect2i]) -> bool: whether a purchase must wait for
+## permission. Optional.
+var hold: Callable
+## Purchases waiting for permission, by their first plot's top-left tile.
+var pending: Dictionary[Vector2i, Array] = {}
 
 
 ## Every plot in the buyable area.
@@ -73,7 +85,12 @@ func is_owned(plot: Rect2i) -> bool:
 
 
 func for_sale(plot: Rect2i) -> bool:
-	return area.encloses(plot) and not is_owned(plot) and _next_to(plot, owned())
+	return area.encloses(plot) and not is_owned(plot) and not is_pending(plot) and _next_to(plot, owned())
+
+
+## Whether a plot is bought but waiting for permission.
+func is_pending(plot: Rect2i) -> bool:
+	return pending.values().any(func(plots: Array) -> bool: return plots.has(plot))
 
 
 ## The plot holding a tile, or an empty rect outside the buyable area.
@@ -101,7 +118,7 @@ func plots_between(a: Vector2i, b: Vector2i) -> Array[Rect2i]:
 ## your land through each other.
 func buyable(chosen: Array[Rect2i]) -> Array[Rect2i]:
 	var have := owned()
-	var left := chosen.filter(func(p: Rect2i) -> bool: return area.encloses(p) and not is_owned(p))
+	var left := chosen.filter(func(p: Rect2i) -> bool: return area.encloses(p) and not is_owned(p) and not is_pending(p))
 	var out: Array[Rect2i] = []
 	var grew := true
 	while grew:
@@ -176,7 +193,9 @@ func buy_all(chosen: Array[Rect2i], flatten := false) -> bool:
 	if chosen.is_empty() or buyable(chosen).size() != chosen.size() or not can_afford_all(chosen, flatten):
 		return false
 	var cost := 0
-	buying.emit(chosen[0])
+	var waiting: bool = hold.is_valid() and hold.call(chosen)
+	if not waiting:
+		buying.emit(chosen[0])
 	for plot in chosen:
 		var each := price(plot)
 		if flatten:
@@ -188,9 +207,30 @@ func buy_all(chosen: Array[Rect2i], flatten := false) -> bool:
 			ledger.add(-each, line)
 		paid[plot.position] = each
 		cost += each
-		building.add_land(plot)
+		if not waiting:
+			building.add_land(plot)
 	last_purchase = {"plots": chosen.duplicate(), "cost": cost, "hour": _hour()} if clock != null else {}
-	bought.emit(chosen[0])
+	if waiting:
+		pending[chosen[0].position] = chosen.duplicate()
+		awaiting.emit(chosen[0].position, chosen.duplicate())
+	else:
+		bought.emit(chosen[0])
+	return true
+
+
+## Permission came through: the purchase filed under `key` becomes yours.
+func grant(key: Vector2i) -> bool:
+	if not pending.has(key):
+		return false
+	var plots: Array = pending[key]
+	pending.erase(key)
+	buying.emit(plots[0])
+	for plot: Rect2i in plots:
+		building.add_land(plot)
+	if not last_purchase.is_empty() and last_purchase.plots[0] == plots[0]:
+		# Undoing it now would be a sale, not a withdrawal.
+		last_purchase.hour = _hour()
+	bought.emit(plots[0])
 	return true
 
 
@@ -246,6 +286,8 @@ func sell_all(chosen: Array[Rect2i]) -> bool:
 func can_undo() -> bool:
 	if last_purchase.is_empty() or _hour() != last_purchase.hour:
 		return false
+	if pending.has(last_purchase.plots[0].position):
+		return true
 	var chosen: Array[Rect2i] = []
 	chosen.assign(last_purchase.plots)
 	return can_sell_all(chosen)
@@ -257,8 +299,15 @@ func undo_last() -> bool:
 		return false
 	if ledger != null:
 		ledger.add(last_purchase.cost, line)
-	for plot: Rect2i in last_purchase.plots:
-		_give_back(plot)
+	var key: Vector2i = last_purchase.plots[0].position
+	if pending.has(key):
+		pending.erase(key)
+		for plot: Rect2i in last_purchase.plots:
+			paid.erase(plot.position)
+		withdrawn.emit(key)
+	else:
+		for plot: Rect2i in last_purchase.plots:
+			_give_back(plot)
 	last_purchase = {}
 	return true
 

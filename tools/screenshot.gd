@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [heads] [tray] [settings] [graded] [inspect=N] [file] [zones] [at=X,Z] [zoom=F] [empty] [map=small|medium|large] [blueprint] [move] [scenario=ID]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [heads] [tray] [settings] [graded] [inspect=N] [file] [zones] [at=X,Z] [zoom=F] [empty] [map=small|medium|large] [blueprint] [move] [scenario=ID] [paper]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
@@ -94,6 +94,11 @@ func _process(_delta: float) -> bool:
 			heads.start_hire(heads.find(&"education"))
 			_main.desk_work.work(heads.warden().id, 150.0)
 			_main.heads_window.toggle()
+		if args.has("paper"):
+			var standing: Standing = _main.standing
+			standing.grade_day()
+			standing.grade_day()
+			_main.morning_paper.show_paper(standing.write_paper())
 		if args.has("bus"):
 			_main.intake.bus()
 		if args.has("debug"):

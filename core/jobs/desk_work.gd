@@ -20,7 +20,7 @@ const CLEAR := 240.0
 ## for each head, by Red tape.
 const WARDEN_PAPER: Array[float] = [0.0, 2.0, 4.0]
 const HEAD_PAPER: Array[float] = [0.0, 1.0, 2.0]
-const ORDER: Array[StringName] = [&"paperwork", &"file", &"card", &"research"]
+const ORDER: Array[StringName] = [&"paperwork", &"file", &"planning", &"card", &"research"]
 ## The pile clerks share for things handed to them, such as in-tray cards.
 const SHARED := -1
 
@@ -58,6 +58,18 @@ func add(owner: int, kind: StringName, title: String, minutes: float, ref: Varia
 	pile.insert(at, item)
 	changed.emit()
 	return item
+
+
+## Takes something off whichever pile it's on, unfinished. Returns
+## whether it was there.
+func remove(kind: StringName, ref: Variant) -> bool:
+	for owner: int in piles:
+		for item: Item in piles[owner]:
+			if item.kind == kind and item.ref == ref:
+				(piles[owner] as Array).erase(item)
+				changed.emit()
+				return true
+	return false
 
 
 ## Paperwork lands on a pile, joining any already there.

@@ -152,9 +152,11 @@ var programmes_window := ProgrammesWindow.new()
 var settings_window := SettingsWindow.new()
 var fail_card := FailCard.new()
 var file_card := PrisonerFileCard.new()
+var morning_paper := MorningPaper.new()
 ## Ctrl+Z and Ctrl+Y for building and landscaping.
 var undo := UndoHistory.new()
 var land_plots := LandPlots.new()
+var planning := Planning.new()
 ## Open jobs and stock, with the debug view.
 var jobs_panel := JobsPanel.new()
 ## Game time. Everything that happens over time listens to it.
@@ -717,6 +719,8 @@ func _ready() -> void:
 				Vector4(area_rect.position.x, area_rect.position.y, area_rect.size.x, area_rect.size.y) * grid.cell_size)
 	for key: Vector2i in saved.get("land_paid", {}):
 		land_plots.paid[key] = saved["land_paid"][key]
+	for key: Vector2i in saved.get("land_pending", {}):
+		land_plots.pending[key] = saved["land_pending"][key]
 	controller.land_plots = land_plots
 	for refused: Signal in [controller.land_refused, controller.spending_refused, controller.drop_refused]:
 		refused.connect(func(_why := "") -> void: Sound.play(&"build_error"))
@@ -861,6 +865,19 @@ func _ready() -> void:
 	missing_files.intake = intake
 	add_child(missing_files)
 	missing_files.start()
+	planning.name = "Planning"
+	planning.desk_work = desk_work
+	planning.heads = heads
+	planning.has_clerk = in_tray.has_clerk
+	planning.land_plots = land_plots
+	add_child(planning)
+	planning.start()
+	land_plots.awaiting.connect(func(_key: Vector2i, plots: Array[Rect2i]) -> void:
+		Toasts.post("Planning application", "The land is paid for. You can build on it once the application is filled in at a desk (%s). Undo within the hour for a refund."
+				% DeskWork.time_text(planning.minutes(plots.size()))))
+	desk_work.finished.connect(func(_owner: int, item: DeskWork.Item) -> void:
+		if item.kind == Planning.KIND:
+			Toasts.post("Planning permission granted", "The new land is yours to build on."))
 	in_tray.answered.connect(func(card: InTray.Card, choice: TrayChoiceDef, by: StringName) -> void:
 		var words := PrisonTray.why(card, choice)
 		in_tray.note(words + (" (lapsed)" if by == &"lapsed" else " (clerk)" if by == &"clerk" else ""))
@@ -1142,7 +1159,8 @@ func _ready() -> void:
 		var lines := PackedStringArray([file, reform.summary(person), courses.summary(person), parole.summary(person),
 				escape_plans.summary(person)])
 		return "\n".join(Array(lines).filter(func(line: String) -> bool: return not line.is_empty())))
-	standing.report_ready.connect(func(text: String) -> void: Toasts.post("Daily report", text, 12.0))
+	standing.paper_ready.connect(func(paper: Dictionary) -> void:
+		Toasts.post_with(MorningPaper.MASTHEAD, paper.headline, "Read", func() -> void: morning_paper.show_paper(paper), 12.0))
 	standing.goal_done.connect(func(goal: GoalDef) -> void:
 		Toasts.post("Goal done: " + goal.title, "A grant of %s came in." % Ledger.text(goal.grant)))
 	vehicle_gates.name = "VehicleGates"
@@ -1349,6 +1367,8 @@ func _add_hud() -> void:
 	file_card.reform = reform
 	file_card.clock = clock
 	hud.add_child(file_card)
+	morning_paper.name = "MorningPaper"
+	hud.add_child(morning_paper)
 	inspector.person_actions.append(["File", "Opens their prison file: offence, sentence, traits found so far and history.",
 			func(person: Person) -> void: file_card.show_for(person),
 			func(person: Person) -> bool: return person.group == &"prisoner"])

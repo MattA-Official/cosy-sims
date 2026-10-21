@@ -8,6 +8,8 @@ extends Node
 ## daily report each morning.
 
 signal report_ready(text: String)
+## The morning paper is out (see paper).
+signal paper_ready(paper: Dictionary)
 signal goal_done(goal: GoalDef)
 ## A fail rule ran out on a difficulty that can be lost.
 signal failed(rule: FailRule)
@@ -112,6 +114,9 @@ var held_by := ""
 var history: Array[Dictionary] = []
 ## The last daily report, or "".
 var report := ""
+## The last morning paper: {day, headline, stars, sections: [[title,
+## lines]], story}, or {}.
+var paper: Dictionary = {}
 
 ## Counts at the moment each counted goal came up, by goal id.
 var _baselines: Dictionary[StringName, int] = {}
@@ -154,6 +159,7 @@ func restore(saved: Dictionary) -> void:
 	grade = saved.get("grade", grade)
 	measures.assign(saved.get("measures", measures))
 	report = saved.get("report", "")
+	paper = saved.get("paper", {})
 	values.assign(saved.get("values", {}))
 	why.assign(saved.get("why", {}))
 	held_by = saved.get("held_by", "")
@@ -453,7 +459,75 @@ func _on_hour(hour: int) -> void:
 	_check_sit_in()
 	if hour == REPORT_HOUR and _graded and office.has_warden():
 		report = write_report()
+		paper = write_paper()
 		report_ready.emit(report)
+		paper_ready.emit(paper)
+
+
+## The morning paper, laid out: a headline from the biggest news, then
+## yesterday under a few headings, and one prisoner's story.
+func write_paper() -> Dictionary:
+	var inside := PackedStringArray()
+	var good: int = _yesterday_moodlets.get(&"good_meal", 0) + _yesterday_moodlets.get(&"lovely_meal", 0)
+	inside.append("%d good meals served, %d missed." % [good, _yesterday_moodlets.get(&"missed_meal", 0)])
+	if _yesterday_arrivals > 0:
+		inside.append("%d new %s arrived on the bus." % [_yesterday_arrivals, "prisoner" if _yesterday_arrivals == 1 else "prisoners"])
+	for more in report_lines:
+		for line: String in more.call():
+			inside.append(line)
+	var trouble := PackedStringArray()
+	var worst := &""
+	if security != null:
+		for kind: StringName in Security.NAMES:
+			var times: int = security.yesterday.get(kind, 0)
+			if times <= 0:
+				continue
+			trouble.append("%s: %d" % [Security.NAMES[kind], times])
+			if Security.SEVERITY.get(kind, 0) > Security.SEVERITY.get(worst, 0):
+				worst = kind
+	var walked: int = _yesterday_moodlets.get(&"walked_back", 0)
+	if walked > 0 and security == null:
+		trouble.append("Guards walked back %d %s." % [walked, "prisoner" if walked == 1 else "prisoners"])
+	if trouble.is_empty():
+		trouble.append("Nothing to report. Long may it last.")
+	var money := Ledger.total(ledger.yesterday)
+	var accounts := PackedStringArray(["%s%s on the day, %s in the bank." % ["+" if money > 0 else "",
+			Ledger.text(money), Ledger.text(ledger.balance)]])
+	var desk := PackedStringArray()
+	if not held_by.is_empty():
+		desk.append("Held to %d★ by %s." % [grade, held_by])
+	desk.append_array(warnings)
+	var sections: Array = [["Inside", inside], ["Trouble", trouble], ["Accounts", accounts]]
+	if not desk.is_empty():
+		sections.append(["The warden's desk", desk])
+	var story := _story()
+	return {"day": clock.day() if clock != null else 0, "stars": grade, "headline": _headline(worst, money, story),
+			"sections": sections, "story": story}
+
+
+## The biggest news of yesterday, in a few words.
+func _headline(worst: StringName, money: int, story: String) -> String:
+	var headlines: Dictionary[StringName, String] = {
+		&"death": "Sad news from the prison",
+		&"escape": "Prisoner on the run!",
+		&"sit_in": "Sit-in at the prison",
+		&"fight": "Scuffles behind bars",
+		&"knocked_out": "Scuffles behind bars",
+		&"escape_plan": "Escape plot foiled",
+	}
+	if headlines.has(worst):
+		return headlines[worst]
+	if history.size() >= 2:
+		var was: int = history[-2].grade
+		if grade > was:
+			return "Prison climbs to %d stars" % grade
+		if grade < was:
+			return "Prison slips to %d stars" % grade
+	if money < 0 and ledger.balance < 0:
+		return "Prison in the red"
+	if not story.is_empty():
+		return "A quiet day, and a happy one"
+	return "A quiet day at the prison"
 
 
 ## A line about one prisoner's day, from a moodlet they have.
