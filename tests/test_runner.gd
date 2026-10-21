@@ -4691,6 +4691,18 @@ func _test_perks() -> void:
 		desks.morning(0, 0, [])
 		_check(office.pile_dressing(warden_person) == [office.stacks[2]] and office.pile_words(warden_person).contains("overloaded"),
 				"an overloaded desk has a teetering stack")
+	var before := roster.morale_target(cook)
+	roster.add_event(cook, -5.0, 3, "trouble on their shift")
+	_check(is_equal_approx(roster.morale_target(cook), maxf(before - 5.0, 0.0)) or before <= 0.0,
+			"trouble on their shift lowers a member of staff's morale")
+	var review_tray: InTray = main.in_tray
+	review_tray.cards.clear()
+	warden.morale = 0.0
+	warden.low_days = StaffRoster.QUIT_DAYS - StaffRoster.WARN_DAYS - 1
+	roster.nightly()
+	_check(review_tray.cards.any(func(c: InTray.Card) -> bool: return c.def.id == &"annual_review"),
+			"an unhappy warden's annual review comes to the in-tray")
+	review_tray.cards.clear()
 	var box: Suggestions = main.suggestions
 	var tray: InTray = main.in_tray
 	tray.cards.clear()

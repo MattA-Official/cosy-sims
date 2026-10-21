@@ -43,6 +43,8 @@ const NAMES: Dictionary[StringName, String] = {
 const ALERTS_KEPT := 40
 
 signal alerted(words: String, level: int, point: Vector2)
+## An incident was counted.
+signal counted(kind: StringName)
 
 var people: People
 var jobs: JobBoard
@@ -159,6 +161,7 @@ func watched(level: int, point: Vector2) -> bool:
 ## Counts an incident, and raises an alert for it unless `quiet`.
 func count(kind: StringName, person: Person = null, words := "", quiet := false) -> void:
 	today[kind] = today.get(kind, 0) + 1
+	counted.emit(kind)
 	if kind == &"walk_back" or quiet:
 		return
 	var text: String = words if not words.is_empty() else NAMES.get(kind, String(kind))

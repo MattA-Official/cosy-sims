@@ -25,6 +25,9 @@ signal changed
 ## Someone handed in their notice and won't be back.
 signal quit(record: Record)
 signal levelled_up(record: Record)
+## Someone has been unhappy long enough that they'll hand in their notice
+## in WARN_DAYS days unless something changes.
+signal unhappy(record: Record)
 ## Someone won't be in tomorrow.
 signal off_sick(record: Record)
 
@@ -60,6 +63,7 @@ const TRAINING_PLACES := 4
 ## A resignation answered with a raise: this much more pay.
 const KEEP_RAISE := 0.2
 const LEAVE_DAYS := 3
+const WARN_DAYS := 3
 
 ## One member of staff, or an applicant hoping to be.
 class Record:
@@ -81,6 +85,9 @@ class Record:
 	var away := ""
 	## Has written a resignation letter that's waiting for an answer.
 	var resigning := false
+	## Things that happened to them, each [points, last day, words], such as
+	## a fight on their shift: on their morale target until the last day.
+	var events: Array = []
 	## Has done their role's course.
 	var trained := false
 	## The day they spend in the training room, or 0.
@@ -120,6 +127,9 @@ var work_trait_counts: Dictionary[StringName, int] = {}
 ## Work traits picked ahead for a role, such as the warden chosen on the
 ## new game screen: applicants for it have them, until one is taken on.
 var preset_traits: Dictionary[StringName, Array] = {}
+## (record) -> Array of [points, words]: more parts of the morale target,
+## such as a staff room or an overloaded desk. Optional.
+var morale_parts: Array[Callable] = []
 ## Optional: for "staff_xp", such as a mentoring head's.
 var modifiers: Modifiers
 var clock: GameClock:
@@ -408,13 +418,40 @@ func pay_feeling(record: Record) -> float:
 ## Where their morale is heading: how they feel at work, and their pay.
 func morale_target(record: Record) -> float:
 	var mood := record.mood_sum / record.mood_hours if record.mood_hours > 0 else 60.0
-	var traits := 0.0
+	var sum := mood + 10.0
+	for part: Array in morale_reasons(record):
+		sum += part[0]
+	return clampf(sum, 0.0, 100.0)
+
+
+## What lifts or lowers someone's morale, besides how they feel at work:
+## [points, words] for pay, traits, events and the game's morale_parts.
+func morale_reasons(record: Record) -> Array:
+	var out: Array = []
+	var pay_part := pay_feeling(record)
+	if absf(pay_part) >= 1.0:
+		out.append([pay_part, "well paid" if pay_part > 0.0 else "underpaid"])
 	for def in record.work_traits:
-		traits += def.morale
+		if def.morale != 0.0:
+			out.append([def.morale, def.display_name.to_lower()])
 	for other in records:
 		for def in other.work_traits:
-			traits += def.staff_morale
-	return clampf(mood + 10.0 + pay_feeling(record) + traits, 0.0, 100.0)
+			if def.staff_morale != 0.0:
+				out.append([def.staff_morale, "%s %s" % [other.first_name(), def.display_name.to_lower()]])
+	for event: Array in record.events:
+		if int(event[1]) >= _day():
+			out.append([float(event[0]), event[2]])
+	for part in morale_parts:
+		out.append_array(part.call(record))
+	return out
+
+
+## Something that happened to someone, on their morale for some days; the
+## same words again replace it.
+func add_event(record: Record, points: float, days: int, words: String) -> void:
+	record.events = record.events.filter(func(e: Array) -> bool: return e[2] != words)
+	record.events.append([points, _day() + days - 1, words])
+	changed.emit()
 
 
 ## Midnight: morale moves, the unhappy quit, and new applicants come.
@@ -427,7 +464,10 @@ func nightly() -> void:
 		record.morale = move_toward(record.morale, target, MORALE_STEP * rate)
 		record.mood_sum = 0.0
 		record.mood_hours = 0
+		record.events = record.events.filter(func(e: Array) -> bool: return int(e[1]) >= _day())
 		record.low_days = record.low_days + 1 if record.morale < QUIT_MORALE else 0
+		if record.low_days == QUIT_DAYS - WARN_DAYS:
+			unhappy.emit(record)
 		if record.low_days >= QUIT_DAYS and resign.is_valid():
 			if not record.resigning:
 				record.resigning = true
@@ -522,9 +562,11 @@ func summary(person: Person) -> String:
 	var feeling := "happy at work" if record.morale >= 70.0 else "content" if record.morale >= 40.0 \
 			else "unhappy at work" if record.morale >= QUIT_MORALE else "thinking of quitting"
 	var role := _role(record.role)
-	return "Level %d%s, morale %d (%s), %s a day, hired day %d%s" % [record.level,
+	var reasons := ", ".join(morale_reasons(record).filter(func(r: Array) -> bool: return absf(r[0]) >= 1.0).map(
+			func(r: Array) -> String: return "%s (%+d)" % [r[1], roundi(r[0])]))
+	return "Level %d%s, morale %d (%s%s), %s a day, hired day %d%s" % [record.level,
 			" (%d%% faster)" % roundi((pace(person) - 1.0) * 100.0) if record.level > 1 else "",
-			roundi(record.morale), feeling, Ledger.text(day_pay(record)), record.hired_day,
+			roundi(record.morale), feeling, "; " + reasons if not reasons.is_empty() else "", Ledger.text(day_pay(record)), record.hired_day,
 			". %s: %s" % [role.perk_name, role.perk_words] if has_perk(record) else ""]
 
 
@@ -558,7 +600,7 @@ func _data(record: Record) -> Dictionary:
 			"look_seed": record.look_seed, "until": record.until, "mood_sum": record.mood_sum,
 			"mood_hours": record.mood_hours, "level": record.level, "xp": record.xp,
 			"off_until": record.off_until, "away": record.away, "resigning": record.resigning,
-			"work_traits": record.work_traits.map(func(t: StaffTraitDef) -> StringName: return t.id), "trained": record.trained, "training_day": record.training_day}
+			"events": record.events, "work_traits": record.work_traits.map(func(t: StaffTraitDef) -> StringName: return t.id), "trained": record.trained, "training_day": record.training_day}
 
 
 func _from(entry: Dictionary) -> Record:
@@ -590,6 +632,7 @@ func _from(entry: Dictionary) -> Record:
 		var def := find_work_trait(StringName(id))
 		if def != null:
 			record.work_traits.append(def)
+	record.events.assign(entry.get("events", []))
 	record.trained = entry.get("trained", false)
 	record.training_day = entry.get("training_day", 0)
 	next_id = maxi(next_id, record.id + 1)

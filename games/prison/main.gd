@@ -770,6 +770,7 @@ func _ready() -> void:
 	in_tray.name = "InTray"
 	in_tray.defs = PrisonTray.cards()
 	in_tray.defs.append(PrisonTray.resignation())
+	in_tray.defs.append(PrisonTray.review())
 	in_tray.desk_work = desk_work
 	in_tray.prisoners = heads.prisoners
 	in_tray.has_clerk = func() -> bool: return roster.records.any(func(r: StaffRoster.Record) -> bool:
@@ -811,6 +812,13 @@ func _ready() -> void:
 		if not attract:
 			Toasts.post("A resignation letter", "%s wants to leave. Answer in the in-tray (J)." % record.name)
 	roster.charge = func(amount: int, line: String) -> void: ledger.add(-amount, line)
+	roster.unhappy.connect(func(record: StaffRoster.Record) -> void:
+		var role := shifts.role_def(record.role)
+		if record.role != &"warden" and (role == null or not role.by_card):
+			return
+		in_tray.post_about(in_tray.find(&"annual_review"), record.id, prison_tray.staff_words(record))
+		if not attract:
+			Toasts.post("An annual review", "%s is unhappy and may leave. See the in-tray (J)." % record.name))
 	missing_files.name = "MissingFiles"
 	missing_files.building = building
 	missing_files.desk_work = desk_work
@@ -1030,6 +1038,26 @@ func _ready() -> void:
 				record.first_name(), shifts.role_def(record.role).display_name.to_lower(), record.shift]))
 	inspector.person_lines.append(roster.summary)
 	inspector.person_lines.append(office.pile_words)
+	# Morale: a staff room helps, an overloaded desk doesn't, and trouble on
+	# their shift stays with them a few days.
+	roster.morale_parts.append(func(record: StaffRoster.Record) -> Array:
+		var out: Array = []
+		if desk_work.is_overloaded(record.id):
+			out.append([-10.0, "overloaded"])
+		var best := -INF
+		for n: int in building.levels:
+			for room: Room in building.levels[n].rooms():
+				if room.type == &"staff_room":
+					best = maxf(best, people.quality(n, room).score)
+		if best > -INF:
+			out.append([5.0 + clampf(best / 2.0, -5.0, 5.0), "a staff room"])
+		return out)
+	security.counted.connect(func(kind: StringName) -> void:
+		if not kind in [&"fight", &"knocked_out", &"escape", &"sit_in", &"death"]:
+			return
+		for record in roster.records:
+			if record.person != null and not record.person.going_home:
+				roster.add_event(record, -5.0, 3, "trouble on their shift"))
 	inspector.person_lines.append(func(person: Person) -> String:
 		return "File: awaiting paperwork, so no parole yet" if MissingFiles.is_missing(person) else "")
 	inspector.person_lines.append(func(person: Person) -> String:

@@ -137,6 +137,19 @@ static func suggestion(idea: Dictionary) -> TrayCardDef:
 	return def
 
 
+## The annual review: warning that a head or the warden is unhappy enough to
+## leave soon. Posted by main on StaffRoster.unhappy.
+static func review() -> TrayCardDef:
+	var def := TrayCardDef.make(&"annual_review", &"review", &"staff", "An annual review",
+			"{who} is unhappy at work, and it came out at their annual review. They may well leave in a few days.",
+			[TrayCardDef.choice("Give a raise (10%)", [{"raise": true}, {"morale": 10}], [&"approve"], "{who} got a raise at their review."),
+			TrayCardDef.choice("Have a chat (+8 morale)", [{"morale": 8}], [], "{who} had a long chat at their review."),
+			TrayCardDef.choice("Leave it", [], [&"decline"], "{who}'s review came to nothing.")], 2)
+	def.weight = 0.0
+	def.deadline_days = 2
+	return def
+
+
 ## Words for a member of staff, such as "Dot the cook".
 func staff_words(record: StaffRoster.Record) -> String:
 	var role := roster._role(record.role)
