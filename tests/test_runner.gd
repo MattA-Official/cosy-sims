@@ -3,6 +3,15 @@ extends SceneTree
 ##   godot --headless -s res://tests/test_runner.gd
 
 var _failures := 0
+## Prisoners can walk off a prison with no perimeter. Every test but the
+## escape one turns that off, so long runs keep everyone they start with.
+var _escapes_on := false
+
+
+func _initialize() -> void:
+	node_added.connect(func(node: Node) -> void:
+		if node is Escapes and not _escapes_on:
+			(node as Escapes).enabled = false)
 
 
 func _process(_delta: float) -> bool:
@@ -62,7 +71,9 @@ func _process(_delta: float) -> bool:
 	_test_fights()
 	_test_consequences()
 	_test_perimeter()
+	_escapes_on = true
 	_test_escapes()
+	_escapes_on = false
 	_test_security()
 	_test_sit_ins()
 	_test_category_timetables()
@@ -3225,7 +3236,8 @@ func _test_escapes() -> void:
 		clock.advance(1.0)
 		minutes += 1
 	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
-	_check(not escapes.possible(), "nobody walks off before there's a perimeter")
+	_check(escapes.possible() and escapes.exit_for(prisoners[0]) != Vector2.INF,
+			"without a perimeter, anyone out of place could walk off")
 	var map: BuildingMap = main.building.ground()
 	var land := map.land_bounds()
 	var fence := BuildingMap.rect_perimeter(land.grow(-6))

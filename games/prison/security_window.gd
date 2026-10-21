@@ -147,7 +147,7 @@ func status_lines() -> PackedStringArray:
 	lines.append("%d %s on duty." % [guards, _plural(guards, "guard")])
 	if secure_area != null:
 		lines.append("Perimeter built: open ground inside it is secure." if secure_area.has_perimeter
-				else "No perimeter yet. Fence the prison in with perimeter walls and gates.")
+				else "No perimeter yet: a prisoner who wanders off outside can walk away. Fence the prison in with perimeter walls and gates.")
 	return lines
 
 

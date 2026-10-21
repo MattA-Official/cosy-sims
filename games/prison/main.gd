@@ -644,8 +644,11 @@ func _ready() -> void:
 		var to := building.object_at(pallets[0]).centre if not pallets.is_empty() else intake.stop_point()
 		vehicles.drive_in(LORRY, to, Callable(), LORRY_STAY))
 	intake.arrived.connect(func(came: Array[Person]) -> void:
-		Toasts.post("The bus is here", "%d new %s on the way to reception." % [came.size(),
-				"prisoner is" if came.size() == 1 else "prisoners are"]))
+		var words := "%d new %s on the way to reception." % [came.size(),
+				"prisoner is" if came.size() == 1 else "prisoners are"]
+		if escapes.without_perimeter and not secure_area.has_perimeter:
+			words += " There's no perimeter yet, so anyone who wanders off can walk away."
+		Toasts.post("The bus is here", words))
 	if not saved.is_empty():
 		PrisonSave.apply_rest(self, saved)
 		build_costs.start_from_now()

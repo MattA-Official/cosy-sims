@@ -34,8 +34,10 @@ var ledger: Ledger
 var prisoner_group: StringName = &"prisoner"
 var guard_role: StringName = &"guard"
 var enabled := true
-## Whether prisoners can walk off before any perimeter is built.
-var without_perimeter := false
+## Whether prisoners can walk off before any perimeter is built (Matt's
+## call, 21 October): without one, anyone out of place may make for the
+## edge of your land.
+var without_perimeter := true
 ## Everyone who got away, as [name, day].
 var at_large: Array = []
 var clock: GameClock:
