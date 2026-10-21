@@ -14,6 +14,8 @@ var searching: Searching
 var kitchen: Kitchen
 var finances: Finances
 var supplies: Supplies
+## Opens the research board. Optional.
+var open_research: Callable
 
 var _missing := Label.new()
 var _limit := Label.new()
@@ -58,6 +60,15 @@ func _ready() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
 	heading.add_child(spacer)
+	var board := Button.new()
+	board.text = "Research board (N)"
+	board.tooltip_text = "Know-how, cards and trials."
+	board.theme_type_variation = &"FlatButton"
+	board.focus_mode = FOCUS_NONE
+	board.pressed.connect(func() -> void:
+		if open_research.is_valid():
+			open_research.call())
+	heading.add_child(board)
 	var close := Button.new()
 	close.text = "Close"
 	close.theme_type_variation = &"FlatButton"

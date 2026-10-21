@@ -22,7 +22,11 @@ const SMALL_SIZE := 11
 
 static var _layout: Dictionary = {}
 
-var research: Research
+var research: Research:
+	set(value):
+		research = value
+		if is_inside_tree():
+			_relayout()
 var heads: Heads
 ## The tree on show: &"office" or a department id.
 var tree: StringName = &"office":
@@ -88,10 +92,15 @@ func _relayout() -> void:
 	_head = data.head
 	_cols = int(t.ncols)
 	_cards.clear()
+	# An add-on's cards leave a blank space until it's owned.
 	for key: String in t.cards:
-		_cards[StringName(key)] = Vector2(t.cards[key][0], t.cards[key][1])
+		var def := research.card(StringName(key)) if research != null else null
+		if def == null or research._addon_owned(def):
+			_cards[StringName(key)] = Vector2(t.cards[key][0], t.cards[key][1])
 	_lines.clear()
 	for line: Dictionary in t.lines:
+		if not _cards.has(StringName(line.from)) or not _cards.has(StringName(line.to)):
+			continue
 		var pts := PackedVector2Array()
 		for p: Array in line.pts:
 			pts.append(Vector2(p[0], p[1]))
@@ -142,7 +151,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 		return ""
 	var def := research.card(id)
 	if research.state_of(id) == Research.State.HIDDEN:
-		return "Face down. Turns up: %s" % (def.reveal.hint if def.reveal != null else "from the start")
+		return "Face down. Turns up: %s" % research.hint_words(def)
 	return "%s\n%s" % [def.display_name, def.gives_text]
 
 
@@ -260,7 +269,7 @@ func _draw_card(id: StringName, font: Font, lit: Dictionary, kids: Dictionary) -
 				muted if hidden else ink)
 	var meta_y := 46.0 if lines.size() == 1 else 60.0
 	if hidden:
-		var hint := def.reveal.hint if def.reveal != null else ""
+		var hint := research.hint_words(def) if def.reveal != null else ""
 		draw_string(font, at + Vector2(10, meta_y), "◆ " + hint, HORIZONTAL_ALIGNMENT_LEFT, _card_size.x - 20, SMALL_SIZE,
 				Color(ACCENT, alpha))
 	else:

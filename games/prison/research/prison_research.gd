@@ -128,7 +128,7 @@ const FUTURE_FLAGS := {
 ## Modifier keys read with the group or role in front, and the pattern
 ## the reading code uses.
 const GROUP_KEYS := {&"guard_walk_speed": "%s_walk_speed", &"staff_need_rate": "%s_need_rate",
-		&"prisoner_mood": "%s_mood"}
+		&"prisoner_mood": "%s_mood", &"knowhow_learning": "knowhow_%s"}
 
 ## Know-how kind -> the department whose head brings it to a joint card.
 const KIND_DEPARTMENTS := {&"security": &"security", &"care": &"wellbeing", &"health": &"medical",

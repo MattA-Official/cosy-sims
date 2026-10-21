@@ -183,6 +183,7 @@ func _rebuild() -> void:
 		for child in holder.get_children():
 			child.queue_free()
 	_live.clear()
+	_chips.visible = research.mode != Research.Mode.OFF
 	for def in knowhow.kinds:
 		var chip := Label.new()
 		chip.tooltip_text = "Earned today: %s" % knowhow.breakdown(def.id)
@@ -228,7 +229,9 @@ func _slot_row(slot: StringName) -> Control:
 			return research.card(id).display_name))
 		if def == null:
 			return "%s: free.%s" % [research.slot_name(slot), next]
-		return "%s: %s, %d%%.%s" % [research.slot_name(slot), def.display_name, roundi(research.progress(def) * 100.0), next]])
+		var away := research.away_line(research.states[def.id])
+		return "%s: %s, %d%%.%s%s" % [research.slot_name(slot), def.display_name, roundi(research.progress(def) * 100.0),
+				next, "" if away == "" else " " + away]])
 	line.add_child(words)
 	var def := research.slot_card(slot)
 	if def != null:
@@ -336,7 +339,7 @@ func _card_panel(def: ResearchCardDef) -> void:
 		var text := ", ".join(tags)
 		_side.add_child(_words(text.left(1).to_upper() + text.substr(1) + ".", true))
 	if state == Research.State.HIDDEN:
-		_side.add_child(_section("Turns up", def.reveal.hint if def.reveal != null else "From the start"))
+		_side.add_child(_section("Turns up", research.hint_words(def)))
 		_needs(def)
 		return
 	_side.add_child(_section("Gives", def.gives_text))
@@ -416,9 +419,10 @@ func _status_words(def: ResearchCardDef) -> String:
 			var who := research.slot_name(s.slot) if s.slot != &"" else "The warden"
 			if s.partner != &"":
 				who += " and %s" % research.slot_name(s.partner)
-			return "%s: %d%% done." % [who, roundi(research.progress(def) * 100.0)]
+			var away := research.away_line(s)
+			return "%s: %d%% done.%s" % [who, roundi(research.progress(def) * 100.0), "" if away == "" else "\n" + away]
 		Research.State.PAUSED:
-			return "Paused at %d%%: its desk is empty." % roundi(research.progress(def) * 100.0)
+			return "Paused at %d%%: nobody is at its desk. It goes on when its head is hired again." % roundi(research.progress(def) * 100.0)
 		Research.State.TRIAL:
 			return "On trial in one wing."
 		Research.State.DONE:

@@ -2061,6 +2061,32 @@ func _test_research_effects() -> void:
 	research.states[&"land-agent"].state = Research.State.FACE_UP
 	research.changed.emit()
 	_check(is_zero_approx(modifiers.value(&"land_price")), "a card no longer done takes its bonus with it")
+	var knowhow: Knowhow = main.knowhow
+	var learning := knowhow.amount(&"learning")
+	research._finish(research.card(&"research-assistants"), 0, true)
+	(main.counters as Counters).add(&"course_session")
+	_check(is_equal_approx(knowhow.amount(&"learning") - learning, 2.2), "Research assistants make Learning come 10% faster")
+	# A Party planner makes things count half as much again towards cards.
+	var reveal := RevealDef.new()
+	reveal.kind = RevealDef.Kind.COUNT
+	reveal.id = &"party_test"
+	reveal.count = 3
+	reveal.hint = "Three of them"
+	(main.counters as Counters).add(&"party_test", 2)
+	_check(research._revealed_now(reveal) == "", "two of three isn't enough")
+	modifiers.set_source(&"test", {&"reveal_counts": 0.5})
+	_check(research._revealed_now(reveal) == "Three of them", "but is with a Party planner")
+	modifiers.clear_source(&"test")
+	# Patrols count by the hour.
+	var guard: Person = (main.people as People).people.filter(func(p: Person) -> bool: return p.role == &"guard")[0]
+	var patrol := Job.new()
+	patrol.kind = &"patrol"
+	guard.job = patrol
+	var hours := (main.counters as Counters).total(&"patrol_hour")
+	for i in 61:
+		(main.clock as GameClock).minute_passed.emit(0)
+	guard.job = null
+	_check((main.counters as Counters).total(&"patrol_hour") > hours, "an hour on patrol counts as a patrol hour")
 	main.queue_free()
 
 
@@ -2121,11 +2147,13 @@ func _test_research_slots() -> void:
 	_check(is_zero_approx(research.progress(joint)), "one turning up isn't enough")
 	research.attend(joint.id, warden.id)
 	_check(research.progress(joint) > 0.0, "with both there, it moves on")
+	var xp := chief.xp
 	for i in 40:
 		research._attended.clear()
 		research.attend(joint.id, chief.id)
 		research.attend(joint.id, warden.id)
 	_check(research.is_done(joint.id), "and meetings finish it")
+	_check(chief.xp > xp, "and both heads learn from it")
 	# Budgets.
 	var guard := research.card(&"guard-training")
 	var plain := research.speed(guard, chief.id)
@@ -2158,12 +2186,19 @@ func _test_research_slots() -> void:
 	(main.standing as Standing).grade = 5
 	_check(research.begin(a) and research.begin(b) and research.states[b.id].slot == &"security+",
 			"a head and their deputy work two cards at once")
+	var desk_item: DeskWork.Item = desk_work.items(chief.id, &"research")[0]
+	var total := desk_item.total
+	research.set_budget(&"security", 500)
+	_check(desk_item.total < total, "a budget speeds up a card already on a desk")
+	research.set_budget(&"security", 0)
 	# Conferences.
 	research._finish(research.card(&"conferences"), 0, false)
 	var hidden := func() -> int: return research.board.cards.filter(func(d: ResearchCardDef) -> bool:
 		return d.department == &"security" and research.state_of(d.id) == Research.State.HIDDEN and d.addon == &"").size()
 	var before: int = hidden.call()
 	_check(research.send_to_conference(chief) and chief.away == "at a conference", "a head goes off to a conference")
+	_check(research.owner_line(chief.id).contains("Paused: %s is at a conference until day" % chief.name),
+			"their card says who is away and until when")
 	(main.clock as GameClock).advance(GameClock.MINUTES_PER_DAY * Research.CONFERENCE_DAYS)
 	_check(not research.conferences.has(chief.id) and hidden.call() <= before - mini(2, before), "and comes back with two new cards")
 	# Pet projects.
@@ -4000,6 +4035,19 @@ func _test_fights() -> void:
 		clock.advance(1.0)
 		minutes += 1
 	_check(not hurt.lying and not infirmary.beds.has(hurt), "and they're back on their feet")
+	# A new arrival's check-up.
+	var arrival: Person = prisoners[0] if prisoners[0] != hurt and prisoners[0] != out else prisoners[1]
+	var checked := []
+	infirmary.checked.connect(func(p: Person) -> void: checked.append(p))
+	var checkups := (main.counters as Counters).total(&"checkup")
+	infirmary.want_checkups([arrival] as Array[Person])
+	minutes = 0
+	while checked.is_empty() and minutes < 600:
+		clock.advance(1.0)
+		minutes += 1
+	_check(checked == [arrival] and not arrival.lying and not infirmary.beds.has(arrival),
+			"a new arrival goes for a check-up and gets up after it")
+	_check((main.counters as Counters).total(&"checkup") > checkups, "which counts towards Health know-how")
 	main.queue_free()
 
 

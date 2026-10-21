@@ -52,7 +52,7 @@ static func all() -> Array[StaffTraitDef]:
 	out.append(head.call(&"softly_spoken", "Softly spoken", "Good moments last 3% longer", &"security", {&"good_moodlet_time": 0.03}, -1))
 	out.append(head.call(&"ex_nurse", "Ex-nurse", "Treatment 5% quicker", &"wellbeing", {&"treat_speed": 0.05}))
 	out.append(head.call(&"sporty", "Sporty", "Good moments last 3% longer", &"wellbeing", {&"good_moodlet_time": 0.03}))
-	var party: StaffTraitDef = head.call(&"party_planner", "Party planner", "Staff a little happier (+2 morale)", &"wellbeing", {})
+	var party: StaffTraitDef = head.call(&"party_planner", "Party planner", "Staff a little happier (+2 morale); things that happen count half as much again towards new research cards", &"wellbeing", {&"reveal_counts": 0.5})
 	party.staff_morale = 2.0
 	out.append(party)
 	out.append(head.call(&"thrifty", "Penny pincher", "Wages and food cost 3% less", &"admin", {&"running_costs": -0.03}, 1))

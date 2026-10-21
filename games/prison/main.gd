@@ -1247,6 +1247,7 @@ func _ready() -> void:
 	intake.offer_made.connect(func(offer: Dictionary) -> void:
 		Toasts.post("Transfer offer", "The Ministry asks you to take %d more prisoners tomorrow, at %s each. Accept or decline in the office (O)."
 				% [offer.count, Ledger.text(offer.fee)]))
+	intake.arrived.connect(infirmary.want_checkups)
 	intake.arrived.connect(func(came: Array[Person]) -> void:
 		var words := "%d new %s on the way to reception." % [came.size(),
 				"prisoner is" if came.size() == 1 else "prisoners are"]
@@ -1407,6 +1408,7 @@ func _add_hud() -> void:
 	office_window.kitchen = kitchen
 	office_window.finances = finances
 	office_window.supplies = supplies
+	office_window.open_research = book.open.bind(&"research")
 	book.add_page(&"office", "Office", "The warden's office: intake, goals and the grade. O", "office",
 			office_window)
 	heads_window.heads = heads

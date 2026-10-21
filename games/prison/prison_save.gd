@@ -41,7 +41,9 @@ static func capture(main: Node) -> Dictionary:
 			"bubble_minutes": person.bubble_minutes, "truant_minutes": person.truant_minutes,
 			"pace": person.pace, "health": person.health, "restrictions": person.restrictions.duplicate(),
 			"points": person.points, "quiet_room_hours": person.quiet_room_hours, "lying": person.lying,
-			"bed_in_infirmary": (main.infirmary as Infirmary).beds.get(person, Vector2i(-1, -1)), "pocket": person.pocket.map(func(def: ItemDef) -> StringName: return def.id),
+			"bed_in_infirmary": (main.infirmary as Infirmary).beds.get(person, Vector2i(-1, -1)),
+			"checkup": 2 if (main.infirmary as Infirmary).checking.has(person) else 1 if (main.infirmary as Infirmary).checkups.has(person) else 0,
+			"pocket": person.pocket.map(func(def: ItemDef) -> StringName: return def.id),
 			"profile": person.profile.duplicate(true), "bed": person.bed,
 			"doing": people.doing_of(person), "work": (main.jobs as JobBoard).work_of(person),
 		})
@@ -187,6 +189,9 @@ static func apply_world(main: Node, data: Dictionary) -> void:
 		var bed: Vector2i = entry.get("bed_in_infirmary", Vector2i(-1, -1))
 		if bed.x != -1:
 			(main.infirmary as Infirmary).beds[person] = bed
+		match entry.get("checkup", 0):
+			1: (main.infirmary as Infirmary).checkups.append(person)
+			2: (main.infirmary as Infirmary).checking[person] = true
 		person.pocket.clear()
 		for id: StringName in entry.get("pocket", []):
 			var def := PrisonCatalogue.item(id)

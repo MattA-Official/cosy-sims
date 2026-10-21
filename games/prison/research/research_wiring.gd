@@ -6,7 +6,7 @@ class_name ResearchWiring
 ## Job kinds -> the Counters event each one finished counts as.
 const JOB_EVENTS := {&"treat": &"treatment", &"search": &"search_done", &"repair": &"repair_done",
 		&"laundry": &"laundry_load", &"cook": &"meal_batch", &"make": &"workshop_good",
-		&"teach": &"course_session", &"patrol": &"patrol_hour"}
+		&"teach": &"course_session", &"checkup": &"checkup"}
 ## Fighters it takes to count as a big fight.
 const BIG_FIGHT := 5
 ## A calm day: no fights, and prisoners' average mood at least this.
@@ -29,6 +29,8 @@ static func setup(main: Node) -> void:
 	knowhow.sources = board.sources
 	knowhow.counters = counters
 	knowhow.clock = clock
+	# Cards such as Research assistants make a kind come faster.
+	knowhow.scale = func(kind: StringName) -> float: return Modifiers.scale(main.modifiers, StringName("knowhow_%s" % kind))
 	main.add_child(knowhow)
 	research.name = "Research"
 	research.board = board
@@ -76,6 +78,15 @@ static func _count(main: Node) -> void:
 	(main.jobs as JobBoard).job_finished.connect(func(job: Job, _worker: Person) -> void:
 		if JOB_EVENTS.has(job.kind):
 			counters.add(JOB_EVENTS[job.kind]))
+	# Patrols count by the hour a guard spends on them, not by the job.
+	var patrolled := {"minutes": 0.0}
+	(main.clock as GameClock).minute_passed.connect(func(_minute: int) -> void:
+		for person: Person in people.people:
+			if person.job != null and person.job.kind == &"patrol":
+				patrolled.minutes += 1.0
+		if patrolled.minutes >= 60.0:
+			counters.add(&"patrol_hour", floori(patrolled.minutes / 60.0))
+			patrolled.minutes = fmod(patrolled.minutes, 60.0))
 	people.moodlet_added.connect(func(_person: Person, id: StringName) -> void:
 		if id == &"good_meal":
 			counters.add(&"meal_good")
@@ -155,6 +166,9 @@ static func _count(main: Node) -> void:
 static func _feedback(main: Node) -> void:
 	var research: Research = main.research
 	(main.standing as Standing).report_lines.append(research.report_lines)
+	(main.inspector as Inspector).person_lines.append(func(person: Person) -> String:
+		var record := (main.roster as StaffRoster).record_of(person)
+		return research.owner_line(record.id) if record != null else "")
 	var toast := func(title: String, body: String) -> void:
 		var toasts := main.get_node_or_null("/root/Toasts")
 		if not main.attract and toasts != null:

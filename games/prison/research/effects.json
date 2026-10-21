@@ -483,6 +483,10 @@
   {
    "modifier": "research_speed",
    "amount": 0.05
+  },
+  {
+   "modifier": "knowhow_learning",
+   "amount": 0.1
   }
  ],
  "restorative-justice": [

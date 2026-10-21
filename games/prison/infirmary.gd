@@ -6,6 +6,8 @@ extends Node
 ## and a nurse looking after them mends them quickly. Without an
 ## infirmary, the hurt mend slowly wherever they are and the knocked out
 ## come round after a while. Nobody dies: health never falls below FLOOR.
+## New arrivals have a check-up: when a nurse is on duty and a bed is
+## free, they lie down for a nurse to look them over.
 
 ## Health a nurse's visit gives back, and how long it takes.
 const TREAT_HEALTH := 15.0
@@ -29,6 +31,7 @@ const DISCHARGE := 90.0
 var deaths := false
 
 signal died(person: Person, level: int, point: Vector2)
+signal checked(person: Person)
 
 ## Bonuses such as a department head's. Optional.
 var modifiers: Modifiers
@@ -44,6 +47,9 @@ var clock: GameClock:
 var beds: Dictionary[Person, Vector2i] = {}
 ## The knocked out being carried, and who by.
 var carried: Dictionary[Person, Person] = {}
+## New arrivals waiting for a check-up, and those in a bed having one.
+var checkups: Array[Person] = []
+var checking: Dictionary[Person, bool] = {}
 var _out_for: Dictionary[Person, float] = {}
 
 
@@ -52,16 +58,42 @@ func start() -> void:
 	jobs.rebuilders[&"treat"] = func(work: Dictionary) -> Job:
 		var person := _patient_in(work)
 		return _treat_job(person) if person != null else null
+	jobs.rebuilders[&"checkup"] = jobs.rebuilders[&"treat"]
 	jobs.rebuilders[&"carry_patient"] = func(work: Dictionary) -> Job:
 		var person := _patient_in(work)
 		return _carry_job(person) if person != null else null
 	people.person_removed.connect(func(person: Person) -> void:
 		beds.erase(person)
 		carried.erase(person)
+		checkups.erase(person)
+		checking.erase(person)
 		_out_for.erase(person))
 
 
+## Puts arrivals on the list for a check-up.
+func want_checkups(arrivals: Array[Person]) -> void:
+	for person in arrivals:
+		if not checkups.has(person):
+			checkups.append(person)
+
+
+func _start_checkups() -> void:
+	if checkups.is_empty() or not nurse_on_duty():
+		return
+	for person: Person in checkups.duplicate():
+		# Once they're through reception and have a cell.
+		if beds.has(person) or people.home_room(person).is_empty():
+			continue
+		var bed := free_bed()
+		if bed == Vector2i(-1, -1):
+			return
+		checkups.erase(person)
+		beds[person] = bed
+		checking[person] = true
+
+
 func tick(minutes: float) -> void:
+	_start_checkups()
 	for person in people.people.duplicate():
 		if person.health >= Health.WELL and not beds.has(person):
 			continue
@@ -69,7 +101,7 @@ func tick(minutes: float) -> void:
 			die(person)
 			continue
 		var injury := Health.injury(person.health)
-		if beds.has(person) and not person.lying and injury < Health.Injury.HURT:
+		if beds.has(person) and not person.lying and injury < Health.Injury.HURT and not checking.has(person):
 			beds.erase(person)
 		if not beds.has(person) and injury >= Health.Injury.HURT:
 			var bed := free_bed()
@@ -77,7 +109,7 @@ func tick(minutes: float) -> void:
 				beds[person] = bed
 		if person.lying and beds.has(person):
 			person.health = minf(100.0, person.health + BED_HEAL * minutes / 60.0)
-			if person.health >= DISCHARGE:
+			if person.health >= DISCHARGE and not checking.has(person):
 				get_up(person)
 			elif not _has_treat_job(person):
 				_post_treat(person)
@@ -135,7 +167,7 @@ func nurse_on_duty() -> bool:
 ## Patients go to bed and stay there; the knocked out stay put.
 func _patient(person: Person, _may_wander: bool) -> bool:
 	if person.lying and beds.has(person):
-		person.activity = "Getting better in the infirmary"
+		person.activity = "Having a check-up" if checking.has(person) else "Getting better in the infirmary"
 		return true
 	var injury := Health.injury(person.health)
 	# The knocked out wait to be carried.
@@ -150,10 +182,11 @@ func _patient(person: Person, _may_wander: bool) -> bool:
 	if injury == Health.Injury.KNOCKED_OUT:
 		person.activity = "Knocked out"
 		return true
-	if not beds.has(person) or injury < Health.Injury.HURT:
+	if not beds.has(person) or (injury < Health.Injury.HURT and not checking.has(person)):
 		return false
 	var spot := _bed_spot(person)
-	return not spot.is_empty() and people.walk_to(person, spot[0], spot[1], "Limping to the infirmary")
+	return not spot.is_empty() and people.walk_to(person, spot[0], spot[1],
+			"Going for a check-up" if checking.has(person) else "Limping to the infirmary")
 
 
 func _lie_in(person: Person, placed: BuildingMap.PlacedObject) -> void:
@@ -237,7 +270,8 @@ func _process(_delta: float) -> void:
 
 
 func _has_treat_job(person: Person) -> bool:
-	return jobs.of_kind(&"treat").any(func(j: Job) -> bool: return j.get_meta(&"patient") == person)
+	return (jobs.of_kind(&"treat") + jobs.of_kind(&"checkup")).any(func(j: Job) -> bool:
+		return j.get_meta(&"patient") == person)
 
 
 func _post_treat(person: Person) -> void:
@@ -252,15 +286,21 @@ func _treat_job(person: Person) -> Job:
 	if spot.is_empty():
 		return null
 	var job := Job.new()
-	job.kind = &"treat"
-	job.title = "Look after %s" % person.name.get_slice(" ", 0)
+	var checkup := checking.has(person)
+	job.kind = &"checkup" if checkup else &"treat"
+	job.title = ("Check-up for %s" if checkup else "Look after %s") % person.name.get_slice(" ", 0)
 	job.priority = 5
 	job.set_meta(&"patient", person)
 	var stage := Job.on_tile(Job.Do.WORK, spot[0], Vector2i(spot[1].floor()))
 	stage.minutes = TREAT_MINUTES / Modifiers.scale(modifiers, &"treat_speed")
-	stage.doing = "Patching up %s" % person.name.get_slice(" ", 0)
+	stage.doing = ("Looking %s over" if checkup else "Patching up %s") % person.name.get_slice(" ", 0)
 	stage.finish = func(_stage: Job.Stage, _nurse: Person) -> void:
-		if people.people.has(person):
-			person.health = minf(100.0, person.health + TREAT_HEALTH)
+		if not people.people.has(person):
+			return
+		person.health = minf(100.0, person.health + TREAT_HEALTH)
+		if checking.has(person):
+			checking.erase(person)
+			checked.emit(person)
+			get_up(person)
 	job.stages = [stage]
 	return job

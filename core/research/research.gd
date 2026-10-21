@@ -141,6 +141,8 @@ var clock: GameClock:
 var _department_of_hire: Dictionary[StringName, StringName] = {}
 ## Joint card id -> roster ids at today's meeting so far.
 var _attended: Dictionary[StringName, Array] = {}
+## Card id -> [progress last night, share done a day], for "about N days".
+var _pace: Dictionary[StringName, Array] = {}
 
 
 func start() -> void:
@@ -244,7 +246,7 @@ func why_not(def: ResearchCardDef) -> String:
 		return "Comes with an add-on."
 	match s.state:
 		State.HIDDEN:
-			return "Not turned up yet" + (": %s." % def.reveal.hint if def.reveal != null else ".")
+			return "Not turned up yet" + (": %s." % hint_words(def) if def.reveal != null else ".")
 		State.RESEARCHING, State.PAUSED:
 			return "Already under way."
 		State.TRIAL:
@@ -506,10 +508,65 @@ func owner_line(owner: int) -> String:
 				if s.partner != &"":
 					var other := s.partner if s.slot == slot else s.slot
 					with = " with %s (meetings at %d:00)" % [slot_name(other), MEETING_HOUR]
-				lines.append("Researching %s%s: %d%%" % [def.display_name, with, roundi(progress(def) * 100.0)])
+				var days := days_left(def)
+				lines.append("Researching %s%s: %d%%%s" % [def.display_name, with, roundi(progress(def) * 100.0),
+						"" if days <= 0 else ", about %d day%s left" % [days, "" if days == 1 else "s"]])
+				var away := away_line(s)
+				if away != "":
+					lines.append(away)
 	if pet_projects.has(owner):
 		lines.append("Pet project: %s" % card(pet_projects[owner]).display_name)
 	return "\n".join(lines)
+
+
+## Days a card has left at the pace of the last few days, or 0 when
+## there's no pace yet.
+func days_left(def: ResearchCardDef) -> int:
+	var pace: Array = _pace.get(def.id, [])
+	if pace.size() < 2 or pace[1] <= 0.0:
+		return 0
+	return maxi(1, ceili((1.0 - progress(def)) / pace[1]))
+
+
+func _note_pace() -> void:
+	for id: StringName in states:
+		if states[id].state != State.RESEARCHING:
+			_pace.erase(id)
+			continue
+		var now := progress(card(id))
+		var pace: Array = _pace.get(id, [])
+		if pace.is_empty():
+			_pace[id] = [now]
+		else:
+			var day := now - float(pace[0])
+			var was: float = pace[1] if pace.size() > 1 else day
+			# Lean on the last day, but keep a little of the days before.
+			_pace[id] = [now, lerpf(was, day, 0.6)]
+
+
+## "Paused: Ann Lee is off sick until day 5." when someone a card needs
+## is away, or "".
+func away_line(s: CardState) -> String:
+	for slot in [s.slot, s.partner]:
+		var record := _record(slot_owner(slot)) if slot != &"" else null
+		if record != null and record.off_until >= _day():
+			return "Paused: %s is %s until day %d." % [record.name, record.away if record.away != "" else "away", record.off_until + 1]
+	return ""
+
+
+## Fits desk time left to today's speed (morale, budgets, modifiers), so a
+## change shows on cards already started.
+func respeed() -> void:
+	for id: StringName in states:
+		var s: CardState = states[id]
+		if s.state != State.RESEARCHING:
+			continue
+		var def := card(id)
+		for item in _desk_items(def):
+			var share := item.done_share()
+			var total := maxf(minutes(def) * (1.0 - s.progress) / speed(def, slot_owner(s.slot)), 1.0)
+			item.total = total
+			item.minutes = total * (1.0 - share)
 
 
 ## Puts cards whose slot came back (a head hired again) back on a desk.
@@ -585,6 +642,8 @@ func nightly() -> void:
 	var today := _day()
 	yesterday_news = news
 	news = []
+	_note_pace()
+	respeed()
 	if has_flag(&"department_budgets") and pay.is_valid():
 		var spend := 0
 		for department: StringName in budget:
@@ -667,6 +726,10 @@ func attend(id: StringName, owner: int) -> void:
 	var pace := (speed(def, a) + speed(def, b)) / 2.0
 	s.progress = minf(1.0, s.progress + MEETING_MINUTES * pace / minutes(def))
 	if s.progress >= 0.999:
+		# Both heads learn from a joint card, as from one on their desk.
+		for record in [_record(a), _record(b)]:
+			if record != null and roster != null:
+				roster.add_xp(record, Heads.CARD_XP)
 		_reached_end(def, a)
 	changed.emit()
 
@@ -686,6 +749,7 @@ func _meeting_seats() -> Array[Vector2i]:
 
 func set_budget(department: StringName, amount: int) -> void:
 	budget[department] = maxi(0, amount)
+	respeed()
 	changed.emit()
 
 
@@ -972,6 +1036,24 @@ func lean_words() -> String:
 
 # --- Inside -------------------------------------------------------------------
 
+## A face-down card's hint, with how far along it is when it counts
+## things: "10 drug finds (6 so far)".
+func hint_words(def: ResearchCardDef) -> String:
+	if def.reveal == null:
+		return "From the start"
+	var reveal_def := def.reveal
+	match reveal_def.kind:
+		RevealDef.Kind.COUNT, RevealDef.Kind.EVENT, RevealDef.Kind.PRISONER:
+			if counters != null and reveal_def.count > 1:
+				var seen := 0
+				for id in String(reveal_def.id).split("|"):
+					seen += counters.total(StringName(id))
+				return "%s (%d so far)" % [reveal_def.hint, mini(seen, reveal_def.count)]
+		RevealDef.Kind.GRADE:
+			return "%s (now grade %d)" % [reveal_def.hint, _grade()]
+	return reveal_def.hint
+
+
 func _revealed_now(reveal_def: RevealDef) -> String:
 	match reveal_def.kind:
 		RevealDef.Kind.START:
@@ -982,7 +1064,9 @@ func _revealed_now(reveal_def: RevealDef) -> String:
 			var seen := 0
 			for id in String(reveal_def.id).split("|"):
 				seen += counters.total(StringName(id))
-			return reveal_def.hint if seen >= reveal_def.count else ""
+			# A Party planner makes things count more towards turning cards up.
+			var scale := Modifiers.scale(modifiers, &"reveal_counts") if reveal_def.kind != RevealDef.Kind.FIRST else 1.0
+			return reveal_def.hint if seen * scale >= reveal_def.count else ""
 		RevealDef.Kind.BUILT:
 			return reveal_def.hint if _built(String(reveal_def.id).split("|")) else ""
 		RevealDef.Kind.SETTING:
