@@ -172,6 +172,52 @@ func add_land(rect: Rect2i) -> void:
 	_changed()
 
 
+## Gives up a rectangle of land: owned rectangles it overlaps are cut
+## around it.
+func remove_land(rect: Rect2i) -> void:
+	land.assign(subtract_rect(land, rect))
+	_changed()
+
+
+## Rectangles less one, cutting any that overlap it into the pieces left.
+static func subtract_rect(rects: Array[Rect2i], cut: Rect2i) -> Array[Rect2i]:
+	var out: Array[Rect2i] = []
+	for rect in rects:
+		var overlap := rect.intersection(cut)
+		if not overlap.has_area():
+			out.append(rect)
+			continue
+		# Strips above and below the cut, then left and right of it.
+		var pieces: Array[Rect2i] = [
+			Rect2i(rect.position.x, rect.position.y, rect.size.x, overlap.position.y - rect.position.y),
+			Rect2i(rect.position.x, overlap.end.y, rect.size.x, rect.end.y - overlap.end.y),
+			Rect2i(rect.position.x, overlap.position.y, overlap.position.x - rect.position.x, overlap.size.y),
+			Rect2i(overlap.end.x, overlap.position.y, rect.end.x - overlap.end.x, overlap.size.y)]
+		for piece in pieces:
+			if piece.has_area():
+				out.append(piece)
+	return out
+
+
+## Whether anything is built in a rectangle: floors, walls, objects or
+## stairs.
+func in_use(rect: Rect2i) -> bool:
+	for cell in floors:
+		if rect.has_point(cell):
+			return true
+	for edge: Vector3i in walls:
+		if rect.has_point(Vector2i(edge.x, edge.y)):
+			return true
+	for key: Vector4i in slants:
+		for end: Vector2i in slant_ends(key):
+			if Rect2(rect).has_point(Vector2(end)):
+				return true
+	for placed: PlacedObject in objects.values():
+		if Rect2(rect).intersects(placed.rect):
+			return true
+	return false
+
+
 ## The smallest rectangle covering all owned land.
 func land_bounds() -> Rect2i:
 	var bounds := land[0]

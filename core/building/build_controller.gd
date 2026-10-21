@@ -87,7 +87,8 @@ const FLOOR_HINTS := {
 
 const WALL_PAINT_HINT := "Click or drag along walls to paint the side you can see. Shift-click paints every wall round the room, Ctrl takes paint off."
 
-const LAND_HINT := "Click a strip next to your land to buy it. Tick flatten to level it with your land, for a fee."
+const LAND_HINT := "Click a plot next to your land to buy it, or drag across several. Ctrl+Z gives it back for a full refund until the hour is up."
+const SELL_HINT := "Click or drag across your empty plots to sell them back for half what they cost."
 
 const WATER_HINTS := {
 	WaterMode.ADD: "Click a hollow to fill it with water. Digging deeper or cutting the rim moves the water.",
@@ -186,6 +187,8 @@ var water_mode := WaterMode.NONE
 var land_plots: LandPlots
 ## The terrain tool buys land instead of sculpting, flattening it if asked.
 var buying_land := false
+## In the land mode, selling back rather than buying.
+var selling_land := false
 var flatten_land := false
 var floor_mode := FloorMode.LAY:
 	set(value):
@@ -240,6 +243,9 @@ var _path_preview := MeshInstance3D.new()
 var _path_status := ""
 var _door_status_shown := ""
 var _land_status_shown := ""
+## The last land picked, and what it was picked from: [chosen, outlined, ok].
+var _land_key: Array = []
+var _land_cache: Array = []
 var _brushing := false
 var _flatten_target := 0.0
 var _plant_cooldown := 0.0
@@ -423,9 +429,8 @@ func _on_press() -> void:
 			else:
 				path_tool.press(_hover_point, _erasing())
 		Tool.TERRAIN when _buying():
-			var plot := land_plots.plot_at(_hover_cell())
-			if plot.has_area() and not land_plots.buy(plot, flatten_land):
-				land_refused.emit()
+			_dragging = true
+			_drag_start_cell = _hover_cell()
 		Tool.TERRAIN when water_mode != WaterMode.NONE:
 			if water != null and water_mode == WaterMode.ADD:
 				water.fill_at(_hover_cell())
@@ -483,6 +488,12 @@ func _on_release() -> void:
 			else:
 				map.build_walls(edges, wall_style)
 				map.build_slants(keys, wall_style)
+		Tool.TERRAIN when _buying():
+			var plots := _land_choice()
+			var done := land_plots.sell_all(plots) if selling_land else land_plots.buy_all(plots, flatten_land)
+			_land_cache = []
+			if not done:
+				land_refused.emit()
 		Tool.DEMOLISH:
 			if rect.size != Vector2i.ONE:
 				map.demolish(rect)
@@ -568,7 +579,7 @@ func hint() -> String:
 			return "Perimeter fences go round the ground floor. Page Down to go back to it."
 		return "This tool works on the ground floor. Page Down to go back to it."
 	if _buying():
-		return (LAND_HINT + "\n" + _land_status_shown).strip_edges()
+		return ((SELL_HINT if selling_land else LAND_HINT) + "\n" + _land_status_shown).strip_edges()
 	if tool == Tool.TERRAIN and water_mode != WaterMode.NONE:
 		return WATER_HINTS[water_mode]
 	if tool == Tool.PATH:
@@ -1295,30 +1306,83 @@ func _buying() -> bool:
 	return tool == Tool.TERRAIN and buying_land and land_plots != null
 
 
-## Outlines every plot for sale, filling the one under the mouse: green if
-## you can pay for it, red if not.
+## The plots a click or drag picks: those for sale (or, selling, yours)
+## under it.
+func _land_choice() -> Array[Rect2i]:
+	var end := _hover_cell()
+	var start := _drag_start_cell if _dragging else end
+	var key := [start, land_plots.plot_at(end), selling_land, land_plots.building.land.size(), _land_money()]
+	if key == _land_key and not _land_cache.is_empty():
+		return _land_cache[0]
+	var under := land_plots.plots_between(start, end)
+	var chosen: Array[Rect2i] = []
+	if selling_land:
+		chosen.assign(under.filter(land_plots.is_owned))
+	else:
+		chosen = land_plots.buyable(under)
+	var outlined: Array[Rect2i] = []
+	if selling_land:
+		outlined = land_plots.owned()
+	else:
+		outlined = land_plots.plots()
+	var ok := land_plots.can_sell_all(chosen) if selling_land else land_plots.can_afford_all(chosen, flatten_land)
+	_land_key = key
+	_land_cache = [chosen, outlined, ok]
+	return chosen
+
+
+func _land_money() -> int:
+	return land_plots.ledger.balance if land_plots.ledger != null else 0
+
+
+## Outlines every plot for sale (or, selling, yours), filling those a click
+## or drag would take: green if it can go ahead, red if not.
 func _preview_land() -> void:
-	var hovered := land_plots.plot_at(_hover_cell()) if _has_hover else Rect2i()
-	for plot in land_plots.plots():
-		if plot == hovered:
-			var colour := ok_colour if land_plots.can_afford(plot, flatten_land) else bad_colour
-			_shapes.cells(BuildingMap.cells_in(plot), colour)
+	if not _has_hover:
+		return
+	var chosen := _land_choice()
+	for plot: Rect2i in _land_cache[1]:
+		if chosen.has(plot):
 			continue
-		for cell in BuildingMap.cells_in(plot):
-			if cell.x == plot.position.x or cell.y == plot.position.y \
-					or cell.x == plot.end.x - 1 or cell.y == plot.end.y - 1:
-				_shapes.cells([cell], land_colour, NAN, 0.03)
+		for cell in _plot_edge(plot):
+			_shapes.cells([cell], land_colour, NAN, 0.03)
+	var colour := ok_colour if _land_cache[2] else bad_colour
+	for plot in chosen:
+		_shapes.cells(BuildingMap.cells_in(plot), colour)
 
 
-## The price of the plot under the mouse, with flattening.
+func _plot_edge(plot: Rect2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for cell in BuildingMap.cells_in(plot):
+		if cell.x == plot.position.x or cell.y == plot.position.y \
+				or cell.x == plot.end.x - 1 or cell.y == plot.end.y - 1:
+			out.append(cell)
+	return out
+
+
+## What a click or drag would buy or sell, and for how much.
 func _land_status() -> String:
-	var plot := land_plots.plot_at(_hover_cell())
-	if not plot.has_area():
-		return "Point at a strip next to your land."
-	var text := "%d × %d strip: %s" % [plot.size.x, plot.size.y, Ledger.text(land_plots.price(plot))]
+	var chosen := _land_choice()
+	var count := chosen.size()
+	var plots_text := "%d plot%s" % [count, "" if count == 1 else "s"]
+	if selling_land:
+		if count == 0:
+			return "Point at one of your plots."
+		var back := 0
+		for plot in chosen:
+			back += land_plots.sell_price(plot)
+		if not land_plots.can_sell_all(chosen):
+			return "Only empty plots sell back, and your land must stay in one piece."
+		return "Sell %s back for %s." % [plots_text, Ledger.text(back)]
+	if count == 0:
+		return "Point at a plot next to your land."
+	var text := "%s: %s" % [plots_text, Ledger.text(land_plots.price_of(chosen))]
 	if flatten_land:
-		text += ", plus %s to flatten" % Ledger.text(land_plots.flatten_price(plot))
-	if not land_plots.can_afford(plot, flatten_land):
+		var fee := 0
+		for plot in chosen:
+			fee += land_plots.flatten_price(plot)
+		text += ", plus %s to flatten" % Ledger.text(fee)
+	if not land_plots.can_afford_all(chosen, flatten_land):
 		text += ". You can't afford it yet."
 	return text
 

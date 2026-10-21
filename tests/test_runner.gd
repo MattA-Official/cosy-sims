@@ -1415,13 +1415,12 @@ func _test_buying_land() -> void:
 	var ledger: Ledger = main.ledger
 	var land := building.land[0]
 	var for_sale := plots.plots()
-	_check(not for_sale.is_empty(), "plots next to your land are for sale")
-	_check(for_sale.size() == 4 and for_sale.all(func(p: Rect2i) -> bool:
-			return not p.intersects(land) and p.grow(1).intersects(land) and maxi(p.size.x, p.size.y) == 48),
-			"a strip the length of each side is for sale")
-	# A bumpy strip to the right of the land.
+	_check(for_sale.size() == 8 and for_sale.all(func(p: Rect2i) -> bool:
+			return not p.intersects(land) and p.grow(1).intersects(land) and p.size == Vector2i(24, 24)),
+			"the plots beside your land are for sale, 24 tiles square")
+	# A bumpy plot to the right of the land.
 	var plot := plots.plot_at(Vector2i(land.end.x + 1, land.position.y + 1))
-	_check(plot.has_area(), "a plot to the side can be bought")
+	_check(plot.has_area() and plot in for_sale, "a plot to the side can be bought")
 	var flat_price := plots.price(plot)
 	for corner in plots._corners(plot):
 		terrain.set_corner_height(corner, 1.0 if (corner.x + corner.y) % 2 == 0 else 0.0)
@@ -1441,13 +1440,32 @@ func _test_buying_land() -> void:
 	_check(is_equal_approx(terrain.corner_height(plot.get_center()), edge_height),
 			"flattening levels the plot with your land")
 	_check(not plot in plots.plots(), "a bought plot isn't for sale any more")
-	_check(plots.plot_at(Vector2i(plot.end.x + 1, plot.position.y + 1)).has_area(), "the next strip out is for sale now")
-	_check(plots.plot_at(Vector2i(land.position.x + 1, land.end.y + 1)).end.x == plot.end.x,
-			"and the strips along the other sides run the new length")
-	var bumpy := plots.plot_at(Vector2i(land.position.x - 2, land.position.y + 1))
-	terrain.set_corner_height(bumpy.get_center(), 2.0)
-	_check(plots.buy(bumpy, false) and is_equal_approx(terrain.corner_height(bumpy.get_center()), 2.0),
-			"without flatten the hills stay")
+	var corner_plot := Rect2i(plot.position - Vector2i(0, plot.size.y), plot.size)
+	_check(corner_plot in plots.plots(), "the plot round the corner is for sale now")
+	var far := plots.plot_at(Vector2i(land.position.x - 1, land.end.y + 1))
+	_check(not far in plots.plots() and plots.buyable(plots.plots_between(far.position,
+			Vector2i(land.position.x + 1, land.end.y + 1))).size() == 2,
+			"a plot away from your land can be bought with one between in the same drag")
+	_check(plots.buy_all(plots.buyable(plots.plots_between(far.position, Vector2i(land.position.x + 1, land.end.y + 1))))
+			and building.ground().owns(far.get_center()), "a dragged block buys together")
+	# Giving land back.
+	_check(not plots.can_sell(Rect2i(land.position, plot.size)), "land with the prison on it doesn't sell")
+	var before := ledger.balance
+	_check(plots.undo_last() and not building.ground().owns(far.get_center())
+			and ledger.balance == before + plots.PLOT_PRICE * 2, "undone within the hour, a purchase is refunded in full")
+	_check(not plots.can_sell(plot), "land a road runs through doesn't sell")
+	plots.buy(corner_plot, false)
+	var price_paid: int = plots.paid[corner_plot.position]
+	before = ledger.balance
+	_check(plots.sell_all([corner_plot]) and not building.ground().owns(corner_plot.get_center())
+			and ledger.balance == before + snappedi(price_paid / 2, 10), "empty land sells back at half price")
+	plots.buy(corner_plot, false)
+	(main.clock as GameClock).jump_to_hour(((main.clock as GameClock).hour() + 2) % 24)
+	_check(not plots.undo_last() and building.ground().owns(corner_plot.get_center()), "after the hour, it stays bought")
+	var left := plots.plot_at(Vector2i(land.position.x - 1, land.position.y + 1))
+	var above_left := Rect2i(left.position - Vector2i(0, left.size.y), left.size)
+	_check(plots.buy_all([left, above_left]) and not plots.can_sell(left) and plots.can_sell(above_left),
+			"land that would leave a piece cut off doesn't sell")
 	var saved := PrisonSave.capture(main)
 	main.queue_free()
 	main = load("res://games/prison/main.tscn").instantiate()

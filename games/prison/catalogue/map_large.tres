@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MapSizeDef" format=3]
+
+[ext_resource type="Script" path="res://core/building/map_size_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"large"
+display_name = "Large"
+description = "Start on 8 × 8 plots and buy up to 16 × 16."
+plots = 16
+start_plots = 8
+margin = 24
+offered = true

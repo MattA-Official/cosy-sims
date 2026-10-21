@@ -152,6 +152,16 @@ const ROLES: Array[StaffRoleDef] = [
 
 ## Staff shifts. Days start at 06:00 so the cook is in for breakfast;
 ## nights pay half as much again.
+## Map sizes: the three offered for a new prison, then the samples' and
+## older saves'.
+const MAP_SIZES: Array[MapSizeDef] = [
+	preload("res://games/prison/catalogue/map_small.tres"),
+	preload("res://games/prison/catalogue/map_medium.tres"),
+	preload("res://games/prison/catalogue/map_large.tres"),
+	preload("res://games/prison/catalogue/map_sample.tres"),
+	preload("res://games/prison/catalogue/map_legacy.tres"),
+]
+
 const SHIFTS: Array[ShiftDef] = [
 	preload("res://games/prison/catalogue/shift_day.tres"),
 	preload("res://games/prison/catalogue/shift_night.tres"),
@@ -420,3 +430,10 @@ const COURSES: Array[CourseDef] = [
 	preload("res://games/prison/catalogue/course_woodwork.tres"),
 	preload("res://games/prison/catalogue/course_calm_minds.tres"),
 ]
+
+
+static func map_size(id: StringName) -> MapSizeDef:
+	for def in MAP_SIZES:
+		if def.id == id:
+			return def
+	return null

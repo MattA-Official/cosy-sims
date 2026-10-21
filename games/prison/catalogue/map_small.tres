@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MapSizeDef" format=3]
+
+[ext_resource type="Script" path="res://core/building/map_size_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"small"
+display_name = "Small"
+description = "Room for a few hundred prisoners: start on 4 × 4 plots and buy up to 8 × 8."
+plots = 8
+start_plots = 4
+margin = 24
+offered = true
