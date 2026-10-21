@@ -124,6 +124,11 @@ static func capture(main: Node) -> Dictionary:
 		"reputation": (main.reputation as Reputation).capture(),
 		"protest": (main.protest as Protest).capture(),
 		"protest_on": (main.protest as Protest).enabled,
+		"seasons_on": (main.calendar as Calendar).enabled,
+		"season_length": (main.calendar as Calendar).length,
+		"weather": (main.weather as Weather).capture(),
+		"weather_on": (main.weather as Weather).enabled,
+		"usual_meal": String(main.get_meta(&"usual_meal", "")),
 		"suggestions": (main.suggestions as Suggestions).capture(),
 		"visits": (main.visits as Visits).capture(),
 		"garden": (main.garden as Garden).capture(),
@@ -362,6 +367,13 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	if data.has("protest"):
 		(main.protest as Protest).restore(data["protest"])
 	(main.protest as Protest).enabled = data.get("protest_on", true)
+	(main.calendar as Calendar).enabled = data.get("seasons_on", true)
+	(main.calendar as Calendar).length = int(data.get("season_length", 7))
+	(main.weather as Weather).enabled = data.get("weather_on", true)
+	if data.has("weather"):
+		(main.weather as Weather).restore(data["weather"])
+	if not String(data.get("usual_meal", "")).is_empty():
+		main.set_meta(&"usual_meal", StringName(data["usual_meal"]))
 	(main.illnesses as Illnesses).fill_in()
 	var parole_data: Dictionary = data.get("parole", {})
 	var parole: Parole = main.parole

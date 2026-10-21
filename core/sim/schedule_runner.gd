@@ -53,6 +53,9 @@ var lockdown := false:
 ## each one's key and whether it should be locked. Hand locks still win.
 ## Optional.
 var other_locks: Callable
+## (group, block) -> block: stands in for a timetabled block, such as on a
+## festive day. Call refresh() when what they give changes.
+var substitutes: Array[Callable] = []
 
 ## What the timetable alone wants each door it controls to be.
 var _planned: Dictionary[Vector4i, bool] = {}
@@ -109,9 +112,17 @@ func merge(key: StringName) -> void:
 ## The block a timetable (a group, or "group/category") is in now.
 func current(group: StringName = &"prisoner") -> ActivityDef:
 	if not _current.has(group) and schedules.has(group) and clock != null:
-		_current[group] = schedules[group].at_time(clock.total_minutes)
+		_current[group] = _substitute(group, schedules[group].at_time(clock.total_minutes))
 		_started[group] = clock.total_minutes
 	return _current.get(group)
+
+
+## The block after any stand-ins for today, such as festivities or the
+## yard moving indoors in the rain.
+func _substitute(group: StringName, def: ActivityDef) -> ActivityDef:
+	for swap in substitutes:
+		def = swap.call(group, def)
+	return def
 
 
 ## Game minutes since a timetable's block began.
@@ -124,7 +135,7 @@ func minutes_into_block(group: StringName = &"prisoner") -> float:
 ## theirs. Called every half hour, and when a timetable is edited.
 func refresh() -> void:
 	for group: StringName in schedules:
-		var def := schedules[group].at_time(clock.total_minutes)
+		var def := _substitute(group, schedules[group].at_time(clock.total_minutes))
 		if _current.get(group) != def:
 			_current[group] = def
 			_started[group] = clock.total_minutes

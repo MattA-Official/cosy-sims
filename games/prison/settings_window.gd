@@ -15,6 +15,8 @@ var sentences: Sentences
 var research: Research
 var illnesses: Illnesses
 var protest: Protest
+var calendar: Calendar
+var weather: Weather
 
 var _difficulty := OptionButton.new()
 var _about := Label.new()
@@ -25,6 +27,10 @@ var _red_tape := OptionButton.new()
 var _research := OptionButton.new()
 var _illness := CheckButton.new()
 var _protestors := CheckButton.new()
+var _seasons := CheckButton.new()
+var _season_length := OptionButton.new()
+var _weather := CheckButton.new()
+const SEASON_LENGTHS: Array[int] = [3, 5, 7, 10, 14, 30]
 
 
 func _ready() -> void:
@@ -106,6 +112,26 @@ func _ready() -> void:
 		if protest != null:
 			protest.enabled = on)
 	box.add_child(_row("Protestors", _protestors))
+	_seasons.focus_mode = FOCUS_NONE
+	_seasons.tooltip_text = "On, the year turns through spring, summer, autumn and winter, with their own light, weather and festive days."
+	_seasons.toggled.connect(func(on: bool) -> void:
+		if calendar != null:
+			calendar.enabled = on)
+	box.add_child(_row("Seasons", _seasons))
+	for days in SEASON_LENGTHS:
+		_season_length.add_item("%d days" % days)
+	_season_length.focus_mode = FOCUS_NONE
+	_season_length.tooltip_text = "How many game days each season lasts."
+	_season_length.item_selected.connect(func(index: int) -> void:
+		if calendar != null:
+			calendar.length = SEASON_LENGTHS[index])
+	box.add_child(_row("Season length", _season_length))
+	_weather.focus_mode = FOCUS_NONE
+	_weather.tooltip_text = "On, rain, snow, heat and storms come and go. Wet days move the yard indoors; snow needs gritting."
+	_weather.toggled.connect(func(on: bool) -> void:
+		if weather != null:
+			weather.enabled = on)
+	box.add_child(_row("Weather", _weather))
 	box.add_child(HSeparator.new())
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()
@@ -157,3 +183,8 @@ func refresh() -> void:
 		_illness.set_pressed_no_signal(illnesses.enabled)
 	if protest != null:
 		_protestors.set_pressed_no_signal(protest.enabled)
+	if calendar != null:
+		_seasons.set_pressed_no_signal(calendar.enabled)
+		_season_length.select(maxi(SEASON_LENGTHS.find(calendar.length), 0))
+	if weather != null:
+		_weather.set_pressed_no_signal(weather.enabled)

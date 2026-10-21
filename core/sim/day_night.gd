@@ -26,7 +26,12 @@ extends Node
 ## The ground's material, whose fog_colour follows the light. Optional.
 var fog_material: ShaderMaterial
 
+## How much an overcast sky dims the sun.
+const OVERCAST_DIM := 0.45
+
 var clock: GameClock
+## How grey the weather makes the day, 0 to 1.
+var overcast := 0.0
 ## Keeps it midday whatever the time.
 var always_day := false:
 	set(value):
@@ -75,13 +80,14 @@ func apply() -> void:
 	var low := 1.0 - sin(through_day * PI)
 	var colour := day_colour.lerp(low_sun_colour, clampf(low * 1.3 - 0.3, 0.0, 1.0) * light)
 	sun.light_color = night_colour.lerp(colour, light)
-	sun.light_energy = lerpf(night_energy, day_energy, light)
+	sun.light_energy = lerpf(night_energy, day_energy * (1.0 - OVERCAST_DIM * overcast), light)
 	if environment != null:
 		environment.ambient_light_energy = lerpf(night_ambient, day_ambient, light)
 	var sky := _sky_material()
 	if sky != null:
-		sky.sky_top_color = night_sky_top.lerp(_day_sky_top, light)
-		sky.sky_horizon_color = night_sky_horizon.lerp(_day_sky_horizon, light)
+		var grey := Color(0.62, 0.65, 0.7)
+		sky.sky_top_color = night_sky_top.lerp(_day_sky_top.lerp(grey, overcast), light)
+		sky.sky_horizon_color = night_sky_horizon.lerp(_day_sky_horizon.lerp(grey, overcast * 0.6), light)
 		var fog := night_fog.lerp(day_fog, light)
 		sky.ground_horizon_color = fog
 		sky.ground_bottom_color = fog

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="FestiveDayDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/sim/festive_day_def.gd" id="1_def"]
+[ext_resource type="Resource" path="res://games/prison/catalogue/activity_festivities.tres" id="2_block"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"halloween"
+display_name = "Halloween"
+season = &"autumn"
+day_of_season = 6
+block = ExtResource("2_block")
+menu = &"hearty"
+moodlet = &"halloween"
+description = "Pumpkins, apple bobbing and a hearty supper."

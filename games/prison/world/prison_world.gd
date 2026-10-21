@@ -1,7 +1,8 @@
 class_name PrisonWorld
 ## Wires M12's outside world into the prison: the town's opinion and the
-## local paper, open days, community service and protestors. Each system
-## keeps to its own node; this only connects them.
+## local paper, open days, community service, protestors, and seasons,
+## weather and festive days. Each system keeps to its own node; this only
+## connects them.
 
 ## Below LOW_REPUTATION Safety loses a star; above HIGH_REPUTATION the
 ## grant gains HIGH_GRANT.
@@ -27,6 +28,13 @@ const OPEN_BAD := 40.0
 const OPEN_DAY_EASE := 30.0
 const WORD_EASE := 25.0
 const WORD_DAYS := 7
+## Blocks a festive day turns into festivities.
+const FESTIVE_SWAPS: Array[StringName] = [&"work", &"learn", &"club", &"yard"]
+## Hotheads lose their temper this much sooner in a heatwave.
+const HEAT_TEMPER := 1.3
+const GRIT_KIND := &"grit"
+const GRIT_SPOTS := 4
+const GRIT_STAGE_MINUTES := 10.0
 ## Community service: the hours out, a chance each day of slipping away
 ## (halved for the happy), and what they do.
 const COMMUNITY := &"community"
@@ -43,6 +51,7 @@ static func setup(main: Node) -> void:
 	_open_day(main)
 	_community_service(main)
 	_protest(main)
+	_seasons(main)
 
 
 static func _reputation(main: Node) -> void:
@@ -390,3 +399,128 @@ static func may_have_a_word(main: Node) -> bool:
 		return false
 	return (main.clock as GameClock).day() - int(main.get_meta(&"last_word", -WORD_DAYS)) >= WORD_DAYS \
 			and (main.protest as Protest).state == Protest.State.PROTESTING
+
+
+## The year turning: seasons with their light, the day's weather, and
+## festive days off.
+static func _seasons(main: Node) -> void:
+	var calendar: Calendar = main.calendar
+	var weather: Weather = main.weather
+	var people: People = main.people
+	var runner: ScheduleRunner = main.runner
+	var clock: GameClock = main.clock
+	var ground := (main.terrain as Terrain).ground_material as ShaderMaterial
+	calendar.name = "Calendar"
+	calendar.seasons.assign(PrisonCatalogue.SEASONS)
+	calendar.festive.assign(PrisonCatalogue.FESTIVE_DAYS)
+	calendar.day_night = main.day_night
+	calendar.ground = ground
+	calendar.clock = clock
+	main.add_child(calendar)
+	calendar.apply()
+	weather.name = "Weather"
+	weather.people = people
+	weather.calendar = calendar
+	weather.defs.assign(PrisonCatalogue.WEATHER)
+	weather.ground = ground
+	weather.day_night = main.day_night
+	weather.clock = clock
+	main.add_child(weather)
+	weather.attach()
+	var view := WeatherView.new()
+	view.name = "WeatherView"
+	view.weather = weather
+	view.centre = func() -> Vector3: return (main.camera_rig as Node3D).position if main.camera_rig != null else Vector3.ZERO
+	main.add_child(view)
+	(main.protest as Protest).stormy = weather.is_stormy
+	runner.substitutes.append(func(group: StringName, def: ActivityDef) -> ActivityDef:
+		if def == null or not String(group).begins_with("prisoner"):
+			return def
+		var festive := calendar.festive_today()
+		if festive != null and festive.block != null and FESTIVE_SWAPS.has(def.id):
+			return festive.block
+		if not weather.outdoors_ok() and def.wet_block != null:
+			return def.wet_block
+		return def)
+	weather.changed.connect(func(_def: WeatherDef) -> void: runner.refresh())
+	clock.day_changed.connect(func(_day: int) -> void:
+		var kitchen: Kitchen = main.kitchen
+		if main.has_meta(&"usual_meal"):
+			var usual := PrisonCatalogue.meal(main.get_meta(&"usual_meal"))
+			if usual != null:
+				kitchen.meal = usual
+			main.remove_meta(&"usual_meal")
+		var festive := calendar.festive_today()
+		if festive != null:
+			celebrate(main, festive)
+		runner.refresh())
+	(main.misconduct as Misconduct).temper_scales.append(func(person: Person) -> float:
+		return HEAT_TEMPER if weather.is_hot() and person.traits.any(func(t: TraitDef) -> bool: return t.id == &"hothead") else 1.0)
+	clock.hour_changed.connect(func(hour: int) -> void:
+		if hour % 2 == 0 and weather.is_snowy() and not weather.gritted() and (main.jobs as JobBoard).of_kind(GRIT_KIND).is_empty():
+			grit_job(main))
+	var clock_bar: Node = main.get(&"clock_bar")
+	if clock_bar != null:
+		clock_bar.calendar = calendar
+		clock_bar.weather = weather
+	(main.inspector as Inspector).person_lines.append(func(person: Person) -> String:
+		if person.block != null and person.block.id == &"indoor_rec" and weather.current() != null:
+			return "Indoors because of the %s (Yard block)" % weather.current().display_name.to_lower()
+		return "")
+	(main.standing as Standing).report_lines.append(func() -> Array[String]:
+		var out: Array[String] = []
+		if calendar.enabled:
+			out.append("%s." % calendar.words())
+		if weather.enabled:
+			out.append(weather.forecast_words())
+		var next := calendar.next_festive()
+		if not next.is_empty() and int(next[0]) > 0 and int(next[0]) <= 3:
+			out.append("%s in %d day%s." % [(next[1] as FestiveDayDef).display_name, next[0], "" if next[0] == 1 else "s"])
+		return out)
+
+
+## A festive day: festivities instead of work, a special dinner and a treat
+## for everyone.
+static func celebrate(main: Node, festive: FestiveDayDef) -> void:
+	var people: People = main.people
+	var kitchen: Kitchen = main.kitchen
+	if festive.menu != &"" and PrisonCatalogue.meal(festive.menu) != null:
+		main.set_meta(&"usual_meal", kitchen.meal.id)
+		kitchen.meal = PrisonCatalogue.meal(festive.menu)
+	for person: Person in people.people:
+		if person.group == &"prisoner" or person.group == &"staff":
+			people.add_moodlet(person, festive.moodlet)
+	var toasts := main.get_node_or_null("/root/Toasts")
+	if not main.attract and toasts != null:
+		toasts.post(festive.display_name, festive.description)
+
+
+## A cleaner's job to grit the paths, at a few points along them.
+static func grit_job(main: Node) -> Job:
+	var paths: PathNetwork = main.paths
+	var weather: Weather = main.weather
+	var spots: Array = []
+	for segment: PathNetwork.Segment in paths.segments.values():
+		if spots.size() >= GRIT_SPOTS:
+			break
+		spots.append(paths.point_on(segment, 0.5))
+	var entrance: Array = (main.shifts as Shifts).entrance
+	if spots.is_empty() and not entrance.is_empty():
+		spots.append(entrance[1])
+	if spots.is_empty():
+		weather.grit()
+		return null
+	var job := Job.new()
+	job.kind = GRIT_KIND
+	job.title = "Grit the paths"
+	job.roles = [&"cleaner"]
+	job.priority = 4
+	job.any_time = true
+	for spot: Vector2 in spots:
+		var stage := Job.on_tile(Job.Do.WORK, 0, Vector2i(spot.floor()))
+		stage.minutes = GRIT_STAGE_MINUTES
+		stage.doing = "Gritting the paths"
+		job.stages.append(stage)
+	(job.stages[-1] as Job.Stage).finish = func(_stage: Job.Stage, _worker: Person) -> void: weather.grit()
+	(main.jobs as JobBoard).post(job)
+	return job

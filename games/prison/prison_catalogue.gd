@@ -301,6 +301,27 @@ const ILLNESSES: Array[IllnessDef] = [
 	preload("res://games/prison/catalogue/illness_cold.tres"),
 ]
 
+## The year's seasons, in order (see Calendar), the weather they bring, and
+## festive days.
+const SEASONS: Array[SeasonDef] = [
+	preload("res://games/prison/catalogue/seasons/season_spring.tres"),
+	preload("res://games/prison/catalogue/seasons/season_summer.tres"),
+	preload("res://games/prison/catalogue/seasons/season_autumn.tres"),
+	preload("res://games/prison/catalogue/seasons/season_winter.tres"),
+]
+const WEATHER: Array[WeatherDef] = [
+	preload("res://games/prison/catalogue/seasons/weather_clear.tres"),
+	preload("res://games/prison/catalogue/seasons/weather_rain.tres"),
+	preload("res://games/prison/catalogue/seasons/weather_snow.tres"),
+	preload("res://games/prison/catalogue/seasons/weather_heat.tres"),
+	preload("res://games/prison/catalogue/seasons/weather_storm.tres"),
+]
+const FESTIVE_DAYS: Array[FestiveDayDef] = [
+	preload("res://games/prison/catalogue/seasons/festive_christmas.tres"),
+	preload("res://games/prison/catalogue/seasons/festive_halloween.tres"),
+	preload("res://games/prison/catalogue/seasons/festive_midsummer.tres"),
+]
+
 ## What crowds at the gate protest about (see Protest).
 const PROTEST_TOPICS: Array[ProtestTopicDef] = [
 	preload("res://games/prison/catalogue/protest/topic_overcrowding.tres"),
@@ -344,6 +365,13 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_heckled.tres"),
 	preload("res://games/prison/catalogue/moodlet_nervous.tres"),
 	preload("res://games/prison/catalogue/moodlet_cheered_on.tres"),
+	preload("res://games/prison/catalogue/moodlet_soaked.tres"),
+	preload("res://games/prison/catalogue/moodlet_chilly.tres"),
+	preload("res://games/prison/catalogue/moodlet_drenched.tres"),
+	preload("res://games/prison/catalogue/moodlet_sweltering.tres"),
+	preload("res://games/prison/catalogue/moodlet_christmas.tres"),
+	preload("res://games/prison/catalogue/moodlet_halloween.tres"),
+	preload("res://games/prison/catalogue/moodlet_midsummer.tres"),
 	preload("res://games/prison/catalogue/moodlet_chocolate.tres"),
 	preload("res://games/prison/catalogue/moodlet_got_a_gift.tres"),
 	preload("res://games/prison/catalogue/moodlet_wrote_home.tres"),

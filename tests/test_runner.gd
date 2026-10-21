@@ -6,12 +6,17 @@ var _failures := 0
 ## Prisoners can walk off a prison with no perimeter. Every test but the
 ## escape one turns that off, so long runs keep everyone they start with.
 var _escapes_on := false
+## Weather is off too, but for the weather test.
+var _weather_on := false
 
 
 func _initialize() -> void:
 	node_added.connect(func(node: Node) -> void:
 		if node is Escapes and not _escapes_on:
-			(node as Escapes).enabled = false)
+			(node as Escapes).enabled = false
+		# Days stay alike unless a test wants weather.
+		if node is Weather and not _weather_on:
+			(node as Weather).enabled = false)
 
 
 func _process(_delta: float) -> bool:
@@ -133,6 +138,7 @@ func _process(_delta: float) -> bool:
 	_test_families()
 	_test_reputation()
 	_test_protest()
+	_test_seasons()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -6882,5 +6888,87 @@ func _test_protest() -> void:
 	var copy := Protest.new()
 	copy.restore(protest.capture())
 	_check(copy.good_days == protest.good_days, "it's saved")
+	copy.free()
+	main.queue_free()
+
+
+func _test_seasons() -> void:
+	_weather_on = true
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	_weather_on = false
+	var calendar: Calendar = main.calendar
+	var weather: Weather = main.weather
+	var people: People = main.people
+	var runner: ScheduleRunner = main.runner
+	var clock: GameClock = main.clock
+	var day_night: DayNight = main.day_night
+	(main.misconduct as Misconduct).enabled = false
+	_check(calendar.season().id == &"spring" and calendar.day_of_season() == clock.day(), "the year starts in spring")
+	_check(calendar.season_of(calendar.length + 1).id == &"summer" and calendar.season_of(calendar.length * 4 + 1).id == &"spring",
+			"and turns through the seasons")
+	var winter_day := calendar.length * 3 + 1
+	calendar.clock.total_minutes = (winter_day - 1) * 24 * 60 + 12 * 60
+	calendar.apply()
+	_check(calendar.season().id == &"winter" and day_night.dawn == 7.5 and day_night.dusk == 17.0, "winter days are short")
+	_check(calendar.words() == "Winter, day 1", "the clock bar says so")
+	# Weather.
+	_check(weather.enabled and weather.today != null, "there is weather")
+	var heatwaves := 0
+	for i in 50:
+		var def := weather.forecast()
+		if def.hot:
+			heatwaves += 1
+		weather.set_today(def)
+	_check(heatwaves == 0, "no heatwaves in winter")
+	var stormy := 0
+	weather.set_today(weather.def_of(&"storm"))
+	for i in 200:
+		if weather.forecast().stormy:
+			stormy += 1
+	_check(stormy == 0, "never two storms in a row")
+	# Rain moves the yard indoors.
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	var yard: ActivityDef = PrisonCatalogue.ACTIVITIES.filter(func(a: ActivityDef) -> bool: return a.id == &"yard")[0]
+	weather.set_today(weather.def_of(&"rain"))
+	_check(people.outdoors_closed and runner._substitute(&"prisoner", yard).id == &"indoor_rec", "rain moves the yard indoors")
+	_check(people._outdoor_rooms(prisoner).is_empty(), "and nobody heads outdoors")
+	people.stop(prisoner)
+	prisoner.outdoors = true
+	weather.hourly()
+	_check(prisoner.moodlets.has(&"soaked"), "those caught out get soaked")
+	weather.set_today(weather.def_of(&"clear"))
+	_check(not people.outdoors_closed and runner._substitute(&"prisoner", yard) == yard, "and clear skies bring it back")
+	# Snow and grit.
+	weather.set_today(weather.def_of(&"snow"))
+	prisoner.outdoors = true
+	_check(not weather.gritted(), "snow lies on the paths")
+	var slow := people.walk_pace(prisoner)
+	var job := PrisonWorld.grit_job(main)
+	if job != null:
+		_check(job.roles.has(&"cleaner") and not job.stages.is_empty(), "cleaners are sent to grit them")
+		job.stages[-1].finish.call(job.stages[-1], null)
+	else:
+		weather.grit()
+	_check(weather.gritted() and people.walk_pace(prisoner) > slow, "and gritted paths are quicker")
+	# Heat.
+	weather.set_today(weather.def_of(&"heat"))
+	weather.hourly()
+	_check(prisoner.moodlets.has(&"sweltering"), "a heatwave makes those outside swelter")
+	# Festive days.
+	var christmas: FestiveDayDef = PrisonCatalogue.FESTIVE_DAYS.filter(func(f: FestiveDayDef) -> bool: return f.id == &"christmas")[0]
+	calendar.clock.total_minutes = (winter_day - 1 + christmas.day_of_season - 1) * 24 * 60 + 12 * 60
+	_check(calendar.festive_today() == christmas, "Christmas falls on its day")
+	var work: ActivityDef = PrisonCatalogue.ACTIVITIES.filter(func(a: ActivityDef) -> bool: return a.id == &"work")[0]
+	_check(runner._substitute(&"prisoner", work).id == &"festivities", "and work gives way to festivities")
+	var kitchen: Kitchen = main.kitchen
+	PrisonWorld.celebrate(main, christmas)
+	_check(kitchen.meal.id == &"hearty" and prisoner.moodlets.has(&"christmas"), "with a hearty dinner and some cheer")
+	var saved: Dictionary = weather.capture()
+	var copy := Weather.new()
+	copy.defs.assign(PrisonCatalogue.WEATHER)
+	copy.restore(saved)
+	_check(copy.today.id == &"heat", "the weather is saved")
 	copy.free()
 	main.queue_free()

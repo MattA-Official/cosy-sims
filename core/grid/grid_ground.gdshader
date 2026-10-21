@@ -18,6 +18,9 @@ uniform vec3 fog_colour : source_color = vec3(0.74, 0.81, 0.76);
 // Soft near-white mottling over the colours, repeating every detail_scale metres.
 uniform sampler2D detail : source_color, hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float detail_scale = 6.0;
+// Snow lying on flat ground, 0 to 1.
+uniform float snow = 0.0;
+uniform vec3 snow_colour : source_color = vec3(0.93, 0.95, 0.98);
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -34,6 +37,7 @@ void fragment() {
 	float shore = 1.0 - smoothstep(water_level + 0.05, water_level + 0.3, world_pos.y);
 	ground = mix(ground, sand_colour, shore);
 	ground *= texture(detail, world_pos.xz / detail_scale).rgb;
+	ground = mix(ground, snow_colour, snow * smoothstep(0.7, 0.9, world_normal.y) * (1.0 - shore));
 
 	vec2 coord = world_pos.xz / cell_size;
 	vec2 width = fwidth(coord) * line_width;

@@ -33,6 +33,9 @@ var in_tray: InTray
 ## () -> Array of warning lines, such as the Ministry counting nights in
 ## debt. Optional.
 var warnings: Callable
+## The season and the weather, shown beside the day. Optional.
+var calendar: Calendar
+var weather: Weather
 
 var _day := Label.new()
 var _time := Label.new()
@@ -155,6 +158,12 @@ func _refresh() -> void:
 	if _time.text != time:
 		_time.text = time
 		_day.text = "Day %d · %s" % [clock.day(), clock.weekday()]
+		if calendar != null and not calendar.words().is_empty():
+			_day.text += " · " + calendar.words()
+		if weather != null and not weather.words().is_empty():
+			_day.text += " · " + weather.words()
+			_day.tooltip_text = weather.forecast_words()
+			_day.mouse_filter = MOUSE_FILTER_STOP
 	var def := runner.current() if runner != null else null
 	_chip.visible = def != null
 	if def != null and _block.text != def.display_name:

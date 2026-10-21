@@ -1,6 +1,8 @@
-[gd_resource type="Resource" script_class="ActivityDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ActivityDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/sim/activity_def.gd" id="1_def"]
+
+[ext_resource type="Resource" path="res://games/prison/catalogue/activity_indoor_rec.tres" id="2_wet"]
 
 [resource]
 script = ExtResource("1_def")
@@ -16,3 +18,4 @@ stay_on_main = false
 free_after = false
 door_rule = 0
 description = "Out in the yard for fresh air."
+wet_block = ExtResource("2_wet")

@@ -262,6 +262,12 @@ var _qualities: Dictionary[Room, RoomQuality] = {}
 ## quality, such as a drawing pinned up. Call quality_changed() when they
 ## change.
 var quality_extras: Array[Callable] = []
+## Rain, snow or a storm: nobody heads outdoors or to things out there.
+var outdoors_closed := false:
+	set(value):
+		if outdoors_closed != value:
+			outdoors_closed = value
+			_rooms_for.clear()
 ## People by (level, x, z) in squares NEARBY tiles across, for finding
 ## who is close, refilled when first wanted each step.
 var _buckets: Dictionary[Vector3i, Array] = {}
@@ -765,7 +771,7 @@ func place_rooms(person: Person) -> Array:
 	if not by_group.has(key):
 		for n: int in building.levels:
 			for room: Room in building.levels[n].rooms():
-				if block.room_types.has(room.type) and may_enter(person, room):
+				if block.room_types.has(room.type) and may_enter(person, room) and (room.indoor or not outdoors_closed):
 					out.append([n, room])
 		by_group[key] = out
 	return by_group[key]
@@ -1572,6 +1578,8 @@ func _candidates(person: Person, tags: Array[StringName], unrestricted := false)
 			if seen.has(placed) or _claimed.has(Vector2i(n, placed.id)) or not _may_use(person, n, placed) \
 					or not may_enter(person, room):
 				continue
+			if outdoors_closed and not unrestricted and (room == null or not room.indoor):
+				continue
 			seen[placed] = true
 			if restricted and not _room_listed(allowed_rooms, n, room):
 				continue
@@ -1607,6 +1615,8 @@ func _objects_tagged(tag: StringName) -> Array:
 func _outdoor_rooms(person: Person, unrestricted := false) -> Array:
 	var restricted := not unrestricted and _restricted(person)
 	var out: Array = []
+	if outdoors_closed:
+		return out
 	for pair: Array in (place_rooms(person) if restricted else _all_rooms()):
 		var room: Room = pair[1]
 		if room.enclosed and not room.indoor and not _someone_elses(person, pair[0], room) \

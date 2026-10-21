@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="SeasonDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/season_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"spring"
+display_name = "Spring"
+dawn = 6.0
+dusk = 20.0
+weather = Dictionary[StringName, float]({&"clear": 0.55, &"rain": 0.4, &"storm": 0.05})
+ground_tint = Color(0.42, 0.68, 0.32, 1)
+heating_scale = 1.0

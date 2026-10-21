@@ -44,6 +44,9 @@ enum DoorRule {
 @export var classes := false
 ## What the block is for, in a line, for the timetable window.
 @export_multiline var description := ""
+## What the block becomes when the weather keeps everyone in, such as the
+## yard moving indoors. Optional.
+@export var wet_block: ActivityDef
 
 
 func allows(tag: StringName) -> bool:

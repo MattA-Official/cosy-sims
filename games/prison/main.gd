@@ -145,6 +145,8 @@ var illnesses := Illnesses.new()
 var animals := Animals.new()
 var reputation := Reputation.new()
 var protest := Protest.new()
+var calendar := Calendar.new()
+var weather := Weather.new()
 var health_tint := HealthTint.new()
 var knowhow := Knowhow.new()
 ## The research board in play.
@@ -1521,6 +1523,8 @@ func _add_hud() -> void:
 	settings_window.research = research
 	settings_window.illnesses = illnesses
 	settings_window.protest = protest
+	settings_window.calendar = calendar
+	settings_window.weather = weather
 	pause_menu.clock = clock
 	pause_menu.subtitle = title
 	pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")
