@@ -43,6 +43,10 @@ colours a real prison would plausibly use.
 - Office: filing_cabinet (1 x 1, 1.3 m, two four-drawer cabinets against
   the wall at -z, drawers to +z), paper_stack_small, paper_stack_tall and
   paper_stack_teetering (0.3 x 0.22 desk dressing, 0.06 / 0.16 / 0.3 m).
+- Arrivals: ferry (1.6 x 4 m, bow to -z, origin at the waterline, hull 0.3 m
+  below), helicopter (3 m rotor span, nose to -z, on skids), jetty (2 x 1 m
+  deck 0.2 m up, origin at the footprint middle at bank level, posts 0.5 m
+  below). Note the bus faces +x, not -z.
 - Prisoner life: easel (1 x 1, 1.15 m, painter at +z), piano (2 x 1 upright
   against the wall at -z, stool in front), knitting_chair (1 x 1 armchair
   with a wool basket), till (1 x 1 shop counter, shopkeeper at -z), pet_cage

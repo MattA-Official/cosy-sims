@@ -133,6 +133,7 @@ PALETTE = dict(
     fabric=("#93a48f", 1.0, 0),         # counselling armchair, soft sage
     cork=("#c8a275", 1.0, 0),
     soil=("#6e5644", 1.0, 0),
+    rope=("#cdb58a", 1.0, 0),
     walnut=("#7a5638", 0.45, 0),        # piano and dark wood
     fur_ginger=("#d6915a", 1.0, 0),
     fur_rabbit=("#a8978a", 1.0, 0),
@@ -1623,6 +1624,90 @@ def therapy_dog():
     return p
 
 
+# ---------------------------------------------------------------- arrivals (M12)
+# Front towards Godot -z (Blender +Y).
+
+def ferry():
+    """A small passenger ferry, 1.6 m wide by 4 m long, bow to Godot -z.
+    The origin is at the waterline under its middle; the hull reaches
+    0.3 m below."""
+    p = Prop("ferry")
+    W, L = 1.6, 4.0
+    body = L - W * 0.6
+    p.box("lorry", (W, body, 0.6), (0, -W * 0.3, 0.0), 0.12, 3)
+    p.cyl("lorry", W / 2, 0.58, (0, body / 2 - W * 0.3, 0.0), bevel=0.1, segs=3, n=32, scale=(1, 1.2, 1))  # bow
+    p.box("car_red", (W + 0.02, body - 0.1, 0.12), (0, -W * 0.3, -0.2), 0.05, 2)  # below the waterline
+    p.box("blue_stripe", (W + 0.03, body - 0.2, 0.08), (0, -W * 0.3, 0.12), 0.03, 2)
+    p.box("pine", (W - 0.14, body - 0.2, 0.04), (0, -W * 0.3, 0.29), 0.01, 1)  # deck
+    # Cabin with windows, and a blue roof.
+    cy = -0.3
+    p.box("cream", (W - 0.3, 1.6, 0.62), (0, cy, 0.6), 0.06, 3)
+    for side in (-1, 1):
+        for k in range(4):
+            p.box("glass", (0.02, 0.26, 0.2), (side * (W - 0.3) / 2, cy - 0.57 + k * 0.38, 0.7), 0.01, 1)
+    p.box("glass", (W - 0.5, 0.02, 0.22), (0, cy + 0.8, 0.72), 0.01, 1)  # front window
+    p.box("sign_blue", (W - 0.2, 1.75, 0.06), (0, cy, 0.94), 0.025, 2)
+    p.cyl("steel_dark", 0.08, 0.3, (0, cy - 0.5, 1.1), bevel=0.02, n=16)  # funnel
+    p.cyl("car_red", 0.083, 0.08, (0, cy - 0.5, 1.2), bevel=0.01, n=16)
+    # Rails round the open front and back decks, and a lifebuoy.
+    for side in (-1, 1):
+        x = side * (W / 2 - 0.08)
+        p.tube("steel", [(x, cy + 0.85, 0.5), (x, 1.2, 0.5), (side * 0.3, 1.75, 0.5)], 0.012, 0.15, n=6)
+        p.tube("steel", [(x, cy - 0.85, 0.5), (x, -1.65, 0.5)], 0.012, 0.0, n=6)
+        for y in (0.9, 1.2, -1.2, -1.5):
+            p.tube("steel", [(x, y, 0.31), (x, y, 0.5)], 0.01, 0, n=6)
+    p.tube("steel", [(-W / 2 + 0.08, -1.65, 0.5), (W / 2 - 0.08, -1.65, 0.5)], 0.012, 0, n=6)
+    ring = [(0.16 * math.cos(a), 0, 0.16 * math.sin(a)) for a in (math.radians(d) for d in range(0, 360, 30))]
+    p.tube("uniform", [(x, cy - 0.81, z + 0.6) for x, _, z in ring + ring[:2]], 0.03, 0.03, n=8)
+    return p
+
+
+def helicopter():
+    """A small blue helicopter, nose to Godot -z, 3 m rotor span, about
+    1.5 m to the rotor head, sitting on skids."""
+    p = Prop("helicopter")
+    p.ball("sign_blue", 0.55, (0, 0.35, 0.72), scale=(0.8, 1.2, 0.85), u=24, v=14)  # cabin
+    p.ball("glass", 0.42, (0, 0.78, 0.8), scale=(0.85, 0.75, 0.75), u=20, v=12)  # bubble
+    for side in (-1, 1):
+        p.box("glass", (0.02, 0.3, 0.22), (side * 0.43, 0.3, 0.85), 0.01, 1)  # side windows
+    p.capsule("sign_blue", 0.11, 1.5, (0, -0.95, 0.85), scale=(1, 1, 0.9), rot=(90, 0, 0))  # tail boom
+    p.taper("sign_blue", (0.06, 0.25), (0.04, 0.12), 0.45, (0, -1.75, 1.0), 0.02, 2)  # fin
+    p.cyl("steel_dark", 0.025, 0.12, (0.06, -1.78, 1.05), bevel=0.0, n=10, rot=(0, 90, 0))
+    for k in (0, 90):
+        p.box("steel_dark", (0.03, 0.5, 0.012), (0.12, -1.78, 1.05), 0.005, 1, rot=(k, 0, 0))  # tail rotor
+    p.box("cream", (0.04, 0.6, 0.06), (0, -1.0, 0.88), 0.01, 1)  # stripe along the boom
+    for side in (-1, 1):  # skids
+        x = side * 0.42
+        p.tube("galv", [(x, -0.45, 0.04), (x, 0.85, 0.04), (x, 1.0, 0.13)], 0.03, 0.12, n=10)
+        for y in (-0.15, 0.6):
+            p.tube("galv", [(x, y, 0.04), (side * 0.25, y, 0.35)], 0.025, 0, n=8)
+    p.cyl("steel_dark", 0.06, 0.25, (0, 0.2, 1.33), bevel=0.02, n=14)  # mast
+    p.cyl("steel_dark", 0.1, 0.06, (0, 0.2, 1.47), bevel=0.02, n=16)
+    for a in (20, 110):
+        p.box("rubber", (3.0, 0.12, 0.025), (0, 0.2, 1.5), 0.01, 1, rot=(0, 0, a))  # main rotor
+    return p
+
+
+def jetty():
+    """2 x 1 m wooden jetty deck on posts, origin at the middle of its
+    footprint at bank level; the deck sits 0.2 m up and the posts reach
+    0.5 m below into the water."""
+    p = Prop("jetty")
+    for k in range(9):
+        x = -0.9 + k * 0.225
+        p.box("pine", (0.2, 0.98, 0.05), (x, 0, 0.18), 0.012, 2)
+    for y in (-0.42, 0.42):
+        p.box("crate", (1.98, 0.08, 0.1), (0, y, 0.1), 0.015, 2)  # bearers
+    for x in (-0.9, 0.0, 0.9):
+        for y in (-0.46, 0.46):
+            p.cyl("crate", 0.06, 0.82, (x, y, -0.13), bevel=0.02, n=12)
+            p.cyl("crate", 0.065, 0.03, (x, y, 0.29), bevel=0.012, n=12)  # post tops
+    p.cyl("steel_dark", 0.05, 0.1, (0.75, 0.3, 0.26), bevel=0.015, n=12)  # bollard
+    p.cyl("steel_dark", 0.07, 0.025, (0.75, 0.3, 0.32), bevel=0.01, n=12)
+    p.tube("rope", [(0.75, 0.3, 0.28), (0.6, 0.35, 0.22), (0.45, 0.3, 0.215)], 0.015, 0.05, n=8)
+    return p
+
+
 # ---------------------------------------------------------------- office paperwork
 
 def filing_cabinet():
@@ -2150,7 +2235,7 @@ def lorry():
     return p
 
 
-MODELS = dict(easel=easel, piano=piano, knitting_chair=knitting_chair, till=till,
+MODELS = dict(ferry=ferry, helicopter=helicopter, jetty=jetty, easel=easel, piano=piano, knitting_chair=knitting_chair, till=till,
               pet_cage=pet_cage, visit_table=visit_table, cat=cat, rabbit=rabbit, budgie=budgie, hen=hen,
               therapy_dog=therapy_dog, **_looks(meeting_table), snack_machine=snack_machine, mobile_phone=mobile_phone, sweets=sweets,
               fruit=fruit, fizzy_pop=fizzy_pop,
