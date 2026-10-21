@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="ScenarioDef" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://core/sim/scenario_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+
+[sub_resource type="Resource" id="goal_1"]
+script = ExtResource("2_goal")
+id = &"house_forty"
+title = "House 40 prisoners"
+grant = 0
+kind = &"prisoners"
+amount = 40.0
+
+[sub_resource type="Resource" id="goal_2"]
+script = ExtResource("2_goal")
+id = &"five_quiet_nights"
+title = "Five nights without an escape"
+grant = 0
+kind = &"days_without"
+amount = 1.0
+target = &"escape"
+hold_days = 5
+
+[resource]
+script = ExtResource("1_def")
+id = &"island"
+title = "Island"
+description = "Cells on an island and one bridge across the moat. Build it up to hold 40 prisoners, then go five nights without an escape."
+layout = 3
+starting_money = -1
+starting_grade = 0
+starting_prisoners = 0
+win_goals = Array[ExtResource("2_goal")]([SubResource("goal_1"), SubResource("goal_2")])
+day_limit = 0

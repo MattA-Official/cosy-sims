@@ -26,6 +26,8 @@ var _wait := 0.0
 var _grade := Label.new()
 var _measures := Label.new()
 var _goals := VBoxContainer.new()
+## The scenario's win goals, pinned at the top.
+var _scenario := VBoxContainer.new()
 var _report := Label.new()
 var _policies: Array[Control] = []
 var _searches := OptionButton.new()
@@ -60,6 +62,8 @@ func _ready() -> void:
 	_missing.theme_type_variation = &"SubtleLabel"
 	_missing.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_missing)
+	_scenario.add_theme_constant_override(&"separation", 2)
+	box.add_child(_scenario)
 
 	var intake_heading := Label.new()
 	intake_heading.text = "Intake"
@@ -255,12 +259,40 @@ func measures_text() -> String:
 	return "\n".join(lines)
 
 
+## The scenario's goals and days, warden or not, and any warnings.
+func _show_scenario() -> void:
+	for child in _scenario.get_children():
+		_scenario.remove_child(child)
+		child.queue_free()
+	_scenario.visible = standing.scenario != null or not standing.warnings.is_empty()
+	if standing.scenario != null:
+		var heading := Label.new()
+		var when := standing.days_left_text()
+		heading.text = "%s%s" % [standing.scenario.title, "  ·  " + when if not when.is_empty() else ""]
+		heading.theme_type_variation = &"HeaderLabel"
+		_scenario.add_child(heading)
+		for goal in standing.scenario.win_goals:
+			var done := standing.scenario_done.has(goal.id)
+			var progress := standing.goal_progress(goal)
+			var line := Label.new()
+			line.text = "%s %s%s" % ["✓" if done else "○", goal.title,
+					" (%s)" % progress if not progress.is_empty() and not done else ""]
+			_scenario.add_child(line)
+	for warning in standing.warnings:
+		var line := Label.new()
+		line.text = warning
+		line.add_theme_color_override(&"font_color", Color(0.75, 0.3, 0.28))
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_scenario.add_child(line)
+
+
 func _show_standing(warden: bool) -> void:
 	_grade.text = "Grade  %s%s" % ["★".repeat(standing.grade), "☆".repeat(5 - standing.grade)]
 	_measures.text = measures_text()
 	for child in _goals.get_children():
 		_goals.remove_child(child)
 		child.queue_free()
+	_show_scenario()
 	if not warden:
 		var none := Label.new()
 		none.text = "A warden in the office takes on grant goals."

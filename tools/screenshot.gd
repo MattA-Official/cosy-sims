@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [heads] [tray] [settings] [graded] [inspect=N] [file] [zones] [at=X,Z] [zoom=F] [empty] [map=small|medium|large] [blueprint] [move]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [heads] [tray] [settings] [graded] [inspect=N] [file] [zones] [at=X,Z] [zoom=F] [empty] [map=small|medium|large] [blueprint] [move] [scenario=ID]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
@@ -35,6 +35,8 @@ func _initialize() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("map="):
 			SamplePrisons.next_map_size = StringName(arg.get_slice("=", 1))
+		if arg.begins_with("scenario="):
+			Standing.next_scenario = StringName(arg.get_slice("=", 1))
 	root.add_child(_main)
 
 

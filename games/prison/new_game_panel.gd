@@ -8,6 +8,8 @@ signal started
 signal back_pressed
 
 const EMPTY_ABOUT := "Flat land by the road, and nothing on it yet. Build the lot yourself."
+## Scenarios come after the samples in the start choices, from this value.
+const FIRST_SCENARIO := 100
 ## Short lines for the sample prisons offered, by SamplePrisons index.
 const START_ABOUT: Dictionary[int, String] = {
 	0: "A small cell block with a corridor and a fenced yard. Plenty of room to grow.",
@@ -80,6 +82,8 @@ func _ready() -> void:
 	var starts: Array = [["Empty land", -1]]
 	for index in NewGame.STARTS:
 		starts.append([SamplePrisons.NAMES[index], index])
+	for i in PrisonCatalogue.SCENARIOS.size():
+		starts.append(["Scenario: %s" % PrisonCatalogue.SCENARIOS[i].title, FIRST_SCENARIO + i])
 	box.add_child(_choices(starts, _start, func(value: int) -> void:
 		_start = value
 		_show_about()))
@@ -163,7 +167,9 @@ func _ready() -> void:
 func _go() -> void:
 	NewGame.pending = true
 	NewGame.prison_name = _name.text.strip_edges() if _name.text.strip_edges() != "" else NewGame.random_name()
-	NewGame.start = _start
+	var scenario := _scenario()
+	NewGame.start = scenario.layout if scenario != null else _start
+	Standing.next_scenario = scenario.id if scenario != null else &""
 	SamplePrisons.next_map_size = _offered_sizes()[_map_size].id
 	NewGame.sentence_length = _length
 	NewGame.staff_cars = _extras.staff_cars
@@ -175,7 +181,11 @@ func _go() -> void:
 
 
 func _show_about() -> void:
-	_start_about.text = EMPTY_ABOUT if _start < 0 else START_ABOUT.get(_start, SamplePrisons.CHALLENGES[_start])
+	var scenario := _scenario()
+	if scenario != null:
+		_start_about.text = scenario.description + (" You have %d days." % scenario.day_limit if scenario.day_limit > 0 else "")
+	else:
+		_start_about.text = EMPTY_ABOUT if _start < 0 else START_ABOUT.get(_start, SamplePrisons.CHALLENGES[_start])
 	_difficulty_about.text = Standing.DIFFICULTIES[_difficulty].description
 	_map_box.visible = _start < 0
 	if _warden == 0:
@@ -186,6 +196,10 @@ func _show_about() -> void:
 				var def: StaffTraitDef = traits.filter(func(t: StaffTraitDef) -> bool: return t.id == id)[0]
 				return "%s: %s" % [def.display_name, def.description.to_lower()])) + "."
 	_map_about.text = _offered_sizes()[_map_size].description
+
+
+func _scenario() -> ScenarioDef:
+	return PrisonCatalogue.SCENARIOS[_start - FIRST_SCENARIO] if _start >= FIRST_SCENARIO else null
 
 
 func _offered_sizes() -> Array:

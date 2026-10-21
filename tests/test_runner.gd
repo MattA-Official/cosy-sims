@@ -104,6 +104,7 @@ func _process(_delta: float) -> bool:
 	_test_visits()
 	_test_garden_and_library()
 	_test_prisoner_files()
+	_test_scenarios()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4844,6 +4845,58 @@ func _test_prisoner_files() -> void:
 	var card: PrisonerFileCard = main.file_card
 	card.show_for(newcomer)
 	_check(card.visible and card._column.get_child_count() > 4, "the file opens")
+	main.queue_free()
+
+
+func _test_scenarios() -> void:
+	Standing.next_scenario = &"full_house"
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	Standing.next_scenario = &""
+	var standing: Standing = main.standing
+	var people: People = main.people
+	_check(standing.scenario != null and standing.scenario.id == &"full_house", "a scenario starts")
+	_check(people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size() == 60
+			and people.people.all(func(p: Person) -> bool: return p.group != &"prisoner" or PrisonerFile.of(p).has_sentence()),
+			"a full house: sixty prisoners, every one with a file")
+	var won: Array = []
+	standing.scenario_won.connect(func(def: ScenarioDef) -> void: won.append(def))
+	standing.check_scenario()
+	standing.count(&"released_reformed", 9)
+	standing.check_scenario()
+	_check(won.is_empty() and standing.goal_progress(standing.scenario.win_goals[0]) == "9 of 10", "nine released reformed is not ten")
+	standing.count(&"released_reformed")
+	standing.check_scenario()
+	_check(won.size() == 1 and standing.won, "ten wins it")
+	var saved := PrisonSave.capture(main)
+	_check(saved.standing.scenario == &"full_house" and saved.standing.won, "the scenario saves")
+	# The day limit: late on a kind difficulty, lost on a hard one.
+	standing.won = false
+	standing.scenario_done.clear()
+	standing.counts.erase(&"released_reformed")
+	var clock: GameClock = main.clock
+	clock.total_minutes = 21 * GameClock.MINUTES_PER_DAY + 60.0
+	standing.check_scenario(true)
+	_check(standing.late and not standing.lost and standing.days_left_text() == "Finished late", "out of time on Standard: finished late")
+	standing.late = false
+	standing.difficulty = Standing.DIFFICULTIES[3]
+	var lost: Array = []
+	standing.failed.connect(func(rule: FailRule) -> void: lost.append(rule))
+	standing.check_scenario(true)
+	_check(lost.size() == 1 and standing.lost, "out of time on Tough: lost")
+	# Days without an escape count at midnight.
+	var quiet: GoalDef = PrisonCatalogue.scenario(&"island").win_goals[1]
+	_check(is_equal_approx(standing.goal_value(quiet), 1.0), "no escapes today")
+	standing.count(&"escape")
+	_check(is_equal_approx(standing.goal_value(quiet), 0.0), "an escape spoils the day")
+	main.queue_free()
+	Standing.next_scenario = &"run_down"
+	main = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	Standing.next_scenario = &""
+	_check((main.standing as Standing).grade == 1 and (main.ledger as Ledger).balance == 3000, "run-down: one star and £3,000")
 	main.queue_free()
 
 

@@ -4,12 +4,13 @@ extends PanelContainer
 ## block everyone is in, buttons for the speed (Space pauses, , and . go
 ## slower and faster), the balance, which opens the money page (M), and
 ## counts of the regime's clashes and the in-tray's letters when there are
-## any, which open their pages.
+## any, and any warnings counting towards losing, which open their pages.
 ## The other management windows live in the ManagementBook below it.
 
 signal money_pressed
 signal clashes_pressed
 signal tray_pressed
+signal warnings_pressed
 
 const ICONS := "res://core/ui/icons/%s.svg"
 const SPEED_ICONS: Array[String] = ["speed_pause", "speed_1", "speed_2", "speed_3"]
@@ -29,6 +30,9 @@ var ledger: Ledger
 var regime: Regime
 ## For the count of cards waiting. Optional.
 var in_tray: InTray
+## () -> Array of warning lines, such as the Ministry counting nights in
+## debt. Optional.
+var warnings: Callable
 
 var _day := Label.new()
 var _time := Label.new()
@@ -39,6 +43,7 @@ var _speeds: Array[CosyButton] = []
 var _money: Button
 var _clashes := Button.new()
 var _tray := Button.new()
+var _warnings := Button.new()
 
 
 func _ready() -> void:
@@ -117,6 +122,14 @@ func _ready() -> void:
 		row.add_child(_tray)
 		in_tray.changed.connect(count_cards)
 		count_cards()
+	if warnings.is_valid():
+		_warnings.theme_type_variation = &"DangerButton"
+		_warnings.focus_mode = FOCUS_NONE
+		_warnings.size_flags_vertical = SIZE_SHRINK_CENTER
+		_warnings.pressed.connect(warnings_pressed.emit)
+		row.add_child(_warnings)
+		clock.hour_changed.connect(func(_hour: int) -> void: count_warnings())
+		count_warnings()
 	clock.speed_changed.connect(func(_index: int) -> void: _show_speed())
 	_show_speed()
 	_refresh()
@@ -152,6 +165,14 @@ func count_cards() -> void:
 	var count := in_tray.cards.filter(func(c: InTray.Card) -> bool: return c.queued < 0).size()
 	_tray.visible = count > 0
 	_tray.text = "%d letter%s" % [count, "" if count == 1 else "s"]
+
+
+## Counts the warnings again.
+func count_warnings() -> void:
+	var lines: Array = warnings.call()
+	_warnings.visible = not lines.is_empty()
+	_warnings.text = "%d warning%s" % [lines.size(), "" if lines.size() == 1 else "s"]
+	_warnings.tooltip_text = "\n".join(lines)
 
 
 ## Counts the regime's clashes again.

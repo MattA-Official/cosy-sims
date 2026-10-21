@@ -132,7 +132,10 @@ static func capture(main: Node) -> Dictionary:
 				"held_by": standing.held_by, "history": standing.history.duplicate(true),
 				"counts": standing.counts.duplicate(), "baselines": standing._baselines.duplicate(),
 				"held": standing._held.duplicate(), "fail_counts": standing.fail_counts.duplicate(),
-				"warnings": standing.warnings.duplicate(), "difficulty": standing.difficulty.id},
+				"warnings": standing.warnings.duplicate(), "difficulty": standing.difficulty.id,
+				"scenario": standing.scenario.id if standing.scenario != null else &"",
+				"scenario_done": standing.scenario_done.keys().map(func(id: StringName) -> String: return String(id)),
+				"won": standing.won, "late": standing.late, "midnight_counts": standing._midnight_counts.duplicate()},
 	}
 
 

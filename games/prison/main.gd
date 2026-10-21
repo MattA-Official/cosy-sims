@@ -1053,6 +1053,11 @@ func _ready() -> void:
 	standing.difficulty_changed.connect(func(_def: DifficultyDef) -> void: _apply_difficulty())
 	if saved.is_empty() and not ledger.sandbox:
 		ledger.balance = standing.difficulty.starting_money
+	if saved.is_empty() and standing.scenario != null:
+		_start_scenario(standing.scenario)
+	security.counted.connect(func(kind: StringName) -> void: standing.count(kind))
+	standing.scenario_won.connect(func(def: ScenarioDef) -> void:
+		Toasts.post("%s: done!" % def.title, "Every goal is met. Carry on as long as you like."))
 	budget.name = "Budget"
 	budget.ledger = ledger
 	budget.finances = finances
@@ -1226,6 +1231,8 @@ func _add_hud() -> void:
 	clock_bar.ledger = ledger
 	clock_bar.regime = regime
 	clock_bar.in_tray = in_tray
+	clock_bar.warnings = func() -> Array: return standing.warnings
+	clock_bar.warnings_pressed.connect(book.toggle.bind(&"office"))
 	clock_bar.tray_pressed.connect(book.toggle.bind(&"in_tray"))
 	clock_bar.money_pressed.connect(book.toggle.bind(&"money"))
 	clock_bar.clashes_pressed.connect(book.toggle.bind(&"timetable"))
@@ -1394,6 +1401,30 @@ func _ghost(level: int, point: Vector2) -> void:
 
 
 ## Difficulty's scales on wages, reform, reoffending and grants.
+## A scenario's start: its money, a run of nights at its grade, and
+## extra prisoners turned up all at once.
+func _start_scenario(def: ScenarioDef) -> void:
+	if def.starting_money >= 0 and not ledger.sandbox:
+		ledger.balance = def.starting_money
+	if def.starting_grade > 0:
+		standing.grade = def.starting_grade
+		for measure in Standing.MEASURES:
+			standing.measures[measure] = def.starting_grade
+		var stars := {}
+		for measure in Standing.MEASURES:
+			stars[measure] = def.starting_grade
+		for i in Standing.AVERAGE_NIGHTS - 1:
+			standing.history.append({"day": 0, "grade": def.starting_grade, "stars": stars.duplicate(), "values": {}})
+	var have := people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size()
+	var spot: Array = shifts.entrance
+	for i in maxi(def.starting_prisoners - have, 0):
+		var person := people.add_person(spot[0], spot[1] + Vector2(i % 8, i / 8) * 0.6) if not spot.is_empty() else null
+		if person == null:
+			break
+		person.category = &"medium"
+		sentences.open_file(person, true)
+
+
 func _apply_difficulty() -> void:
 	var def := standing.difficulty
 	finances.wage_scale = def.wage_scale

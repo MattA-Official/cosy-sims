@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="ScenarioDef" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/sim/scenario_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+
+[sub_resource type="Resource" id="goal_1"]
+script = ExtResource("2_goal")
+id = &"reach_three_stars"
+title = "Reach a 3-star grade"
+grant = 0
+kind = &"grade"
+amount = 3.0
+
+[resource]
+script = ExtResource("1_def")
+id = &"run_down"
+title = "Run-down"
+description = "The Ministry has given you a tired one-star prison and very little money. Get it to three stars."
+layout = 11
+starting_money = 3000
+starting_grade = 1
+starting_prisoners = 0
+win_goals = Array[ExtResource("2_goal")]([SubResource("goal_1")])
+day_limit = 10

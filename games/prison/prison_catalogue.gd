@@ -425,6 +425,20 @@ static func room_type(id: StringName) -> RoomTypeDef:
 	return null
 
 
+const SCENARIOS: Array[ScenarioDef] = [
+	preload("res://games/prison/catalogue/scenario_run_down.tres"),
+	preload("res://games/prison/catalogue/scenario_island.tres"),
+	preload("res://games/prison/catalogue/scenario_full_house.tres"),
+]
+
+
+static func scenario(id: StringName) -> ScenarioDef:
+	for def in SCENARIOS:
+		if def.id == id:
+			return def
+	return null
+
+
 static var _offences: Array[OffenceDef] = []
 
 

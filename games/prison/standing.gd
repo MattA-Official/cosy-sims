@@ -12,6 +12,8 @@ signal goal_done(goal: GoalDef)
 ## A fail rule ran out on a difficulty that can be lost.
 signal failed(rule: FailRule)
 signal difficulty_changed(def: DifficultyDef)
+## Every win goal of the scenario is done.
+signal scenario_won(def: ScenarioDef)
 
 const REPORT_HOUR := 6
 ## Grant goals shown at once.
@@ -22,6 +24,8 @@ const SPREAD := 2
 const HISTORY_NIGHTS := 7
 ## The difficulty a new game starts on, once one has been picked.
 static var next_difficulty: StringName = &""
+## The scenario a new game plays, if any.
+static var next_scenario: StringName = &""
 const DIFFICULTIES: Array[DifficultyDef] = [
 	preload("res://games/prison/catalogue/difficulty_sandbox.tres"),
 	preload("res://games/prison/catalogue/difficulty_cosy.tres"),
@@ -92,6 +96,13 @@ var warnings: Array[String] = []
 var longest_sit_in: Callable
 ## The game was lost (on a difficulty that can be).
 var lost := false
+## The scenario being played, or null for a free game.
+var scenario: ScenarioDef
+## Its win goals done, by id.
+var scenario_done: Dictionary[StringName, bool] = {}
+var won := false
+## The day limit passed without a win, on a difficulty that can't fail.
+var late := false
 ## Each measure's value and why line as of last midnight, by name.
 var values: Dictionary[String, float] = {}
 var why: Dictionary[String, String] = {}
@@ -104,6 +115,8 @@ var report := ""
 
 ## Counts at the moment each counted goal came up, by goal id.
 var _baselines: Dictionary[StringName, int] = {}
+## Counts as they stood at the last midnight, for "days without" goals.
+var _midnight_counts: Dictionary[StringName, int] = {}
 ## Midnights in a row each held goal has been met, by goal id.
 var _held: Dictionary[StringName, int] = {}
 ## Today so far: moodlets given out, by id, and arrivals.
@@ -132,6 +145,8 @@ func start() -> void:
 			measure_value[measure] = defaults[measure]
 	_apply()
 	goals.assign((preload("res://games/prison/catalogue/goals_sandbox.tres") as GoalListDef).goals)
+	if next_scenario != &"":
+		scenario = PrisonCatalogue.scenario(next_scenario)
 
 
 ## Puts back the grade and goals from a save.
@@ -155,6 +170,13 @@ func restore(saved: Dictionary) -> void:
 	_held.assign(saved.get("held", {}))
 	fail_counts.assign(saved.get("fail_counts", {}))
 	warnings.assign(saved.get("warnings", []))
+	scenario = PrisonCatalogue.scenario(saved.get("scenario", &""))
+	scenario_done.clear()
+	for id: String in saved.get("scenario_done", []):
+		scenario_done[StringName(id)] = true
+	won = saved.get("won", false)
+	late = saved.get("late", false)
+	_midnight_counts.assign(saved.get("midnight_counts", {}))
 	var difficulty_id: StringName = saved.get("difficulty", difficulty.id)
 	for def in DIFFICULTIES:
 		if def.id == difficulty_id:
@@ -195,6 +217,7 @@ func goal_value(goal: GoalDef) -> float:
 		&"grade": return grade if measures_known() else 0.0
 		&"measure": return measures.get(String(goal.target), 0) if measures_known() else 0.0
 		&"average_mood": return _average_mood()
+		&"days_without": return 1.0 if counts.get(goal.target, 0) == _midnight_counts.get(goal.target, 0) else 0.0
 	if goal_kinds.has(goal.kind):
 		return goal_kinds[goal.kind].call(goal)
 	return 0.0
@@ -235,6 +258,54 @@ func check_goals(midnight := false) -> Array[GoalDef]:
 			finished.append(goal)
 			goal_done.emit(goal)
 	return finished
+
+
+## The scenario's win goals: done ones stay done, whoever is in the
+## office. All done wins.
+func check_scenario(midnight := false) -> void:
+	if scenario == null or won:
+		return
+	for goal in scenario.win_goals:
+		if scenario_done.has(goal.id):
+			continue
+		if goal.counted and not _baselines.has(goal.id):
+			# Counted from the start of the scenario.
+			_baselines[goal.id] = 0
+		if goal.hold_days > 0:
+			if midnight:
+				_held[goal.id] = _held.get(goal.id, 0) + 1 if goal_value(goal) >= goal.amount else 0
+			if _held.get(goal.id, 0) >= goal.hold_days:
+				scenario_done[goal.id] = true
+		elif goal_value(goal) >= goal.amount:
+			scenario_done[goal.id] = true
+	if scenario.win_goals.all(func(g: GoalDef) -> bool: return scenario_done.has(g.id)):
+		won = true
+		scenario_won.emit(scenario)
+	elif midnight and scenario.day_limit > 0 and not late and _day() > scenario.day_limit:
+		# Out of time: a loss where the game can be lost, else just late.
+		if difficulty.can_fail and not lost:
+			var rule := FailRule.new()
+			rule.kind = &"day_limit"
+			rule.reason = "The %d days the Ministry gave you are up, and the job isn't done." % scenario.day_limit
+			lost = true
+			failed.emit(rule)
+		else:
+			late = true
+
+
+## "Day 4 of 10", or "" with no limit.
+func days_left_text() -> String:
+	if scenario == null or scenario.day_limit <= 0:
+		return ""
+	if won:
+		return "Done on day %d" % mini(_day(), scenario.day_limit)
+	if late:
+		return "Finished late"
+	return "Day %d of %d" % [mini(_day(), scenario.day_limit), scenario.day_limit]
+
+
+func _day() -> int:
+	return clock.day() if clock != null else 1
 
 
 ## Changes how kind the game is; the Ministry's counts start again.
@@ -337,7 +408,9 @@ func grade_day() -> void:
 	_moodlets = {}
 	_arrivals = 0
 	check_goals(true)
+	check_scenario(true)
 	check_fail_rules()
+	_midnight_counts = counts.duplicate()
 
 
 ## The morning paper: yesterday in a few lines.
@@ -376,6 +449,7 @@ func write_report() -> String:
 
 func _on_hour(hour: int) -> void:
 	check_goals()
+	check_scenario()
 	_check_sit_in()
 	if hour == REPORT_HOUR and _graded and office.has_warden():
 		report = write_report()
