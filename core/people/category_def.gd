@@ -16,6 +16,9 @@ extends Resource
 @export var search_weight := 1.0
 ## Tiles from a guard at which they're spotted out of place.
 @export var watch_distance := 3.0
+## Walked by a guard to where their block wants them when they can't get
+## there alone, such as through gates locked to them.
+@export var escorted := false
 ## How long they stay, in game days: a sentence, or a hospital stay.
 @export var stay_days_min := 5
 @export var stay_days_max := 12

@@ -42,6 +42,9 @@ extends Node3D
 ## When set, picking the ground uses a flat plane at this height instead
 ## of the terrain, for building on upper storeys and in basements.
 var pick_height := NAN
+## () -> Vector3 or null: something to keep in view, such as someone
+## running off. Panning by hand, or a null, stops following.
+var follow: Callable
 
 var _target_position: Vector3
 var _target_yaw: float
@@ -99,6 +102,13 @@ func _process(delta: float) -> void:
 	if move != Vector2.ZERO:
 		pan_by(move.limit_length(1.0) * pan_speed * _target_distance * fast * delta)
 
+	if follow.is_valid():
+		var at: Variant = follow.call()
+		if at == null:
+			follow = Callable()
+		else:
+			focus_on(at)
+
 	var spin := Input.get_axis("camera_rotate_right", "camera_rotate_left")
 	_target_yaw += spin * rotate_speed_deg * fast * delta
 
@@ -122,6 +132,8 @@ func _process(delta: float) -> void:
 ## Moves the focus point. x is screen-right and y is screen-down, relative to
 ## the way the camera currently faces.
 func pan_by(screen_offset: Vector2) -> void:
+	if screen_offset != Vector2.ZERO:
+		follow = Callable()
 	var basis_yaw := Basis(Vector3.UP, deg_to_rad(_target_yaw))
 	var world := basis_yaw * Vector3(screen_offset.x, 0.0, screen_offset.y)
 	_target_position += world

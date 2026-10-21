@@ -124,6 +124,7 @@ var suggestions := Suggestions.new()
 var rounds := Rounds.new()
 var visits := Visits.new()
 var garden := Garden.new()
+var vehicle_gates := VehicleGates.new()
 ## Department heads, hired from the warden's desk.
 var heads := Heads.new()
 ## Request cards for the warden, and what their answers do.
@@ -474,6 +475,9 @@ func _ready() -> void:
 	routes.height_at = func(level: int, point: Vector2) -> float: return people.nav().height_at(level, point)
 	grid.add_child(routes)
 	guarding.routes = routes
+	people.led_group = &"staff"
+	guarding.area_weight = func(level: int, point: Vector2) -> float:
+		return Security.ALERT_PATROL if security.alert_level(level, point) > 0 else 1.0
 	add_child(guarding)
 	runner.other_locks = guarding.gate_locks
 	runner.refresh()
@@ -538,7 +542,19 @@ func _ready() -> void:
 	add_child(escapes)
 	escapes.start()
 	escapes.running.connect(func(person: Person) -> void:
-		Toasts.post("Escape!", "%s is making a run for it. The nearest guards are giving chase." % person.name))
+		Toasts.post_with("Escape!", "%s is making a run for it. The guards are giving chase." % person.name, "Follow",
+				func() -> void:
+					camera_rig.follow = func() -> Variant:
+						if not escapes.runners.has(person):
+							return null
+						var at := person.flat()
+						return Vector3(at.x * grid.cell_size, 0.0, at.y * grid.cell_size)))
+	escapes.alarm_changed.connect(func(on: bool) -> void:
+		runner.lockdown = on
+		if on:
+			Toasts.post("Alarm", "Every cell door is locked until it's over.")
+		else:
+			Toasts.post("All clear", "The alarm is off and the cells open as usual."))
 	escapes.caught.connect(func(person: Person, by: Person) -> void:
 		Toasts.post("Caught", "%s caught %s." % [by.name, person.name]))
 	escapes.got_away.connect(func(person: Person) -> void:
@@ -553,6 +569,8 @@ func _ready() -> void:
 	contraband.start()
 	searching.name = "Searching"
 	searching.people = people
+	searching.area_weight = func(level: int, point: Vector2) -> float:
+		return Security.ALERT_SEARCH if security.alert_level(level, point) > 0 else 1.0
 	searching.jobs = jobs
 	searching.items = items
 	searching.clock = clock
@@ -600,7 +618,7 @@ func _ready() -> void:
 		var words := SitIns.words(sit_in, room_name.call(sit_in))
 		Toasts.post("Sit-in!", "%s. To end it, %s, or send someone to talk them round (Security window, K)." % [words, sit_in.hint])
 		security.count(&"sit_in", null, "", true)
-		security.alert_at(words, sit_in.level, sit_in.room.centre()))
+		security.alert_at(words, sit_in.level, sit_in.room.centre(), 3))
 	sit_ins.ended.connect(func(sit_in: SitIns.SitIn, how: String) -> void:
 		var endings := {"fixed": "They've stood up: whatever it was is sorted.",
 				"talked": "They've been talked round and gone back to the timetable.",
@@ -622,8 +640,12 @@ func _ready() -> void:
 		var words := "A %s is missing from the %s" % [def.display_name.to_lower(),
 				type.display_name.to_lower() if type != null else "room"]
 		security.count(&"missing_tool", null, "", true)
-		security.alert_at(words, level, room.centre())
+		security.alert_at(words, level, room.centre(), 1)
 		Toasts.post("Tool missing", words + ". A search might turn it up."))
+	contraband.secure_area = secure_area
+	contraband.confiscated.connect(func(def: ItemDef, _level: int, _point: Vector2) -> void:
+		security.count(&"contraband", null, "A %s thrown over the fence" % def.display_name.to_lower())
+		Toasts.post("Thrown over the fence", "A guard picked up a %s someone threw over the fence." % def.display_name.to_lower()))
 	contraband.detected.connect(func(person: Person, def: ItemDef) -> void:
 		security.count(&"metal_detector", person, "Set off the metal detector")
 		searching.search_person(person))
@@ -631,7 +653,7 @@ func _ready() -> void:
 		Toasts.post("Shakedown", "Guards are turning over %d cells. Nobody's happy about it." % cells))
 	infirmary.died.connect(func(person: Person, level: int, point: Vector2) -> void:
 		security.count(&"death", null, "", true)
-		security.alert_at("%s died" % person.name, level, point)
+		security.alert_at("%s died" % person.name, level, point, 3)
 		Toasts.post("A death", "%s didn't make it. A plaque marks the spot." % person.name)
 		_ghost(level, point)
 		var map: BuildingMap = building.levels.get(level)
@@ -896,7 +918,7 @@ func _ready() -> void:
 	visits.building = building
 	visits.progress = reform.progress
 	visits.contraband.assign(PrisonCatalogue.CONTRABAND.filter(func(d: ItemDef) -> bool:
-			return d.id in [&"biscuit", &"spoon", &"screwdriver"]))
+			return d.id in [&"biscuit", &"spoon", &"screwdriver", &"sweets", &"phone"]))
 	visits.entrance = func() -> Array: return shifts.entrance
 	visits.clock = clock
 	add_child(visits)
@@ -965,6 +987,11 @@ func _ready() -> void:
 	for system: Object in [kitchen, cleaning, workshop, budget, release, intake, parole, contraband, searching]:
 		system.set(&"regime", regime)
 	misconduct.temper_scales.append(courses.calm_scale)
+	misconduct.temper_scales.append(func(person: Person) -> float:
+		return Security.ALERT_TEMPER if security.alert_level(person.level, person.flat()) > 0 else 1.0)
+	# Fizzy pop makes them rowdy: quicker to lose their temper.
+	misconduct.temper_scales.append(func(person: Person) -> float:
+		return Contraband.ROWDY_TEMPER if person.moodlets.has(&"rowdy") else 1.0)
 	inspector.person_pickers.append(["Course", "Put them on a course now, or take them off one.",
 		func(_person: Person) -> Array:
 			var out: Array = [[&"", "None"]]
@@ -1118,8 +1145,22 @@ func _ready() -> void:
 	standing.report_ready.connect(func(text: String) -> void: Toasts.post("Daily report", text, 12.0))
 	standing.goal_done.connect(func(goal: GoalDef) -> void:
 		Toasts.post("Goal done: " + goal.title, "A grant of %s came in." % Ledger.text(goal.grant)))
+	vehicle_gates.name = "VehicleGates"
+	vehicle_gates.building = building
+	vehicle_gates.people = people
+	vehicle_gates.guarding = guarding
+	vehicle_gates.escapes = escapes
+	vehicle_gates.contraband.assign(PrisonCatalogue.CONTRABAND.filter(func(d: ItemDef) -> bool:
+			return d.id in [&"biscuit", &"screwdriver", &"phone", &"sweets"]))
+	add_child(vehicle_gates)
+	vehicle_gates.found.connect(func(item: ItemDef) -> void:
+		security.count(&"contraband", null, "A %s hidden in the delivery" % item.display_name.to_lower())
+		Toasts.post("Found at the gate", "The guard checking the lorry found a %s hidden in the delivery." % item.display_name.to_lower()))
+	intake.arrived.connect(func(_came: Array[Person]) -> void: vehicle_gates.vehicle_came())
 	# The lorry brings the morning delivery and takes the rubbish and goods.
 	kitchen.delivered.connect(func(_crates: int) -> void:
+		vehicle_gates.delivery()
+		vehicle_gates.vehicle_came()
 		var pallets := building.objects_tagged([&"delivery_pallet"])
 		var to := building.object_at(pallets[0]).centre if not pallets.is_empty() else intake.stop_point()
 		vehicles.drive_in(LORRY, to, Callable(), LORRY_STAY))
@@ -1283,6 +1324,7 @@ func _add_hud() -> void:
 	security_window.secure_area = secure_area
 	security_window.searching = searching
 	security_window.escapes = escapes
+	security_window.vehicle_gates = vehicle_gates
 	security_window.coverage_tint = coverage_tint
 	security_window.sit_ins = sit_ins
 	security_window.infirmary = infirmary

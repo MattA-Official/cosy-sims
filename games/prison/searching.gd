@@ -33,6 +33,9 @@ var prisoner_group: StringName = &"prisoner"
 var searched_moodlet: StringName = &"searched"
 ## Random cell searches a day.
 var random_per_day := 2
+## (level, point) -> float: how much likelier a random search picks a cell
+## there, such as one on alert. Optional.
+var area_weight: Callable
 ## Today's tally, for the daily report and the Security window.
 var searches_today := 0
 ## Every cell is searched at the next Lockup.
@@ -192,6 +195,9 @@ func _tick() -> void:
 			continue
 		var category: CategoryDef = people.categories.get(person.category)
 		var weight := category.search_weight if category != null else 1.0
+		if area_weight.is_valid():
+			# A cell on alert, or whose prisoner is somewhere on alert.
+			weight *= maxf(area_weight.call(home[0], (home[1] as Room).centre()), area_weight.call(person.level, person.flat()))
 		var at := homes.find_custom(func(h: Array) -> bool: return h[1] == home[1])
 		if at == -1:
 			homes.append(home)

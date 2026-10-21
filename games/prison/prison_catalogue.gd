@@ -233,6 +233,10 @@ const CONTRABAND: Array[ItemDef] = [
 	preload("res://games/prison/catalogue/item_screwdriver.tres"),
 	preload("res://games/prison/catalogue/item_mallet.tres"),
 	preload("res://games/prison/catalogue/item_soap_sock.tres"),
+	preload("res://games/prison/catalogue/item_sweets.tres"),
+	preload("res://games/prison/catalogue/item_phone.tres"),
+	preload("res://games/prison/catalogue/item_fruit.tres"),
+	preload("res://games/prison/catalogue/item_fizzy_pop.tres"),
 ]
 
 ## Privileges lost as a consequence, in the order they're taken.
@@ -266,6 +270,9 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_uneasy.tres"),
 	preload("res://games/prison/catalogue/moodlet_searched_tidy.tres"),
 	preload("res://games/prison/catalogue/moodlet_had_a_biscuit.tres"),
+	preload("res://games/prison/catalogue/moodlet_had_sweets.tres"),
+	preload("res://games/prison/catalogue/moodlet_rowdy.tres"),
+	preload("res://games/prison/catalogue/moodlet_phoned_home.tres"),
 	preload("res://games/prison/catalogue/moodlet_saw_a_fight.tres"),
 	preload("res://games/prison/catalogue/moodlet_saw_a_nasty_fight.tres"),
 	preload("res://games/prison/catalogue/moodlet_in_the_quiet_room.tres"),

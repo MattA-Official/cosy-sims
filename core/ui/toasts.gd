@@ -56,6 +56,24 @@ func post(title: String, body := "", seconds := 6.0) -> Control:
 	return note
 
 
+## Shows a note with a button on it, such as "Follow", which also takes
+## the note down when pressed.
+func post_with(title: String, body: String, button_text: String, pressed: Callable, seconds := 10.0) -> Control:
+	var note := post(title, body, seconds)
+	if note == null:
+		return null
+	var button := Button.new()
+	button.text = button_text
+	button.theme_type_variation = &"FlatButton"
+	button.focus_mode = Control.FOCUS_NONE
+	button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	button.pressed.connect(func() -> void:
+		pressed.call()
+		note.queue_free())
+	note.get_child(0).add_child(button)
+	return note
+
+
 ## Takes every note down at once.
 func clear() -> void:
 	for note in _stack.get_children():

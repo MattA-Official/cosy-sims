@@ -22,6 +22,25 @@ const LIGHT_FINGERED_CHANCE := 0.15
 const SEEN_WITHIN := 3.0
 ## Treats are eaten once mood falls below this.
 const TREAT_MOOD := 40.0
+## A phone is used in their own cell once the family need falls below
+## this.
+const PHONE_NEED := 40.0
+const FAMILY := &"family"
+## Each night, the chance fruit hidden in a cell has turned to fizzy pop.
+const BREW_CHANCE := 0.5
+## Fizzy pop is drunk in this block.
+const DRINK_BLOCK := &"lockup"
+## How much quicker to temper someone rowdy on fizzy pop is.
+const ROWDY_TEMPER := 1.5
+## Each night, with a fence on the perimeter and nobody watching a stretch
+## of it, the chance something is thrown over, and what it might be.
+const THROW_CHANCE := 0.05
+const THROWN: Array[StringName] = [&"phone", &"sweets"]
+const THROW_HOUR := 2
+## Tiles from something thrown over at which a guard confiscates it, or a
+## prisoner picks it up; and the tiles to it with no guard for a throw.
+const PICK_UP_DISTANCE := 2.0
+const THROW_QUIET := 10.0
 
 signal pocketed(person: Person, item: ItemDef)
 ## A kitchen or workshop counted its tools and one was gone.
@@ -29,6 +48,10 @@ signal tool_missing(level: int, room: Room, item: ItemDef)
 signal traded(buyer: Person, seller: Person, item: ItemDef)
 ## Someone walked through a metal detector with metal on them.
 signal detected(person: Person, item: ItemDef)
+## Something landed inside the fence.
+signal thrown_over(level: int, cell: Vector2i, item: ItemDef)
+## A guard got to something thrown over before a prisoner did.
+signal confiscated(item: ItemDef, level: int, point: Vector2)
 
 ## Rooms that count their tools, and the hours they do (shift changes).
 const TOOL_ROOMS: Array[StringName] = [&"kitchen", &"workshop"]
@@ -54,6 +77,11 @@ var light_fingered: StringName = &"light_fingered"
 var enabled := true
 ## Tools taken since the last count: [level, Room, ItemDef].
 var missing: Array = []
+## For throw-overs: which ground is inside the perimeter. Optional.
+var secure_area: SecureArea
+var guard_role: StringName = &"guard"
+## Thrown over and lying on the ground: [level, cell, ItemDef].
+var landed: Array = []
 ## When set, its operation times are used instead of the hour above (main
 ## passes on Regime.operation_due).
 var regime: Regime
@@ -64,6 +92,10 @@ var clock: GameClock:
 			tick()
 			if minute % 60 == 30:
 				trade_round()
+			if minute == 0:
+				brew()
+			if minute == THROW_HOUR * 60:
+				throw_over()
 			if regime == null and minute % 60 == 0 and COUNT_HOURS.has(minute / 60):
 				count_tools())
 
@@ -233,8 +265,12 @@ func tick() -> void:
 	if not enabled:
 		return
 	check_detectors()
+	_pick_up_landed()
 	for person in people.people:
-		if person.group != prisoner_group or person.pocket.is_empty():
+		if person.group != prisoner_group:
+			continue
+		_use_in_cell(person)
+		if person.pocket.is_empty():
 			continue
 		if person.mood < TREAT_MOOD:
 			_eat_treat(person)
@@ -260,6 +296,117 @@ func hiding_place(person: Person) -> Vector2i:
 		if placed.def.hide_spot > 0.0 and (best == null or placed.def.hide_spot > best.def.hide_spot):
 			best = placed
 	return Vector2i(person.level, best.id) if best != null else Vector2i(-1, -1)
+
+
+## Fruit hidden in cells ferments: some of it is fizzy pop by morning.
+## Returns how many turned.
+func brew() -> int:
+	if not enabled:
+		return 0
+	var fruit := item(&"fruit")
+	var pop := item(&"fizzy_pop")
+	var turned := 0
+	for key: Vector2i in items.hidden.keys():
+		var stash: Dictionary = items.hidden[key]
+		if not stash.has(fruit) or _rng.randf() >= BREW_CHANCE:
+			continue
+		var owner: int = items.stash_owner.get(key, -1)
+		items.unhide(key, fruit)
+		items.hide_in(key, pop, owner)
+		turned += 1
+	return turned
+
+
+## At night, something may come over a quiet stretch of perimeter fence,
+## near the yard. Returns where it landed as [level, cell, item], or [].
+func throw_over(force := false) -> Array:
+	if not enabled or secure_area == null or not secure_area.has_perimeter or (not force and _rng.randf() >= THROW_CHANCE):
+		return []
+	var spots := fence_spots()
+	if spots.is_empty():
+		return []
+	var cell: Vector2i = spots[_rng.randi() % spots.size()]
+	var def := item(THROWN[_rng.randi() % THROWN.size()])
+	items.drop_on_floor(Vector3i(0, cell.x, cell.y), def, 1)
+	landed.append([0, cell, def])
+	thrown_over.emit(0, cell, def)
+	return [0, cell, def]
+
+
+## Secure ground tiles just inside a perimeter fence (not a wall) with no
+## guard near, nearest a yard first.
+func fence_spots() -> Array[Vector2i]:
+	var map := people.building.ground()
+	var yards: Array[Vector2] = []
+	for room: Room in map.rooms():
+		if room.type == &"yard":
+			yards.append(room.centre())
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in secure_area.secure:
+		for step in BuildingMap.DIRECTIONS:
+			if secure_area.is_secure(cell + step) or not map.owns(cell + step):
+				continue
+			var def := map.wall_def(map.wall_style(BuildingMap.edge_between(cell, cell + step)))
+			if def == null or not def.secure or not (def.see_through or def.cuttable):
+				continue
+			var point := Vector2(cell) + Vector2(0.5, 0.5)
+			if people.people.any(func(p: Person) -> bool:
+					return p.role == guard_role and p.level == 0 and p.flat().distance_to(point) <= THROW_QUIET):
+				continue
+			out.append(cell)
+			break
+	out.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return _yard_distance(a, yards) < _yard_distance(b, yards))
+	return out.slice(0, 12)
+
+
+func _yard_distance(cell: Vector2i, yards: Array[Vector2]) -> float:
+	var best := INF
+	for yard in yards:
+		best = minf(best, yard.distance_to(Vector2(cell)))
+	return best
+
+
+## Whoever reaches something thrown over first: a guard confiscates it, a
+## prisoner pockets it.
+func _pick_up_landed() -> void:
+	for entry: Array in landed.duplicate():
+		var point := Vector2(entry[1]) + Vector2(0.5, 0.5)
+		var near := people.people.filter(func(p: Person) -> bool:
+			return p.level == entry[0] and not p.led and p.flat().distance_to(point) <= PICK_UP_DISTANCE \
+					and (p.role == guard_role or p.group == prisoner_group))
+		if near.is_empty():
+			continue
+		var key := Vector3i(entry[0], entry[1].x, entry[1].y)
+		if items.count_on_floor(key) > 0:
+			items.take_from_floor(key, (entry[2] as ItemDef).tags.back(), 1)
+		landed.erase(entry)
+		var guard := near.filter(func(p: Person) -> bool: return p.role == guard_role)
+		if not guard.is_empty():
+			confiscated.emit(entry[2], entry[0], point)
+		else:
+			(near[0] as Person).pocket.append(entry[2])
+			pocketed.emit(near[0], entry[2])
+
+
+## In their own cell: ring home on a hidden phone when they miss their
+## family, and drink fizzy pop at lock-up.
+func _use_in_cell(person: Person) -> void:
+	var spot := hiding_place(person)
+	if spot == Vector2i(-1, -1):
+		return
+	if person.needs.get(FAMILY, 100.0) < PHONE_NEED and _has(person, &"phone", spot):
+		person.needs[FAMILY] = 100.0
+		people.add_moodlet(person, &"phoned_home")
+	if person.block != null and person.block.id == DRINK_BLOCK and not person.moodlets.has(&"rowdy"):
+		var pop := item(&"fizzy_pop")
+		if take(person, pop):
+			people.add_moodlet(person, &"rowdy")
+
+
+## Whether they have something on them or hidden at `spot`.
+func _has(person: Person, id: StringName, spot: Vector2i) -> bool:
+	return person.pocket.any(func(d: ItemDef) -> bool: return d.id == id) \
+			or (items.hidden.get(spot, {}) as Dictionary).keys().any(func(d: ItemDef) -> bool: return d.id == id)
 
 
 func _on_used(person: Person, placed: BuildingMap.PlacedObject) -> void:

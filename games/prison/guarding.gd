@@ -31,6 +31,8 @@ const WATCH_DISTANCE := 3.0
 const FAR_WATCH_DISTANCE := 5.0
 ## Game minutes before the same prisoner is walked back again.
 const ESCORT_COOLDOWN := 30.0
+## Game minutes between looks for escorted prisoners who are stuck.
+const ESCORT_EVERY := 5
 ## Tiles tried in a room for somewhere to walk a prisoner back to.
 const PLACE_TRIES := 8
 ## Tiles a prisoner being walked somewhere keeps to behind their guard.
@@ -47,6 +49,9 @@ var clock: GameClock:
 var routes: PatrolRoutes
 ## Who is a prisoner, and the moodlet for being walked back.
 var prisoner_group: StringName = &"prisoner"
+## (level, point) -> float: how much more a place needs watching, such as
+## an area on alert. Optional.
+var area_weight: Callable
 var walked_back_moodlet: StringName = &"walked_back"
 
 ## Desks, as (level, object id), with the game minute a guard last sat
@@ -70,6 +75,8 @@ func look() -> void:
 	_walk_routes()
 	_patrol()
 	_spot_out_of_place()
+	if int(clock.total_minutes) % ESCORT_EVERY == 0:
+		_escort_stuck()
 	_lead()
 
 
@@ -194,10 +201,11 @@ func _patrol() -> void:
 
 
 ## A tile, as [level, tile], somewhere in the room with the most
-## prisoners in it, or near a prisoner out on the ground. Null with no
+## prisoners in it (an area on alert counting extra), or near a prisoner
+## out on the ground. Null with no
 ## prisoners about.
 func _busy_spot() -> Variant:
-	var counts: Dictionary[Room, int] = {}
+	var counts: Dictionary[Room, float] = {}
 	var levels: Dictionary[Room, int] = {}
 	var outside: Array[Person] = []
 	for person in people.people:
@@ -207,8 +215,11 @@ func _busy_spot() -> Variant:
 		if here.is_empty():
 			outside.append(person)
 			continue
-		counts[here[1]] = counts.get(here[1], 0) + 1
+		counts[here[1]] = counts.get(here[1], 0.0) + 1.0
 		levels[here[1]] = here[0]
+	if area_weight.is_valid():
+		for room: Room in counts:
+			counts[room] *= area_weight.call(levels[room], room.centre())
 	var best: Room = null
 	for room: Room in counts:
 		if best == null or counts[room] > counts[best] or (counts[room] == counts[best] and _rng.randf() < 0.5):
@@ -332,6 +343,27 @@ func _lead() -> void:
 		if person.level != guard.level or person.flat().distance_to(guard.flat()) > FOLLOW_DISTANCE:
 			people.walk_to(person, guard.level, guard.flat(), _led_doing.get(person, "Being walked back"))
 			person.led = true
+
+
+## Prisoners whose category is walked about (high security) and who can't
+## get to where their block wants them get a guard to take them.
+func _escort_stuck() -> void:
+	var waiting: Array = jobs.of_kind(&"escort").map(func(j: Job) -> Person: return j.get_meta(&"prisoner"))
+	for person in people.people:
+		if person.group != prisoner_group or person.led or person.place_wait <= 0.0 or waiting.has(person) \
+				or person.going_home or person.quiet_room_hours > 0.0 or people.is_in_place(person):
+			continue
+		var category: CategoryDef = people.categories.get(person.category)
+		if category == null or not category.escorted:
+			continue
+		var spot := people.place_spot(person)
+		if spot.is_empty():
+			continue
+		var map: BuildingMap = building.levels[spot[0]]
+		var room := map.room_at_point(spot[1])
+		var type := people.room_type(room.type) if room != null else null
+		escort(person, [spot[0], Vector2i((spot[1] as Vector2).floor())],
+				"to the %s" % type.display_name.to_lower() if type != null else "over", &"")
 
 
 func _let_go(person: Person) -> void:

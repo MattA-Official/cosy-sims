@@ -105,6 +105,10 @@ func _process(_delta: float) -> bool:
 	_test_garden_and_library()
 	_test_prisoner_files()
 	_test_scenarios()
+	_test_alert_areas()
+	_test_alarm()
+	_test_escorted_through_gates()
+	_test_contraband_extras()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4897,6 +4901,182 @@ func _test_scenarios() -> void:
 	root.add_child(main)
 	Standing.next_scenario = &""
 	_check((main.standing as Standing).grade == 1 and (main.ledger as Ledger).balance == 3000, "run-down: one star and £3,000")
+	main.queue_free()
+
+
+func _test_alert_areas() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var security: Security = main.security
+	var people: People = main.people
+	var building: Building = main.building
+	var map: BuildingMap = building.levels[0]
+	var canteen: Room = map.rooms().filter(func(r: Room) -> bool: return r.type == &"canteen")[0]
+	var yard: Room = map.rooms().filter(func(r: Room) -> bool: return r.type == &"yard")[0]
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	prisoner.level = 0
+	prisoner.position = Vector3(canteen.centre().x, 0.0, canteen.centre().y)
+	security.count(&"fight", prisoner, "Started a fight")
+	_check(security.alert_level(0, prisoner.flat()) == 2 and security.alert_level(0, canteen.centre() + Vector2(0.5, 0.5)) == 2,
+			"a fight puts the canteen on alert")
+	_check(security.alert_level(0, yard.centre()) == 0, "but not the yard")
+	security.count(&"contraband", prisoner, "Found with a spoon")
+	_check(security.areas.size() == 1 and security.alert_level(0, prisoner.flat()) == 2, "a lesser incident there keeps the worse level")
+	_check((main.guarding as Guarding).area_weight.call(0, canteen.centre()) > 1.0
+			and (main.searching as Searching).area_weight.call(0, canteen.centre()) > 1.0, "patrols and searches lean towards it")
+	_check(not security.area_words().is_empty() and security.area_words()[0].begins_with("Canteen"), "the Security window names it")
+	var saved := PrisonSave.capture(main)
+	_check((saved.security.areas as Array).size() == 1, "alerts save")
+	for i in Security.AREA_HOURS:
+		security._age_areas()
+	_check(security.areas.is_empty(), "a day later it calms down")
+	main.queue_free()
+
+
+func _test_alarm() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var escapes: Escapes = main.escapes
+	var runner: ScheduleRunner = main.runner
+	var people: People = main.people
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	var guards := people.people.filter(func(p: Person) -> bool: return p.role == &"guard" and not p.going_home)
+	escapes.without_perimeter = true
+	_check(escapes.run(prisoner), "someone makes a run for it")
+	_check(escapes.alarm and runner.lockdown, "the alarm sounds")
+	_check(escapes.chasers.size() == guards.size(), "every free guard gives chase (%d of %d)" % [escapes.chasers.size(), guards.size()])
+	var ground: BuildingMap = main.building.levels[0]
+	var cells := ground.rooms().filter(func(r: Room) -> bool: return r.type == &"cell")
+	_check(not cells.is_empty() and cells.all(func(r: Room) -> bool:
+		return runner.room_doors(ground, r).all(func(edge: Vector3i) -> bool: return people.is_door_locked(0, edge))), "every cell door locks")
+	escapes._caught(prisoner, guards[0])
+	escapes._catch_up()
+	_check(not escapes.alarm and not runner.lockdown, "caught: all clear")
+	main.queue_free()
+
+
+func _test_escorted_through_gates() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var runner: ScheduleRunner = main.runner
+	var guarding: Guarding = main.guarding
+	var jobs: JobBoard = main.jobs
+	var ground: BuildingMap = main.building.levels[0]
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	var corridor: Room = ground.rooms().filter(func(r: Room) -> bool: return r.type == &"" and r.cells.size() > 20)[0]
+	prisoner.position = Vector3(corridor.centre().x, 0.0, corridor.centre().y)
+	prisoner.level = 0
+	var cell: Room = ground.rooms().filter(func(r: Room) -> bool: return r.type == &"cell")[1]
+	var inside: Vector2 = people._spot_in_room(0, cell)
+	for edge in runner.room_doors(ground, cell):
+		people.set_door_locked(0, edge, true)
+	_check(not people.can_reach(prisoner, 0, inside), "a locked door stops a prisoner")
+	prisoner.led = true
+	_check(people.can_reach(prisoner, 0, inside), "but not one a guard is walking through it")
+	prisoner.led = false
+	for edge in runner.room_doors(ground, cell):
+		people.set_door_locked(0, edge, false)
+	prisoner.category = &"high"
+	prisoner.place_wait = 10.0
+	prisoner.block = load("res://games/prison/catalogue/activity_eat.tres")
+	_check(not people.is_in_place(prisoner), "a high-security prisoner stuck away from the canteen")
+	guarding._escort_stuck()
+	var escorts := jobs.of_kind(&"escort").filter(func(j: Job) -> bool: return j.get_meta(&"prisoner") == prisoner)
+	_check(escorts.size() == 1 and (escorts[0] as Job).title.ends_with("to the canteen"), "gets a guard to walk them there")
+	prisoner.category = &"medium"
+	jobs.cancel(escorts[0])
+	guarding._escort_stuck()
+	_check(jobs.of_kind(&"escort").filter(func(j: Job) -> bool: return j.get_meta(&"prisoner") == prisoner).is_empty(),
+			"others find their own way")
+	main.queue_free()
+
+
+func _test_contraband_extras() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var items: ItemStore = main.items
+	var contraband: Contraband = main.contraband
+	var gates: VehicleGates = main.vehicle_gates
+	var map: BuildingMap = main.building.ground()
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool:
+		return p.group == &"prisoner" and not people.home_room(p).is_empty())
+	var prisoner: Person = prisoners[0]
+	prisoner.traits.clear()
+	# In their own cell: a phone home, and fizzy pop at lock-up.
+	var home := people.home_room(prisoner)
+	var room: Room = home[1]
+	people.stop(prisoner)
+	prisoner.level = home[0]
+	prisoner.position = Vector3(room.cells[0].x + 0.5, prisoner.position.y, room.cells[0].y + 0.5)
+	var spot := contraband.hiding_place(prisoner)
+	_check(spot != Vector2i(-1, -1), "their cell has a hiding place")
+	prisoner.pocket.append(contraband.item(&"phone"))
+	prisoner.needs[&"family"] = 20.0
+	contraband.tick()
+	_check(prisoner.needs[&"family"] == 100.0 and prisoner.moodlets.has(&"phoned_home"), "a hidden phone rings home")
+	items.hide_in(spot, contraband.item(&"fruit"), prisoner.id)
+	var turned := 0
+	for night in 20:
+		turned += contraband.brew()
+		if turned > 0:
+			break
+	_check(turned == 1 and (items.hidden[spot] as Dictionary).has(contraband.item(&"fizzy_pop")), "fruit hidden in a cell turns to fizzy pop")
+	prisoner.block = load("res://games/prison/catalogue/activity_lockup.tres")
+	contraband.tick()
+	_check(prisoner.moodlets.has(&"rowdy") and not (items.hidden.get(spot, {}) as Dictionary).has(contraband.item(&"fizzy_pop")),
+			"and gets drunk at lock-up, making them rowdy")
+	# Throw-overs land just inside a fence nobody's watching.
+	var land := map.land_bounds()
+	var edges := BuildingMap.rect_perimeter(land.grow(-2))
+	map.build_walls(edges, &"perimeter_fence")
+	var gate: Vector3i = edges[edges.size() / 2]
+	map.set_door(gate, true, &"vehicle_gate")
+	contraband.guard_role = &"nobody"
+	var landed := contraband.throw_over(true)
+	contraband.guard_role = &"guard"
+	_check(landed.size() == 3 and items.count_on_floor(Vector3i(0, landed[1].x, landed[1].y)) == 1, "something comes over the fence")
+	var guard: Person = people.people.filter(func(p: Person) -> bool: return p.role == &"guard")[0]
+	people.stop(guard)
+	guard.level = 0
+	guard.position = Vector3(landed[1].x + 0.5, 0.0, landed[1].y + 0.5)
+	var taken := []
+	contraband.confiscated.connect(func(def: ItemDef, _l: int, _p: Vector2) -> void: taken.append(def))
+	contraband.tick()
+	_check(taken == [landed[2]] and contraband.landed.is_empty() and items.count_on_floor(Vector3i(0, landed[1].x, landed[1].y)) == 0,
+			"a guard who gets there first takes it")
+	guard.position = Vector3(-50.0, 0.0, -50.0)
+	contraband.guard_role = &"nobody"
+	landed = contraband.throw_over(true)
+	contraband.guard_role = &"guard"
+	var other: Person = prisoners[1]
+	people.stop(other)
+	other.level = 0
+	other.position = Vector3(landed[1].x + 0.5, 0.0, landed[1].y + 0.5)
+	contraband.tick()
+	_check(other.pocket.has(landed[2]) or items.hidden.values().any(func(d: Dictionary) -> bool: return d.has(landed[2])),
+			"a prisoner who gets there first keeps it")
+	# The vehicle gate, unmanned.
+	_check(gates.gates().size() == 1 and not gates.checked(), "an unmanned vehicle gate")
+	_check(not gates.warnings().is_empty(), "is a warning")
+	var smuggled := []
+	gates.smuggled.connect(func(p: Person, def: ItemDef) -> void: smuggled.append(p))
+	var came := gates.delivery(true)
+	_check(came != null and smuggled.size() == 1 and (smuggled[0] as Person).pocket.has(came), "the lorry's extra goes to a prisoner")
+	var runner: Person = prisoners[2]
+	people.stop(runner)
+	var cells := BuildingMap.edge_cells(gate)
+	var inside: Vector2i = cells[0] if main.secure_area.is_secure(cells[0]) else cells[1]
+	runner.level = 0
+	runner.position = Vector3(inside.x + 0.5, 0.0, inside.y + 0.5)
+	_check(gates.vehicle_came(1.0) == runner and main.escapes.runners.has(runner), "someone by an open gate slips out behind the lorry")
+	main.escapes._caught(runner, guard)
+	_check(runner.passes_as == &"", "caught, they're a prisoner again at the doors")
 	main.queue_free()
 
 

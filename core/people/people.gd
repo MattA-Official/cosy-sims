@@ -149,6 +149,9 @@ var graph: NavGraph
 var paused := false
 ## Who may go where: zones, staff doors and locked doors.
 var access := Access.new()
+## The group whose doors someone being led (person.led) may go through,
+## such as staff walking a prisoner. Empty to keep their own.
+var led_group: StringName = &""
 ## Security categories by id, for uniform colours.
 var categories: Dictionary[StringName, CategoryDef] = {}
 ## Objects broken and waiting to be mended, by (level, object id): nobody
@@ -691,6 +694,19 @@ func place_rooms(person: Person) -> Array:
 					out.append([n, room])
 		by_group[key] = out
 	return by_group[key]
+
+
+## Somewhere in the nearest room someone's block wants them in, as
+## [level, spot], or [] if there's nowhere.
+func place_spot(person: Person) -> Array:
+	var rooms := place_rooms(person).duplicate()
+	rooms.sort_custom(func(a: Array, b: Array) -> bool:
+		return _room_score(person, a) < _room_score(person, b))
+	for pair: Array in rooms:
+		var spot: Variant = _spot_in_room(pair[0], pair[1])
+		if spot != null:
+			return [pair[0], spot]
+	return []
 
 
 ## The room someone is in, as [level, Room], or [] if they are not in one.
@@ -1704,8 +1720,12 @@ static func _door_middle(edge: Vector3i) -> Vector2:
 
 func _set_up_access(person: Person) -> void:
 	var here := room_of(person)
-	access.set_up(nav(), building, person.group, here[1] if not here.is_empty() else null,
-			person.level, person.category)
+	if person.led and led_group != &"":
+		# Kept with whoever leads them, through doors they couldn't pass.
+		access.set_up(nav(), building, led_group, here[1] if not here.is_empty() else null, person.level)
+		return
+	access.set_up(nav(), building, person.passes_as if person.passes_as != &"" else person.group,
+			here[1] if not here.is_empty() else null, person.level, person.category)
 
 
 func _walk_to(person: Person, level: int, spot: Vector2) -> bool:
