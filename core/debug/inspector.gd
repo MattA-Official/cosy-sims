@@ -59,8 +59,9 @@ func _ready() -> void:
 	add_child(instance)
 	_layer.layer = 10
 	add_child(_layer)
-	_panel.offset_left = 12.0
-	_panel.offset_top = 120.0
+	# Beside the management book's bookmarks.
+	_panel.offset_left = 76.0
+	_panel.offset_top = 76.0
 	_panel.custom_minimum_size = Vector2(330, 0)
 	_panel.add_child(_box)
 	_layer.add_child(_panel)

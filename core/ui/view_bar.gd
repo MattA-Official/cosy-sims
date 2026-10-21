@@ -2,12 +2,12 @@ class_name ViewBar
 extends PanelContainer
 ## The view controls in the top-right corner, kept apart from the build
 ## menu: which level you're on (Page Up / Down), how walls are shown (Tab),
-## and buttons for the help card (F1) and the debug view (F3).
+## always-day light, and buttons for the help card (F1), the debug view
+## (F3) and the pause menu (Esc).
 
 signal help_pressed
 signal debug_pressed
-signal saves_pressed
-signal settings_pressed
+signal menu_pressed
 
 const ICONS := "res://core/ui/icons/%s.svg"
 const VIEW_ICONS: Array[String] = ["view_walls_up", "view_cutaway", "view_walls_down", "view_roofs"]
@@ -20,6 +20,8 @@ const VIEW_DETAILS: Array[String] = [
 
 var building: Building
 var controller: BuildController
+## Optional: shows the always-day button.
+var day_night: DayNight
 
 var _level := Label.new()
 var _views: Array[CosyButton] = []
@@ -61,14 +63,13 @@ func _ready() -> void:
 		_views.append(button)
 	row.add_child(VSeparator.new())
 
-	var saves := _button("Save and load", "Save the prison, or load a save. F2", "save")
-	saves.toggle_mode = false
-	saves.pressed.connect(saves_pressed.emit)
-	row.add_child(saves)
-	var settings := _button("Game settings", "Difficulty and sentence length. F4", "settings")
-	settings.toggle_mode = false
-	settings.pressed.connect(settings_pressed.emit)
-	row.add_child(settings)
+	if day_night != null:
+		var sun := _button("Always day", "Keeps the light bright while you build, whatever the time.",
+				"always_day")
+		sun.toggled.connect(func(on: bool) -> void: day_night.always_day = on)
+		row.add_child(sun)
+		row.add_child(VSeparator.new())
+
 	var help := _button("Controls", "Every key and mouse control. F1", "help")
 	help.toggle_mode = false
 	help.pressed.connect(help_pressed.emit)
@@ -76,6 +77,10 @@ func _ready() -> void:
 	_debug = _button("Debug view", "Rooms tinted and labelled, and an inspector. F3", "debug")
 	_debug.pressed.connect(debug_pressed.emit)
 	row.add_child(_debug)
+	var menu := _button("Menu", "Pause, save and load, settings, and quitting. Esc", "menu")
+	menu.toggle_mode = false
+	menu.pressed.connect(menu_pressed.emit)
+	row.add_child(menu)
 
 	building.active_changed.connect(func(_level_number: int) -> void: _show_level())
 	controller.wall_view_changed.connect(func(_mode: BuildController.WallView) -> void: _show_wall_view())

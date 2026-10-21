@@ -11,7 +11,7 @@ var _main: Node
 
 
 func _initialize() -> void:
-	var scene: PackedScene = load(ProjectSettings.get_setting("application/run/main_scene"))
+	var scene: PackedScene = load("res://games/prison/main.tscn")
 	_main = scene.instantiate()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("sample="):

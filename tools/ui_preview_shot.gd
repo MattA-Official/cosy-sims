@@ -10,7 +10,7 @@ var _frames := 0
 
 
 func _initialize() -> void:
-	var scene: PackedScene = load(ProjectSettings.get_setting("application/run/main_scene"))
+	var scene: PackedScene = load("res://games/prison/main.tscn")
 	root.add_child(scene.instantiate())
 
 

@@ -5,6 +5,10 @@ extends CanvasLayer
 
 const MAX_SHOWN := 4
 
+## While true, notes are dropped: the title screen's backdrop prison
+## shouldn't chatter.
+var muted := false
+
 var _stack := VBoxContainer.new()
 
 
@@ -21,6 +25,8 @@ func _ready() -> void:
 ## Shows a note for `seconds`, then fades it out. Returns the note, so a
 ## caller can free it early.
 func post(title: String, body := "", seconds := 6.0) -> Control:
+	if muted:
+		return null
 	var note := PanelContainer.new()
 	note.theme_type_variation = &"ToastPanel"
 	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -48,3 +54,9 @@ func post(title: String, body := "", seconds := 6.0) -> Control:
 	tween.tween_property(note, "modulate:a", 0.0, 0.6)
 	tween.tween_callback(note.queue_free)
 	return note
+
+
+## Takes every note down at once.
+func clear() -> void:
+	for note in _stack.get_children():
+		note.free()

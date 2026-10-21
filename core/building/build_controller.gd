@@ -307,6 +307,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if map == null:
 		return
 	if event.is_action_pressed("build_cancel"):
+		if tool == Tool.NONE and not _dragging:
+			# Nothing to put away: leave Esc to the game (the pause menu).
+			return
 		if _dragging:
 			_dragging = false
 		elif tool == Tool.PATH and path_tool.cancel():

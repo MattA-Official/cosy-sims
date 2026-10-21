@@ -25,7 +25,7 @@ const SECTIONS := [
 		["[ / ]", "Turn step, or brush size"],
 		["F", "Hold to turn to face the mouse"],
 	]],
-	["Time", [
+	["Time and the book", [
 		["Space", "Pause, or carry on"],
 		[", / .", "Slower or faster (up to 4×)"],
 		["T", "The timetable"],
@@ -33,9 +33,12 @@ const SECTIONS := [
 		["M", "Money"],
 		["O", "Warden's office: intake, goals, grade"],
 		["K", "Security: cameras, incidents, alerts"],
+		["L", "Programmes: courses, parole, reform"],
+		["Esc", "Close the book"],
 	]],
 	["Other", [
 		["F1", "This card"],
+		["Esc", "Pause menu, with nothing else open"],
 		["F2", "Save and load"],
 		["F4", "Game settings: difficulty, sentence length"],
 		["Ctrl+Z / Ctrl+Y", "Undo or redo building"],

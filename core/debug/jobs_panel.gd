@@ -8,7 +8,7 @@ extends Node3D
 ## Seconds between refreshing the lists.
 const REFRESH_SECONDS := 0.5
 ## Where the panel's top sits when it is beside the debug overlay's panel.
-const TOP := 70.0
+const TOP := 112.0
 ## The panel's width, the same as the debug overlay's panel.
 const WIDTH := 418.0
 const GAP := 12.0

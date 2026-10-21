@@ -9,17 +9,37 @@ is, and how to add things to it.
 
 | Piece | Where | File | What it shows |
 | --- | --- | --- | --- |
-| Status bar | Top middle | `core/ui/status_bar.gd` | Short readouts: level, room under the mouse, people |
-| View bar | Top right | `core/ui/view_bar.gd` | Level up and down, wall views, help and debug buttons |
-| Clock bar | Top left | `core/ui/clock_bar.gd` | Time, day, the current timetable block, speeds, timetable and always-day buttons |
-| Timetable | Top middle, on T | `core/ui/timetable_window.gd` | 24 hours to paint with blocks |
+| Clock bar | Top left | `core/ui/clock_bar.gd` | Time, day, the current timetable block, speeds and the balance |
+| Management book | Left edge, under the clock | `core/ui/management_book.gd` | Bookmarks for every management window, and the book they open in |
+| View bar | Top right | `core/ui/view_bar.gd` | Level up and down, wall views, always day, help, debug and menu buttons |
+| Status bar | Top right, under the view bar | `core/ui/status_bar.gd` | Short readouts: room under the mouse, people |
 | Build menu | Bottom middle | `games/prison/build_toolbar.gd` | Tool icons, and the choices for the current tool above them |
 | Notes | Bottom right | `core/ui/toasts.gd` | Short messages that fade away |
 | Controls card | Middle, on F1 | `core/ui/help_card.gd` | Every key and mouse control |
+| Pause menu | Middle, on Esc | `core/ui/pause_menu.gd` | Resume, save and load, settings, controls, quit |
 | Inspector and debug panel | Left and right, on F3 | `core/debug/` | Developer tools |
 
 The prison game puts all of these on its `HUD` layer in
 `games/prison/main.gd` (see `_add_hud()`).
+
+Each corner has one owner, so nothing new should need a corner of its
+own: a window goes in the book, a view toggle goes in the view bar, a
+readout goes in the status bar, and a message is a note.
+
+### Screens outside the game
+
+| Screen | File | What it does |
+| --- | --- | --- |
+| Title | `games/prison/title.tscn` (the main scene) | A sample prison running behind, turning slowly; Continue, New prison, Load and Quit |
+| New prison | `games/prison/new_game_panel.gd` | Name, what to start with, difficulty, sentences and extras |
+
+The title screen hands its choices to the prison through `NewGame`
+(`games/prison/new_game.gd`), a set of static values the prison reads once
+in `_ready()`. To offer a new choice: add a static to `NewGame`, a control
+for it in `NewGamePanel`, and read it at the top of `main.gd`'s `_ready()`.
+The backdrop is the real prison scene with `attract = true`: no HUD, no
+notes and no autosave. Tools that need the game itself load
+`res://games/prison/main.tscn` directly.
 
 ## The theme
 
@@ -154,12 +174,12 @@ The game sets readouts by key; they appear in the order first set, with
 dividers between.
 
 ```gdscript
-status.set_item(&"clock", "07:40  Breakfast", &"HeaderLabel")
-status.set_item(&"money", "£12,450")
-status.remove_item(&"money")
+status.set_item(&"weather", "Drizzle")
+status.set_item(&"visitors", "3 visitors", &"SubtleLabel")
+status.remove_item(&"visitors")
 ```
 
-When the clock and money arrive, they slot in here.
+The level isn't a readout here: the view bar already shows it.
 
 ## Notes (toasts)
 
@@ -189,19 +209,71 @@ Each section is `[heading, [[keys, what they do], ...]]`. Keys separated by
 ## The view bar
 
 `ViewBar` needs the game's `building` and `controller` before it goes into
-the tree. It changes the level and wall view itself, and follows Page Up /
-Down and Tab. Its help and debug buttons only emit `help_pressed` and
-`debug_pressed`, so the game decides what they open; call `show_debug(on)`
+the tree, and `day_night` for the always-day button. It changes the level
+and wall view itself, and follows Page Up / Down and Tab. Its help, debug
+and menu buttons only emit `help_pressed`, `debug_pressed` and
+`menu_pressed`, so the game decides what they open; call `show_debug(on)`
 to light the debug button.
 
-## Adding a new panel
+## The management book
 
-1. Make a script that extends `PanelContainer` (a cream card by default) in
-   `core/ui/` if every game could use it, or in the game's folder if not.
+Like Prison Architect's reports, every management window is a page of one
+book. Bookmarks run down the left edge under the clock; pressing one (or
+its key) opens the book beside them on that page, and Esc or the page's
+own Close shuts it. Only one page shows at a time, so windows never pile
+up on each other or on the build menu.
+
+### Adding a management window
+
+1. Make a script that extends `PanelContainer` in `core/ui/` if every game
+   could use it, or in the game's folder if not. Build its contents in
+   `_ready()`, with a heading row (a `HeaderLabel` and a `FlatButton`
+   Close that calls `hide`) like the others.
+2. Give it a `refresh()` that redraws it from the game's data; the book
+   calls it each time the page opens. A `toggle()` is handy for tools and
+   tests, and works as before: showing the window opens the book on it.
+3. Hand it any data it needs, then add it to the book in `_add_hud()`:
+
+   ```gdscript
+   book.add_page(&"visits", "Visits", "Who's coming to see whom. V", "visits", visits_window)
+   ```
+
+   That's the id, the bookmark's hover card (title and details, ending in
+   its key), an icon from `core/ui/icons/`, and the window.
+4. For a key, add an action to `core/input/default_actions.gd` and an entry
+   to `BOOK_KEYS` in `main.gd`, and list it in `prison_help.gd`.
+
+Don't anchor or size the window yourself: the book drops its card, makes
+it as wide as it needs (480 px at least), and scrolls it if it's taller
+than the screen.
+
+## The pause menu
+
+Esc opens it when there's nothing else to put away (a tool, the book, the
+controls card). It dims and pauses the world, then starts the clock again
+on Resume if it was running. Buttons either run something or open a page
+beside the column, taken over just like the book's pages:
+
+```gdscript
+pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")
+pause_menu.add_button("Quit to title", func() -> void: get_tree().change_scene_to_file(TITLE_SCENE))
+```
+
+The last argument of `add_page` is an input action that opens the menu
+straight on that page (F2 for saves, F4 for settings).
+
+## Adding a different kind of panel
+
+Something that isn't a management window (a card that pops up over the
+world, like the fail card):
+
+1. Make a script that extends `PanelContainer` (a cream card by default).
 2. Build its contents in `_ready()` with plain controls and the variations
-   above. Give it any data it needs (like `building`) through variables
-   the game sets before adding it.
-3. Add it to the game's `HUD` layer in `main.gd`, and connect its signals
-   there. Keep game rules out of the panel: it emits signals, the game acts.
+   above. Give it any data it needs through variables the game sets
+   before adding it.
+3. Add it to the game's `HUD` layer in `main.gd`, before the pause menu,
+   and connect its signals there. Keep game rules out of the panel: it
+   emits signals, the game acts.
 4. Anchor it with `set_anchors_and_offsets_preset()` in `_ready()`, once it
-   is in the tree, so it follows the window size.
+   is in the tree, so it follows the window size. Keep it out of the four
+   corners, which belong to the bars above.

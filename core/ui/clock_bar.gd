@@ -1,16 +1,11 @@
 class_name ClockBar
 extends PanelContainer
 ## The clock in the top-left corner: the day, the time, the timetable
-## block everyone is in, and buttons for the speed (Space pauses, , and .
-## go slower and faster), the timetable window (T), the staff window (P),
-## the office (O), security (K), programmes (L), always-day light, and the balance, which opens the money window (M).
+## block everyone is in, buttons for the speed (Space pauses, , and . go
+## slower and faster), and the balance, which opens the money page (M).
+## The other management windows live in the ManagementBook below it.
 
-signal timetable_pressed
-signal staff_pressed
 signal money_pressed
-signal office_pressed
-signal security_pressed
-signal programmes_pressed
 
 const ICONS := "res://core/ui/icons/%s.svg"
 const SPEED_ICONS: Array[String] = ["speed_pause", "speed_1", "speed_2", "speed_3"]
@@ -24,7 +19,6 @@ const SPEED_DETAILS: Array[String] = [
 
 var clock: GameClock
 var runner: ScheduleRunner
-var day_night: DayNight
 ## The prison's money, shown as a balance. Optional.
 var ledger: Ledger
 
@@ -34,7 +28,6 @@ var _block := Label.new()
 var _chip := PanelContainer.new()
 var _chip_box := StyleBoxFlat.new()
 var _speeds: Array[CosyButton] = []
-var _timetable: CosyButton
 var _money: Button
 
 
@@ -78,34 +71,7 @@ func _ready() -> void:
 				clock.speed_index = i)
 		row.add_child(button)
 		_speeds.append(button)
-	row.add_child(VSeparator.new())
 
-	_timetable = _button("Timetable", "Who should be where, hour by hour. T", "timetable")
-	_timetable.toggle_mode = false
-	_timetable.pressed.connect(timetable_pressed.emit)
-	row.add_child(_timetable)
-	var staff := _button("Staff", "Who works here, and work programmes. P", "staff")
-	staff.toggle_mode = false
-	staff.pressed.connect(staff_pressed.emit)
-	row.add_child(staff)
-	var office := _button("Office", "The warden's office: intake, goals and the grade. O", "office")
-	office.toggle_mode = false
-	office.pressed.connect(office_pressed.emit)
-	row.add_child(office)
-	var security := _button("Security", "Cameras, incidents, alerts and the Safety grade. K", "security")
-	security.toggle_mode = false
-	security.pressed.connect(security_pressed.emit)
-	row.add_child(security)
-	var programmes := _button("Programmes", "Courses, therapy, parole and how reformed everyone is. L", "programmes")
-	programmes.toggle_mode = false
-	programmes.pressed.connect(programmes_pressed.emit)
-	row.add_child(programmes)
-	var sun := _button("Always day", "Keeps the light bright while you build, whatever the time.",
-			"always_day")
-	sun.toggled.connect(func(on: bool) -> void:
-		if day_night != null:
-			day_night.always_day = on)
-	row.add_child(sun)
 	if ledger != null:
 		row.add_child(VSeparator.new())
 		_money = Button.new()

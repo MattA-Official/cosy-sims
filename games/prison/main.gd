@@ -37,6 +37,11 @@ const PASSING_CARS := Vector2(20.0, 90.0)
 const ENTRANCE_TRIES := 60
 ## The hour the game saves itself each day.
 const AUTOSAVE_HOUR := 6
+const TITLE_SCENE := "res://games/prison/title.tscn"
+## The key for each page of the management book.
+const BOOK_KEYS: Dictionary[StringName, StringName] = {&"timetable": &"timetable_toggle",
+		&"staff": &"staff_toggle", &"money": &"money_toggle", &"office": &"office_toggle",
+		&"security": &"security_toggle", &"programmes": &"programmes_toggle"}
 
 @onready var grid: BuildGrid = $BuildGrid
 @onready var view: BuildingView = $BuildGrid/BuildingView
@@ -152,15 +157,22 @@ var office_window := OfficeWindow.new()
 var security_window := SecurityWindow.new()
 ## Save slots and the autosave, on F2.
 var saves_window := SavesWindow.new()
+## The bookmarks down the left and the book they open: every management
+## window is a page in it.
+var book := ManagementBook.new()
+## Esc with nothing to put away: resume, save and load, settings, quit.
+var pause_menu := PauseMenu.new()
+## Running behind the title screen: no HUD, no notes, no autosave.
+var attract := false
 ## The prison's name in saves: the sample's, or the save's it was loaded from.
 var title := "My prison"
 ## The F3 inspector for people, objects and rooms.
 var inspector := Inspector.new()
 ## Grid lines at the height of the level being built on, off the ground.
 var level_grid := LevelGrid.new()
-## The bar across the top: level, room under the mouse, people.
+## Room under the mouse and people, under the view bar.
 var status := StatusBar.new()
-## Level, wall view, help and debug buttons, top right.
+## Level, wall view, always day, help, debug and menu buttons, top right.
 var view_bar := ViewBar.new()
 ## Every control, on F1.
 var help_card := HelpCard.new()
@@ -169,6 +181,13 @@ var views: Dictionary[int, BuildingView] = {}
 
 
 func _ready() -> void:
+	if NewGame.pending:
+		build_sample_layout = NewGame.start >= 0
+		if build_sample_layout:
+			SamplePrisons.next = NewGame.start
+		staff_cars = NewGame.staff_cars
+		split_levels = NewGame.split_levels
+		door_steps = NewGame.door_steps
 	Building.split_levels = split_levels
 	Building.door_steps = door_steps
 	CarPark.enabled = staff_cars
@@ -307,6 +326,8 @@ func _ready() -> void:
 	else:
 		PrisonSave.apply_world(self, saved)
 		title = saved.get("title", title)
+	if NewGame.pending and NewGame.prison_name != "":
+		title = NewGame.prison_name
 	people.assign_beds()
 	runner.refresh()
 	kitchen.name = "Kitchen"
@@ -664,6 +685,8 @@ func _ready() -> void:
 	sentences.clock = clock
 	add_child(sentences)
 	sentences.start()
+	if NewGame.pending:
+		sentences.length = NewGame.sentence_length
 	courses.name = "Courses"
 	courses.people = people
 	courses.jobs = jobs
@@ -791,7 +814,7 @@ func _ready() -> void:
 		build_costs.start_from_now()
 		_apply_difficulty()
 	clock.hour_changed.connect(func(hour: int) -> void:
-		if hour == AUTOSAVE_HOUR:
+		if hour == AUTOSAVE_HOUR and not attract:
 			PrisonSave.write(PrisonSave.AUTOSAVE, PrisonSave.capture(self)))
 	undo.name = "Undo"
 	undo.capture = capture_world
@@ -835,8 +858,15 @@ func _ready() -> void:
 	_add_hud()
 	_on_cell_hovered(cursor.hovered_cell)
 	_apply_wall_view()
-	if not saved.is_empty():
+	var new_game := NewGame.pending
+	NewGame.pending = false
+	if attract:
+		hud.visible = false
+	elif not saved.is_empty():
 		Toasts.post("Loaded", PrisonSave.describe(saved), 6.0)
+	elif new_game:
+		Toasts.post("Welcome to " + title, ("Empty land to build on." if not build_sample_layout
+				else SamplePrisons.CHALLENGES[sample]) + "\nPress F1 for the controls.", 8.0)
 	elif build_sample_layout:
 		Toasts.post(SamplePrisons.NAMES[sample], SamplePrisons.CHALLENGES[sample]
 				+ "\nPress F1 for the controls.", 8.0)
@@ -846,30 +876,26 @@ func _add_hud() -> void:
 	hud.add_child(status)
 	view_bar.building = building
 	view_bar.controller = controller
+	view_bar.day_night = day_night
 	view_bar.help_pressed.connect(func() -> void: help_card.visible = not help_card.visible)
 	view_bar.debug_pressed.connect(func() -> void: debug_overlay.visible = not debug_overlay.visible)
-	view_bar.saves_pressed.connect(saves_window.toggle)
+	view_bar.menu_pressed.connect(func() -> void: pause_menu.open())
 	debug_overlay.visibility_changed.connect(func() -> void: view_bar.show_debug(debug_overlay.visible))
 	hud.add_child(view_bar)
-	help_card.sections = PrisonHelp.SECTIONS
-	hud.add_child(help_card)
 	clock_bar.clock = clock
 	clock_bar.runner = runner
-	clock_bar.day_night = day_night
 	clock_bar.ledger = ledger
-	clock_bar.money_pressed.connect(finance_window.toggle)
-	clock_bar.office_pressed.connect(office_window.toggle)
-	clock_bar.security_pressed.connect(security_window.toggle)
-	clock_bar.programmes_pressed.connect(programmes_window.toggle)
-	clock_bar.timetable_pressed.connect(timetable.toggle)
+	clock_bar.money_pressed.connect(book.toggle.bind(&"money"))
 	hud.add_child(clock_bar)
+
+	# The management book: each window is a page behind a bookmark.
+	hud.add_child(book)
 	timetable.schedule = schedule
 	timetable.runner = runner
 	timetable.categories.assign(PrisonCatalogue.CATEGORIES)
 	timetable.activities = PrisonCatalogue.ACTIVITIES
 	timetable.clock = clock
-	hud.add_child(timetable)
-	clock_bar.staff_pressed.connect(staff_window.toggle)
+	book.add_page(&"timetable", "Timetable", "Who should be where, hour by hour. T", "timetable", timetable)
 	staff_window.roles = PrisonCatalogue.ROLES
 	staff_window.programmes = PrisonCatalogue.PROGRAMMES
 	staff_window.people = people
@@ -879,15 +905,16 @@ func _add_hud() -> void:
 	staff_window.ledger = ledger
 	staff_window.hire_refused.connect(func() -> void:
 		Toasts.post("Out of money", "Nobody new can be taken on until the balance is back above zero."))
-	hud.add_child(staff_window)
+	book.add_page(&"staff", "Staff", "Who works here, and work programmes. P", "staff", staff_window)
 	finance_window.ledger = ledger
-	hud.add_child(finance_window)
+	book.add_page(&"money", "Money", "What comes in and goes out. M", "money", finance_window)
 	office_window.office = office
 	office_window.intake = intake
 	office_window.standing = standing
 	office_window.consequences = consequences
 	office_window.searching = searching
-	hud.add_child(office_window)
+	book.add_page(&"office", "Office", "The warden's office: intake, goals and the grade. O", "office",
+			office_window)
 	security_window.security = security
 	security_window.secure_area = secure_area
 	security_window.searching = searching
@@ -900,23 +927,17 @@ func _add_hud() -> void:
 	security_window.look_pressed.connect(func(level: int, point: Vector2) -> void:
 		building.active = level
 		camera_rig.focus_on(Vector3(point.x * grid.cell_size, people.nav().height_at(level, point), point.y * grid.cell_size)))
-	hud.add_child(security_window)
+	book.add_page(&"security", "Security", "Cameras, incidents, alerts and the Safety grade. K", "security",
+			security_window)
 	programmes_window.courses = courses
 	programmes_window.reform = reform
 	programmes_window.parole = parole
 	programmes_window.release = release
-	hud.add_child(programmes_window)
-	saves_window.save = func(slot: String) -> void:
-		if PrisonSave.write(slot, PrisonSave.capture(self)) == OK:
-			Toasts.post("Saved", PrisonSave.describe(PrisonSave.read(slot)))
-	saves_window.load_slot = func(slot: String) -> void:
-		PrisonSave.pending = PrisonSave.read(slot)
-		get_tree().reload_current_scene()
-	hud.add_child(saves_window)
-	settings_window.standing = standing
-	settings_window.sentences = sentences
-	hud.add_child(settings_window)
-	view_bar.settings_pressed.connect(settings_window.toggle)
+	book.add_page(&"programmes", "Programmes", "Courses, therapy, parole and how reformed everyone is. L",
+			"programmes", programmes_window)
+
+	help_card.sections = PrisonHelp.SECTIONS
+	hud.add_child(help_card)
 	fail_card.keep_playing = func() -> void:
 		standing.lost = false
 		standing.set_difficulty(Standing.DIFFICULTIES[0])
@@ -928,6 +949,30 @@ func _add_hud() -> void:
 		SamplePrisons.next = sample
 		get_tree().reload_current_scene()
 	hud.add_child(fail_card)
+
+	# The pause menu goes last, so it sits over everything and hears keys
+	# first.
+	saves_window.save = func(slot: String) -> void:
+		if PrisonSave.write(slot, PrisonSave.capture(self)) == OK:
+			Toasts.post("Saved", PrisonSave.describe(PrisonSave.read(slot)))
+	saves_window.load_slot = func(slot: String) -> void:
+		PrisonSave.pending = PrisonSave.read(slot)
+		get_tree().reload_current_scene()
+	settings_window.standing = standing
+	settings_window.sentences = sentences
+	pause_menu.clock = clock
+	pause_menu.subtitle = title
+	pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")
+	pause_menu.add_page(&"settings", "Game settings", settings_window, &"settings_toggle")
+	pause_menu.add_button("Controls", func() -> void:
+		pause_menu.close()
+		help_card.show())
+	pause_menu.add_gap()
+	pause_menu.add_button("Quit to title", func() -> void:
+		get_tree().change_scene_to_file(TITLE_SCENE))
+	pause_menu.add_button("Quit to desktop", func() -> void: get_tree().quit(), &"DangerButton")
+	hud.add_child(pause_menu)
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("level_up"):
@@ -946,29 +991,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		if not clock.paused():
 			clock.speed_index = maxi(clock.speed_index - 1, 1)
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("timetable_toggle"):
-		timetable.toggle()
-	elif event.is_action_pressed("staff_toggle"):
-		staff_window.toggle()
+	elif event.is_action_pressed("build_cancel"):
+		# Only reaches here when no window or tool wanted Esc.
+		pause_menu.open()
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("money_toggle"):
-		finance_window.toggle()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("settings_toggle"):
-		settings_window.toggle()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("saves_toggle"):
-		saves_window.toggle()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("office_toggle"):
-		office_window.toggle()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("security_toggle"):
-		security_window.toggle()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("programmes_toggle"):
-		programmes_window.toggle()
-		get_viewport().set_input_as_handled()
+	else:
+		for id: StringName in BOOK_KEYS:
+			if event.is_action_pressed(BOOK_KEYS[id]):
+				book.toggle(id)
+				get_viewport().set_input_as_handled()
+				return
 
 
 ## A little ghost that floats up and fades where someone died.
@@ -1235,7 +1267,6 @@ func _floor_level_at(cell: Vector2i) -> float:
 
 
 func _on_cell_hovered(cell: Vector2i) -> void:
-	status.set_item(&"level", Building.level_name(building.active), &"HeaderLabel")
 	var room := building.current().room_at(cell) if cell != GridCursor.NO_CELL else null
 	if room == null:
 		status.set_item(&"room", "No room here" if cell != GridCursor.NO_CELL else "Off the map", &"SubtleLabel")

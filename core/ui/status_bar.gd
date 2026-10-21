@@ -1,8 +1,8 @@
 class_name StatusBar
 extends PanelContainer
-## The rounded bar across the top of the screen: a row of short readouts
-## (the level, the room under the mouse, how many people) with dividers
-## between them. Readouts appear in the order they are first set.
+## The small rounded bar in the top-right corner, under the view bar: a row
+## of short readouts (the room under the mouse, how many people) with
+## dividers between them. Readouts appear in the order they are first set.
 ##
 ##   status.set_item(&"level", "Ground floor", &"HeaderLabel")
 ##   status.set_item(&"room", "Cell, 16 tiles")
@@ -14,9 +14,9 @@ var _items := {} # key -> Label
 
 func _ready() -> void:
 	theme_type_variation = &"HudBar"
-	set_anchors_and_offsets_preset(PRESET_CENTER_TOP)
-	grow_horizontal = GROW_DIRECTION_BOTH
-	offset_top = 12.0
+	set_anchors_and_offsets_preset(PRESET_TOP_RIGHT, PRESET_MODE_MINSIZE, 12)
+	grow_horizontal = GROW_DIRECTION_BEGIN
+	offset_top = 66.0
 	mouse_filter = MOUSE_FILTER_IGNORE
 	_row.add_theme_constant_override(&"separation", 12)
 	_row.mouse_filter = MOUSE_FILTER_IGNORE
@@ -64,9 +64,9 @@ func item_text(key: StringName) -> String:
 	return label.text if label != null else ""
 
 
-## Keeps the bar centred as its readouts change width.
+## Keeps the bar against the right edge as its readouts change width.
 func _recentre() -> void:
 	reset_size()
 	var width := get_combined_minimum_size().x
-	offset_left = -width * 0.5
-	offset_right = width * 0.5
+	offset_right = -12.0
+	offset_left = -12.0 - width
