@@ -55,6 +55,9 @@ var _days: Array[Button] = []
 var _every_day := CheckButton.new()
 var _offers := HFlowContainer.new()
 var _clash_box := VBoxContainer.new()
+## Who comes in by which way, when ways in are set up (see Arrivals).
+var arrivals: Arrivals
+var _arrival_box := VBoxContainer.new()
 
 
 ## The lanes for one day, drawn and dragged on.
@@ -461,6 +464,7 @@ func _ready() -> void:
 		box.add_child(_offers)
 		_build_offers()
 		box.add_child(_clash_box)
+	box.add_child(_arrival_box)
 	if not activities.is_empty():
 		_pick(activities[0])
 	if clock != null:
@@ -480,6 +484,51 @@ func toggle() -> void:
 func refresh() -> void:
 	_refresh_timetables()
 	_redraw()
+	_build_arrivals()
+
+
+## A row for each trip in: when, what, how, and a pick of the way in where
+## there's a choice.
+func _build_arrivals() -> void:
+	for child in _arrival_box.get_children():
+		child.queue_free()
+	if arrivals == null:
+		return
+	var title := Label.new()
+	title.text = "ARRIVALS"
+	title.theme_type_variation = &"TitleLabel"
+	_arrival_box.add_child(title)
+	for row: Dictionary in arrivals.rows():
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override(&"separation", 10)
+		var when := Label.new()
+		when.text = GameClock.hour_text(row.hour) if row.hour >= 0 else "Each shift"
+		when.custom_minimum_size.x = 80
+		line.add_child(when)
+		var what := Label.new()
+		what.text = "%s, %s" % [row.words, row.how]
+		line.add_child(what)
+		var choices: Array = row.choices
+		if choices.size() > 1:
+			var pick := OptionButton.new()
+			pick.focus_mode = FOCUS_NONE
+			for id: StringName in choices:
+				pick.add_item(arrivals.point_def(id).display_name)
+				if id == row.point:
+					pick.select(pick.item_count - 1)
+			var carries: StringName = row.carries
+			pick.item_selected.connect(func(index: int) -> void:
+				arrivals.choose(carries, choices[index])
+				_build_arrivals())
+			line.add_child(pick)
+		if not String(row.closed).is_empty():
+			var closed := Label.new()
+			closed.text = "Cancelled today"
+			closed.tooltip_text = row.closed
+			closed.mouse_filter = MOUSE_FILTER_STOP
+			closed.add_theme_color_override(&"font_color", Color(0.75, 0.3, 0.28))
+			line.add_child(closed)
+		_arrival_box.add_child(line)
 
 
 ## Shows another day of the week, 0 for Monday.

@@ -68,6 +68,8 @@ var visit_scale: Callable
 ## road. Optional.
 var vehicles: Vehicles
 var bus_model: PackedScene
+## Ways in (see Arrivals). Optional.
+var arrivals: Arrivals
 var bus_stop: Callable
 var clock: GameClock:
 	set(value):
@@ -144,7 +146,12 @@ func seat_pairs() -> Array:
 func visiting_hours() -> void:
 	if vehicles != null and bus_model != null and bus_stop.is_valid() and not seat_pairs().is_empty() \
 			and not waiting().is_empty():
-		if vehicles.drive_in(bus_model, bus_stop.call(), func(_bus: Node3D) -> void: start_visits(), BUS_STAY) != null:
+		if arrivals != null and arrivals.cancel_if_closed(Arrivals.VISITORS):
+			return
+		var came := func(_bus: Node3D) -> void: start_visits()
+		var bus := arrivals.send(Arrivals.VISITORS, bus_model, bus_stop.call(), came, BUS_STAY) if arrivals != null \
+				else vehicles.drive_in(bus_model, bus_stop.call(), came, BUS_STAY)
+		if bus != null:
 			return
 	start_visits()
 

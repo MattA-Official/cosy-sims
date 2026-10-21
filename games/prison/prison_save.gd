@@ -130,6 +130,7 @@ static func capture(main: Node) -> Dictionary:
 		"weather_on": (main.weather as Weather).enabled,
 		"surprises": (main.surprises as Surprises).capture(),
 		"utilities": (main.utilities as Utilities).capture(),
+		"arrivals": (main.arrivals as Arrivals).capture(),
 		"usual_meal": String(main.get_meta(&"usual_meal", "")),
 		"suggestions": (main.suggestions as Suggestions).capture(),
 		"visits": (main.visits as Visits).capture(),
@@ -375,6 +376,7 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	if data.has("weather"):
 		(main.weather as Weather).restore(data["weather"])
 	(main.utilities as Utilities).restore(data.get("utilities", {}))
+	(main.arrivals as Arrivals).restore(data.get("arrivals", {}))
 	if data.has("surprises"):
 		(main.surprises as Surprises).restore(data["surprises"])
 	if not String(data.get("usual_meal", "")).is_empty():

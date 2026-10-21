@@ -34,6 +34,7 @@ var _season_length := OptionButton.new()
 var _weather := CheckButton.new()
 var _surprises := OptionButton.new()
 var _utilities := OptionButton.new()
+var _location := OptionButton.new()
 const SEASON_LENGTHS: Array[int] = [3, 5, 7, 10, 14, 30]
 
 
@@ -152,6 +153,13 @@ func _ready() -> void:
 		if utilities != null:
 			utilities.mode = index as Utilities.Mode)
 	box.add_child(_row("Utilities", _utilities))
+	for def in PrisonCatalogue.LOCATIONS:
+		_location.add_item(def.display_name + (" (location pack)" if def.pack else ""))
+		_location.set_item_disabled(_location.item_count - 1, def.pack)
+		_location.set_item_tooltip(_location.item_count - 1, def.description)
+	_location.focus_mode = FOCUS_NONE
+	_location.tooltip_text = "Where the prison stands, which decides the ways in. The countryside has a road and buses, and a jetty for the ferry where there's water. Other places come as location packs."
+	box.add_child(_row("Location", _location))
 	box.add_child(HSeparator.new())
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()

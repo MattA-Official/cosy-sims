@@ -28,6 +28,10 @@ const PALLETS: Array[StringName] = [&"delivery_pallet"]
 ## The lorry has been, leaving this many crates.
 signal delivered(count: int)
 
+## () -> bool: whether today's delivery can come, such as not in a storm
+## that closes the dock. Optional.
+var may_deliver: Callable
+
 ## When set, its operation times are used instead of the hour above (main
 ## passes on Regime.operation_due).
 var regime: Regime
@@ -146,6 +150,8 @@ func meals_needed() -> int:
 ## The lorry leaves enough crates on the delivery pallets to keep two
 ## days' meals in stock, as far as they fit. Returns how many came.
 func deliver() -> int:
+	if may_deliver.is_valid() and not may_deliver.call():
+		return 0
 	var per_day := ceili(float(_prisoners() * meals_per_day()) / MEALS_PER_BATCH)
 	var wanted := per_day * STOCK_DAYS - items.total(&"ingredient")
 	var came := 0

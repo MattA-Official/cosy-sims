@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ArrivalPointDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/world/arrival_point_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/helicopter.glb" id="2_vehicle"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"helipad"
+display_name = "Helipad"
+object_tag = &"helipad"
+route = 2
+vehicle = ExtResource("2_vehicle")
+vehicle_name = "helicopter"
+seats = 6
+cargo = 10
+travel_minutes = 20.0
+closed_by = Array[StringName]([&"storm"])

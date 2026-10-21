@@ -144,6 +144,7 @@ func _process(_delta: float) -> bool:
 	_test_seasons()
 	_test_surprises()
 	_test_utilities()
+	_test_arrivals()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -7168,5 +7169,84 @@ func _test_utilities() -> void:
 	var copy := Utilities.new()
 	copy.restore(utilities.capture())
 	_check(copy.mode == Utilities.Mode.BOUGHT_IN, "the setting is saved")
+	copy.free()
+	main.queue_free()
+
+
+## Places an object anywhere it fits on the ground floor; its id or 0.
+func _place_anywhere(main: Node, def: ObjectDef) -> int:
+	var building: Building = main.building
+	var map: BuildingMap = building.levels[0]
+	for rect: Rect2i in building.land:
+		for y in range(rect.position.y + 1, rect.end.y - 2, 2):
+			for x in range(rect.position.x + 1, rect.end.x - 2, 2):
+				var id := map.place_object(def, Vector2(x, y), 0)
+				if id != 0:
+					return id
+	return 0
+
+
+func _test_arrivals() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var arrivals: Arrivals = main.arrivals
+	var vehicles: Vehicles = main.vehicles
+	var weather: Weather = main.weather
+	var counters: Counters = main.counters
+	(main.misconduct as Misconduct).enabled = false
+	_check(arrivals.location.id == &"countryside" and arrivals.point_def(&"dock") != null and arrivals.point_def(&"helipad") == null,
+			"the countryside has a bus stop and a jetty")
+	_check(arrivals.rows().size() == 4, "the timetable lists prisoners, staff, visitors and deliveries")
+	var road := arrivals.point_for(Arrivals.PRISONERS)
+	_check(road == null or road.id == &"bus_stop", "everyone comes by bus to begin with")
+	# A jetty and the ferry.
+	_check(_place_anywhere(main, PrisonCatalogue.object(&"dock")) != 0, "a jetty can be built")
+	arrivals.choose(Arrivals.PRISONERS, &"dock")
+	_check(arrivals.point_for(Arrivals.PRISONERS).id == &"dock" and not arrivals.step_off(Arrivals.PRISONERS).is_empty(),
+			"new prisoners can come by ferry")
+	var landed := [false]
+	var ferry := arrivals.send(Arrivals.PRISONERS, null, Vector2.ZERO, func(_v: Node3D) -> void: landed[0] = true)
+	_check(ferry != null and ferry.has_meta(&"afloat"), "the ferry sails in")
+	for i in 200:
+		vehicles._drive(1.0)
+	_check(landed[0] and arrivals.step_off(Arrivals.PRISONERS)[1].distance_to(Vector2(ferry.get_meta(&"at"))) < 3.0, "and ties up at the jetty")
+	vehicles.drive_out(ferry)
+	# Storms close the jetty.
+	weather.enabled = true
+	weather.set_today(weather.def_of(&"storm"))
+	var reasons: Array = []
+	arrivals.cancelled.connect(func(_carries: StringName, reason: String) -> void: reasons.append(reason))
+	_check((main.intake as Intake).bus().is_empty() and not reasons.is_empty() and reasons[0].contains("jetty"),
+			"a storm keeps the ferry away, and says why")
+	arrivals.choose(Arrivals.DELIVERIES, &"dock")
+	var late := counters.total(&"late_delivery")
+	_check((main.kitchen as Kitchen).deliver() == 0 and counters.total(&"late_delivery") > late, "and the delivery is late")
+	weather.set_today(weather.def_of(&"clear"))
+	weather.enabled = false
+	_check(arrivals.closed_reason(Arrivals.DELIVERIES).is_empty(), "clear skies open it again")
+	# A helipad flies people in.
+	arrivals.points.append(PrisonCatalogue.HELIPAD)
+	var pad := ObjectDef.new()
+	pad.id = &"helipad"
+	pad.size = Vector2(2, 2)
+	pad.tags.assign([&"helipad"])
+	pad.blocks = false
+	_check(_place_anywhere(main, pad) != 0, "a helipad can go down")
+	arrivals.choose(Arrivals.VISITORS, &"helipad")
+	var heli := arrivals.send(Arrivals.VISITORS, PrisonCatalogue.HELIPAD.vehicle, Vector2.ZERO)
+	var ground_y := heli.position.y
+	for i in 3:
+		vehicles._drive(1.0)
+	_check(heli.has_meta(&"lift") and heli.position.y > ground_y + 1.0, "a helicopter flies in")
+	vehicles.drive_out(heli)
+	# Logistics.
+	var research: Research = main.research
+	if research.mode != Research.Mode.OFF:
+		_check((arrivals.rows().filter(func(r: Dictionary) -> bool: return r.carries == Arrivals.DELIVERIES)[0].choices as Array).is_empty()
+				and (main.regime as Regime).operation(&"kitchen_lorry").fixed, "deliveries need the Logistics card to change")
+	var copy := Arrivals.new()
+	copy.restore(arrivals.capture())
+	_check(copy.trips[Arrivals.PRISONERS].point == &"dock", "the timetable is saved")
 	copy.free()
 	main.queue_free()

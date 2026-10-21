@@ -1,8 +1,8 @@
 class_name PrisonWorld
 ## Wires M12's outside world into the prison: the town's opinion and the
 ## local paper, open days, community service, protestors, seasons,
-## weather and festive days, utilities, and small surprises. Each system
-## keeps to its own node; this only connects them.
+## weather and festive days, utilities, arrival points, and small
+## surprises. Each system keeps to its own node; this only connects them.
 
 ## Below LOW_REPUTATION Safety loses a star; above HIGH_REPUTATION the
 ## grant gains HIGH_GRANT.
@@ -61,6 +61,7 @@ static func setup(main: Node) -> void:
 	_protest(main)
 	_seasons(main)
 	_utilities(main)
+	_arrivals(main)
 	_surprises(main)
 
 
@@ -669,3 +670,64 @@ static func _utilities(main: Node) -> void:
 		return [words + "."] if not words.is_empty() else ([] as Array[String]))
 	(main.inspector as Inspector).person_lines.append(func(person: Person) -> String:
 		return "In the dark: the power is off" if utilities.cut and person.moodlets.has(&"lights_out") else "")
+
+
+## Ways in: the bus stop, a jetty for the ferry, and the timetable of who
+## comes by which. Storms close the jetty for the day.
+static func _arrivals(main: Node) -> void:
+	var arrivals: Arrivals = main.arrivals
+	var weather: Weather = main.weather
+	var regime: Regime = main.get(&"regime")
+	var research: Research = main.research
+	arrivals.name = "Arrivals"
+	arrivals.building = main.building
+	arrivals.people = main.people
+	arrivals.vehicles = main.vehicles
+	arrivals.map_size = (main.terrain as Terrain).size
+	arrivals.set_location(PrisonCatalogue.LOCATIONS[0])
+	arrivals.weather_id = func() -> StringName:
+		return weather.current().id if weather.enabled and weather.current() != null else &""
+	arrivals.hour_of = func(carries: StringName) -> int:
+		match carries:
+			Arrivals.PRISONERS:
+				return floori(regime.hour_of(&"intake_bus")) if regime != null else 9
+			Arrivals.DELIVERIES:
+				return floori(regime.hour_of(&"kitchen_lorry")) if regime != null else Kitchen.DELIVERY_HOUR
+			Arrivals.VISITORS:
+				return Visits.VISIT_HOURS.x
+		return -1
+	var logistics := func() -> bool: return research.mode == Research.Mode.OFF or research.has_flag(&"logistics")
+	arrivals.may_choose = func(carries: StringName) -> bool:
+		return carries != Arrivals.DELIVERIES or logistics.call()
+	main.add_child(arrivals)
+	(main.intake as Intake).arrivals = arrivals
+	(main.visits as Visits).arrivals = arrivals
+	var staff_bus: StaffBus = main.get(&"staff_bus")
+	if staff_bus != null:
+		staff_bus.arrivals = arrivals
+	(main.visits as Visits).entrance = func() -> Array:
+		var off := arrivals.step_off(Arrivals.VISITORS)
+		if not off.is_empty():
+			return off
+		return (main.intake as Intake).arrival_spot() if not (main.building as Building).objects_tagged([Intake.BUS_STOP]).is_empty() \
+				else (main.shifts as Shifts).entrance
+	(main.kitchen as Kitchen).may_deliver = func() -> bool:
+		return not arrivals.cancel_if_closed(Arrivals.DELIVERIES)
+	arrivals.cancelled.connect(func(carries: StringName, reason: String) -> void:
+		if carries == Arrivals.DELIVERIES:
+			(main.counters as Counters).add(&"late_delivery")
+		(main.in_tray as InTray).note(reason)
+		var toasts := main.get_node_or_null("/root/Toasts")
+		if not main.attract and toasts != null:
+			toasts.post("%s can't come" % Arrivals.WORDS.get(carries, "A trip"), reason))
+	# Logistics: the delivery's time can be moved on the regime page.
+	if regime != null and regime.operation(&"kitchen_lorry") != null:
+		var lorry := regime.operation(&"kitchen_lorry")
+		var settle := func() -> void:
+			lorry.fixed = not logistics.call()
+			lorry.fixed_reason = "" if not lorry.fixed else "Needs the Logistics card"
+		settle.call()
+		(main.clock as GameClock).hour_changed.connect(func(_hour: int) -> void: settle.call())
+	var timetable: Node = main.get(&"timetable")
+	if timetable != null:
+		timetable.set(&"arrivals", arrivals)

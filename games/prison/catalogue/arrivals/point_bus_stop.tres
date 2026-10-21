@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ArrivalPointDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/world/arrival_point_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"bus_stop"
+display_name = "Bus stop"
+object_tag = &"bus_stop"
+route = 0
+vehicle_name = "bus"
+seats = 8
+cargo = 40
+travel_minutes = 0.0
+closed_by = Array[StringName]([])

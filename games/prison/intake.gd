@@ -72,6 +72,8 @@ var transfers: Dictionary = {}
 ## Drives the bus in, when there's a road.
 var vehicles: Vehicles
 var bus_model: PackedScene
+## Ways in (see Arrivals); the bus stop and the road without it.
+var arrivals: Arrivals
 ## Optional: () -> int, prisoners waiting to leave on the bus, so it comes
 ## even with nobody to bring.
 var leavers: Callable
@@ -141,7 +143,15 @@ func bus() -> Array[Person]:
 	var leaving: int = leavers.call() if leavers.is_valid() else 0
 	if (count <= 0 and leaving <= 0) or _reception().is_empty() or entrance.is_empty() or _bus != null:
 		return []
-	if vehicles != null:
+	if arrivals != null and arrivals.cancel_if_closed(Arrivals.PRISONERS):
+		return []
+	if arrivals != null:
+		_bus = arrivals.send(Arrivals.PRISONERS, bus_model, stop_point(), func(_vehicle: Node3D) -> void:
+			_bus_minutes = 0.0
+			_step_off(count))
+		if _bus != null:
+			return []
+	elif vehicles != null:
 		_bus = vehicles.drive_in(bus_model, stop_point(), func(_vehicle: Node3D) -> void:
 			_bus_minutes = 0.0
 			_step_off(count))
@@ -377,6 +387,8 @@ func _look() -> void:
 ## Where the bus stops: by a bus stop if there is one, otherwise by the
 ## entrance.
 func stop_point() -> Vector2:
+	if arrivals != null and arrivals.point_for(Arrivals.PRISONERS) != null:
+		return arrivals.stop_at(Arrivals.PRISONERS)
 	var stops := building.objects_tagged([BUS_STOP])
 	if not stops.is_empty():
 		return building.object_at(stops[0]).centre
@@ -385,6 +397,10 @@ func stop_point() -> Vector2:
 
 ## Where arrivals step off: beside the bus stop, or at the entrance.
 func arrival_spot() -> Array:
+	if arrivals != null:
+		var off := arrivals.step_off(Arrivals.PRISONERS)
+		if not off.is_empty():
+			return off
 	var stops := building.objects_tagged([BUS_STOP])
 	if not stops.is_empty():
 		var placed := building.object_at(stops[0])

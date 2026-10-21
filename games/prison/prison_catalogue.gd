@@ -52,6 +52,7 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/goods_shelf.tres"),
 	preload("res://games/prison/catalogue/reception_desk.tres"),
 	preload("res://games/prison/catalogue/bus_stop.tres"),
+	preload("res://games/prison/catalogue/dock.tres"),
 	preload("res://games/prison/catalogue/infirmary_bed.tres"),
 	preload("res://games/prison/catalogue/medicine_cabinet.tres"),
 	preload("res://games/prison/catalogue/filing_cabinet.tres"),
@@ -353,6 +354,17 @@ const REPUTATION: Array[ReputationEventDef] = [
 	preload("res://games/prison/catalogue/reputation/rep_hen.tres"),
 	preload("res://games/prison/catalogue/reputation/rep_town_meeting.tres"),
 ]
+
+## Where a prison can stand (see Arrivals): the countryside, and the
+## location packs, shown but not yet playable.
+const LOCATIONS: Array[LocationDef] = [
+	preload("res://games/prison/catalogue/arrivals/location_countryside.tres"),
+	preload("res://games/prison/catalogue/arrivals/location_island.tres"),
+	preload("res://games/prison/catalogue/arrivals/location_desert.tres"),
+	preload("res://games/prison/catalogue/arrivals/location_mountain.tres"),
+	preload("res://games/prison/catalogue/arrivals/location_moon.tres"),
+]
+const HELIPAD: ArrivalPointDef = preload("res://games/prison/catalogue/arrivals/point_helipad.tres")
 
 ## Small surprises, one roll a day (see Surprises).
 const SURPRISES: Array[SurpriseDef] = [

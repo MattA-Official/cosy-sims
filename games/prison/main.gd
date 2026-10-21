@@ -149,6 +149,7 @@ var calendar := Calendar.new()
 var weather := Weather.new()
 var surprises := Surprises.new()
 var utilities := Utilities.new()
+var arrivals := Arrivals.new()
 var health_tint := HealthTint.new()
 var knowhow := Knowhow.new()
 ## The research board in play.
@@ -1268,7 +1269,7 @@ func _ready() -> void:
 		vehicle_gates.vehicle_came()
 		var pallets := building.objects_tagged([&"delivery_pallet"])
 		var to := building.object_at(pallets[0]).centre if not pallets.is_empty() else intake.stop_point()
-		vehicles.drive_in(LORRY, to, Callable(), LORRY_STAY))
+		arrivals.send(Arrivals.DELIVERIES, LORRY, to, Callable(), LORRY_STAY))
 	intake.offer_made.connect(func(offer: Dictionary) -> void:
 		Toasts.post("Transfer offer", "The Ministry asks you to take %d more prisoners tomorrow, at %s each. Accept or decline in the office (O)."
 				% [offer.count, Ledger.text(offer.fee)]))
