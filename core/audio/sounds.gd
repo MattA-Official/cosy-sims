@@ -11,16 +11,17 @@ const BUSES: Array[StringName] = [&"Effects", &"Interface", &"Ambience", &"Music
 const DIR := "res://core/audio/sounds/"
 const SETTINGS := "user://audio.cfg"
 const PLAYERS := 8
-## [bus, volume in dB] by id.
+## [bus, volume in dB] by id. The files carry their own relative loudness
+## (see docs/art.md), so they all play at 0 dB.
 const DEFS := {
 	&"build_place": [&"Effects", 0.0],
-	&"build_remove": [&"Effects", -2.0],
-	&"build_rotate": [&"Interface", -4.0],
-	&"build_paint": [&"Effects", -2.0],
-	&"build_error": [&"Interface", -3.0],
-	&"build_finished": [&"Effects", -2.0],
-	&"build_wall": [&"Effects", -1.0],
-	&"build_floor": [&"Effects", -2.0],
+	&"build_remove": [&"Effects", 0.0],
+	&"build_rotate": [&"Interface", 0.0],
+	&"build_paint": [&"Effects", 0.0],
+	&"build_error": [&"Interface", 0.0],
+	&"build_finished": [&"Effects", 0.0],
+	&"build_wall": [&"Effects", 0.0],
+	&"build_floor": [&"Effects", 0.0],
 }
 
 var defs: Dictionary[StringName, SoundDef] = {}
