@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="StaffRoleDef" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://core/jobs/staff_role_def.gd" id="1_def"]
-[ext_resource type="Texture2D" path="res://core/ui/icons/heads.svg" id="2_icon"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/role_clerk.svg" id="2_icon"]
 [ext_resource type="Resource" path="res://games/prison/catalogue/nameplate.tres" id="3_name"]
 [ext_resource type="Resource" path="res://games/prison/catalogue/mug.tres" id="4_mug"]
 

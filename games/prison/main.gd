@@ -1129,7 +1129,7 @@ func _add_hud() -> void:
 	heads_window.clock = clock
 	in_tray_window.in_tray = in_tray
 	in_tray_window.clock = clock
-	book.add_page(&"in_tray", "In-tray", "Requests and letters waiting for an answer. J", "heads", in_tray_window)
+	book.add_page(&"in_tray", "In-tray", "Requests and letters waiting for an answer. J", "in_tray", in_tray_window)
 	book.add_page(&"heads", "Heads", "Department heads: hire cards, applicants and bonuses. H", "heads",
 			heads_window)
 	security_window.security = security
