@@ -81,6 +81,23 @@ func set_slot(slot: int, def: ActivityDef, every_day := false) -> void:
 		edited.emit()
 
 
+## Makes one day's timetable the same as another's (every other day's,
+## with `to` -1).
+func copy_day(from: int, to: int) -> void:
+	_fill_week()
+	var changed := false
+	for day in DAYS:
+		if day == from or (to != -1 and day != to):
+			continue
+		for half in SLOTS_PER_DAY:
+			var def := slots[from * SLOTS_PER_DAY + half]
+			if slots[day * SLOTS_PER_DAY + half] != def:
+				slots[day * SLOTS_PER_DAY + half] = def
+				changed = true
+	if changed:
+		edited.emit()
+
+
 ## Paints a whole hour of every day.
 func set_hour(hour: int, def: ActivityDef) -> void:
 	_fill_week()
@@ -94,14 +111,6 @@ func set_hour(hour: int, def: ActivityDef) -> void:
 				changed = true
 	if changed:
 		edited.emit()
-
-
-## Copies one day's timetable onto another.
-func copy_day(from: int, to: int) -> void:
-	_fill_week()
-	for i in SLOTS_PER_DAY:
-		slots[to * SLOTS_PER_DAY + i] = slots[from * SLOTS_PER_DAY + i]
-	edited.emit()
 
 
 ## Whether every day of the week is the same.

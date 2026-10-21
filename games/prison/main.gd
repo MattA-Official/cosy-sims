@@ -1018,6 +1018,7 @@ func _ready() -> void:
 		return count
 	regime.schedules = func() -> Dictionary: return runner.schedules
 	regime.rota = _rota_rows
+	regime.rota_menu = _rota_menu
 	regime.clock = clock
 	regime.schedule = schedule
 	add_child(regime)
@@ -1593,8 +1594,30 @@ func _rota_rows() -> Array:
 			if count > 0:
 				parts.append("%s %d" % [role.display_name, count])
 				total += count
-		if total > 0:
-			out.append(["%s: %s" % [shift.display_name, ", ".join(parts)], shift.start_hour * 2, shift.hours * 2, total])
+		out.append(["%s: %s" % [shift.display_name, ", ".join(parts) if total > 0 else "nobody"],
+				shift.start_hour * 2, shift.hours * 2, total, shift.id])
+	return out
+
+
+## What the regime page can change about a shift: take on or let go of
+## each kind of staff on it.
+func _rota_menu(row: Array) -> Array:
+	var shift: StringName = row[4]
+	var out: Array = []
+	for role in PrisonCatalogue.all_roles():
+		if not role.works(shift):
+			continue
+		var id := role.id
+		if shifts.may_add(id, shift) and roster.cheapest(id, shift) != null:
+			out.append(["Take on a %s" % role.display_name.to_lower(), func() -> void:
+				var pick := roster.cheapest(id, shift)
+				if pick != null:
+					roster.hire(pick)])
+		if not roster.on(id, shift).is_empty():
+			out.append(["Let a %s go" % role.display_name.to_lower(), func() -> void:
+				var on := roster.on(id, shift)
+				if not on.is_empty():
+					roster.dismiss(on.back())])
 	return out
 
 

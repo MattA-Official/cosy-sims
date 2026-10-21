@@ -104,6 +104,15 @@ class Lanes:
 			var placed: Variant = _thing_at(button.position)
 			if placed is Regime.Placement:
 				window.regime.pin(placed, not placed.pinned)
+			elif placed is Array:
+				# An operation: on this day or not.
+				var id: StringName = placed[0]
+				window.regime.set_runs_on(id, window.day, not window.regime.runs_on(id, window.day))
+				queue_redraw()
+			else:
+				var row := _rota_row_at(button.position)
+				if not row.is_empty():
+					window.open_rota_menu(row, get_screen_transform() * button.position)
 			accept_event()
 			return
 		if button != null and button.button_index == MOUSE_BUTTON_LEFT:
@@ -146,6 +155,15 @@ class Lanes:
 			if moved != 0 and not window.regime.set_time(id, index, window.regime.slot_of(id, index) + moved):
 				Sound.play(&"build_error")
 
+	## The rota row under a point, or [].
+	func _rota_row_at(at: Vector2) -> Array:
+		var top: float = lane_tops().get(&"rota", -1.0)
+		if top < 0.0 or at.y < top:
+			return []
+		var rows := _rota()
+		var i := floori((at.y - top) / TimetableWindow.ROTA_HEIGHT)
+		return rows[i] if i >= 0 and i < rows.size() else []
+
 	func _paint(at: Vector2) -> void:
 		window.paint_slot(slot_at(at.x))
 
@@ -178,8 +196,14 @@ class Lanes:
 				var when := Schedule.slot_text(window.regime.slot_of(op.id, entry[1]))
 				if op.fixed:
 					return "%s at %s. %s\n%s" % [op.display_name, when, op.description, op.fixed_reason]
-				return "%s at %s. %s\nDrag between %s and %s." % [op.display_name, when, op.description,
-						Schedule.slot_text(op.earliest), Schedule.slot_text(op.latest)]
+				var today := Schedule.DAY_NAMES[window.day]
+				var on := window.regime.runs_on(op.id, window.day)
+				return "%s at %s%s. %s\nDrag between %s and %s. Right-click to %s on %ss." % [op.display_name, when,
+						"" if on else " (not on %ss)" % today, op.description,
+						Schedule.slot_text(op.earliest), Schedule.slot_text(op.latest),
+						"stop it" if on else "run it", today]
+		if not _rota_row_at(at).is_empty() and window.regime.rota_menu.is_valid():
+			return "Right-click to take on or let go of staff on this shift."
 		return ""
 
 	func _session_rows() -> int:
@@ -330,6 +354,8 @@ class Lanes:
 					slot = clampi(slot + _drag_slot - slot_at(_drag_from.x), op.earliest, op.latest)
 				var rect := Rect2(left + slot * w + 2, y + 2, w - 4, TimetableWindow.OPERATION_HEIGHT - 4)
 				var colour := Color(0.62, 0.62, 0.6) if op.fixed else Color(0.95, 0.72, 0.4)
+				if not window.regime.runs_on(op.id, window.day):
+					colour = Color(0.85, 0.83, 0.8)
 				if clashing.has(base + slot) or clashing.has(slot):
 					colour = Color(0.88, 0.45, 0.4)
 				draw_style_box(_box(colour, true, true), rect)
@@ -457,6 +483,24 @@ func refresh() -> void:
 
 
 ## Shows another day of the week, 0 for Monday.
+## The things a shift can have changed, from the regime's rota menu.
+func open_rota_menu(row: Array, at: Vector2) -> void:
+	if not regime.rota_menu.is_valid():
+		return
+	var entries: Array = regime.rota_menu.call(row)
+	if entries.is_empty():
+		return
+	var menu := PopupMenu.new()
+	for i in entries.size():
+		menu.add_item(entries[i][0], i)
+	menu.id_pressed.connect(func(id: int) -> void:
+		(entries[id][1] as Callable).call()
+		_redraw())
+	menu.popup_hide.connect(menu.queue_free)
+	add_child(menu)
+	menu.popup(Rect2i(Vector2i(at), Vector2i.ZERO))
+
+
 func show_day(to: int) -> void:
 	day = posmod(to, Schedule.DAYS)
 	for i in _days.size():
@@ -489,6 +533,22 @@ func _day_row() -> HBoxContainer:
 		every_day = on
 		_pick(_picked))
 	row.add_child(_every_day)
+	var copy := MenuButton.new()
+	copy.text = "Copy this day to…"
+	copy.flat = false
+	copy.focus_mode = FOCUS_NONE
+	copy.tooltip_text = "Makes other days' timetables the same as the day shown."
+	copy.about_to_popup.connect(func() -> void:
+		var menu := copy.get_popup()
+		menu.clear()
+		menu.add_item("Every other day", -1)
+		for i in Schedule.DAYS:
+			if i != day:
+				menu.add_item(Schedule.DAY_NAMES[i], i))
+	copy.get_popup().id_pressed.connect(func(id: int) -> void:
+		schedule.copy_day(day, id)
+		_redraw())
+	row.add_child(copy)
 	return row
 
 

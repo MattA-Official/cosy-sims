@@ -116,6 +116,7 @@ func _process(_delta: float) -> bool:
 	_test_headcount()
 	_test_supplies()
 	_test_moving_cells()
+	_test_regime_extras()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1753,6 +1754,48 @@ func _test_moving_cells() -> void:
 		_check((main.homeless_prisoners() as Array).has(homeless), "and counted as needing a bed")
 		_check((main.clock_bar.warnings.call() as Array).any(func(line: String) -> bool: return line.contains("held in reception")),
 				"which the clock bar warns about")
+	main.queue_free()
+
+
+func _test_regime_extras() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var regime: Regime = main.regime
+	var schedule: Schedule = main.schedule
+	var roster: StaffRoster = main.roster
+	# Copying a day.
+	var lockup: ActivityDef = load("res://games/prison/catalogue/activity_lockup.tres")
+	schedule.set_slot(20, lockup)
+	_check(schedule.at_slot(Schedule.SLOTS_PER_DAY + 20) != lockup, "painting Monday leaves Tuesday be")
+	schedule.copy_day(0, 1)
+	_check(schedule.at_slot(Schedule.SLOTS_PER_DAY + 20) == lockup and schedule.at_slot(2 * Schedule.SLOTS_PER_DAY + 20) != lockup,
+			"copying Monday to Tuesday")
+	schedule.copy_day(0, -1)
+	_check(schedule.same_every_day(), "or to every other day")
+	# An operation with a day off.
+	var op := regime.operations.filter(func(o: OperationDef) -> bool: return not o.fixed)[0] as OperationDef
+	var due := []
+	regime.operation_due.connect(func(id: StringName, _i: int) -> void: due.append(id))
+	_check(regime.set_runs_on(op.id, 6, false) and not regime.runs_on(op.id, 6), "an operation can skip Sundays")
+	regime._on_half_hour(6 * Schedule.SLOTS_PER_DAY + regime.slot_of(op.id))
+	_check(not due.has(op.id), "and doesn't run then")
+	regime._on_half_hour(regime.slot_of(op.id))
+	_check(due.has(op.id), "but runs on Monday")
+	var data := regime.to_data()
+	regime.set_runs_on(op.id, 6, true)
+	regime.load_data(data)
+	_check(not regime.runs_on(op.id, 6), "days off are saved")
+	# The rota from the regime page.
+	var rows: Array = regime.rota.call()
+	var day_row: Array = rows.filter(func(r: Array) -> bool: return r[4] == &"day")[0]
+	var menu: Array = regime.rota_menu.call(day_row)
+	var take_on := menu.filter(func(e: Array) -> bool: return e[0] == "Take on a guard")
+	_check(not take_on.is_empty(), "the rota offers to take on a guard")
+	var before := roster.on(&"guard", &"day").size()
+	if not take_on.is_empty():
+		(take_on[0][1] as Callable).call()
+	_check(roster.on(&"guard", &"day").size() == before + 1, "which takes one on")
 	main.queue_free()
 
 

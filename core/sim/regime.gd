@@ -46,8 +46,11 @@ var on_duty: Callable
 ## (room type: StringName) -> int: how many rooms of a type there are.
 var rooms: Callable
 ## Rows for the rota lane: [words, first half hour of the day, half hours,
-## how many staff]. Optional.
+## how many staff, shift id]. Optional.
 var rota: Callable
+## (rota row) -> Array of [words, Callable]: what can be changed about a
+## shift from the regime page, such as taking on a guard. Optional.
+var rota_menu: Callable
 ## Each operation's times, as half hours of the day, by id.
 var times: Dictionary[StringName, Array] = {}
 ## Sessions a week the player offers, by session id.
@@ -55,6 +58,8 @@ var offered: Dictionary[StringName, int] = {}
 var placements: Array[Placement] = []
 ## Sessions a week that couldn't be placed at the last fill, by session id.
 var unplaced: Dictionary[StringName, int] = {}
+## Days of the week (0 for Monday) an operation doesn't run, by id.
+var days_off: Dictionary[StringName, Array] = {}
 
 
 func start() -> void:
@@ -115,6 +120,26 @@ func set_time(id: StringName, index: int, slot: int) -> bool:
 	return true
 
 
+## Whether an operation runs on a day of the week (0 for Monday).
+func runs_on(id: StringName, day: int) -> bool:
+	return not (days_off.get(id, []) as Array).has(posmod(day, Schedule.DAYS))
+
+
+## Has an operation run on a day of the week or not. Fixed ones always
+## run. Returns whether it changed.
+func set_runs_on(id: StringName, day: int, on: bool) -> bool:
+	var op := operation(id)
+	if op == null or op.fixed or runs_on(id, day) == on:
+		return false
+	var off: Array = days_off.get_or_add(id, [])
+	if on:
+		off.erase(posmod(day, Schedule.DAYS))
+	else:
+		off.append(posmod(day, Schedule.DAYS))
+	changed.emit()
+	return true
+
+
 func set_offered(id: StringName, count: int) -> void:
 	offered[id] = clampi(count, 0, 14)
 	fill()
@@ -122,7 +147,10 @@ func set_offered(id: StringName, count: int) -> void:
 
 func _on_half_hour(slot: int) -> void:
 	var of_day := slot % Schedule.SLOTS_PER_DAY
+	var day := slot / Schedule.SLOTS_PER_DAY
 	for op in operations:
+		if not runs_on(op.id, day):
+			continue
 		var list: Array = times.get(op.id, op.times)
 		for i in list.size():
 			if list[i] == of_day:
@@ -310,7 +338,8 @@ func to_data() -> Dictionary:
 	for each in placements:
 		if each.pinned:
 			placed.append([String(each.session.id), each.slot])
-	return {"times": times.duplicate(true), "offered": offered.duplicate(), "pinned": placed}
+	return {"times": times.duplicate(true), "offered": offered.duplicate(), "pinned": placed,
+			"days_off": days_off.duplicate(true)}
 
 
 func load_data(data: Dictionary) -> void:
@@ -318,6 +347,9 @@ func load_data(data: Dictionary) -> void:
 		if operation(id) != null:
 			times[id] = (data.times[id] as Array).duplicate()
 	offered.merge(data.get("offered", {}), true)
+	days_off.clear()
+	for id: StringName in data.get("days_off", {}):
+		days_off[id] = (data.days_off[id] as Array).duplicate()
 	placements.clear()
 	for entry: Array in data.get("pinned", []):
 		var def := session(StringName(entry[0]))
