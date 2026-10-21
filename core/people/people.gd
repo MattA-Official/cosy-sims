@@ -1724,8 +1724,8 @@ func _set_up_access(person: Person) -> void:
 		# Kept with whoever leads them, through doors they couldn't pass.
 		access.set_up(nav(), building, led_group, here[1] if not here.is_empty() else null, person.level)
 		return
-	access.set_up(nav(), building, person.group, here[1] if not here.is_empty() else null,
-			person.level, person.category)
+	access.set_up(nav(), building, person.passes_as if person.passes_as != &"" else person.group,
+			here[1] if not here.is_empty() else null, person.level, person.category)
 
 
 func _walk_to(person: Person, level: int, spot: Vector2) -> bool:

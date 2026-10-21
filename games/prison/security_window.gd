@@ -18,6 +18,7 @@ var coverage_tint: CoverageTint
 var sit_ins: SitIns
 var infirmary: Infirmary
 var prisoners: Callable
+var vehicle_gates: VehicleGates
 
 var _show := CheckBox.new()
 var _status := Label.new()
@@ -155,6 +156,8 @@ func status_lines() -> PackedStringArray:
 	if secure_area != null:
 		lines.append("Perimeter built: open ground inside it is secure." if secure_area.has_perimeter
 				else "No perimeter yet: a prisoner who wanders off outside can walk away. Fence the prison in with perimeter walls and gates.")
+	if vehicle_gates != null:
+		lines.append_array(vehicle_gates.warnings())
 	return lines
 
 

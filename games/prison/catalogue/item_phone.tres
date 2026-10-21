@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ItemDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/items/item_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"phone"
+display_name = "Phone"
+tags = Array[StringName]([&"contraband", &"phone"])
+colour = Color(0.25, 0.27, 0.3, 1)
+metal = true
+smell = 0.1
+trade_value = 20
+use = &"phone"

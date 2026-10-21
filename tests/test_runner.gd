@@ -108,6 +108,7 @@ func _process(_delta: float) -> bool:
 	_test_alert_areas()
 	_test_alarm()
 	_test_escorted_through_gates()
+	_test_contraband_extras()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4991,6 +4992,91 @@ func _test_escorted_through_gates() -> void:
 	guarding._escort_stuck()
 	_check(jobs.of_kind(&"escort").filter(func(j: Job) -> bool: return j.get_meta(&"prisoner") == prisoner).is_empty(),
 			"others find their own way")
+	main.queue_free()
+
+
+func _test_contraband_extras() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var items: ItemStore = main.items
+	var contraband: Contraband = main.contraband
+	var gates: VehicleGates = main.vehicle_gates
+	var map: BuildingMap = main.building.ground()
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool:
+		return p.group == &"prisoner" and not people.home_room(p).is_empty())
+	var prisoner: Person = prisoners[0]
+	prisoner.traits.clear()
+	# In their own cell: a phone home, and fizzy pop at lock-up.
+	var home := people.home_room(prisoner)
+	var room: Room = home[1]
+	people.stop(prisoner)
+	prisoner.level = home[0]
+	prisoner.position = Vector3(room.cells[0].x + 0.5, prisoner.position.y, room.cells[0].y + 0.5)
+	var spot := contraband.hiding_place(prisoner)
+	_check(spot != Vector2i(-1, -1), "their cell has a hiding place")
+	prisoner.pocket.append(contraband.item(&"phone"))
+	prisoner.needs[&"family"] = 20.0
+	contraband.tick()
+	_check(prisoner.needs[&"family"] == 100.0 and prisoner.moodlets.has(&"phoned_home"), "a hidden phone rings home")
+	items.hide_in(spot, contraband.item(&"fruit"), prisoner.id)
+	var turned := 0
+	for night in 20:
+		turned += contraband.brew()
+		if turned > 0:
+			break
+	_check(turned == 1 and (items.hidden[spot] as Dictionary).has(contraband.item(&"fizzy_pop")), "fruit hidden in a cell turns to fizzy pop")
+	prisoner.block = load("res://games/prison/catalogue/activity_lockup.tres")
+	contraband.tick()
+	_check(prisoner.moodlets.has(&"rowdy") and not (items.hidden.get(spot, {}) as Dictionary).has(contraband.item(&"fizzy_pop")),
+			"and gets drunk at lock-up, making them rowdy")
+	# Throw-overs land just inside a fence nobody's watching.
+	var land := map.land_bounds()
+	var edges := BuildingMap.rect_perimeter(land.grow(-2))
+	map.build_walls(edges, &"perimeter_fence")
+	var gate: Vector3i = edges[edges.size() / 2]
+	map.set_door(gate, true, &"vehicle_gate")
+	contraband.guard_role = &"nobody"
+	var landed := contraband.throw_over(true)
+	contraband.guard_role = &"guard"
+	_check(landed.size() == 3 and items.count_on_floor(Vector3i(0, landed[1].x, landed[1].y)) == 1, "something comes over the fence")
+	var guard: Person = people.people.filter(func(p: Person) -> bool: return p.role == &"guard")[0]
+	people.stop(guard)
+	guard.level = 0
+	guard.position = Vector3(landed[1].x + 0.5, 0.0, landed[1].y + 0.5)
+	var taken := []
+	contraband.confiscated.connect(func(def: ItemDef, _l: int, _p: Vector2) -> void: taken.append(def))
+	contraband.tick()
+	_check(taken == [landed[2]] and contraband.landed.is_empty() and items.count_on_floor(Vector3i(0, landed[1].x, landed[1].y)) == 0,
+			"a guard who gets there first takes it")
+	guard.position = Vector3(-50.0, 0.0, -50.0)
+	contraband.guard_role = &"nobody"
+	landed = contraband.throw_over(true)
+	contraband.guard_role = &"guard"
+	var other: Person = prisoners[1]
+	people.stop(other)
+	other.level = 0
+	other.position = Vector3(landed[1].x + 0.5, 0.0, landed[1].y + 0.5)
+	contraband.tick()
+	_check(other.pocket.has(landed[2]) or items.hidden.values().any(func(d: Dictionary) -> bool: return d.has(landed[2])),
+			"a prisoner who gets there first keeps it")
+	# The vehicle gate, unmanned.
+	_check(gates.gates().size() == 1 and not gates.checked(), "an unmanned vehicle gate")
+	_check(not gates.warnings().is_empty(), "is a warning")
+	var smuggled := []
+	gates.smuggled.connect(func(p: Person, def: ItemDef) -> void: smuggled.append(p))
+	var came := gates.delivery(true)
+	_check(came != null and smuggled.size() == 1 and (smuggled[0] as Person).pocket.has(came), "the lorry's extra goes to a prisoner")
+	var runner: Person = prisoners[2]
+	people.stop(runner)
+	var cells := BuildingMap.edge_cells(gate)
+	var inside: Vector2i = cells[0] if main.secure_area.is_secure(cells[0]) else cells[1]
+	runner.level = 0
+	runner.position = Vector3(inside.x + 0.5, 0.0, inside.y + 0.5)
+	_check(gates.vehicle_came(1.0) == runner and main.escapes.runners.has(runner), "someone by an open gate slips out behind the lorry")
+	main.escapes._caught(runner, guard)
+	_check(runner.passes_as == &"", "caught, they're a prisoner again at the doors")
 	main.queue_free()
 
 
