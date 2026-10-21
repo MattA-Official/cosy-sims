@@ -26,10 +26,14 @@ const PALLETS: Array[StringName] = [&"delivery_pallet"]
 ## The lorry has been, leaving this many crates.
 signal delivered(count: int)
 
+## When set, its operation times are used instead of the hour above (main
+## passes on Regime.operation_due).
+var regime: Regime
 var clock: GameClock:
 	set(value):
 		clock = value
 		clock.hour_changed.connect(_on_hour)
+		clock.half_hour_changed.connect(_on_half_hour)
 var people: People
 var jobs: JobBoard
 var items: ItemStore
@@ -44,9 +48,10 @@ var tray := PrisonCatalogue.item(&"meal_tray")
 ## if a meal is due within the hour.
 func start() -> void:
 	deliver()
-	if _meal_starts(clock.hour() + 1):
+	var now := Schedule.slot_of(clock.total_minutes)
+	if _meal_starts(now + 1) or _meal_starts(now + 2):
 		cook()
-	elif schedule.at(clock.hour()) != null and schedule.at(clock.hour()).main_tag == MEAL_TAG:
+	elif schedule.at_slot(now) != null and schedule.at_slot(now).main_tag == MEAL_TAG:
 		# Starting at a mealtime, the meal is already out.
 		var wanted := _prisoners()
 		for key in building.objects_tagged(COUNTERS):
@@ -55,12 +60,16 @@ func start() -> void:
 
 
 func _on_hour(hour: int) -> void:
-	if hour == DELIVERY_HOUR:
+	if hour == DELIVERY_HOUR and regime == null:
 		deliver()
 	_unload()
-	if _meal_starts(hour + 1):
+
+
+## Cooking starts an hour before each meal; leftovers go once it ends.
+func _on_half_hour(slot: int) -> void:
+	if _meal_starts(slot + 2):
 		cook()
-	if _meal_ends(hour):
+	if _meal_ends(slot):
 		clear_leftovers()
 
 
@@ -164,20 +173,22 @@ func warnings() -> Array[String]:
 ## How many meals the prisoners' timetable has in a day.
 func meals_per_day() -> int:
 	var count := 0
-	for hour in Schedule.HOURS:
-		if _meal_starts(hour):
+	var day := Schedule.weekday_of(clock.total_minutes) if clock != null else 0
+	for i in Schedule.SLOTS_PER_DAY:
+		if _meal_starts(day * Schedule.SLOTS_PER_DAY + i):
 			count += 1
 	return count
 
 
-func _meal_starts(hour: int) -> bool:
-	var now := schedule.at(hour)
-	return now != null and now.main_tag == MEAL_TAG and schedule.at(hour - 1) != now
+## Whether a meal starts in a half hour of the week.
+func _meal_starts(slot: int) -> bool:
+	var now := schedule.at_slot(slot)
+	return now != null and now.main_tag == MEAL_TAG and schedule.at_slot(slot - 1) != now
 
 
-func _meal_ends(hour: int) -> bool:
-	var before := schedule.at(hour - 1)
-	return before != null and before.main_tag == MEAL_TAG and schedule.at(hour) != before
+func _meal_ends(slot: int) -> bool:
+	var before := schedule.at_slot(slot - 1)
+	return before != null and before.main_tag == MEAL_TAG and schedule.at_slot(slot) != before
 
 
 func _prisoners() -> int:

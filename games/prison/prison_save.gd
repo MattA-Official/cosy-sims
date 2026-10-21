@@ -45,14 +45,11 @@ static func capture(main: Node) -> Dictionary:
 			"profile": person.profile.duplicate(true), "bed": person.bed,
 			"doing": people.doing_of(person), "work": (main.jobs as JobBoard).work_of(person),
 		})
-	var hours: Array = []
-	for def in (main.schedule as Schedule).hours:
-		hours.append(def.id if def != null else &"")
+	var hours: Array = (main.schedule as Schedule).ids()
 	var category_hours: Dictionary = {}
 	for key: StringName in (main.runner as ScheduleRunner).schedules:
 		if String(key).contains("/"):
-			category_hours[key] = (main.runner as ScheduleRunner).schedules[key].hours.map(
-					func(def: ActivityDef) -> StringName: return def.id if def != null else &"")
+			category_hours[key] = (main.runner as ScheduleRunner).schedules[key].ids()
 	var routes: Array = []
 	for route in (main.routes as PatrolRoutes).routes:
 		routes.append([route.level, route.points.duplicate(), route.guards, route.name])
@@ -106,6 +103,7 @@ static func capture(main: Node) -> Dictionary:
 				"today": (main.searching as Searching).searches_today,
 				"found": (main.searching as Searching).found_today.duplicate()},
 		"timetable": hours,
+		"regime": (main.regime as Regime).to_data(),
 		"category_timetables": category_hours,
 		"locks": people.access.locked.duplicate(),
 		"overrides": (main.runner as ScheduleRunner).overrides.duplicate(),
@@ -205,19 +203,13 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	var people: People = main.people
 	var schedule: Schedule = main.schedule
 	var hours: Array = data.get("timetable", [])
-	for i in mini(hours.size(), schedule.hours.size()):
-		for def in PrisonCatalogue.ACTIVITIES:
-			if def.id == hours[i]:
-				schedule.hours[i] = def
+	if not hours.is_empty():
+		schedule.load_ids(hours, PrisonCatalogue.ACTIVITIES)
 	var category_hours: Dictionary = data.get("category_timetables", {})
 	for key: StringName in category_hours:
 		var parts := String(key).split("/")
 		var split := (main.runner as ScheduleRunner).split(StringName(parts[0]), StringName(parts[1]))
-		var saved_hours: Array = category_hours[key]
-		for i in mini(saved_hours.size(), split.hours.size()):
-			for def in PrisonCatalogue.ACTIVITIES:
-				if def.id == saved_hours[i]:
-					split.hours[i] = def
+		split.load_ids(category_hours[key], PrisonCatalogue.ACTIVITIES)
 	people.access.locked.assign(data.get("locks", {}))
 	(main.runner as ScheduleRunner).overrides.assign(data.get("overrides", {}))
 	(main.runner as ScheduleRunner).pinned.assign(data.get("pinned", {}))
@@ -300,6 +292,8 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 			people.resume_doing(person, entry.get("doing", {}))
 			(main.jobs as JobBoard).resume_work(person, entry.get("work", {}))
 	(main.courses as Courses).places.assign(data.get("course_places", {}))
+	if data.has("regime"):
+		(main.regime as Regime).load_data(data.regime)
 	var parole_data: Dictionary = data.get("parole", {})
 	var parole: Parole = main.parole
 	parole.today = parole_data.get("today", [])

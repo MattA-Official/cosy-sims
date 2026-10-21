@@ -54,6 +54,9 @@ var light_fingered: StringName = &"light_fingered"
 var enabled := true
 ## Tools taken since the last count: [level, Room, ItemDef].
 var missing: Array = []
+## When set, its operation times are used instead of the hour above (main
+## passes on Regime.operation_due).
+var regime: Regime
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -61,7 +64,7 @@ var clock: GameClock:
 			tick()
 			if minute % 60 == 30:
 				trade_round()
-			if minute % 60 == 0 and COUNT_HOURS.has(minute / 60):
+			if regime == null and minute % 60 == 0 and COUNT_HOURS.has(minute / 60):
 				count_tools())
 
 var _rng := RandomNumberGenerator.new()

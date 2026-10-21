@@ -37,6 +37,9 @@ var people: People
 var jobs: JobBoard
 var building: Building
 var runner: ScheduleRunner
+## Places sessions in the week. Optional: without it, classes run in every
+## block that holds them.
+var regime: Regime
 var reform: Progress
 var prisoner_group: StringName = &"prisoner"
 var defs: Array[CourseDef] = []
@@ -188,11 +191,22 @@ func look() -> void:
 
 
 func _in_class(person: Person) -> bool:
+	if regime != null:
+		var course := course_of(person)
+		var placed := regime.running(course.id, clock.total_minutes) if course != null else null
+		return placed != null and person.block != null and regime._allowed(placed.session, person.block)
 	return person.block != null and person.block.classes
 
 
-## When the class block someone is in began, in game minutes.
+## When the class someone is in began, in game minutes: its session, or
+## without a regime, its block.
 func _block_start(person: Person) -> float:
+	if regime != null and course_of(person) != null:
+		var placed := regime.running(course_of(person).id, clock.total_minutes)
+		if placed != null:
+			var into := posmod(Schedule.slot_of(clock.total_minutes) - placed.slot, Schedule.SLOTS)
+			return snappedf(floorf(clock.total_minutes / Schedule.SLOT_MINUTES) * Schedule.SLOT_MINUTES
+					- into * Schedule.SLOT_MINUTES, 1.0)
 	var key := runner.key_for(person)
 	return snappedf(clock.total_minutes - runner.minutes_into_block(key), 1.0)
 

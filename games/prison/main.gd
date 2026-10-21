@@ -146,6 +146,7 @@ var clock := GameClock.new()
 var schedule: Schedule = PrisonCatalogue.SCHEDULE.copy()
 ## Puts everyone in their timetable block and locks cell doors.
 var runner := ScheduleRunner.new()
+var regime := Regime.new()
 var day_night := DayNight.new()
 var door_lights := DoorLights.new()
 ## Tints rooms by who may be in them while the zones tool is open.
@@ -763,6 +764,31 @@ func _ready() -> void:
 	courses.clock = clock
 	add_child(courses)
 	courses.places.assign(site.course_places)
+	regime.name = "Regime"
+	regime.operations = PrisonRegime.operations()
+	regime.sessions = PrisonRegime.sessions(PrisonCatalogue.COURSES)
+	regime.on_duty = func(role: StringName, slot: int) -> bool:
+		for shift in shifts.shifts:
+			if shift.is_on(slot * Schedule.SLOT_MINUTES) and shifts.wanted_for(role, shift.id) > 0:
+				return true
+		return false
+	regime.rooms = func(type: StringName) -> int:
+		var count := 0
+		for n: int in building.levels:
+			for room: Room in building.levels[n].rooms():
+				if room.type == type:
+					count += 1
+		return count
+	regime.schedules = func() -> Dictionary: return runner.schedules
+	regime.rota = _rota_rows
+	regime.clock = clock
+	regime.schedule = schedule
+	add_child(regime)
+	regime.start()
+	courses.regime = regime
+	regime.operation_due.connect(_on_operation)
+	for system: Object in [kitchen, cleaning, workshop, budget, release, intake, parole, contraband, searching]:
+		system.set(&"regime", regime)
 	misconduct.temper_scales.append(courses.calm_scale)
 	inspector.person_pickers.append(["Course", "Put them on a course now, or take them off one.",
 		func(_person: Person) -> Array:
@@ -1146,6 +1172,39 @@ func _apply_difficulty() -> void:
 	finances.wage_scale = def.wage_scale
 	reform.loss_scale = def.reform_loss_scale
 	release.return_scale = def.reoffend_scale
+
+
+## An operation's time came round in the regime.
+func _on_operation(id: StringName, index: int) -> void:
+	match id:
+		&"kitchen_lorry":
+			kitchen.deliver()
+			cleaning.collect()
+			workshop.collect()
+		&"workshop_contracts":
+			budget.make_offers()
+		&"release":
+			release.announce()
+		&"intake_bus":
+			intake.bus()
+		&"parole_planning":
+			parole.plan_day()
+		&"parole_hearings":
+			parole._post_hearing()
+		&"tool_counts":
+			contraband.count_tools()
+
+
+## The rota lane: each shift's staff by role, such as "Guards, day: 4".
+func _rota_rows() -> Array:
+	var out: Array = []
+	for shift in shifts.shifts:
+		for role in PrisonCatalogue.ROLES:
+			var count := shifts.wanted_for(role.id, shift.id)
+			if count > 0:
+				out.append(["%s, %s" % [role.display_name, shift.display_name.to_lower()],
+						shift.start_hour * 2, shift.hours * 2, count])
+	return out
 
 
 ## Postcard boards show the latest cards that came.

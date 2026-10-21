@@ -30,11 +30,14 @@ var finances: Finances
 var intake: Intake
 var workshop: Workshop
 var building: Building
+## When set, its operation times are used instead of the hour above (main
+## passes on Regime.operation_due).
+var regime: Regime
 var clock: GameClock:
 	set(value):
 		clock = value
 		clock.hour_changed.connect(func(hour: int) -> void:
-			if hour == OFFER_HOUR:
+			if hour == OFFER_HOUR and regime == null:
 				make_offers())
 		clock.day_changed.connect(func(_day: int) -> void: _midnight())
 

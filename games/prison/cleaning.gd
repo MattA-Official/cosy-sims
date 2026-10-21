@@ -17,6 +17,9 @@ const BAG := &"rubbish_bag"
 const BINS: Array[StringName] = [&"bin"]
 const SKIPS: Array[StringName] = [&"skip"]
 
+## When set, its operation times are used instead of the hour above (main
+## passes on Regime.operation_due).
+var regime: Regime
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -24,7 +27,7 @@ var clock: GameClock:
 			if minute % LOOK_MINUTES == 0:
 				look())
 		clock.hour_changed.connect(func(hour: int) -> void:
-			if hour == Kitchen.DELIVERY_HOUR:
+			if hour == Kitchen.DELIVERY_HOUR and regime == null:
 				collect())
 var jobs: JobBoard
 var items: ItemStore

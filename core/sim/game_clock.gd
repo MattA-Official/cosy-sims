@@ -11,6 +11,9 @@ extends Node
 ## Every whole minute, as minutes since midnight (0 to 1439).
 signal minute_passed(minute: int)
 signal hour_changed(hour: int)
+## Every half hour (on the hour too), as the half hour of the week from
+## Monday midnight: see Schedule.slot_of.
+signal half_hour_changed(slot: int)
 signal day_changed(day: int)
 ## Game minutes moved on this frame. Nothing is sent while paused.
 signal advanced(minutes: float)
@@ -74,6 +77,7 @@ func jump_to_hour(hour: int) -> void:
 	if day() != old_day:
 		day_changed.emit(day())
 	hour_changed.emit(hour)
+	half_hour_changed.emit(Schedule.slot_of(total_minutes))
 	minute_passed.emit(minute_of_day())
 
 
@@ -134,4 +138,6 @@ func _cross(from: int, to: int) -> void:
 			day_changed.emit(whole / MINUTES_PER_DAY + 1)
 		if minute % MINUTES_PER_HOUR == 0:
 			hour_changed.emit(minute / MINUTES_PER_HOUR)
+		if minute % 30 == 0:
+			half_hour_changed.emit(Schedule.slot_of(whole))
 		minute_passed.emit(minute)

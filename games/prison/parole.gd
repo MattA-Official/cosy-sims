@@ -44,6 +44,9 @@ var reform: Reform
 var prisoner_group: StringName = &"prisoner"
 ## Flat change to every chance, from difficulty.
 var chance_shift := 0.0
+## When set, its operation times are used instead of the hour above (main
+## passes on Regime.operation_due).
+var regime: Regime
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -174,9 +177,9 @@ func _on_hour(hour: int) -> void:
 		for person in queue:
 			person.profile["parole_missed"] = true
 		queue.clear()
-	elif hour == PLAN_HOUR:
+	elif hour == PLAN_HOUR and regime == null:
 		plan_day()
-	elif hour == HEARING_HOUR:
+	elif hour == HEARING_HOUR and regime == null:
 		_post_hearing()
 
 

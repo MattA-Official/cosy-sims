@@ -52,6 +52,9 @@ var postcard_defs: Array[PostcardDef] = []
 var prisoner_group: StringName = &"prisoner"
 ## Scales the reoffending chance (difficulty).
 var return_scale := 1.0
+## When set, its operation times are used instead of the hour above (main
+## passes on Regime.operation_due).
+var regime: Regime
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -159,17 +162,28 @@ func report_lines() -> Array[String]:
 	return out
 
 
+## When leavers set off, in hours.
+func leave_hour() -> float:
+	return regime.hour_of(&"release") if regime != null else float(LEAVE_HOUR)
+
+
+## The morning's leavers are told about (main calls this for the regime's
+## release time).
+func announce() -> void:
+	var count := due().size()
+	if count > 0:
+		going.emit(count)
+
+
 func _on_hour(hour: int) -> void:
-	if hour == LEAVE_HOUR:
-		var count := due().size()
-		if count > 0:
-			going.emit(count)
+	if hour == LEAVE_HOUR and regime == null:
+		announce()
 
 
 ## Moves leavers along, and sets off anyone due.
 func _look() -> void:
-	var hour := clock.hour()
-	if hour >= LEAVE_HOUR and hour < LAST_HOUR:
+	var minute := clock.minute_of_day()
+	if minute >= leave_hour() * 60 and minute < LAST_HOUR * 60:
 		for person in due():
 			_set_off(person)
 	for person: Person in _leaving.keys():

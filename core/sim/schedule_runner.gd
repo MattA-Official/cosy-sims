@@ -1,6 +1,6 @@
 class_name ScheduleRunner
 extends Node
-## Runs the timetables. On every hour it works out each group's block and
+## Runs the timetables. Every half hour it works out each group's block and
 ## puts everyone in theirs (see People.set_block). A group can have extra
 ## timetables for some of its categories, keyed "group/category" (such as
 ## "prisoner/high"); everyone else follows the group's. Every minute it locks
@@ -18,7 +18,7 @@ const LATE_MINUTES := 15.0
 var clock: GameClock:
 	set(value):
 		clock = value
-		clock.hour_changed.connect(func(_hour: int) -> void: refresh())
+		clock.half_hour_changed.connect(func(_slot: int) -> void: refresh())
 		clock.minute_passed.connect(func(_minute: int) -> void: _every_minute())
 var people: People:
 	set(value):
@@ -103,7 +103,7 @@ func merge(key: StringName) -> void:
 ## The block a timetable (a group, or "group/category") is in now.
 func current(group: StringName = &"prisoner") -> ActivityDef:
 	if not _current.has(group) and schedules.has(group) and clock != null:
-		_current[group] = schedules[group].at(clock.hour())
+		_current[group] = schedules[group].at_time(clock.total_minutes)
 		_started[group] = clock.total_minutes
 	return _current.get(group)
 
@@ -114,11 +114,11 @@ func minutes_into_block(group: StringName = &"prisoner") -> float:
 	return clock.total_minutes - _started.get(group, clock.total_minutes)
 
 
-## Works out every group's block for the hour and puts everyone in theirs.
-## Called on the hour, and when a timetable is edited.
+## Works out every group's block for the half hour and puts everyone in
+## theirs. Called every half hour, and when a timetable is edited.
 func refresh() -> void:
 	for group: StringName in schedules:
-		var def := schedules[group].at(clock.hour())
+		var def := schedules[group].at_time(clock.total_minutes)
 		if _current.get(group) != def:
 			_current[group] = def
 			_started[group] = clock.total_minutes

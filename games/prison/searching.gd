@@ -42,6 +42,9 @@ var found_today: Array[String] = []
 ## (level, room) -> void: anything else a cell search turns up, such as a
 ## tunnel.
 var room_checks: Array[Callable] = []
+## When set, its operation times are used instead of the hour above (main
+## passes on Regime.operation_due).
+var regime: Regime
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -170,9 +173,13 @@ func _tick() -> void:
 	if random_per_day <= 0 or clock == null:
 		return
 	var minute := clock.minute_of_day()
-	var span := (LAST_HOUR - FIRST_HOUR) * 60
-	var gap := span / random_per_day
-	if minute < FIRST_HOUR * 60 or minute >= LAST_HOUR * 60 or (minute - FIRST_HOUR * 60) % gap != gap / 2:
+	var first := FIRST_HOUR * 60
+	var last := LAST_HOUR * 60
+	if regime != null:
+		first = roundi(regime.hour_of(&"cell_searches", 0) * 60)
+		last = roundi(regime.hour_of(&"cell_searches", 1) * 60)
+	var gap := maxi((last - first) / random_per_day, 1)
+	if minute < first or minute >= last or (minute - first) % gap != gap / 2:
 		return
 	# Cells weighted by who sleeps there: high security more often.
 	var homes: Array = []

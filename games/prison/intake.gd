@@ -80,16 +80,23 @@ var leavers: Callable
 ## arrival that person again.
 var returning: Callable
 var on_return: Callable
+## When set, its operation times are used instead of the hour above (main
+## passes on Regime.operation_due).
+var regime: Regime
 var clock: GameClock:
 	set(value):
 		clock = value
 		clock.minute_passed.connect(func(_minute: int) -> void:
 			_look()
 			_bus_waits())
+		# With a regime, transfers are offered an hour after the bus.
+		clock.half_hour_changed.connect(func(slot: int) -> void:
+			if regime != null and slot % Schedule.SLOTS_PER_DAY == (regime.slot_of(&"intake_bus") + 2) % Schedule.SLOTS_PER_DAY:
+				_maybe_offer())
 		clock.hour_changed.connect(func(hour: int) -> void:
-			if hour == BUS_HOUR:
+			if hour == BUS_HOUR and regime == null:
 				bus()
-			elif hour == OFFER_HOUR:
+			elif hour == OFFER_HOUR and regime == null:
 				_maybe_offer()
 			elif hour == 0:
 				offer = {})
@@ -230,11 +237,16 @@ func plan_for(day: int) -> Dictionary[StringName, int]:
 	return out
 
 
+## When the bus comes, in hours, such as 9.5.
+func bus_hour() -> float:
+	return regime.hour_of(&"intake_bus") if regime != null else float(BUS_HOUR)
+
+
 ## The next week's arrivals: [day, weekday, count], from today if the bus
 ## hasn't come yet.
 func forecast(days := FORECAST_DAYS) -> Array:
 	var out: Array = []
-	var first := _today() + (1 if clock != null and clock.hour() >= BUS_HOUR else 0)
+	var first := _today() + (1 if clock != null and clock.minute_of_day() >= bus_hour() * 60 else 0)
 	for day in range(first, first + days):
 		out.append([day, GameClock.WEEKDAYS[(day - 1) % GameClock.WEEKDAYS.size()], _count_of(plan_for(day))])
 	return out

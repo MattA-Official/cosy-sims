@@ -97,6 +97,7 @@ func _process(_delta: float) -> bool:
 	_test_templates()
 	_test_build_feel()
 	_test_blueprints()
+	_test_regime()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1304,7 +1305,7 @@ func _test_saving() -> void:
 	var map: BuildingMap = main.building.ground()
 	map.build_room(Rect2i(map.land_bounds().position + Vector2i(1, 6), Vector2i(3, 3)))
 	main.ledger.sandbox = true
-	main.schedule.hours[3] = PrisonCatalogue.ACTIVITIES[0]
+	main.schedule.set_hour(3, PrisonCatalogue.ACTIVITIES[0])
 	var data := PrisonSave.capture(main)
 	_check(PrisonSave.write("test", data) == OK and not PrisonSave.read("test").is_empty(), "a prison saves to a file")
 	var names: Array = main.people.people.filter(func(p: Person) -> bool: return not p.going_home) \
@@ -1327,7 +1328,7 @@ func _test_saving() -> void:
 	_check(loaded.building.ground().walls.size() == walls, "the build comes back, new room and all")
 	_check(is_equal_approx(loaded.clock.total_minutes, minutes), "and the time")
 	_check(loaded.ledger.balance == balance and loaded.ledger.sandbox, "and the money")
-	_check(loaded.schedule.hours[3] == PrisonCatalogue.ACTIVITIES[0], "and the timetable")
+	_check(loaded.schedule.at(3) == PrisonCatalogue.ACTIVITIES[0], "and the timetable")
 	_check(loaded.items.total(&"ingredient") == shelf, "and the food on the shelves")
 	_check(loaded.people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").all(
 			func(p: Person) -> bool: return p.category != &""), "and each prisoner's category")
@@ -4398,6 +4399,62 @@ func _test_blueprints() -> void:
 	_check(map.planned_floors.is_empty() and map.planned_walls.is_empty() and ledger.balance == before
 			and jobs.of_kind(&"build").is_empty(), "is cancelled with the demolish tool, for nothing")
 	main.free()
+
+
+func _test_regime() -> void:
+	var clock := GameClock.new()
+	clock.start_hour = 0.0
+	root.add_child(clock)
+	var regime := Regime.new()
+	regime.operations = PrisonRegime.operations()
+	regime.sessions = PrisonRegime.sessions(PrisonCatalogue.COURSES)
+	regime.on_duty = func(_role: StringName, _slot: int) -> bool: return true
+	regime.rooms = func(_type: StringName) -> int: return 2
+	regime.clock = clock
+	regime.schedule = PrisonCatalogue.SCHEDULE.copy()
+	root.add_child(regime)
+	regime.start()
+	var reading := regime.sessions[0]
+	var placed := regime.placements.filter(func(p: Regime.Placement) -> bool: return p.session == reading)
+	_check(placed.size() == 7, "a course offered daily is placed seven times a week (%d)" % placed.size())
+	_check(placed.all(func(p: Regime.Placement) -> bool: return regime.fits(reading, p.slot, p)), "each in a block that allows it")
+	var days := {}
+	for p: Regime.Placement in placed:
+		days[p.slot / Schedule.SLOTS_PER_DAY] = true
+	_check(days.size() == 7, "spread one a day")
+	var wednesday: Regime.Placement = placed[2]
+	_check(not regime.move(wednesday, 2 * Schedule.SLOTS_PER_DAY + 4), "a session can't move into the night")
+	var at := wednesday.slot
+	regime.set_offered(reading.id, 3)
+	_check(regime.placements.filter(func(p: Regime.Placement) -> bool: return p.session == reading).size() == 3, "offering fewer places fewer")
+	regime.set_offered(reading.id, 7)
+	wednesday = regime.placements.filter(func(p: Regime.Placement) -> bool: return p.session == reading)[2]
+	wednesday.pinned = true
+	var data := regime.to_data()
+	_check((data.pinned as Array).size() == 1, "pinned sessions are saved")
+	_check(not regime.set_time(&"daily_report", 0, 20), "fixed operations don't move")
+	_check(regime.set_time(&"intake_bus", 0, 99) and regime.slot_of(&"intake_bus") == regime.operation(&"intake_bus").latest,
+			"an operation is kept inside its window")
+	var due: Array = []
+	regime.operation_due.connect(func(id: StringName, _index: int) -> void: due.append(id))
+	clock.advance(14 * 60.0 + 1.0)
+	_check(due.has(&"intake_bus") and due.has(&"kitchen_lorry") and due.count(&"tool_counts") == 1, "operations fall due at their times (%s)" % [due])
+	var again := Regime.new()
+	again.operations = regime.operations
+	again.sessions = regime.sessions
+	again.schedule = regime.schedule
+	again.start()
+	again.load_data(data)
+	_check(again.slot_of(&"intake_bus") == 18 and again.placements.any(func(p: Regime.Placement) -> bool:
+			return p.pinned and p.slot == at), "times and pinned sessions load back")
+	regime.set_time(&"tool_counts", 0, 26)
+	_check(regime.clashes().any(func(c: Array) -> bool: return String(c[1]).begins_with("Tool counts during")),
+			"a tool count in the yard is a clash (%s)" % [regime.clashes()])
+	regime.rooms = func(_type: StringName) -> int: return 0
+	_check(regime.clashes().any(func(c: Array) -> bool: return String(c[1]).begins_with("No ")), "no classroom is a clash")
+	again.free()
+	regime.free()
+	clock.free()
 
 
 func _test_staff_roster() -> void:

@@ -16,12 +16,15 @@ var jobs: JobBoard:
 	set(value):
 		jobs = value
 		jobs.job_finished.connect(_on_job_finished)
+## When set, its operation times are used instead of the hour above (main
+## passes on Regime.operation_due).
+var regime: Regime
 var clock: GameClock:
 	set(value):
 		clock = value
 		clock.hour_changed.connect(func(hour: int) -> void:
 			look()
-			if hour == Kitchen.DELIVERY_HOUR:
+			if hour == Kitchen.DELIVERY_HOUR and regime == null:
 				collect())
 var items: ItemStore
 var building: Building
