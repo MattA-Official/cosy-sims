@@ -21,6 +21,8 @@ const CLEAR := 240.0
 const WARDEN_PAPER: Array[float] = [0.0, 2.0, 4.0]
 const HEAD_PAPER: Array[float] = [0.0, 1.0, 2.0]
 const ORDER: Array[StringName] = [&"paperwork", &"card", &"research"]
+## The pile clerks share for things handed to them, such as in-tray cards.
+const SHARED := -1
 
 ## One thing on a pile.
 class Item:
@@ -89,18 +91,22 @@ func work(owner: int, minutes: float) -> void:
 
 
 ## Clerks' work: desk minutes off the biggest paperwork pile, then the
-## next. Returns the minutes used.
+## next, then the shared pile. Returns the minutes used.
 func work_paperwork(minutes: float) -> float:
 	var used := 0.0
 	while minutes - used > 0.001:
 		var biggest := 0
 		var most := 0.0
 		for owner: int in piles:
-			var paper := pile_minutes(owner, &"paperwork")
+			var paper := pile_minutes(owner, &"paperwork") if owner != SHARED else 0.0
 			if paper > most:
 				most = paper
 				biggest = owner
 		if most <= 0.0:
+			var shared := minf(minutes - used, pile_minutes(SHARED))
+			if shared > 0.0:
+				work(SHARED, shared)
+				used += shared
 			break
 		for item: Item in piles[biggest]:
 			if item.kind == &"paperwork":
@@ -117,9 +123,9 @@ func work_paperwork(minutes: float) -> float:
 	return used
 
 
-## Paperwork waiting on every desk.
+## Paperwork waiting on every desk, and the clerks' shared pile.
 func all_paperwork() -> float:
-	var sum := 0.0
+	var sum := pile_minutes(SHARED)
 	for owner: int in piles:
 		sum += pile_minutes(owner, &"paperwork")
 	return sum

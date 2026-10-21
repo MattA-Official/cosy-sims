@@ -40,7 +40,7 @@ const AUTOSAVE_HOUR := 6
 const TITLE_SCENE := "res://games/prison/title.tscn"
 ## The key for each page of the management book.
 const BOOK_KEYS: Dictionary[StringName, StringName] = {&"timetable": &"timetable_toggle",
-		&"staff": &"staff_toggle", &"money": &"money_toggle", &"office": &"office_toggle", &"heads": &"heads_toggle",
+		&"staff": &"staff_toggle", &"money": &"money_toggle", &"office": &"office_toggle", &"heads": &"heads_toggle", &"in_tray": &"in_tray_toggle",
 		&"security": &"security_toggle", &"programmes": &"programmes_toggle"}
 
 @onready var grid: BuildGrid = $BuildGrid
@@ -121,6 +121,9 @@ var desk_work := DeskWork.new()
 var modifiers := Modifiers.new()
 ## Department heads, hired from the warden's desk.
 var heads := Heads.new()
+## Request cards for the warden, and what their answers do.
+var in_tray := InTray.new()
+var prison_tray := PrisonTray.new()
 ## Desks people have claimed.
 var claims := Claims.new()
 ## The grade, grant goals and the daily report.
@@ -170,6 +173,8 @@ var office_window := OfficeWindow.new()
 var security_window := SecurityWindow.new()
 ## Department heads, on H.
 var heads_window := HeadsWindow.new()
+## The in-tray, on J.
+var in_tray_window := InTrayWindow.new()
 ## Save slots and the autosave, on F2.
 var saves_window := SavesWindow.new()
 ## The bookmarks down the left and the book they open: every management
@@ -736,6 +741,32 @@ func _ready() -> void:
 	for system: Object in [people, searching, infirmary, courses, workshop, finances]:
 		system.set(&"modifiers", modifiers)
 	jobs.job_finished.connect(roster.job_done)
+	for def in PrisonTray.moodlets():
+		people.moodlet_defs[def.id] = def
+	prison_tray.name = "PrisonTray"
+	prison_tray.people = people
+	prison_tray.ledger = ledger
+	prison_tray.roster = roster
+	prison_tray.desk_work = desk_work
+	prison_tray.heads = heads
+	prison_tray.clock = clock
+	add_child(prison_tray)
+	in_tray.name = "InTray"
+	in_tray.defs = PrisonTray.cards()
+	in_tray.desk_work = desk_work
+	in_tray.prisoners = heads.prisoners
+	in_tray.has_clerk = func() -> bool: return roster.records.any(func(r: StaffRoster.Record) -> bool:
+			return Office.CLERKS.has(r.role))
+	in_tray.pick_subject = prison_tray.pick_subject
+	in_tray.apply = prison_tray.apply
+	in_tray.clock = clock
+	add_child(in_tray)
+	in_tray.start()
+	in_tray.answered.connect(func(card: InTray.Card, choice: TrayChoiceDef, by: StringName) -> void:
+		var words := PrisonTray.why(card, choice)
+		in_tray.note(words + (" (lapsed)" if by == &"lapsed" else " (clerk)" if by == &"clerk" else ""))
+		if by == &"lapsed" and not attract:
+			Toasts.post("In-tray: %s" % card.def.title, "Nobody answered, so: %s" % choice.label.get_slice(" (", 0).to_lower()))
 	people.pace_scales.append(roster.pace)
 	intake.name = "Intake"
 	intake.people = people
@@ -1055,6 +1086,8 @@ func _add_hud() -> void:
 	clock_bar.runner = runner
 	clock_bar.ledger = ledger
 	clock_bar.regime = regime
+	clock_bar.in_tray = in_tray
+	clock_bar.tray_pressed.connect(book.toggle.bind(&"in_tray"))
 	clock_bar.money_pressed.connect(book.toggle.bind(&"money"))
 	clock_bar.clashes_pressed.connect(book.toggle.bind(&"timetable"))
 	hud.add_child(clock_bar)
@@ -1094,6 +1127,9 @@ func _add_hud() -> void:
 	heads_window.heads = heads
 	heads_window.desk_work = desk_work
 	heads_window.clock = clock
+	in_tray_window.in_tray = in_tray
+	in_tray_window.clock = clock
+	book.add_page(&"in_tray", "In-tray", "Requests and letters waiting for an answer. J", "heads", in_tray_window)
 	book.add_page(&"heads", "Heads", "Department heads: hire cards, applicants and bonuses. H", "heads",
 			heads_window)
 	security_window.security = security

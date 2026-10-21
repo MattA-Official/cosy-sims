@@ -2,12 +2,14 @@ class_name ClockBar
 extends PanelContainer
 ## The clock in the top-left corner: the day, the time, the timetable
 ## block everyone is in, buttons for the speed (Space pauses, , and . go
-## slower and faster), the balance, which opens the money page (M), and a
-## count of the regime's clashes when there are any, which opens it.
+## slower and faster), the balance, which opens the money page (M), and
+## counts of the regime's clashes and the in-tray's letters when there are
+## any, which open their pages.
 ## The other management windows live in the ManagementBook below it.
 
 signal money_pressed
 signal clashes_pressed
+signal tray_pressed
 
 const ICONS := "res://core/ui/icons/%s.svg"
 const SPEED_ICONS: Array[String] = ["speed_pause", "speed_1", "speed_2", "speed_3"]
@@ -25,6 +27,8 @@ var runner: ScheduleRunner
 var ledger: Ledger
 ## For the clash count. Optional.
 var regime: Regime
+## For the count of cards waiting. Optional.
+var in_tray: InTray
 
 var _day := Label.new()
 var _time := Label.new()
@@ -34,6 +38,7 @@ var _chip_box := StyleBoxFlat.new()
 var _speeds: Array[CosyButton] = []
 var _money: Button
 var _clashes := Button.new()
+var _tray := Button.new()
 
 
 func _ready() -> void:
@@ -103,6 +108,15 @@ func _ready() -> void:
 		regime.changed.connect(count_clashes)
 		clock.hour_changed.connect(func(_hour: int) -> void: count_clashes())
 		count_clashes()
+	if in_tray != null:
+		_tray.theme_type_variation = &"FlatButton"
+		_tray.focus_mode = FOCUS_NONE
+		_tray.size_flags_vertical = SIZE_SHRINK_CENTER
+		_tray.tooltip_text = "Cards waiting in the in-tray. J"
+		_tray.pressed.connect(tray_pressed.emit)
+		row.add_child(_tray)
+		in_tray.changed.connect(count_cards)
+		count_cards()
 	clock.speed_changed.connect(func(_index: int) -> void: _show_speed())
 	_show_speed()
 	_refresh()
@@ -131,6 +145,13 @@ func _refresh() -> void:
 		_block.text = def.display_name
 		_chip_box.bg_color = def.colour
 		_chip.tooltip_text = def.description
+
+
+## Counts the cards in the in-tray again.
+func count_cards() -> void:
+	var count := in_tray.cards.filter(func(c: InTray.Card) -> bool: return c.queued < 0).size()
+	_tray.visible = count > 0
+	_tray.text = "%d letter%s" % [count, "" if count == 1 else "s"]
 
 
 ## Counts the regime's clashes again.

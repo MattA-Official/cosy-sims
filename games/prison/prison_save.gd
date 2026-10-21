@@ -105,6 +105,7 @@ static func capture(main: Node) -> Dictionary:
 		"timetable": hours,
 		"regime": (main.regime as Regime).to_data(),
 		"desk_work": (main.desk_work as DeskWork).capture(),
+		"in_tray": (main.in_tray as InTray).capture(),
 		"category_timetables": category_hours,
 		"locks": people.access.locked.duplicate(),
 		"overrides": (main.runner as ScheduleRunner).overrides.duplicate(),
@@ -297,6 +298,8 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 		(main.regime as Regime).load_data(data.regime)
 	if data.has("desk_work"):
 		(main.desk_work as DeskWork).restore(data.desk_work)
+	if data.has("in_tray"):
+		(main.in_tray as InTray).restore(data.in_tray)
 	var parole_data: Dictionary = data.get("parole", {})
 	var parole: Parole = main.parole
 	parole.today = parole_data.get("today", [])

@@ -37,6 +37,7 @@ const KEY_ACTIONS := {
 	"money_toggle": [KEY_M],
 	"office_toggle": [KEY_O],
 	"heads_toggle": [KEY_H],
+	"in_tray_toggle": [KEY_J],
 	"security_toggle": [KEY_K],
 	"programmes_toggle": [KEY_L],
 	"saves_toggle": [KEY_F2],

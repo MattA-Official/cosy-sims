@@ -99,6 +99,7 @@ func _process(_delta: float) -> bool:
 	_test_blueprints()
 	_test_regime()
 	_test_heads()
+	_test_in_tray()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4542,6 +4543,52 @@ func _test_heads() -> void:
 			sick = true
 			break
 	_check(sick and roster.next_in(&"cook", &"day") != cook, "low morale brings a sick day, and they stay home")
+	main.queue_free()
+
+
+func _test_in_tray() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var tray: InTray = main.in_tray
+	var ledger: Ledger = main.ledger
+	var people: People = main.people
+	var desk_work: DeskWork = main.desk_work
+	var roster: StaffRoster = main.roster
+	tray.cards.clear()
+	var card := tray.post(tray.find(&"guitar"))
+	_check(card != null and not card.words.is_empty() and card.text().begins_with(card.words), "a request names the prisoner asking")
+	var asker: Person = people.people.filter(func(p: Person) -> bool: return p.id == card.subject)[0]
+	var balance := ledger.balance
+	tray.answer(card, 0)
+	_check(ledger.balance == balance - 40 and asker.moodlets.has(&"tray_yes") and tray.cards.is_empty(),
+			"saying yes pays for it and cheers them up")
+	var kettle := tray.post(tray.find(&"kettle"))
+	var record: StaffRoster.Record = roster.records.filter(func(r: StaffRoster.Record) -> bool: return r.id == kettle.subject)[0]
+	var morale := record.morale
+	tray.answer(kettle, 1)
+	_check(is_equal_approx(record.morale, maxf(morale - 5.0, 0.0)), "turning down staff lowers their morale")
+	var plant := tray.post(tray.find(&"pot_plant"))
+	plant.due_day = (main.clock as GameClock).day()
+	tray.morning()
+	_check(not tray.cards.has(plant) and tray.history.back().ends_with("(lapsed)"), "an unanswered card lapses to its default")
+	desk_work.red_tape = DeskWork.RedTape.OFF
+	tray.cards.clear()
+	tray.morning()
+	_check(tray.cards.is_empty(), "no red tape, no cards")
+	desk_work.red_tape = DeskWork.RedTape.LIGHT
+	roster.take_on(&"clerk", &"day")
+	tray.set_rule(&"prisoner_request", &"approve")
+	var book := tray.post(tray.find(&"book_club"))
+	_check(book.queued == 0 and desk_work.pile_minutes(DeskWork.SHARED) > 0.0, "with a rule, the clerk takes the card")
+	desk_work.work_paperwork(desk_work.all_paperwork())
+	_check(not tray.cards.has(book) and tray.history.back().ends_with("(clerk)"), "and answers it after some desk work")
+	var spicy := tray.post(tray.find(&"spicy"))
+	var saved := tray.capture()
+	tray.cards.clear()
+	tray.restore(saved)
+	_check(tray.cards.size() == 1 and tray.cards[0].def.id == &"spicy" and tray.cards[0].words == spicy.words,
+			"the in-tray saves and loads")
 	main.queue_free()
 
 
