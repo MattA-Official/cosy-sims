@@ -183,6 +183,7 @@ const PROGRAMMES: Array[WorkProgrammeDef] = [
 
 const DOOR_KINDS: Array[DoorKindDef] = [
 	preload("res://games/prison/catalogue/door_staff.tres"),
+	preload("res://games/prison/catalogue/door_visitor.tres"),
 	preload("res://games/prison/catalogue/door_security_gate.tres"),
 	preload("res://games/prison/catalogue/door_people_gate.tres"),
 	preload("res://games/prison/catalogue/door_vehicle_gate.tres"),
@@ -419,6 +420,25 @@ static func item(id: StringName) -> ItemDef:
 
 static func room_type(id: StringName) -> RoomTypeDef:
 	for def in ROOM_TYPES:
+		if def.id == id:
+			return def
+	return null
+
+
+static var _offences: Array[OffenceDef] = []
+
+
+## Every soft offence a prisoner can be sent down for.
+static func offences() -> Array[OffenceDef]:
+	if _offences.is_empty():
+		for file in DirAccess.get_files_at("res://games/prison/catalogue/"):
+			if file.begins_with("offence_") and (file.ends_with(".tres") or file.ends_with(".tres.remap")):
+				_offences.append(load("res://games/prison/catalogue/" + file.trim_suffix(".remap")))
+	return _offences
+
+
+static func offence(id: StringName) -> OffenceDef:
+	for def in offences():
 		if def.id == id:
 			return def
 	return null

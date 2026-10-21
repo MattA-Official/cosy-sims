@@ -6,6 +6,8 @@ extends Node
 ## Part-way through, they may go before a parole hearing.
 
 signal due_out(person: Person)
+## Something about someone came to light, such as "Gus is a Foodie".
+signal revealed(person: Person, def: TraitDef)
 
 enum Length { SHORT, NORMAL, LONG }
 const LENGTH_SCALES: Array[float] = [0.6, 1.0, 1.5]
@@ -20,6 +22,8 @@ const REOFFENDER_REFORM := 10.0
 const SKILLS: Array[StringName] = [&"cooking", &"woodwork", &"reading", &"laundry", &"cleaning"]
 const GRAFTER := &"grafter"
 const GRAFTER_SKILL := 20
+## Days in before staff have someone's measure: all their traits known.
+const REVEAL_DAYS := 3
 
 var people: People
 var intake: Intake
@@ -40,6 +44,7 @@ func start() -> void:
 	intake.arrived.connect(func(came: Array[Person]) -> void:
 		for person in came:
 			open_file(person))
+	people.moodlet_added.connect(_on_moodlet)
 	for person in people.people:
 		if person.group == prisoner_group and not PrisonerFile.of(person).has_sentence():
 			open_file(person, true)
@@ -55,6 +60,8 @@ func open_file(person: Person, part_served := false) -> void:
 	var days := maxi(roundi(_rng.randi_range(low, high) * LENGTH_SCALES[length]), 1)
 	var today := _today()
 	file.sentence_days = days
+	if file.offence == &"":
+		file.offence = pick_offence(person.category)
 	file.served_days = _rng.randi_range(0, days - 1) if part_served else 0
 	var start := today - file.served_days
 	file.release_day = start + days
@@ -65,6 +72,9 @@ func open_file(person: Person, part_served := false) -> void:
 	if person.traits.any(func(t: TraitDef) -> bool: return t.id == GRAFTER) and file.skills.is_empty():
 		file.raise_skill(SKILLS[_rng.randi() % SKILLS.size()], GRAFTER_SKILL)
 	file.add_log(today, "Arrived to serve %d days" % days)
+	if file.served_days >= REVEAL_DAYS:
+		for def in person.traits:
+			file.reveal(def.id)
 
 
 ## A day served by everyone. Called at midnight.
@@ -77,9 +87,48 @@ func tick() -> void:
 		if not file.has_sentence():
 			continue
 		file.served_days += 1
+		if file.served_days >= REVEAL_DAYS:
+			for def in person.traits:
+				reveal(person, def)
 		if today >= file.release_day and not file.due_out:
 			file.due_out = true
 			due_out.emit(person)
+
+
+## An offence for someone of a category, weighted.
+func pick_offence(category: StringName) -> StringName:
+	var choices := PrisonCatalogue.offences().filter(func(d: OffenceDef) -> bool:
+		return d.category == (category if category != &"" else &"medium"))
+	var total := 0.0
+	for def: OffenceDef in choices:
+		total += def.weight
+	var roll := _rng.randf() * total
+	for def: OffenceDef in choices:
+		roll -= def.weight
+		if roll <= 0.0:
+			return def.id
+	return &""
+
+
+## Finds a trait out. Returns true if it was news.
+func reveal(person: Person, def: TraitDef) -> bool:
+	var file := PrisonerFile.of(person)
+	if not file.reveal(def.id):
+		return false
+	if file.has_sentence():
+		file.add_log(_today(), "Found out: %s" % def.display_name)
+	revealed.emit(person, def)
+	return true
+
+
+## A moodlet only a trait gives away the trait: a lovely meal means a
+## foodie.
+func _on_moodlet(person: Person, id: StringName) -> void:
+	if person.group != prisoner_group:
+		return
+	for def in person.traits:
+		if def.moodlet_swaps.values().has(id) or id in [def.crowd_moodlet, def.nearby_moodlet, def.wake_moodlet]:
+			reveal(person, def)
 
 
 ## "Day 4 of 9 · parole from day 5", for the inspector.

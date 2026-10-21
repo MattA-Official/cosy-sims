@@ -159,6 +159,8 @@ func wants_work(person: Person) -> bool:
 		return false
 	if person.role != &"":
 		return true
+	if jobs.any(func(job: Job) -> bool: return job.only_for == person and job.any_time):
+		return true
 	if person.block == null or not person.block.jobs:
 		return false
 	return person.programme != &"" or jobs.any(func(job: Job) -> bool: return job.only_for == person)
@@ -178,6 +180,14 @@ func may_take(person: Person, job: Job) -> bool:
 			or (programme != null and programme.job_kinds.has(job.kind) and job.programmes.is_empty())
 
 
+## Outside a work block, prisoners only take their own jobs (a class place
+## in a Learn block, say) or ones for any time.
+func _takes_now(person: Person, job: Job) -> bool:
+	if person.role != &"" or job.any_time or (person.block != null and person.block.jobs):
+		return true
+	return job.only_for == person
+
+
 ## Is there a job someone could take now?
 func has_work_for(person: Person) -> bool:
 	if person.job != null:
@@ -185,7 +195,7 @@ func has_work_for(person: Person) -> bool:
 	if not wants_work(person):
 		return false
 	for job in jobs:
-		if job.worker == null and job.wait <= 0.0 and may_take(person, job):
+		if job.worker == null and job.wait <= 0.0 and may_take(person, job) and _takes_now(person, job):
 			return true
 	return false
 
@@ -322,7 +332,7 @@ func _best_for(person: Person) -> Job:
 	var best: Job = null
 	var best_score := INF
 	for job in jobs:
-		if job.worker != null or job.wait > 0.0 or not may_take(person, job):
+		if job.worker != null or job.wait > 0.0 or not may_take(person, job) or not _takes_now(person, job):
 			continue
 		var stage := job.current()
 		var distance := 0.0

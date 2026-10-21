@@ -103,6 +103,7 @@ func _process(_delta: float) -> bool:
 	_test_perks()
 	_test_visits()
 	_test_garden_and_library()
+	_test_prisoner_files()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4810,6 +4811,39 @@ func _test_garden_and_library() -> void:
 	var before := reform.value(reader)
 	people.used.emit(reader, building.object_at(shelf))
 	_check(reform.value(reader) > before, "reading in the library counts towards reform")
+	main.queue_free()
+
+
+func _test_prisoner_files() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var sentences: Sentences = main.sentences
+	var prisoners := people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	_check(prisoners.all(func(p: Person) -> bool: return PrisonerFile.of(p).offence != &""), "every prisoner's file says what they're in for")
+	_check(PrisonCatalogue.offences().size() == 12, "a dozen soft offences")
+	var high := PrisonCatalogue.offence(sentences.pick_offence(&"high"))
+	_check(high != null and high.category == &"high", "offences suit the category")
+	var file := PrisonerFile.of(prisoners[0])
+	file.offence = high.id
+	_check(file.offence_words() == "Serious offence", "serious ones say no more")
+	var foodie: TraitDef = PrisonCatalogue.TRAITS.filter(func(t: TraitDef) -> bool: return t.id == &"foodie")[0]
+	var newcomer: Person = prisoners[1]
+	newcomer.traits.assign([foodie])
+	newcomer.profile["traits_known"] = []
+	PrisonerFile.of(newcomer).served_days = 0
+	_check(not PrisonerFile.of(newcomer).knows_trait(&"foodie"), "a newcomer's traits are not known yet")
+	people.add_moodlet(newcomer, &"lovely_meal")
+	_check(PrisonerFile.of(newcomer).knows_trait(&"foodie"), "a lovely meal gives a foodie away")
+	var quiet: Person = prisoners[2]
+	quiet.profile["traits_known"] = []
+	PrisonerFile.of(quiet).served_days = Sentences.REVEAL_DAYS - 1
+	sentences.tick()
+	_check(quiet.traits.all(func(t: TraitDef) -> bool: return PrisonerFile.of(quiet).knows_trait(t.id)), "after a few days staff have their measure")
+	var card: PrisonerFileCard = main.file_card
+	card.show_for(newcomer)
+	_check(card.visible and card._column.get_child_count() > 4, "the file opens")
 	main.queue_free()
 
 

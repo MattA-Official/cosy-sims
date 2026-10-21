@@ -48,6 +48,16 @@ var log: Array:
 var came_back: int:
 	get: return profile.get("came_back", 0)
 	set(value): profile["came_back"] = value
+## The OffenceDef id they were sent down for.
+var offence: StringName:
+	get: return StringName(profile.get("offence", ""))
+	set(value): profile["offence"] = String(value)
+## Trait ids found out so far; the rest show as "?".
+var traits_known: Array:
+	get:
+		if not profile.has("traits_known"):
+			profile["traits_known"] = []
+		return profile["traits_known"]
 ## Their time is up (or parole granted): they go home in the morning.
 var due_out: bool:
 	get: return profile.get("due_out", false)
@@ -72,6 +82,26 @@ func add_log(day: int, words: String) -> void:
 	log.append([day, words])
 	if log.size() > LOG_KEPT:
 		log.remove_at(0)
+
+
+## What they're in for, in words. Serious ones say no more than that.
+func offence_words() -> String:
+	var def := PrisonCatalogue.offence(offence)
+	if def == null:
+		return "Not known"
+	return "Serious offence" if def.category == &"high" else def.display_name
+
+
+func knows_trait(id: StringName) -> bool:
+	return traits_known.has(String(id))
+
+
+## Finds a trait out. Returns true if it was news.
+func reveal(id: StringName) -> bool:
+	if knows_trait(id):
+		return false
+	traits_known.append(String(id))
+	return true
 
 
 func skill(id: StringName) -> int:

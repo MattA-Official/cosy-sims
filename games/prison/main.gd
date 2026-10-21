@@ -150,6 +150,7 @@ var programmes_window := ProgrammesWindow.new()
 ## Difficulty and sentence length, on F4.
 var settings_window := SettingsWindow.new()
 var fail_card := FailCard.new()
+var file_card := PrisonerFileCard.new()
 ## Ctrl+Z and Ctrl+Y for building and landscaping.
 var undo := UndoHistory.new()
 var land_plots := LandPlots.new()
@@ -915,6 +916,17 @@ func _ready() -> void:
 	sentences.clock = clock
 	add_child(sentences)
 	sentences.start()
+	# Notable days go in prisoners' files.
+	var file_log := func(person: Person, words: String) -> void:
+		if person != null and PrisonerFile.of(person).has_sentence():
+			PrisonerFile.of(person).add_log(clock.day(), words)
+	misconduct.acted.connect(func(person: Person, rung: MisconductDef, words: String) -> void:
+		if rung.points > 0:
+			file_log.call(person, words.left(1).to_upper() + words.substr(1)))
+	searching.found.connect(func(owner: Person, def: ItemDef, _where: String) -> void:
+		file_log.call(owner, "Found with a %s" % def.display_name.to_lower()))
+	escapes.caught.connect(func(person: Person, _by: Person) -> void: file_log.call(person, "Caught trying to escape"))
+	visits.visited.connect(func(person: Person) -> void: file_log.call(person, "A visit from family"))
 	if NewGame.pending:
 		sentences.length = NewGame.sentence_length
 	courses.name = "Courses"
@@ -1283,6 +1295,14 @@ func _add_hud() -> void:
 
 	help_card.sections = PrisonHelp.SECTIONS
 	hud.add_child(help_card)
+	file_card.people = people
+	file_card.sentences = sentences
+	file_card.reform = reform
+	file_card.clock = clock
+	hud.add_child(file_card)
+	inspector.person_actions.append(["File", "Opens their prison file: offence, sentence, traits found so far and history.",
+			func(person: Person) -> void: file_card.show_for(person),
+			func(person: Person) -> bool: return person.group == &"prisoner"])
 	var readout := CursorReadout.new()
 	readout.controller = controller
 	hud.add_child(readout)

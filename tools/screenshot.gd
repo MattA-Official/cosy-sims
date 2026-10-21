@@ -1,11 +1,11 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [heads] [tray] [settings] [graded] [inspect=N] [zones] [at=X,Z] [zoom=F] [empty] [map=small|medium|large] [blueprint] [move]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [heads] [tray] [settings] [graded] [inspect=N] [file] [zones] [at=X,Z] [zoom=F] [empty] [map=small|medium|large] [blueprint] [move]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
-## person; "zones" opens the zones tool; "land" buys a plot and shows the
+## person ("file" opens their prison file too); "zones" opens the zones tool; "land" buys a plot and shows the
 ## plots for sale; "staff" opens the staff window;
 ## "money" and "office" open those windows; "bus" brings the morning bus;
 ## "debug" turns on the debug view (F3); "route" opens the patrol route
@@ -214,6 +214,8 @@ func _process(_delta: float) -> bool:
 		if inspect >= 0 and inspect < _main.people.people.size():
 			_main.debug_overlay.visible = true
 			_main.inspector.select(_main.people.people[inspect])
+			if args.has("file"):
+				_main.file_card.show_for(_main.people.people[inspect])
 	if _frames < FRAMES_TO_WAIT:
 		return false
 	var path: String = args[0] if args.size() > 0 else "user://screenshot.png"

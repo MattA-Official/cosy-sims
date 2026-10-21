@@ -51,6 +51,9 @@ var programmes: Array[StringName] = []
 ## Only this person may take it, whatever their role or programme, such as
 ## a student's place in class. Null for anyone allowed.
 var only_for: Person
+## A job just for someone that they go to whatever their timetable says,
+## such as a family visit.
+var any_time := false
 var stages: Array[Stage] = []
 ## The stage being worked on.
 var stage := 0

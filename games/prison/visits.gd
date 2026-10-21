@@ -16,8 +16,11 @@ const POST_HOUR := 7
 const LETTER_CHANCE := 0.2
 const HOMESICK_CHANCE := 0.35
 const LETTER_FAMILY := 30.0
-const VISIT_HOURS := Vector2i(14, 16)
-const VISIT_MINUTES := 45.0
+const VISIT_HOURS := Vector2i(18, 20)
+const VISIT_MINUTES := 30.0
+## Visitors sit and wait this long at most; the visit ends when the
+## prisoner's time at the table is up.
+const VISITOR_MINUTES := 120.0
 ## Most visits at once, and days before the same prisoner has another.
 const MOST_VISITS := 6
 const VISIT_GAP_DAYS := 3
@@ -135,16 +138,20 @@ func visit(prisoner: Person, seats: Array, spot: Array) -> Person:
 		return null
 	_visitors[visitor] = prisoner
 	last_visit[prisoner.id] = _day()
-	jobs.post(_job(prisoner, seats[0], "Having a visit", func(_stage: Job.Stage, _worker: Person) -> void:
+	jobs.post(_job(prisoner, seats[0], "Having a visit", VISIT_MINUTES, func(_stage: Job.Stage, _worker: Person) -> void:
 		visit_done(prisoner)))
-	jobs.post(_job(visitor, seats[1], "Visiting %s" % prisoner.name.get_slice(" ", 0), func(_stage: Job.Stage, _worker: Person) -> void:
-		send_home(visitor)))
+	jobs.post(_job(visitor, seats[1], "Visiting %s" % prisoner.name.get_slice(" ", 0), VISITOR_MINUTES,
+			func(_stage: Job.Stage, _worker: Person) -> void: send_home(visitor)))
 	return visitor
 
 
 ## A visit went well: the need is met, reform rises, and perhaps something
-## was slipped across the table.
+## was slipped across the table. Their visitor heads home.
 func visit_done(prisoner: Person) -> void:
+	for visitor: Person in _visitors.keys():
+		if _visitors[visitor] == prisoner:
+			_call_off(visitor)
+			send_home(visitor)
 	if prisoner.needs.has(NEED):
 		prisoner.needs[NEED] = 100.0
 	people.add_moodlet(prisoner, &"had_a_visit")
@@ -161,10 +168,15 @@ func visit_done(prisoner: Person) -> void:
 ## every visitor heads out.
 func end_visits() -> void:
 	for job in jobs.of_kind(JOB):
-		if job.worker == null or job.only_for == null or job.only_for.state != Person.State.USING:
+		if job.only_for == null or job.only_for.group == VISITOR:
+			continue
+		if job.worker == null or job.only_for.state != Person.State.USING:
 			jobs.cancel(job)
+	# Visitors whose prisoner isn't mid-visit go now; the rest once it ends.
 	for visitor: Person in _visitors.keys():
-		if not jobs.of_kind(JOB).any(func(j: Job) -> bool: return j.only_for == visitor):
+		var prisoner: Person = _visitors[visitor]
+		if not jobs.of_kind(JOB).any(func(j: Job) -> bool: return j.only_for == prisoner):
+			_call_off(visitor)
 			send_home(visitor)
 
 
@@ -200,14 +212,22 @@ func visitors() -> Array[Person]:
 	return _visitors.keys()
 
 
-func _job(person: Person, seat: Vector2i, doing: String, finish: Callable) -> Job:
+## Takes a visitor's sitting off the board.
+func _call_off(visitor: Person) -> void:
+	for job in jobs.of_kind(JOB):
+		if job.only_for == visitor:
+			jobs.cancel(job)
+
+
+func _job(person: Person, seat: Vector2i, doing: String, minutes: float, finish: Callable) -> Job:
 	var job := Job.new()
 	job.kind = JOB
 	job.only_for = person
+	job.any_time = true
 	job.title = "A visit"
 	job.priority = 8
 	var sit := Job.at(Job.Do.WORK, seat.x, seat.y)
-	sit.minutes = VISIT_MINUTES
+	sit.minutes = minutes
 	sit.doing = doing
 	sit.finish = finish
 	job.stages = [sit]
