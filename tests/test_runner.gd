@@ -4606,6 +4606,13 @@ func _test_in_tray() -> void:
 	var xp := unhappy.xp
 	_check(roster.send_on_course(unhappy) and ledger.balance == balance - StaffRoster.COURSE_FEE
 			and unhappy.xp > xp and roster.next_in(&"cook", &"day") != unhappy, "a course costs a fee, adds experience and takes them away")
+	var files: MissingFiles = main.missing_files
+	var newcomer: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	_check(files.lose(newcomer) and MissingFiles.is_missing(newcomer)
+			and (main.parole as Parole).why_not(newcomer) in ["Awaiting paperwork", "Going home anyway"],
+			"an arrival without a file can't go up for parole")
+	desk_work.work_paperwork(desk_work.all_paperwork())
+	_check(not MissingFiles.is_missing(newcomer), "until a clerk fills it in")
 	var spicy := tray.post(tray.find(&"spicy"))
 	var saved := tray.capture()
 	tray.cards.clear()

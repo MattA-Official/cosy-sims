@@ -20,7 +20,7 @@ const CLEAR := 240.0
 ## for each head, by Red tape.
 const WARDEN_PAPER: Array[float] = [0.0, 2.0, 4.0]
 const HEAD_PAPER: Array[float] = [0.0, 1.0, 2.0]
-const ORDER: Array[StringName] = [&"paperwork", &"card", &"research"]
+const ORDER: Array[StringName] = [&"paperwork", &"file", &"card", &"research"]
 ## The pile clerks share for things handed to them, such as in-tray cards.
 const SHARED := -1
 

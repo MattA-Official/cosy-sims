@@ -124,6 +124,8 @@ var heads := Heads.new()
 ## Request cards for the warden, and what their answers do.
 var in_tray := InTray.new()
 var prison_tray := PrisonTray.new()
+## Arrivals who come without their paperwork.
+var missing_files := MissingFiles.new()
 ## Desks people have claimed.
 var claims := Claims.new()
 ## The grade, grant goals and the daily report.
@@ -769,6 +771,14 @@ func _ready() -> void:
 		if not attract:
 			Toasts.post("A resignation letter", "%s wants to leave. Answer in the in-tray (J)." % record.name)
 	roster.charge = func(amount: int, line: String) -> void: ledger.add(-amount, line)
+	missing_files.name = "MissingFiles"
+	missing_files.desk_work = desk_work
+	missing_files.heads = heads
+	missing_files.people = people
+	missing_files.has_clerk = in_tray.has_clerk
+	missing_files.intake = intake
+	add_child(missing_files)
+	missing_files.start()
 	in_tray.answered.connect(func(card: InTray.Card, choice: TrayChoiceDef, by: StringName) -> void:
 		var words := PrisonTray.why(card, choice)
 		in_tray.note(words + (" (lapsed)" if by == &"lapsed" else " (clerk)" if by == &"clerk" else ""))
@@ -973,6 +983,8 @@ func _ready() -> void:
 		Toasts.post("%s quit" % record.name, "%s, a %s on the %s shift, has handed in their notice." % [
 				record.first_name(), shifts.role_def(record.role).display_name.to_lower(), record.shift]))
 	inspector.person_lines.append(roster.summary)
+	inspector.person_lines.append(func(person: Person) -> String:
+		return "File: awaiting paperwork, so no parole yet" if MissingFiles.is_missing(person) else "")
 	inspector.person_lines.append(func(person: Person) -> String:
 		if person.group != &"prisoner":
 			return ""

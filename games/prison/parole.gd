@@ -68,6 +68,8 @@ func why_not(person: Person) -> String:
 	var day := _day()
 	if not file.has_sentence() or file.due_out:
 		return "Going home anyway"
+	if MissingFiles.is_missing(person):
+		return "Awaiting paperwork"
 	if day < file.parole_from_day:
 		return "Not until day %d" % file.parole_from_day
 	if day < person.profile.get("parole_next", 0):
