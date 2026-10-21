@@ -113,6 +113,8 @@ func _process(_delta: float) -> bool:
 	_test_morning_paper()
 	_test_meals_and_snacks()
 	_test_serving_queue()
+	_test_headcount()
+	_test_supplies()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1645,6 +1647,68 @@ func _test_serving_queue() -> void:
 	people._wait_in_queue(line[3], 1.0)
 	_check(line[3].fetch_from == Person.NO_OBJECT and not (people.queues.get(source, []) as Array).has(line[3]),
 			"someone waiting too long gives up")
+	main.queue_free()
+
+
+func _test_headcount() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var people: People = main.people
+	var shifts: Shifts = main.shifts
+	var guide := Headcount.new()
+	guide.shifts = shifts
+	guide.building = main.building
+	guide.people = people
+	var prisoners := people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size()
+	_check(guide.suggested(&"guard", &"day") == ceili(prisoners / 8.0), "a guard by day for every 8 prisoners")
+	_check(guide.suggested(&"cook", &"night") == 0, "no cooks at night")
+	shifts.wanted[&"guard"][&"night"] = 0
+	_check(guide.advice().any(func(line: String) -> bool: return line.begins_with("Nobody guards the night")),
+			"an unguarded night shift is flagged")
+	shifts.wanted[&"handyman"] = {&"day": 0, &"night": 0}
+	_check(guide.advice().any(func(line: String) -> bool: return line.begins_with("No handyman")), "and no handyman")
+	for i in 30:
+		people.add_person(0, people.people[0].flat())
+	_check(guide.advice().any(func(line: String) -> bool: return line.begins_with("Guards:")), "more prisoners want more guards")
+	main.queue_free()
+
+
+func _test_supplies() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var supplies: Supplies = main.supplies
+	var ledger: Ledger = main.ledger
+	var people: People = main.people
+	var map: BuildingMap = main.map
+	ledger.sandbox = false
+	_check(supplies.capacity() == 0.0 and supplies.stock == supplies.daily(), "without a storeroom, a day's supplies to start")
+	supplies.stock = 0.0
+	var before := ledger.balance
+	var cost := supplies.restock()
+	_check(cost == roundi(supplies.daily() * Supplies.PRICE * Supplies.SMALL_ORDER) and ledger.balance == before - cost,
+			"bought a day at a time, it costs more")
+	# A storeroom with a shelf holds more, bought at the plain price.
+	var kitchen: Room = map.rooms().filter(func(r: Room) -> bool: return r.type == &"kitchen")[0]
+	var shelf := map.objects.values().filter(func(p: BuildingMap.PlacedObject) -> bool:
+			return p.def.tags.has(&"food_shelf") and map.room_at_point(p.centre) == kitchen)
+	_check(not shelf.is_empty(), "the kitchen has a food shelf")
+	map.set_room_type(kitchen, &"storeroom")
+	_check(supplies.capacity() >= Supplies.SHELF_HOLDS, "a storeroom's shelves hold supplies")
+	supplies.stock = 0.0
+	cost = supplies.restock()
+	_check(supplies.stock == supplies.capacity() and cost == roundi(supplies.capacity() * Supplies.PRICE), "stocked up at the plain price")
+	# Out of soap.
+	supplies.stock = 0.0
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	prisoner.traits.clear()
+	var shower := map.objects.values().filter(func(p: BuildingMap.PlacedObject) -> bool:
+			return p.def.tags.has(&"shower"))[0] as BuildingMap.PlacedObject
+	prisoner.needs[&"hygiene"] = 100.0
+	people.used.emit(prisoner, shower)
+	_check(prisoner.needs[&"hygiene"] == Supplies.SOAPLESS_HYGIENE and prisoner.moodlets.has(&"no_soap"),
+			"with none left, showers come without soap")
 	main.queue_free()
 
 

@@ -35,6 +35,12 @@ var roster: StaffRoster
 ## () -> bool: there's a training room, so courses can be done on site.
 ## Optional.
 var has_training_room: Callable
+## () -> Array[String]: advice on numbers, such as shifts nobody covers.
+## Optional.
+var advice: Callable
+## (role, shift) -> int: how many the guide suggests. Optional.
+var suggested: Callable
+var _advice := Label.new()
 
 ## Count labels by role, then by shift.
 var _counts: Dictionary[StringName, Dictionary] = {}
@@ -142,6 +148,10 @@ func _ready() -> void:
 							if not on.is_empty():
 								roster.dismiss(on.back()))
 		box.add_child(row)
+	_advice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_advice.theme_type_variation = &"SubtleLabel"
+	_advice.add_theme_color_override(&"font_color", Color(0.75, 0.45, 0.2))
+	box.add_child(_advice)
 
 	var staff_needs := CheckButton.new()
 	staff_needs.text = "Staff needs"
@@ -214,6 +224,14 @@ func refresh() -> void:
 				label.tooltip_text = "%d on the roster, %d on site now. %s" % [want, here,
 						"No applicants today." if waiting == 0
 						else "+ takes on the cheapest of %d applicants; − lets the newest go with a day's pay." % waiting]
+			if suggested.is_valid():
+				label.tooltip_text += "\nThe headcount guide suggests %d." % suggested.call(role, shift)
+	if advice.is_valid():
+		var lines: Array = advice.call()
+		_advice.text = "\n".join(lines)
+		_advice.visible = not lines.is_empty()
+	else:
+		_advice.visible = false
 	if ledger != null:
 		_wages_text.text = "Wages %s a day" % Ledger.text(daily_wages())
 	if roster != null and not _listed:

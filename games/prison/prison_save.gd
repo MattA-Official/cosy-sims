@@ -112,6 +112,7 @@ static func capture(main: Node) -> Dictionary:
 		"visits": (main.visits as Visits).capture(),
 		"garden": (main.garden as Garden).capture(),
 		"meal": (main.kitchen as Kitchen).meal.id,
+		"supplies": (main.supplies as Supplies).capture(),
 		"category_timetables": category_hours,
 		"locks": people.access.locked.duplicate(),
 		"overrides": (main.runner as ScheduleRunner).overrides.duplicate(),
@@ -312,6 +313,8 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 		(main.visits as Visits).restore(data.visits)
 	if data.has("garden"):
 		(main.garden as Garden).restore(data.garden)
+	if data.has("supplies"):
+		(main.supplies as Supplies).restore(data.supplies)
 	if data.has("meal") and PrisonCatalogue.meal(data.meal) != null:
 		(main.kitchen as Kitchen).meal = PrisonCatalogue.meal(data.meal)
 	if data.has("suggestions"):

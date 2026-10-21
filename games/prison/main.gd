@@ -76,6 +76,7 @@ var jobs := JobBoard.new()
 var item_view := ItemView.new()
 var kitchen := Kitchen.new()
 var snacks := Snacks.new()
+var supplies := Supplies.new()
 var cleaning := Cleaning.new()
 var laundry := Laundry.new()
 var workshop := Workshop.new()
@@ -387,6 +388,14 @@ func _ready() -> void:
 	snacks.ledger = ledger
 	snacks.clock = clock
 	add_child(snacks)
+	supplies.name = "Supplies"
+	supplies.building = building
+	supplies.ledger = ledger
+	supplies.people = people
+	supplies.clock = clock
+	add_child(supplies)
+	# A day's worth to start with, whatever the storerooms hold.
+	supplies.stock = maxf(supplies.capacity(), supplies.daily())
 	cleaning.name = "Cleaning"
 	cleaning.jobs = jobs
 	cleaning.items = items
@@ -1007,7 +1016,7 @@ func _ready() -> void:
 	regime.start()
 	courses.regime = regime
 	regime.operation_due.connect(_on_operation)
-	for system: Object in [kitchen, cleaning, workshop, budget, release, intake, parole, contraband, searching]:
+	for system: Object in [kitchen, cleaning, workshop, budget, release, intake, parole, contraband, searching, supplies]:
 		system.set(&"regime", regime)
 	misconduct.temper_scales.append(courses.calm_scale)
 	misconduct.temper_scales.append(func(person: Person) -> float:
@@ -1321,6 +1330,12 @@ func _add_hud() -> void:
 	staff_window.ledger = ledger
 	staff_window.roster = roster
 	staff_window.has_training_room = training.has_room
+	var headcount := Headcount.new()
+	headcount.shifts = shifts
+	headcount.building = building
+	headcount.people = people
+	staff_window.advice = headcount.advice
+	staff_window.suggested = headcount.suggested
 	staff_window.hire_refused.connect(func() -> void:
 		Toasts.post("Out of money", "Nobody new can be taken on until the balance is back above zero."))
 	book.add_page(&"staff", "Staff", "Who works here, and work programmes. P", "staff", staff_window)
@@ -1336,6 +1351,7 @@ func _add_hud() -> void:
 	office_window.searching = searching
 	office_window.kitchen = kitchen
 	office_window.finances = finances
+	office_window.supplies = supplies
 	book.add_page(&"office", "Office", "The warden's office: intake, goals and the grade. O", "office",
 			office_window)
 	heads_window.heads = heads
@@ -1507,6 +1523,7 @@ func _on_operation(id: StringName, index: int) -> void:
 	match id:
 		&"kitchen_lorry":
 			kitchen.deliver()
+			supplies.restock()
 			cleaning.collect()
 			workshop.collect()
 		&"workshop_contracts":

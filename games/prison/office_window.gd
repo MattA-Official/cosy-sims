@@ -13,6 +13,7 @@ var searching: Searching
 ## For the Kitchen and stores section. Optional.
 var kitchen: Kitchen
 var finances: Finances
+var supplies: Supplies
 
 var _missing := Label.new()
 var _limit := Label.new()
@@ -264,6 +265,8 @@ func stock_text() -> String:
 			kitchen.meals_in_stock(), kitchen.meals_needed(),
 			", %s a crate" % Ledger.text(roundi(finances.crate_price())) if finances != null else ""])
 	lines.append("Uniforms: %d clean, %d waiting to be washed." % [items.total(&"clean_laundry"), items.total(&"dirty_laundry")])
+	if supplies != null:
+		lines.append(supplies.words())
 	var goods := items.total(&"goods")
 	if goods > 0:
 		lines.append("Goods waiting for the lorry: %d." % goods)
