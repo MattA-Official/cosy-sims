@@ -18,6 +18,7 @@ var heads: Heads
 
 var _chips := HFlowContainer.new()
 var _lean := Label.new()
+var _filter := OptionButton.new()
 var _tabs := HBoxContainer.new()
 var _tab_buttons: Dictionary[StringName, Button] = {}
 var _scroll := ScrollContainer.new()
@@ -63,7 +64,16 @@ func _ready() -> void:
 	left.add_theme_constant_override(&"separation", 0)
 	body.add_child(left)
 	_tabs.add_theme_constant_override(&"separation", 4)
-	left.add_child(_tabs)
+	_tabs.size_flags_horizontal = SIZE_EXPAND_FILL
+	var tab_row := HBoxContainer.new()
+	tab_row.add_child(_tabs)
+	_filter.focus_mode = FOCUS_NONE
+	_filter.tooltip_text = "Fades the cards that don't match."
+	_filter.item_selected.connect(func(index: int) -> void:
+		_view.filter = _filter.get_item_metadata(index)
+		_view.queue_redraw())
+	tab_row.add_child(_filter)
+	left.add_child(tab_row)
 	_scroll.size_flags_vertical = SIZE_EXPAND_FILL
 	_scroll.size_flags_horizontal = SIZE_EXPAND_FILL
 	left.add_child(_scroll)
@@ -179,6 +189,14 @@ func _state_key() -> String:
 
 
 func _rebuild() -> void:
+	if _filter.item_count == 0:
+		for entry: Array in [["All cards", ""], ["Can start now", "start"], ["Face up", "face_up"],
+				["Under way", "busy"], ["Done", "done"]]:
+			_filter.add_item(entry[0])
+			_filter.set_item_metadata(_filter.item_count - 1, entry[1])
+		for def in knowhow.kinds:
+			_filter.add_item("Needs %s" % def.display_name)
+			_filter.set_item_metadata(_filter.item_count - 1, "kind:%s" % def.id)
 	for holder: Control in [_chips, _side]:
 		for child in holder.get_children():
 			child.queue_free()
@@ -284,6 +302,37 @@ func _tree_tools() -> void:
 		_side.add_child(HSeparator.new())
 		_side.add_child(_heading(_view.tree_name(wedge)))
 		_side.add_child(tools)
+
+
+## Which wing a trial runs in; picking another starts its days again.
+func _wing_picker(def: ResearchCardDef) -> Control:
+	var line := HBoxContainer.new()
+	var label := Label.new()
+	label.text = "Wing"
+	line.add_child(label)
+	var pick := OptionButton.new()
+	pick.focus_mode = FOCUS_NONE
+	pick.size_flags_horizontal = SIZE_EXPAND_FILL
+	pick.tooltip_text = "Where the trial runs. Picking another wing starts its three days again."
+	var current: Array = (research.trials.get(def.id, {}).get("rooms", []) as Array).duplicate()
+	current.sort()
+	var options := research.wing_options()
+	var chosen := -1
+	for option: Array in options:
+		var rooms: Array = (option[1] as Array).duplicate()
+		rooms.sort()
+		pick.add_item("%s (%d rooms)" % [option[0], rooms.size()])
+		if rooms == current:
+			chosen = pick.item_count - 1
+	if chosen == -1:
+		pick.add_item("Its own wing (%d rooms)" % current.size())
+		chosen = pick.item_count - 1
+	pick.select(chosen)
+	pick.item_selected.connect(func(index: int) -> void:
+		if index < options.size():
+			research.set_wing(def, options[index][1]))
+	line.add_child(pick)
+	return line
 
 
 func _trial_row(def: ResearchCardDef) -> Control:
@@ -407,6 +456,7 @@ func _actions(def: ResearchCardDef, state: Research.State) -> void:
 		line.add_child(_button("Stop", "All its know-how back; its progress is kept.", func() -> void: research.cancel(def)))
 	elif state == Research.State.TRIAL:
 		_side.add_child(_words(research.trial_words(def), false))
+		_side.add_child(_wing_picker(def))
 		line = _trial_buttons(def)
 	if line.get_child_count() > 0:
 		_side.add_child(line)

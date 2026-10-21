@@ -11,6 +11,10 @@ const JOB_EVENTS := {&"treat": &"treatment", &"search": &"search_done", &"repair
 const BIG_FIGHT := 5
 ## A calm day: no fights, and prisoners' average mood at least this.
 const CALM_MOOD := 60.0
+## A skill this high counts as a high skill.
+const HIGH_SKILL := 60
+## Things broken at once that count as a big repair bill.
+const BIG_REPAIR := 5
 ## Days in a game year, until M12 brings seasons: four weeks.
 const DAYS_PER_YEAR := 28
 
@@ -49,10 +53,18 @@ static func setup(main: Node) -> void:
 	research.clock = clock
 	main.add_child(research)
 	research.start()
+	var marks := TrialMarks.new()
+	marks.name = "TrialMarks"
+	marks.cell_size = (main.grid as BuildGrid).cell_size
+	marks.building = main.building
+	marks.research = research
+	marks.clock = clock
+	(main.grid as BuildGrid).add_child(marks)
 	_count(main)
 	_effects(main)
 	_trials(main)
 	_feedback(main)
+	_thoughts(main)
 	clock.hour_changed.connect(func(_hour: int) -> void: research.check_reveals())
 
 
@@ -75,9 +87,26 @@ static func _setting(main: Node, id: StringName) -> Variant:
 static func _count(main: Node) -> void:
 	var counters: Counters = main.counters
 	var people: People = main.people
-	(main.jobs as JobBoard).job_finished.connect(func(job: Job, _worker: Person) -> void:
+	(main.jobs as JobBoard).job_finished.connect(func(job: Job, worker: Person) -> void:
+		if worker != null and worker.group == &"prisoner":
+			(main.research as Research).note_trial(worker, &"work")
 		if JOB_EVENTS.has(job.kind):
 			counters.add(JOB_EVENTS[job.kind]))
+	(main.in_tray as InTray).posted.connect(func(card: InTray.Card) -> void:
+		if card.def.kind == &"memo":
+			counters.add(&"ministry_memo"))
+	(main.infirmary as Infirmary).knocked_out.connect(func(_person: Person) -> void: counters.add(&"serious_injury"))
+	(main.wear as Wear).broke.connect(func(_key: Vector2i) -> void:
+		if people.broken.size() >= BIG_REPAIR:
+			counters.add(&"big_repair_bill"))
+	# Each prisoner with a high skill counts once, checked each night.
+	var skilled: Dictionary[int, bool] = {}
+	(main.clock as GameClock).day_changed.connect(func(_day: int) -> void:
+		for person: Person in people.people:
+			var file := PrisonerFile.of(person) if person.group == &"prisoner" else null
+			if file != null and not skilled.has(person.id) and file.skill(file.best_skill()) >= HIGH_SKILL:
+				skilled[person.id] = true
+				counters.add(&"high_skill"))
 	# Patrols count by the hour a guard spends on them, not by the job.
 	var patrolled := {"minutes": 0.0}
 	(main.clock as GameClock).minute_passed.connect(func(_minute: int) -> void:
@@ -169,6 +198,8 @@ static func _feedback(main: Node) -> void:
 	(main.inspector as Inspector).person_lines.append(func(person: Person) -> String:
 		var record := (main.roster as StaffRoster).record_of(person)
 		return research.owner_line(record.id) if record != null else "")
+	(main.inspector as Inspector).person_lines.append(func(person: Person) -> String:
+		return "\n".join(PrisonResearch.person_lines(research, person)))
 	var toast := func(title: String, body: String) -> void:
 		var toasts := main.get_node_or_null("/root/Toasts")
 		if not main.attract and toasts != null:
@@ -178,6 +209,47 @@ static func _feedback(main: Node) -> void:
 	research.revealed.connect(func(def: ResearchCardDef, why: String) -> void:
 		if why != "From the start":
 			toast.call("A new idea: %s" % def.display_name, "Turned up: %s. See the research board (N)." % why.to_lower()))
+
+
+## A head at their desk on a card shows it in a thought bubble; clicking
+## them opens the board on that card.
+static func _thoughts(main: Node) -> void:
+	var research: Research = main.research
+	var roster: StaffRoster = main.roster
+	var desk_work: DeskWork = main.desk_work
+	var card_of := func(person: Person) -> ResearchCardDef:
+		var record := roster.record_of(person)
+		if record == null or person.job == null or person.job.kind != Office.DESK_JOB or not person.sitting:
+			return null
+		for item: DeskWork.Item in desk_work.piles.get(record.id, []):
+			if item.kind == &"research" and item.ref is String:
+				return research.card(StringName(String(item.ref).trim_prefix("card:")))
+			if item.kind != &"research":
+				return null
+		return null
+	(main.clock as GameClock).minute_passed.connect(func(_minute: int) -> void:
+		for slot in research.slots():
+			var record := research._record(research.slot_owner(slot))
+			var person: Person = record.person if record != null else null
+			if person == null or (not person.bubble.is_empty() and not person.has_meta(&"research_bubble")):
+				continue
+			var def: ResearchCardDef = card_of.call(person)
+			if def != null:
+				person.bubble = "… %s" % def.display_name
+				person.bubble_minutes = 2.0
+				person.set_meta(&"research_bubble", def.id)
+			elif person.has_meta(&"research_bubble"):
+				person.remove_meta(&"research_bubble")
+				person.bubble = "")
+	(main.cursor as GridCursor).cell_clicked.connect(func(_cell: Vector2i, button: MouseButton) -> void:
+		var inspector: Inspector = main.inspector
+		if button != MOUSE_BUTTON_LEFT or (main.controller as BuildController).tool != BuildController.Tool.NONE:
+			return
+		var person := inspector.person_under_mouse()
+		if person != null and person.has_meta(&"research_bubble"):
+			var book: ManagementBook = main.book
+			book.open(&"research")
+			(main.research_window as ResearchWindow).show_card(person.get_meta(&"research_bubble")))
 
 
 ## Wing trials report through the in-tray.
@@ -212,6 +284,7 @@ static func _effects(main: Node) -> void:
 	var toolbar := main.get_node_or_null("HUD/BuildToolbar")
 	if toolbar != null:
 		toolbar.allowed = research.unlocked
+		toolbar.upgrades = research.upgrades_of
 	modifiers.set_source(&"research", research.modifier_sums())
 	var misconduct: Misconduct = main.misconduct
 	var clock: GameClock = main.clock

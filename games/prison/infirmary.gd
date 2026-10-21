@@ -32,6 +32,8 @@ var deaths := false
 
 signal died(person: Person, level: int, point: Vector2)
 signal checked(person: Person)
+## Someone was knocked out: a serious injury.
+signal knocked_out(person: Person)
 
 ## Bonuses such as a department head's. Optional.
 var modifiers: Modifiers
@@ -114,6 +116,8 @@ func tick(minutes: float) -> void:
 			elif not _has_treat_job(person):
 				_post_treat(person)
 		elif injury == Health.Injury.KNOCKED_OUT:
+			if not _out_for.has(person):
+				knocked_out.emit(person)
 			_out_for[person] = _out_for.get(person, 0.0) + minutes
 			person.health = maxf(0.0 if deaths else FLOOR, person.health - UNTREATED_LOSS * minutes / 60.0)
 			person.bubble = "Seeing stars"

@@ -66,7 +66,7 @@ const CURRENCY := &"biscuit"
 const DETECT_DISTANCE := 0.45
 const DETECT_COOLDOWN := 30.0
 
-## Research bonuses: pocket_chance. Optional.
+## Research bonuses: pocket_chance, detector_reach. Optional.
 var modifiers: Modifiers
 var people: People
 var items: ItemStore
@@ -255,7 +255,8 @@ func check_detectors() -> void:
 		if metal.is_empty():
 			continue
 		for detector: Array in detectors:
-			if detector[0] == person.level and (detector[1] as Vector2).distance_to(person.flat()) <= DETECT_DISTANCE:
+			if detector[0] == person.level and (detector[1] as Vector2).distance_to(person.flat()) \
+					<= DETECT_DISTANCE * Modifiers.scale(modifiers, &"detector_reach"):
 				_beeped[person] = now
 				detected.emit(person, metal[0])
 				break

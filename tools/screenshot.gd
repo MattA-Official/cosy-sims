@@ -102,7 +102,8 @@ func _process(_delta: float) -> bool:
 			research.begin(research.card(&"walkabouts"))
 			_main.desk_work.work(_main.heads.warden().id, 200.0)
 			research.start_trial(research.card(&"cell-searches"))
-			_main.book.toggle(&"research")
+			if not args.has("map"):
+				_main.book.toggle(&"research")
 		if args.has("desks"):
 			_main.desk_tint.shown = true
 		if args.has("paper"):

@@ -109,6 +109,14 @@
   {
    "modifier": "search_speed",
    "amount": 0.05
+  },
+  {
+   "modifier": "detector_reach",
+   "amount": 0.5
+  },
+  {
+   "upgrade": "metal_detector",
+   "words": "Upgraded by Metal detectors: reaches half as far again, so fewer slip past"
   }
  ],
  "vehicle-checks": [
@@ -411,6 +419,10 @@
   {
    "modifier": "reform_gain",
    "amount": 0.05
+  },
+  {
+   "upgrade": "library",
+   "words": "Upgraded by Library: time here counts 5% more towards reform"
   }
  ],
  "guest-speakers": [

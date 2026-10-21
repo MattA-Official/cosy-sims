@@ -121,7 +121,7 @@ func _on_cell_clicked(cell: Vector2i, button: MouseButton) -> void:
 		_sending = false
 		_rebuild()
 		return
-	var person := _person_under_mouse()
+	var person := person_under_mouse()
 	if person != null:
 		select(person)
 		return
@@ -139,7 +139,7 @@ func _on_cell_clicked(cell: Vector2i, button: MouseButton) -> void:
 
 
 ## The person drawn nearest the mouse, if any is close enough.
-func _person_under_mouse() -> Person:
+func person_under_mouse() -> Person:
 	var camera := get_viewport().get_camera_3d()
 	if camera == null or people == null:
 		return null

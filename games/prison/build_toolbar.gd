@@ -10,6 +10,9 @@ extends VBoxContainer
 ## (kind: "room" or "object", id) -> bool: whether research has unlocked
 ## it. Unset, everything shows.
 var allowed: Callable
+## (id) -> Array[String]: what research has upgraded about a room type or
+## object, for its tooltip. Optional.
+var upgrades: Callable
 
 ## In the order they're used: put up rooms, then fit them out, then the
 ## grounds, with demolish set apart, then running the prison, then moving. Keys 1 to 9 then 0 follow
@@ -650,6 +653,14 @@ func _section(title: String) -> HBoxContainer:
 
 ## The line or two under a choice's name on its hover card.
 func _describe(def: Resource) -> String:
+	var words := _describe_plain(def)
+	if upgrades.is_valid() and (def is ObjectDef or def is RoomTypeDef):
+		for line: String in upgrades.call(def.id):
+			words += "\n" + line
+	return words
+
+
+func _describe_plain(def: Resource) -> String:
 	if def is ObjectDef:
 		var size: Vector2 = def.size
 		return "%s × %s tiles · %s" % [_number(size.x), _number(size.y), Ledger.text(def.price)]

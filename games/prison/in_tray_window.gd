@@ -150,6 +150,9 @@ func _card(card: InTray.Card) -> Control:
 	for i in card.def.choices.size():
 		var button := Button.new()
 		button.text = card.def.choices[i].label
+		var tags := card.def.choices[i].tags
+		if tags.has(&"caring") or tags.has(&"strict"):
+			button.tooltip_text = "Nudges your character towards %s." % ("caring" if tags.has(&"caring") else "strict")
 		button.focus_mode = FOCUS_NONE
 		var index := i
 		button.pressed.connect(func() -> void: in_tray.answer(card, index))

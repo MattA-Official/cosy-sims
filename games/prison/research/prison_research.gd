@@ -130,6 +130,41 @@ const FUTURE_FLAGS := {
 const GROUP_KEYS := {&"guard_walk_speed": "%s_walk_speed", &"staff_need_rate": "%s_need_rate",
 		&"prisoner_mood": "%s_mood", &"knowhow_learning": "knowhow_%s"}
 
+## Who a card's modifier shows on in the inspector, and in what words:
+## a role or &"prisoner" -> {modifier: [words, up, down]}, where the
+## amount goes in as "10% faster". Mood is points, not a share.
+const PERSON_EFFECTS := {
+	&"guard": {&"guard_walk_speed": ["Walks %s", "faster", "slower"], &"search_speed": ["Searches %s", "faster", "slower"]},
+	&"nurse": {&"treat_speed": ["Treats %s", "faster", "slower"]},
+	&"handyman": {&"repair_speed": ["Repairs %s", "faster", "slower"]},
+	&"prisoner": {&"prisoner_mood": ["Mood %s", "", ""], &"temper_rate": ["Temper rises %s", "faster", "slower"],
+			&"sleep_rate": ["Sleeps %s", "better", "worse"], &"course_pass": ["Passes courses %s", "likelier", "less likely"],
+			&"parole_chance": ["Parole %s", "likelier", "less likely"], &"reform_gain": ["Reforms %s", "faster", "slower"]},
+}
+
+
+## "Walks 10% faster (Guard training)" lines for someone, from cards done
+## and any trial in their wing.
+static func person_lines(research: Research, person: Person) -> Array[String]:
+	var out: Array[String] = []
+	var effects: Dictionary = PERSON_EFFECTS.get(person.group if person.group == &"prisoner" else person.role, {})
+	for key: StringName in effects:
+		var words: Array = effects[key]
+		for source: Array in research.sources_of(key):
+			out.append(_effect_words(key, words, source[1], source[0]))
+		for id: StringName in research.trials:
+			if research.in_wing(id, person):
+				for effect: Dictionary in research.card(id).effects:
+					if StringName(effect.get("modifier", "")) == key:
+						out.append(_effect_words(key, words, float(effect.amount), "trial of %s" % research.card(id).display_name))
+	return out
+
+
+static func _effect_words(key: StringName, words: Array, amount: float, why: String) -> String:
+	var size := "%+d" % roundi(amount) if key == &"prisoner_mood" \
+			else "%d%% %s" % [roundi(absf(amount) * 100.0), words[1] if amount > 0.0 else words[2]]
+	return "%s (%s)" % [String(words[0]) % size, why]
+
 ## Know-how kind -> the department whose head brings it to a joint card.
 const KIND_DEPARTMENTS := {&"security": &"security", &"care": &"wellbeing", &"health": &"medical",
 		&"learning": &"education", &"craft": &"industry", &"admin": &"admin"}

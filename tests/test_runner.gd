@@ -2087,6 +2087,16 @@ func _test_research_effects() -> void:
 		(main.clock as GameClock).minute_passed.emit(0)
 	guard.job = null
 	_check((main.counters as Counters).total(&"patrol_hour") > hours, "an hour on patrol counts as a patrol hour")
+	research._finish(research.card(&"guard-training"), 0, true)
+	# Upgrades: things built before research stay, and cards improve them.
+	_check(research.unlocked("room", &"library") and research.upgrades_of(&"library").is_empty(),
+			"a library needs no card")
+	research._finish(research.card(&"library"), 0, true)
+	research._finish(research.card(&"metal-detectors"), 0, true)
+	_check(research.upgrades_of(&"library").size() == 1 and modifiers.value(&"detector_reach") == 0.5,
+			"the Library and Metal detectors cards upgrade them")
+	_check(PrisonResearch.person_lines(research, guard).has("Walks 10% faster (Guard training)"),
+			"the inspector says which card made a guard faster")
 	main.queue_free()
 
 
@@ -2186,6 +2196,22 @@ func _test_research_slots() -> void:
 	(main.standing as Standing).grade = 5
 	_check(research.begin(a) and research.begin(b) and research.states[b.id].slot == &"security+",
 			"a head and their deputy work two cards at once")
+	# A head at their desk on a card shows it in a thought bubble.
+	var thinker := chief.person
+	var thinking := roster.record_of(thinker)
+	desk_work.piles[thinking.id] = desk_work.piles[chief.id].filter(func(i: DeskWork.Item) -> bool: return i.kind == &"research")
+	var desk_job := Job.new()
+	desk_job.kind = Office.DESK_JOB
+	var had_job := thinker.job
+	thinker.job = desk_job
+	thinker.sitting = true
+	thinker.bubble = ""
+	thinker.remove_meta(&"research_bubble")
+	(main.clock as GameClock).minute_passed.emit(0)
+	_check(thinker.has_meta(&"research_bubble") and thinker.bubble.contains(research.card(thinker.get_meta(&"research_bubble")).display_name),
+			"a head at their desk shows their card in a thought bubble")
+	thinker.job = had_job
+	thinker.sitting = false
 	var desk_item: DeskWork.Item = desk_work.items(chief.id, &"research")[0]
 	var total := desk_item.total
 	research.set_budget(&"security", 500)
@@ -2237,13 +2263,23 @@ func _test_research_trials() -> void:
 	var outside: Person = prisoners.filter(func(p: Person) -> bool: return not research.in_wing(policy.id, p))[0]
 	_check(modifiers.value_for(key, inside[0]) != 0.0 and modifiers.value_for(key, outside) == 0.0
 			and modifiers.value(key) == 0.0, "its effects count only in the wing")
+	var marks: TrialMarks = main.get_node("BuildGrid/TrialMarks")
+	_check(marks.marks(int(wing[0][0])).size() == wing.filter(func(k: Array) -> bool: return k[0] == wing[0][0]).size(),
+			"its rooms are marked on the map")
+	var options := research.wing_options()
+	_check(options.size() >= 2, "there are wings to pick from")
+	var other: Array = options.filter(func(o: Array) -> bool: return not (o[1] as Array).has(
+			research.trials[policy.id].rooms[0]))[0][1]
+	research.set_wing(policy, other)
+	_check(research.trials[policy.id].rooms == other, "picking another wing moves the trial")
+	research.set_wing(policy, wing)
 	research.note_trial(inside[0], &"fight")
 	var reports := []
 	research.trial_report.connect(func(def: ResearchCardDef, words: String) -> void: reports.append(words))
 	for i in Research.TRIAL_DAYS:
 		research.trials[policy.id].start_day -= 1
 		research.nightly()
-	_check(reports.size() == 1 and String(reports[0]).contains("1 fight"), "after three days a report compares the wing and the rest")
+	_check(reports.size() == 1 and String(reports[0]).contains("1 fight in the wing"), "after three days a report compares the wing and the rest")
 	var card: InTray.Card = in_tray.cards.filter(func(c: InTray.Card) -> bool: return c.def.kind == &"trial")[0]
 	in_tray.answer(card, 2)
 	_check(research.state_of(policy.id) == Research.State.FACE_UP and modifiers.value_for(key, inside[0]) == 0.0,

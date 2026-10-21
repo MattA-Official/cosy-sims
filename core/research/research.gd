@@ -831,6 +831,53 @@ func default_wing() -> Array:
 	return out
 
 
+## Wings to pick from, as [name, rooms]: each side of the prison and, with
+## cells upstairs, each floor. Rooms are [level, x, y] of a first cell.
+func wing_options() -> Array:
+	var rooms := people.home_rooms() if people != null else []
+	var key := func(entry: Array) -> Array:
+		return [entry[0], (entry[1] as Room).cells[0].x, (entry[1] as Room).cells[0].y]
+	var beds := 0
+	for entry: Array in rooms:
+		beds += int(entry[2])
+	# The rooms that hold the first half of the beds, sorted by `along`.
+	var half := func(along: Callable) -> Array:
+		var sorted := rooms.duplicate()
+		sorted.sort_custom(func(a: Array, b: Array) -> bool: return along.call(a) < along.call(b))
+		var out: Array = []
+		var taken := 0
+		for entry: Array in sorted:
+			if taken * 2 >= beds and not out.is_empty():
+				break
+			out.append(key.call(entry))
+			taken += int(entry[2])
+		return out
+	var rest := func(of: Array) -> Array:
+		return rooms.map(key).filter(func(k: Array) -> bool: return not of.has(k))
+	var west: Array = half.call(func(e: Array) -> float: return (e[1] as Room).centre().x)
+	var north: Array = half.call(func(e: Array) -> float: return (e[1] as Room).centre().y)
+	var options: Array = [["West side", west], ["East side", rest.call(west)], ["North side", north],
+			["South side", rest.call(north)]]
+	var ground: Array = rooms.filter(func(e: Array) -> bool: return int(e[0]) == 0).map(key)
+	if not ground.is_empty() and ground.size() < rooms.size():
+		options += [["Ground floor", ground], ["Upstairs", rest.call(ground)]]
+	var out: Array = []
+	var seen: Array = []
+	for option: Array in options:
+		var sorted: Array = (option[1] as Array).duplicate()
+		sorted.sort()
+		if not sorted.is_empty() and sorted.size() < rooms.size() and not seen.has(sorted):
+			seen.append(sorted)
+			out.append(option)
+	return out
+
+
+## Moves a trial to another wing, starting its days again.
+func set_wing(def: ResearchCardDef, rooms: Array) -> void:
+	if state_of(def.id) == State.TRIAL and not rooms.is_empty():
+		start_trial(def, rooms)
+
+
 ## Whether someone sleeps in a trial's wing.
 func in_wing(id: StringName, person: Object) -> bool:
 	var trial: Dictionary = trials.get(id, {})
@@ -848,17 +895,22 @@ func start_trial(def: ResearchCardDef, rooms: Array = []) -> void:
 	var s: CardState = states[def.id]
 	s.state = State.TRIAL
 	trials[def.id] = {"rooms": rooms if not rooms.is_empty() else default_wing(), "start_day": _day(),
-			"report_day": 0, "wing": [0.0, 0, 0, 0], "rest": [0.0, 0, 0, 0]}
+			"report_day": 0, "wing": [0.0, 0, 0, 0, 0], "rest": [0.0, 0, 0, 0, 0]}
 	_scope_trial(def)
 	changed.emit()
 
 
-## Something worth comparing happened to someone during trials: &"fight"
-## or &"find".
+## Something worth comparing happened to someone during trials: &"fight",
+## &"find" or &"work" (a job done).
 func note_trial(person: Person, what: StringName) -> void:
+	var index: int = {&"fight": 2, &"find": 3, &"work": 4}.get(what, -1)
+	if index < 0:
+		return
 	for id: StringName in trials:
 		var side: Array = trials[id].wing if in_wing(id, person) else trials[id].rest
-		side[2 if what == &"fight" else 3] += 1
+		while side.size() <= index:
+			side.append(0)
+		side[index] += 1
 
 
 ## Rolls a trial out everywhere: the card is done.
@@ -899,13 +951,28 @@ func trial_words(def: ResearchCardDef) -> String:
 	var trial: Dictionary = trials.get(def.id, {})
 	if trial.is_empty():
 		return ""
-	if int(trial.wing[1]) == 0 and int(trial.rest[1]) == 0:
+	var wing: Array = trial.wing
+	var rest: Array = trial.rest
+	if int(wing[1]) == 0 and int(rest[1]) == 0:
 		return "No numbers yet: the first come in at midnight."
-	var side := func(name: String, row: Array) -> String:
-		var mood := roundi(row[0] / row[1]) if int(row[1]) > 0 else 0
-		return "%s: mood %d, %d %s, %d %s found" % [name, mood, row[2], "fight" if int(row[2]) == 1 else "fights",
-				row[3], "item" if int(row[3]) == 1 else "items"]
-	return "%s. %s." % [side.call("The wing", trial.wing), side.call("The rest", trial.rest)]
+	# Per ten prisoners a day, so a small wing compares fairly.
+	var rate := func(row: Array, index: int) -> float:
+		return (float(row[index]) if row.size() > index else 0.0) * 10.0 / maxf(1.0, float(row[1]))
+	var arrow := func(a: float, b: float) -> String:
+		return "=" if absf(a - b) <= maxf(0.05, absf(b) * 0.05) else "▲" if a > b else "▼"
+	var lines: Array[String] = []
+	var mood_wing: float = wing[0] / maxf(1.0, float(wing[1]))
+	var mood_rest: float = rest[0] / maxf(1.0, float(rest[1]))
+	lines.append("Mood %s %d in the wing, %d elsewhere" % [arrow.call(mood_wing, mood_rest), roundi(mood_wing), roundi(mood_rest)])
+	for row: Array in [[2, "fight", "fights"], [3, "item found", "items found"], [4, "job done", "jobs done"]]:
+		var count := int(wing[row[0]]) if wing.size() > row[0] else 0
+		var a: float = rate.call(wing, row[0])
+		var b: float = rate.call(rest, row[0])
+		lines.append("%s %d %s in the wing (%.1f a day for ten, %.1f elsewhere)" % [arrow.call(a, b), count,
+				row[1] if count == 1 else row[2], a, b])
+	if card(def.id).lean != 0:
+		lines.append("Rolling it out moves your character towards %s" % ("strict" if def.lean > 0 else "caring"))
+	return ". ".join(lines) + "."
 
 
 func _scope_trial(def: ResearchCardDef) -> void:
@@ -956,6 +1023,34 @@ func modifier_sums() -> Dictionary:
 			if effect.has("modifier"):
 				var key := StringName(effect.modifier)
 				out[key] = out.get(key, 0.0) + float(effect.amount) * times
+	return out
+
+
+## What cards done have upgraded about something built before research,
+## such as a metal detector, as lines of words.
+func upgrades_of(id: StringName) -> Array[String]:
+	var out: Array[String] = []
+	if mode == Mode.OFF:
+		return out
+	for def in board.cards:
+		if is_done(def.id):
+			for effect: Dictionary in def.effects:
+				if StringName(effect.get("upgrade", "")) == id:
+					out.append(String(effect.get("words", "Upgraded by %s" % def.display_name)))
+	return out
+
+
+## The cards behind a modifier, as [card name, amount] pairs, for why
+## lines such as "Walks 10% faster (Guard training)".
+func sources_of(key: StringName) -> Array:
+	var out: Array = []
+	for def in board.cards + board.refinements:
+		var times := float(refinements.get(def.department, 0)) if def.repeatable else (1.0 if is_done(def.id) else 0.0)
+		if times <= 0.0:
+			continue
+		for effect: Dictionary in def.effects:
+			if effect.has("modifier") and StringName(effect.modifier) == key:
+				out.append([def.display_name, float(effect.amount) * times])
 	return out
 
 

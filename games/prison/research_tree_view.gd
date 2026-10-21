@@ -22,6 +22,9 @@ const SMALL_SIZE := 11
 
 static var _layout: Dictionary = {}
 
+## Cards that don't match fade: "" for none, "start", "face_up", "busy",
+## "done" or "kind:<know-how id>".
+var filter := ""
 var research: Research:
 	set(value):
 		research = value
@@ -133,6 +136,26 @@ func _gui_input(event: InputEvent) -> void:
 		accept_event()
 
 
+## Whether a card matches the filter.
+func passes(id: StringName) -> bool:
+	var def := research.card(id)
+	var state := research.state_of(id)
+	match filter:
+		"":
+			return true
+		"start":
+			return state == Research.State.FACE_UP and research.available(def)
+		"face_up":
+			return state == Research.State.FACE_UP
+		"busy":
+			return state == Research.State.RESEARCHING or state == Research.State.PAUSED or state == Research.State.TRIAL
+		"done":
+			return state == Research.State.DONE
+	if filter.begins_with("kind:"):
+		return def.kinds().has(StringName(filter.trim_prefix("kind:")))
+	return true
+
+
 func card_at(point: Vector2) -> StringName:
 	for id: StringName in _cards:
 		if Rect2(_cards[id], _card_size).has_point(point):
@@ -230,6 +253,8 @@ func _draw_card(id: StringName, font: Font, lit: Dictionary, kids: Dictionary) -
 	var alpha := 1.0
 	if state == Research.State.LOCKED_OUT:
 		alpha = 0.45
+	if not passes(id):
+		alpha *= 0.25
 	if selected != &"":
 		if id == selected:
 			edge = ACCENT

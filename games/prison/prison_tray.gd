@@ -47,32 +47,35 @@ static func cards() -> Array[TrayCardDef]:
 	var no_mood := [{"moodlet": &"tray_no"}]
 	var approve := [&"approve"]
 	var decline := [&"decline"]
+	# Answers to prisoners move the warden's character a little.
+	var caring := [&"approve", &"caring"]
+	var strict := [&"decline", &"strict"]
 	var out: Array[TrayCardDef] = []
 	out.append(TrayCardDef.make(&"guitar", &"prisoner_request", PRISONER, "A guitar",
 			"{who} asks for a guitar in their cell. They promise to learn more than three chords.",
-			[TrayCardDef.choice("Yes, a guitar (£40)", [{"money": -40}, {"moodlet": &"tray_yes"}], approve, "{who} got a guitar."),
-			TrayCardDef.choice("No", no_mood, decline, "{who} didn't get a guitar.")], 1))
+			[TrayCardDef.choice("Yes, a guitar (£40)", [{"money": -40}, {"moodlet": &"tray_yes"}], caring, "{who} got a guitar."),
+			TrayCardDef.choice("No", no_mood, strict, "{who} didn't get a guitar.")], 1))
 	out.append(TrayCardDef.make(&"mural", &"prisoner_request", PRISONER, "A mural",
 			"{who} would like to paint a mural on the canteen wall. Something with seagulls.",
 			[TrayCardDef.choice("Yes, buy paint (£60)", [{"money": -60}, {"moodlet": &"tray_treat", "who": "prisoners"}, {"moodlet": &"tray_yes"}],
-				approve, "{who} painted the seagulls."),
-			TrayCardDef.choice("No", no_mood, decline)], 1))
+				caring, "{who} painted the seagulls."),
+			TrayCardDef.choice("No", no_mood, strict)], 1))
 	out.append(TrayCardDef.make(&"blankets", &"prisoner_request", PRISONER, "Extra blankets",
 			"{who} says the cells are chilly at night and asks for extra blankets all round.",
-			[TrayCardDef.choice("Yes, blankets for all (£80)", [{"money": -80}, {"moodlet": &"tray_treat", "who": "prisoners"}], approve),
-			TrayCardDef.choice("No", no_mood, decline)], 1))
+			[TrayCardDef.choice("Yes, blankets for all (£80)", [{"money": -80}, {"moodlet": &"tray_treat", "who": "prisoners"}], caring),
+			TrayCardDef.choice("No", no_mood, strict)], 1))
 	out.append(TrayCardDef.make(&"book_club", &"prisoner_request", PRISONER, "A book club",
 			"{who} wants to start a book club. First up: a very long book about whales.",
-			[TrayCardDef.choice("Yes, buy books (£30)", [{"money": -30}, {"moodlet": &"tray_yes"}], approve),
-			TrayCardDef.choice("No", no_mood, decline)], 1))
+			[TrayCardDef.choice("Yes, buy books (£30)", [{"money": -30}, {"moodlet": &"tray_yes"}], caring),
+			TrayCardDef.choice("No", no_mood, strict)], 1))
 	out.append(TrayCardDef.make(&"pot_plant", &"prisoner_request", PRISONER, "A pot plant",
 			"{who} asks to keep a small pot plant in their cell. They've already named it Doris.",
-			[TrayCardDef.choice("Yes (£10)", [{"money": -10}, {"moodlet": &"tray_yes"}], approve),
-			TrayCardDef.choice("No", no_mood, decline)], 1))
+			[TrayCardDef.choice("Yes (£10)", [{"money": -10}, {"moodlet": &"tray_yes"}], caring),
+			TrayCardDef.choice("No", no_mood, strict)], 1))
 	out.append(TrayCardDef.make(&"spicy", &"prisoner_request", PRISONER, "Spicier food",
 			"{who} asks, on behalf of several people, whether the food could be a little less beige.",
-			[TrayCardDef.choice("Order spices (£50)", [{"money": -50}, {"moodlet": &"tray_treat", "who": "prisoners"}], approve),
-			TrayCardDef.choice("No", no_mood, decline)], 1))
+			[TrayCardDef.choice("Order spices (£50)", [{"money": -50}, {"moodlet": &"tray_treat", "who": "prisoners"}], caring),
+			TrayCardDef.choice("No", no_mood, strict)], 1))
 	out.append(TrayCardDef.make(&"kettle", &"staff_request", &"staff", "A new kettle",
 			"{who} asks for a new kettle for the staff. The old one has started to whistle in a minor key.",
 			[TrayCardDef.choice("Buy a kettle (£30)", [{"money": -30}, {"morale": 5, "who": "staff"}], approve),
@@ -107,11 +110,11 @@ static func cards() -> Array[TrayCardDef]:
 			TrayCardDef.choice("Ignore it", [], decline)], 1))
 	out.append(TrayCardDef.make(&"cold_showers", &"complaint", PRISONER, "Cold showers",
 			"{who} complains that the showers have gone cold again.",
-			[TrayCardDef.choice("Fix the boiler (£120)", [{"money": -120}, {"moodlet": &"tray_treat", "who": "prisoners"}], approve),
-			TrayCardDef.choice("Ignore it", [{"moodlet": &"tray_cold", "who": "prisoners"}], decline)], 1))
+			[TrayCardDef.choice("Fix the boiler (£120)", [{"money": -120}, {"moodlet": &"tray_treat", "who": "prisoners"}], caring),
+			TrayCardDef.choice("Ignore it", [{"moodlet": &"tray_cold", "who": "prisoners"}], strict)], 1))
 	out.append(TrayCardDef.make(&"visiting", &"complaint", &"", "Visiting hours",
 			"A prisoner's family write asking if visiting hours could be a bit longer on Sundays.",
-			[TrayCardDef.choice("Send a kind letter (£5)", [{"money": -5}], approve),
+			[TrayCardDef.choice("Send a kind letter (£5)", [{"money": -5}], caring),
 			TrayCardDef.choice("Ignore it", [], decline)], 1))
 	return out
 
