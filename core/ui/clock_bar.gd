@@ -108,6 +108,7 @@ func _ready() -> void:
 		_clashes.focus_mode = FOCUS_NONE
 		_clashes.size_flags_vertical = SIZE_SHRINK_CENTER
 		_clashes.tooltip_text = "Things in the regime that don't add up. Opens the regime. T"
+		_badge(_clashes, "clash")
 		_clashes.pressed.connect(clashes_pressed.emit)
 		row.add_child(_clashes)
 		regime.changed.connect(count_clashes)
@@ -118,6 +119,7 @@ func _ready() -> void:
 		_tray.focus_mode = FOCUS_NONE
 		_tray.size_flags_vertical = SIZE_SHRINK_CENTER
 		_tray.tooltip_text = "Cards waiting in the in-tray. J"
+		_badge(_tray, "in_tray")
 		_tray.pressed.connect(tray_pressed.emit)
 		row.add_child(_tray)
 		in_tray.changed.connect(count_cards)
@@ -127,6 +129,7 @@ func _ready() -> void:
 		_warnings.focus_mode = FOCUS_NONE
 		_warnings.size_flags_vertical = SIZE_SHRINK_CENTER
 		_warnings.pressed.connect(warnings_pressed.emit)
+		_badge(_warnings, "alert")
 		row.add_child(_warnings)
 		clock.hour_changed.connect(func(_hour: int) -> void: count_warnings())
 		count_warnings()
@@ -164,22 +167,26 @@ func _refresh() -> void:
 func count_cards() -> void:
 	var count := in_tray.cards.filter(func(c: InTray.Card) -> bool: return c.queued < 0).size()
 	_tray.visible = count > 0
-	_tray.text = "%d letter%s" % [count, "" if count == 1 else "s"]
+	_tray.text = str(count)
+	_tray.tooltip_text = "%d letter%s waiting in the in-tray. J" % [count, "" if count == 1 else "s"]
 
 
 ## Counts the warnings again.
 func count_warnings() -> void:
 	var lines: Array = warnings.call()
 	_warnings.visible = not lines.is_empty()
-	_warnings.text = "%d warning%s" % [lines.size(), "" if lines.size() == 1 else "s"]
-	_warnings.tooltip_text = "\n".join(lines)
+	_warnings.text = str(lines.size())
+	_warnings.tooltip_text = "%d warning%s:\n%s" % [lines.size(), "" if lines.size() == 1 else "s",
+			"\n".join(lines)]
 
 
 ## Counts the regime's clashes again.
 func count_clashes() -> void:
 	var count := regime.clashes().size() if regime != null else 0
 	_clashes.visible = count > 0
-	_clashes.text = "%d clash%s" % [count, "" if count == 1 else "es"]
+	_clashes.text = str(count)
+	_clashes.tooltip_text = "%d clash%s in the regime: things that don't add up. T" % [count,
+			"" if count == 1 else "es"]
 
 
 func _show_speed() -> void:
@@ -198,3 +205,16 @@ func _button(title: String, details: String, icon_name: String) -> CosyButton:
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.custom_minimum_size = Vector2(34, 34)
 	return button
+
+
+## A count badge: an icon and a number, the words in its hover text, so a
+## few of them fit beside the clock without crowding the view bar.
+func _badge(button: Button, icon_name: String) -> void:
+	button.icon = load(ICONS % icon_name)
+	button.expand_icon = false
+	button.add_theme_constant_override(&"icon_max_width", 18)
+	button.add_theme_constant_override(&"h_separation", 4)
+	var ink := button.get_theme_color(&"font_color", button.theme_type_variation)
+	for state in [&"icon_normal_color", &"icon_hover_color", &"icon_pressed_color",
+			&"icon_hover_pressed_color", &"icon_focus_color"]:
+		button.add_theme_color_override(state, ink)
