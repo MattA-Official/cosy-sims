@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="ItemDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ItemDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/items/item_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/mobile_phone.glb" id="2_model"]
 
 [resource]
 script = ExtResource("1_def")
@@ -12,3 +13,4 @@ metal = true
 smell = 0.1
 trade_value = 20
 use = &"phone"
+model = ExtResource("2_model")

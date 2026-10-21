@@ -133,6 +133,8 @@ PALETTE = dict(
     fabric=("#93a48f", 1.0, 0),         # counselling armchair, soft sage
     cork=("#c8a275", 1.0, 0),
     soil=("#6e5644", 1.0, 0),
+    pop=("#a9cf8f", 0.25, 0),           # cloudy green home-brew
+    trunk_dark=("#6b5240", 0.9, 0),     # fruit stalks
     knit=("#bf9a66", 1.0, 0),           # teacher's cardigan, camel
     scarf=("#b06f5c", 1.0, 0),          # counsellor's scarf, muted rust
     trunk=("#ffffff", 0.9, 0),
@@ -1261,6 +1263,105 @@ def wall_shelf():
 
 
 
+def snack_machine():
+    """1 x 1, 1.8 m: a chunky vending machine, front to Godot +z. Rows of
+    little coloured snacks behind a glass front (an open window with a
+    couple of glints, so the snacks show), keypad on the right and a
+    flap at the bottom."""
+    p = Prop("snack_machine")
+    h, w, d, y = 1.8, 0.9, 0.72, 0.1  # body centre sits back towards the wall
+    yf = y - d / 2  # the front face
+    p.box("car_red", (w, d, h - 0.06), (0, y, (h - 0.06) / 2 + 0.06), 0.04, 3)
+    p.box("steel_dark", (w - 0.06, d - 0.06, 0.06), (0, y, 0.03), 0.01, 1)  # plinth
+    p.box("cream", (w - 0.06, 0.02, 0.16), (0, yf - 0.005, h - 0.12), 0.02, 2)  # header sign
+    for x in (-0.25, -0.1, 0.05, 0.2):
+        p.ball(("food_c", "poster_c", "food_b", "sign_blue")[int((x + 0.25) / 0.15 + 0.1)], 0.035,
+               (x, yf - 0.02, h - 0.12), scale=(1, 0.4, 1), u=10, v=6)
+    # The window stands proud of the front: a dark inside with shelves of snacks.
+    x0, x1, z0, z1 = -0.4, 0.18, 0.5, 1.6
+    p.box("screen", (x1 - x0, 0.02, z1 - z0), ((x0 + x1) / 2, yf - 0.13 + 0.12, (z0 + z1) / 2), 0.004, 1)
+    for sx in (x0, x1):  # the window's side cheeks and sill
+        p.box("car_red", (0.03, 0.13, z1 - z0), (sx, yf - 0.13 + 0.06, (z0 + z1) / 2), 0.008, 1)
+    for sz in (z0, z1):
+        p.box("car_red", (x1 - x0 + 0.03, 0.13, 0.03), ((x0 + x1) / 2, yf - 0.13 + 0.06, sz), 0.008, 1)
+    snacks = ("food_c", "poster_c", "food_b", "sign_blue", "book_b", "book_d", "cream", "uniform")
+    rng = random.Random(3)
+    rows = 5
+    for r in range(rows):
+        z = z0 + 0.05 + r * (z1 - z0 - 0.08) / rows
+        p.box("steel", (x1 - x0 - 0.02, 0.1, 0.012), ((x0 + x1) / 2, yf - 0.13 + 0.06, z), 0.003, 1)
+        for c in range(4):
+            x = x0 + 0.08 + c * (x1 - x0 - 0.12) / 3
+            mat = snacks[(r * 3 + c * 5) % len(snacks)]
+            tall = 0.13 if (r + c) % 3 else 0.1
+            for k in range(2):  # two of each, one behind the other
+                p.box(mat, (0.1, 0.03, tall), (x, yf - 0.13 + 0.04 + k * 0.035, z + 0.006 + tall / 2),
+                      0.01, 2, rot=(0, rng.uniform(-4, 4), 0))
+            p.tube("steel", [(x - 0.04, yf - 0.13 + 0.025, z + 0.02), (x + 0.04, yf - 0.13 + 0.025, z + 0.02)], 0.004, 0, n=6)
+    for gx, gz in ((-0.25, 1.35), (-0.18, 1.32)):  # glints on the glass
+        p.box("glass", (0.025, 0.006, 0.42), (gx, yf - 0.135, gz), 0.002, 1, rot=(0, 25, 0))
+    # Keypad and coin slot on the right.
+    p.box("steel_dark", (0.17, 0.02, 0.44), (0.32, yf - 0.005, 1.15), 0.015, 2)
+    p.box("screen", (0.12, 0.012, 0.05), (0.32, yf - 0.015, 1.31), 0.004, 1)
+    p.box("cross", (0.05, 0.014, 0.015), (0.3, yf - 0.017, 1.31), 0.002, 1)
+    for r in range(4):
+        for c in range(3):
+            p.box("steel", (0.03, 0.014, 0.025), (0.285 + c * 0.035, yf - 0.016, 1.22 - r * 0.04), 0.005, 1)
+    p.box("steel", (0.012, 0.014, 0.05), (0.32, yf - 0.016, 1.0), 0.003, 1)  # coin slot
+    # Collection flap at the bottom.
+    p.box("steel_dark", (0.58, 0.03, 0.2), (-0.11, yf - 0.005, 0.28), 0.015, 2)
+    p.box("bag", (0.5, 0.032, 0.03), (-0.11, yf - 0.008, 0.35), 0.006, 1)
+    return p
+
+
+# Contraband for the phones-and-brewing work: built big enough to read in a
+# hand or on the floor, like the other items.
+
+def mobile_phone():
+    p = Prop("mobile_phone")  # a chunky little mobile
+    p.box("bag", (0.13, 0.04, 0.24), (0, 0, 0.02 + 0.12), 0.025, 3, rot=(0, 0, 0))
+    p.box("screen", (0.1, 0.01, 0.1), (0, -0.02, 0.2), 0.01, 1)
+    for r in range(3):
+        for c in range(3):
+            p.box("steel", (0.022, 0.01, 0.016), (-0.03 + c * 0.03, -0.021, 0.1 - r * 0.026), 0.004, 1)
+    p.cyl("bag", 0.012, 0.06, (0.045, 0.0, 0.28), bevel=0.004, n=8)  # stubby aerial
+    return p
+
+
+def sweets():
+    p = Prop("sweets")  # a brown paper bag spilling wrapped sweets
+    p.taper("crate", (0.14, 0.1), (0.17, 0.12), 0.18, (0, 0.02, 0.09), 0.02, 2)
+    p.taper("crate", (0.17, 0.12), (0.12, 0.05), 0.05, (0, 0.02, 0.205), 0.015, 1)
+    for k, (x, y, mat) in enumerate(((-0.12, -0.08, "food_c"), (-0.04, -0.12, "poster_c"),
+                                     (0.06, -0.1, "food_b"), (0.13, -0.05, "sign_blue"))):
+        p.ball(mat, 0.03, (x, y, 0.025), scale=(1.3, 1, 1), rot=(0, 0, k * 40), u=10, v=6)
+        for side in (-1, 1):  # twisted wrapper ends
+            a = math.radians(k * 40)
+            p.ball(mat, 0.016, (x + side * 0.045 * math.cos(a), y + side * 0.045 * math.sin(a), 0.025),
+                   scale=(1, 1.4, 0.6), rot=(0, 0, k * 40), u=8, v=6)
+    return p
+
+
+def fruit():
+    p = Prop("fruit")  # an orange and an apple
+    p.ball("ball", 0.085, (-0.06, 0, 0.08), u=16, v=10)
+    p.ball("food_c", 0.08, (0.08, 0.03, 0.075), scale=(1, 1, 0.92), u=16, v=10)
+    p.tube("trunk_dark", [(0.08, 0.03, 0.14), (0.085, 0.03, 0.175)], 0.008, 0, n=6)
+    p.ball("leaf", 0.03, (0.105, 0.03, 0.17), scale=(1.4, 0.5, 0.6), rot=(0, -20, 0), u=10, v=6)
+    return p
+
+
+def fizzy_pop():
+    p = Prop("fizzy_pop")  # a cloudy home-brew in an old plastic bottle
+    p.cyl("pop", 0.07, 0.2, (0, 0, 0.1), bevel=0.03, segs=3, n=20)
+    p.cyl("pop", 0.07, 0.08, (0, 0, 0.24), r2=0.025, bevel=0.01, n=20)
+    p.cyl("sheet", 0.072, 0.07, (0, 0, 0.11), bevel=0.005, n=20)  # label
+    p.cyl("food_c", 0.028, 0.035, (0, 0, 0.295), bevel=0.008, n=14)  # cap
+    for x, z in ((0.03, 0.2), (-0.02, 0.16), (0.01, 0.23)):
+        p.ball("sheet", 0.008, (x, -0.066, z), u=6, v=4)  # bubbles
+    return p
+
+
 # ---------------------------------------------------------------- office paperwork
 
 def filing_cabinet():
@@ -1784,7 +1885,9 @@ def lorry():
     return p
 
 
-MODELS = dict(payphone=payphone, planter=planter, veg_bed=veg_bed,
+MODELS = dict(snack_machine=snack_machine, mobile_phone=mobile_phone, sweets=sweets,
+              fruit=fruit, fizzy_pop=fizzy_pop,
+              payphone=payphone, planter=planter, veg_bed=veg_bed,
               filing_cabinet=filing_cabinet, paper_stack_small=paper_stack_small,
               paper_stack_tall=paper_stack_tall, paper_stack_teetering=paper_stack_teetering,
               class_desk=class_desk, whiteboard=whiteboard, armchair=armchair,
