@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [heads] [tray] [settings] [graded] [inspect=N] [file] [zones] [at=X,Z] [zoom=F] [empty] [map=small|medium|large] [blueprint] [move] [scenario=ID] [paper] [research]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [heads] [tray] [settings] [graded] [inspect=N] [file] [zones] [at=X,Z] [zoom=F] [empty] [map=small|medium|large] [blueprint] [move] [scenario=ID] [paper] [research] [card=ID]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
@@ -234,6 +234,11 @@ func _process(_delta: float) -> bool:
 			_main.inspector.select(_main.people.people[inspect])
 			if args.has("file"):
 				_main.file_card.show_for(_main.people.people[inspect])
+	if _frames == FRAMES_TO_WAIT / 2:
+		# Once the book has its size, so the tree scrolls to the card.
+		for arg in args:
+			if arg.begins_with("card="):
+				_main.research_window.show_card(StringName(arg.get_slice("=", 1)))
 	if _frames < FRAMES_TO_WAIT:
 		return false
 	var path: String = args[0] if args.size() > 0 else "user://screenshot.png"

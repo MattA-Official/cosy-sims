@@ -1886,6 +1886,12 @@ func _test_research_board() -> void:
 			"add-on cards belong to their add-on, hooks to the base game")
 	_check(board.card(&"strict-rules").pair == &"prison-council" and board.card(&"strict-rules").lean == 1,
 			"Strict rules leans strict and pairs with the council")
+	var drawn := {}
+	for tree in ResearchTreeView.trees():
+		for id in ResearchTreeView.cards_in(tree):
+			drawn[id] = true
+	_check(board.cards.all(func(d: ResearchCardDef) -> bool: return drawn.has(d.id)) and drawn.size() == board.cards.size(),
+			"every card has a place on the board's trees")
 	var knowhow := Knowhow.new()
 	knowhow.kinds = board.knowhow
 	knowhow.sources = board.sources
