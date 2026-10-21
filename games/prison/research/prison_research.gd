@@ -110,9 +110,8 @@ const SOURCES := [
 const FUTURE_FLAGS := {
 	&"petitions": "M11 prisoner life",
 	&"phone_credit": "M11 privileges", &"earned_privileges": "M11 privileges",
-	&"town_meetings": "M12 reputation",
-	&"open_books": "M12 reputation", &"lobbying": "M12 Ministry", &"long_term_plan": "M12 Ministry",
-	&"seasonal_days": "M12 seasons", &"inspection_prep": "M12 inspections", &"health_inspection_ready": "M12 inspections",
+	&"lobbying": "M12 Ministry", &"long_term_plan": "M12 Ministry",
+	&"inspection_prep": "M12 inspections", &"health_inspection_ready": "M12 inspections",
 	&"escape_review": "Escape Mode", &"day_release": "Open Prison add-on", &"prison_farm": "Prison Farm add-on",
 	&"gang_intelligence": "Maximum Security add-on", &"armoury": "Maximum Security add-on",
 	&"marksmen": "Maximum Security add-on", &"mediation": "Maximum Security add-on",

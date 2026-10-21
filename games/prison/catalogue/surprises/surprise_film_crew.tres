@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurpriseDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/world/surprise_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://games/prison/world/surprises/film_crew.gd" id="2_script"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"film_crew"
+display_name = "Film crew"
+weight = 1.0
+seasons = Array[StringName]([])
+requires = Array[StringName]([&"reputation_on"])
+min_day = 5
+cooldown_days = 14
+hours = 6.0
+behaviour = ExtResource("2_script")
+card_text = "A film crew wants to spend the day making a documentary about the prison. Tidy rooms will look good on screen; messy ones won't."
+choices = Array[String](["Let them film", "Turn them away"])
+default_choice = 0

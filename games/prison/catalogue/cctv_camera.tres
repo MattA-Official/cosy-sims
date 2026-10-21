@@ -17,3 +17,4 @@ tags = Array[StringName]([&"camera"])
 model = ExtResource("2_ext")
 price = 250
 blocks = false
+idle_uses = Dictionary[StringName, float]({&"power": 0.2})

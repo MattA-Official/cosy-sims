@@ -74,6 +74,8 @@ const MIX_LOW := &"low"
 const MIX_HIGH := &"high"
 const MIX_EVERY := 10
 var coverage := Coverage.new()
+## The power is off to the cameras, such as in a power cut.
+var cameras_off := false
 ## Incidents so far today and yesterday, by kind.
 var today: Dictionary[StringName, int] = {}
 var yesterday: Dictionary[StringName, int] = {}
@@ -144,6 +146,8 @@ static func facing(placed: BuildingMap.PlacedObject) -> Vector2:
 ## Whether a guard is sat at a monitor, so the cameras are being watched:
 ## at a monitor of its own, or at a guard desk with a monitor on it.
 func cameras_live() -> bool:
+	if cameras_off:
+		return false
 	for job in jobs.of_kind(&"monitor"):
 		if job.worker != null and job.worker.state == Person.State.USING:
 			return true

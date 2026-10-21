@@ -74,6 +74,10 @@ enum Connects {
 ## Game minutes people use it for when it meets no need, such as a quick
 ## stop at a shop till. 0 for the usual while.
 @export var use_minutes := 0.0
+## Utilities (see Utilities): units an hour of &"power", &"water" or
+## &"sewage" while someone uses it, and always.
+@export var uses: Dictionary[StringName, float] = {}
+@export var idle_uses: Dictionary[StringName, float] = {}
 
 ## Where it can stand: on the floor, only on a surface's spot (a chess
 ## board on a table), or either (a radio).

@@ -14,3 +14,4 @@ colour = Color(0.55, 0.6, 0.65, 1)
 icon = ExtResource("2_icon")
 model = ExtResource("3_model")
 price = 600
+electric = true

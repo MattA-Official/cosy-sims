@@ -17,3 +17,4 @@ tags = Array[StringName]([&"shower"])
 model = ExtResource("2_model")
 uses_before_breaking = 12
 price = 200
+uses = Dictionary[StringName, float]({&"water": 6.0, &"sewage": 2.0})

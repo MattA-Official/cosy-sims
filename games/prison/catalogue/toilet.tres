@@ -17,3 +17,4 @@ model = ExtResource("2_model")
 uses_before_breaking = 15
 price = 120
 hide_spot = 0.6
+uses = Dictionary[StringName, float]({&"water": 2.0, &"sewage": 2.0})

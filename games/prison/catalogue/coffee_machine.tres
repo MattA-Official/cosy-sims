@@ -15,3 +15,4 @@ colour = Color(0.55, 0.42, 0.35, 1)
 tags = Array[StringName]([&"coffee"])
 model = ExtResource("2_ext")
 price = 150
+uses = Dictionary[StringName, float]({&"power": 1.0})

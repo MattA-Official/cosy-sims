@@ -36,10 +36,13 @@ var warnings: Callable
 ## The season and the weather, shown beside the day. Optional.
 var calendar: Calendar
 var weather: Weather
+## The surprise running, if any, shown under the day. Optional.
+var surprises: Surprises
 
 var _day := Label.new()
 var _time := Label.new()
 var _block := Label.new()
+var _surprise := Label.new()
 var _chip := PanelContainer.new()
 var _chip_box := StyleBoxFlat.new()
 var _speeds: Array[CosyButton] = []
@@ -64,6 +67,10 @@ func _ready() -> void:
 	when.add_child(_time)
 	_day.theme_type_variation = &"SubtleLabel"
 	when.add_child(_day)
+	_surprise.theme_type_variation = &"SubtleLabel"
+	_surprise.add_theme_color_override(&"font_color", Color(0.72, 0.45, 0.2))
+	_surprise.visible = false
+	when.add_child(_surprise)
 	row.add_child(when)
 
 	_chip_box.set_corner_radius_all(9)
@@ -164,6 +171,13 @@ func _refresh() -> void:
 			_day.text += " · " + weather.words()
 			_day.tooltip_text = weather.forecast_words()
 			_day.mouse_filter = MOUSE_FILTER_STOP
+	if surprises != null:
+		var words := surprises.words()
+		_surprise.visible = not words.is_empty()
+		if _surprise.text != words:
+			_surprise.text = words
+			_surprise.tooltip_text = surprises.running.def.card_text if surprises.running != null else ""
+			_surprise.mouse_filter = MOUSE_FILTER_STOP
 	var def := runner.current() if runner != null else null
 	_chip.visible = def != null
 	if def != null and _block.text != def.display_name:

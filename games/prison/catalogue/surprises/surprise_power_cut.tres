@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurpriseDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/world/surprise_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://games/prison/world/surprises/power_cut.gd" id="2_script"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"power_cut"
+display_name = "Power cut"
+weight = 1.0
+seasons = Array[StringName]([])
+requires = Array[StringName]([&"utilities_on"])
+min_day = 10
+cooldown_days = 12
+hours = 19.0
+behaviour = ExtResource("2_script")
+card_text = "The electricity board warns the power will go off tonight from 22:00. Electric doors will fail locked and the lights will go out until it's mended."
+choices = Array[String]([])
+default_choice = 0

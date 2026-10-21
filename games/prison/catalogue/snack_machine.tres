@@ -16,3 +16,4 @@ tags = Array[StringName]([&"snack_machine"])
 litter_chance = 0.3
 uses_before_breaking = 80
 price = 400
+idle_uses = Dictionary[StringName, float]({&"power": 0.5})

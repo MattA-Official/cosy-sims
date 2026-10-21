@@ -18,3 +18,4 @@ capacity = 8
 model = ExtResource("2_model")
 shows_held = false
 price = 300
+idle_uses = Dictionary[StringName, float]({&"power": 1.0})

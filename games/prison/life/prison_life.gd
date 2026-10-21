@@ -46,11 +46,10 @@ const YOUNG_COURSES := 1.2
 const HYGIENE_ABOVE := 50.0
 const HYGIENE_SCALE := 0.7
 const VACCINE_SCALE := 0.5
-## A flu week: a chance a day, how long, and how much faster colds spread.
-const FLU_WEEK_ODDS := 0.01
+## A flu week (a surprise, see Surprises): how long, and how much faster
+## colds spread.
 const FLU_WEEK_DAYS := 7
 const FLU_WEEK_SCALE := 2.0
-const FLU_WEEK_LEAST := 10
 ## How often the ill sneeze, a chance an hour.
 const SNEEZE_ODDS := 0.3
 ## Cats: one for every CAT_PRISONERS prisoners, once there are CAT_FROM; a
@@ -510,13 +509,6 @@ static func _health(main: Node) -> void:
 					person.reason = "Has a cold"
 					return true
 		return false)
-	# A flu week now and then.
-	clock.day_changed.connect(func(_day: int) -> void:
-		if not illnesses.enabled or int(main.get_meta(&"flu_week_until", -1)) >= clock.day():
-			return
-		var prisoners := people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size()
-		if prisoners >= FLU_WEEK_LEAST and rng.randf() < FLU_WEEK_ODDS:
-			start_flu_week(main))
 	# A red nose on the ill.
 	var noses := func() -> void:
 		for person: Person in people.people:
@@ -560,19 +552,27 @@ static func _health(main: Node) -> void:
 		return out)
 
 
-## A week when colds spread twice as fast, starting with one.
-static func start_flu_week(main: Node) -> void:
+## A week when colds spread twice as fast, and flu gets in: `first`
+## prisoners start with it. Returns those who caught it.
+static func start_flu_week(main: Node, first := 3) -> Array[Person]:
 	var illnesses: Illnesses = main.illnesses
 	var clock: GameClock = main.clock
 	main.set_meta(&"flu_week_until", clock.day() + FLU_WEEK_DAYS - 1)
-	(main.counters as Counters).add(&"flu_week")
-	var prisoners: Array = (main.people as People).people.filter(func(p: Person) -> bool:
+	var flu: IllnessDef = null
+	for def in illnesses.defs:
+		if def.id == &"flu":
+			flu = def
+	var well: Array = (main.people as People).people.filter(func(p: Person) -> bool:
 		return p.group == &"prisoner" and illnesses.illness_of(p) == null)
-	if not prisoners.is_empty() and not illnesses.defs.is_empty():
-		illnesses.catch(prisoners.pick_random(), illnesses.defs[0])
-	var toasts := main.get_node_or_null("/root/Toasts")
-	if not main.attract and toasts != null:
-		toasts.post("Flu week", "Colds are spreading twice as fast this week. A nurse in the infirmary helps.")
+	well.shuffle()
+	var out: Array[Person] = []
+	if flu == null:
+		return out
+	for person: Person in well.slice(0, first):
+		person.profile["caught_from"] = "a visitor"
+		illnesses.catch(person, flu)
+		out.append(person)
+	return out
 
 
 ## Work pays tokens, the shop sells for them while someone works the till,

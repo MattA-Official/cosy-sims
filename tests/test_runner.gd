@@ -6,8 +6,9 @@ var _failures := 0
 ## Prisoners can walk off a prison with no perimeter. Every test but the
 ## escape one turns that off, so long runs keep everyone they start with.
 var _escapes_on := false
-## Weather is off too, but for the weather test.
+## Weather is off too, but for the weather test, and so are surprises.
 var _weather_on := false
+var _surprises_on := false
 
 
 func _initialize() -> void:
@@ -16,7 +17,9 @@ func _initialize() -> void:
 			(node as Escapes).enabled = false
 		# Days stay alike unless a test wants weather.
 		if node is Weather and not _weather_on:
-			(node as Weather).enabled = false)
+			(node as Weather).enabled = false
+		if node is Surprises and not _surprises_on:
+			(node as Surprises).frequency = Surprises.Frequency.OFF)
 
 
 func _process(_delta: float) -> bool:
@@ -139,6 +142,8 @@ func _process(_delta: float) -> bool:
 	_test_reputation()
 	_test_protest()
 	_test_seasons()
+	_test_surprises()
+	_test_utilities()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -6530,9 +6535,13 @@ func _test_health() -> void:
 	for p: Person in prisoners.slice(0, Illnesses.OUTBREAK):
 		illnesses.catch(p, cold)
 	_check(counters.total(&"cold_outbreak") >= 1, "an outbreak is noticed")
-	PrisonLife.start_flu_week(main)
+	var surprises: Surprises = main.surprises
+	surprises.start(surprises.find(&"flu_week"))
 	_check(counters.total(&"flu_week") >= 1 and int(main.get_meta(&"flu_week_until")) >= (main.clock as GameClock).day(),
 			"a flu week starts")
+	_check(illnesses.ill().any(func(p: Person) -> bool: return illnesses.illness_of(p).id == &"flu" and illnesses.words(p).contains("Caught from a visitor")),
+			"and brings flu with it")
+	surprises.finish()
 	var tint: HealthTint = main.health_tint
 	_check(not tint.ill_rooms(a.level).is_empty() or illnesses.ill().all(func(p: Person) -> bool: return people.room_of(p).is_empty()),
 			"the Health view finds rooms with the ill")
@@ -6832,6 +6841,18 @@ func _test_reputation() -> void:
 	if back.has(p):
 		_check(not p.away and reputation.score > was, "good for the prison's name")
 	_check(jobs.of_kind(PrisonWorld.COMMUNITY).is_empty(), "and the outing is over")
+	# Town meetings and open books.
+	var board: Research = main.research
+	if board.mode != Research.Mode.OFF:
+		var protest: Protest = main.protest
+		board._finish(board.card(&"town-meetings"), 0, true)
+		board._finish(board.card(&"open-books"), 0, true)
+		protest.pressure = 50.0
+		clock.day_changed.emit(14)
+		_check(protest.pressure < 50.0 and reputation.entries.any(func(e: Dictionary) -> bool: return e.id == &"town_meeting"),
+				"the warden's town meetings win people round")
+		var good: float = reputation.entries.filter(func(e: Dictionary) -> bool: return e.id == &"town_meeting")[-1].change
+		_check(good > 2.0, "open books make good news count for more")
 	main.queue_free()
 
 
@@ -6961,7 +6982,11 @@ func _test_seasons() -> void:
 	calendar.clock.total_minutes = (winter_day - 1 + christmas.day_of_season - 1) * 24 * 60 + 12 * 60
 	_check(calendar.festive_today() == christmas, "Christmas falls on its day")
 	var work: ActivityDef = PrisonCatalogue.ACTIVITIES.filter(func(a: ActivityDef) -> bool: return a.id == &"work")[0]
-	_check(runner._substitute(&"prisoner", work).id == &"festivities", "and work gives way to festivities")
+	var research: Research = main.research
+	if research.mode != Research.Mode.OFF:
+		_check(runner._substitute(&"prisoner", work) == work, "without Seasonal days, work goes on")
+		research._finish(research.card(&"seasonal-days"), 0, true)
+	_check(runner._substitute(&"prisoner", work).id == &"festivities", "and with it, work gives way to festivities")
 	var kitchen: Kitchen = main.kitchen
 	PrisonWorld.celebrate(main, christmas)
 	_check(kitchen.meal.id == &"hearty" and prisoner.moodlets.has(&"christmas"), "with a hearty dinner and some cheer")
@@ -6970,5 +6995,178 @@ func _test_seasons() -> void:
 	copy.defs.assign(PrisonCatalogue.WEATHER)
 	copy.restore(saved)
 	_check(copy.today.id == &"heat", "the weather is saved")
+	copy.free()
+	main.queue_free()
+
+
+func _test_surprises() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var surprises: Surprises = main.surprises
+	var people: People = main.people
+	var in_tray: InTray = main.in_tray
+	var reputation: Reputation = main.reputation
+	var modifiers: Modifiers = main.modifiers
+	var jobs: JobBoard = main.jobs
+	var weather: Weather = main.weather
+	(main.misconduct as Misconduct).enabled = false
+	_check(surprises.frequency == Surprises.Frequency.OFF and surprises.roll() == null, "no surprises when they're off")
+	surprises.frequency = Surprises.Frequency.LIVELY
+	_check(not surprises.may_come(surprises.find(&"heatwave")), "a heatwave needs summer and weather")
+	_check(surprises.may_come(surprises.find(&"escaped_hen")), "a hen may get in any time")
+	# The escaped hen.
+	var hen_run := surprises.start(surprises.find(&"escaped_hen"))
+	_check(hen_run != null and (main.animals as Animals).of_kind(&"hen").size() == 1, "a hen gets in")
+	_check(surprises.start(surprises.find(&"film_crew")) == null, "one surprise at a time")
+	surprises.tick(1.0)
+	var chase := jobs.of_kind(&"hen_chase")
+	_check(chase.size() == 1 and chase[0].roles.has(&"guard"), "guards are sent to catch it")
+	var hen: Person = (main.animals as Animals).of_kind(&"hen")[0]
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	people.stop(prisoner)
+	prisoner.level = hen.level
+	prisoner.position = hen.position + Vector3(0.5, 0.0, 0.0)
+	hen_run.laugh()
+	_check(prisoner.moodlets.has(&"laughed"), "and prisoners nearby have a laugh")
+	_check(surprises.words().begins_with("Escaped hen · 1 hen loose"), "the clock says a hen is loose")
+	for i in 3:
+		chase[0].stages[0].finish.call(chase[0].stages[0], null)
+	_check((main.animals as Animals).of_kind(&"hen").is_empty() and hen_run.minutes_left <= 0.0, "once caught, it goes home")
+	surprises.tick(1.0)
+	_check(surprises.running == null and jobs.of_kind(&"hen_chase").is_empty(), "and the surprise is over")
+	_check(not surprises.may_come(surprises.find(&"escaped_hen")), "it won't come again for a while")
+	surprises.hard = true
+	surprises.last_day.clear()
+	surprises.start(surprises.find(&"escaped_hen"))
+	_check((main.animals as Animals).of_kind(&"hen").size() == 2, "two hens when it's hard")
+	surprises.finish()
+	surprises.hard = false
+	_check((main.animals as Animals).of_kind(&"hen").is_empty(), "and they go home when it's over")
+	# A film crew asks first.
+	var crew_run := surprises.start(surprises.find(&"film_crew"))
+	var card: InTray.Card = null
+	for c: InTray.Card in in_tray.cards:
+		if c.def.id == &"surprise_film_crew":
+			card = c
+	_check(card != null and card.def.choices.size() == 2, "a film crew writes in first")
+	in_tray.answer(card, 0)
+	var crew: Array = people.people.filter(func(p: Person) -> bool: return p.profile.has("film_crew"))
+	_check(surprises.chosen == 0 and crew.size() == 2 and crew.all(func(p: Person) -> bool: return p.profile.has("tour")),
+			"and comes to film")
+	var saved := surprises.capture()
+	crew_run.minutes_left = 0.5
+	var before := reputation.entries.size()
+	surprises.tick(1.0)
+	_check(surprises.running == null and main.has_meta(&"film_score"), "the film is scored")
+	_check(not people.people.any(func(p: Person) -> bool: return p.profile.has("film_crew") and p.profile.has("tour")), "and the crew go home")
+	var score: float = main.get_meta(&"film_score")
+	_check((score > PrisonWorld.OPEN_GOOD) == reputation.entries.slice(before).any(func(e: Dictionary) -> bool: return e.id == &"film_good"),
+			"a good film is good news")
+	# Unanswered, the default happens.
+	surprises.last_day.clear()
+	surprises.start(surprises.find(&"film_crew"))
+	surprises.tick(Surprises.CHOICE_MINUTES + 1.0)
+	_check(surprises.chosen == 0 and not in_tray.cards.any(func(c: InTray.Card) -> bool: return c.def.id == &"surprise_film_crew"),
+			"left unanswered, the crew come anyway")
+	surprises.finish()
+	# Turned away.
+	surprises.last_day.clear()
+	surprises.start(surprises.find(&"film_crew"))
+	surprises.choose(1)
+	surprises.tick(1.0)
+	_check(surprises.running == null, "turned away, they don't come")
+	# A celebrity chef.
+	_check(surprises.may_come(surprises.find(&"celebrity_chef")) == people._all_rooms().any(func(pair: Array) -> bool:
+			return (pair[1] as Room).type == &"kitchen") or (main.clock as GameClock).day() < 6, "a celebrity chef needs a kitchen")
+	var chef := surprises.start(surprises.find(&"celebrity_chef"))
+	surprises.choose(0)
+	_check(modifiers.value(&"tasty_meals") >= 1.0 and reputation.entries[-1].id == &"celebrity", "a celebrity chef's meals are lovely, and in the paper")
+	_check((main.counters as Counters).total(&"celebrity_chef") >= 1, "which turns up the research card")
+	var copy := Surprises.new()
+	copy.defs.assign(PrisonCatalogue.SURPRISES)
+	copy.host = main
+	modifiers.clear_source(&"celebrity_chef")
+	copy.restore(surprises.capture())
+	_check(copy.running != null and copy.running.def.id == &"celebrity_chef" and copy.running.chef == chef.chef
+			and modifiers.value(&"tasty_meals") >= 1.0, "a running surprise is saved")
+	copy.running = null
+	copy.free()
+	surprises.finish()
+	_check(modifiers.value(&"tasty_meals") < 1.0, "and the chef leaves at the end")
+	# A heatwave.
+	weather.enabled = true
+	surprises.last_day.clear()
+	surprises.start(surprises.find(&"heatwave"))
+	_check(weather.tomorrow != null and weather.tomorrow.id == &"heat", "a heatwave is forecast")
+	weather.forecast()
+	surprises.tick(1.0)
+	_check(weather.tomorrow.id == &"heat", "whatever the forecast says")
+	surprises.finish()
+	weather.enabled = false
+	_check(saved.has("running") and saved["running"].id == "film_crew", "the crew's visit is saved too")
+	main.queue_free()
+
+
+func _test_utilities() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var utilities: Utilities = main.utilities
+	var ledger: Ledger = main.ledger
+	var clock: GameClock = main.clock
+	var people: People = main.people
+	var calendar: Calendar = main.calendar
+	var surprises: Surprises = main.surprises
+	(main.misconduct as Misconduct).enabled = false
+	clock.total_minutes = (clock.day() - 1) * 24 * 60 + 23 * 60
+	_check(utilities.mode == Utilities.Mode.OFF, "utilities are off to start with")
+	utilities.sample(60.0)
+	_check(utilities.hour_use.is_empty(), "and cost nothing")
+	_check(not surprises.may_come(surprises.find(&"power_cut")), "no power cuts with utilities off")
+	utilities.mode = Utilities.Mode.BOUGHT_IN
+	utilities.sample(60.0)
+	_check(utilities.is_dark() and utilities.hour_use.get(&"power", 0.0) > 0.0, "bought in, lit rooms use power after dark")
+	var shower: BuildingMap.PlacedObject = null
+	var level := 0
+	for n: int in (main.building as Building).levels:
+		for placed: BuildingMap.PlacedObject in (main.building as Building).levels[n].objects.values():
+			if placed.def.id == &"shower" and shower == null:
+				shower = placed
+				level = n
+	if shower != null:
+		var water: float = utilities.hour_use.get(&"water", 0.0)
+		var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+		people._claimed[Vector2i(level, shower.id)] = prisoner
+		utilities.sample(60.0)
+		_check(utilities.hour_use.get(&"water", 0.0) >= water + 6.0, "a shower in use uses water")
+		people._claimed.erase(Vector2i(level, shower.id))
+	var before: int = ledger.today.get("Power", 0)
+	utilities.bill_hour()
+	_check(ledger.today.get("Power", 0) < before and utilities.hour_use.is_empty(), "the hour's power is billed")
+	calendar.enabled = true
+	clock.total_minutes = (calendar.length * 3) * 24 * 60 + 12 * 60
+	var winter := utilities.heating_bill()
+	clock.total_minutes = (calendar.length * 1) * 24 * 60 + 12 * 60
+	var summer := utilities.heating_bill()
+	_check(winter > summer and summer > 0, "heating costs more in winter")
+	utilities.bill_day()
+	_check(ledger.today.get("Heating", 0) == -summer and utilities.words().contains("heating"), "and is billed each day")
+	# A power cut.
+	var cut := surprises.start(surprises.find(&"power_cut"))
+	_check(cut != null and not utilities.cut, "a power cut is forecast in the morning")
+	clock.total_minutes = (clock.day() - 1) * 24 * 60 + 22 * 60
+	surprises.tick(1.0)
+	_check(utilities.cut and cut.off and not (main.jobs as JobBoard).of_kind(&"fix_power").is_empty(), "at night the power goes and a handyman is sent")
+	var power: float = utilities.hour_use.get(&"power", 0.0)
+	utilities.sample(60.0)
+	_check(utilities.hour_use.get(&"power", 0.0) == power, "nothing uses power in a cut")
+	var job: Job = (main.jobs as JobBoard).of_kind(&"fix_power")[0]
+	job.stages[0].finish.call(job.stages[0], null)
+	surprises.tick(1.0)
+	_check(surprises.running == null and not utilities.cut and (main.jobs as JobBoard).of_kind(&"fix_power").is_empty(), "mending the fuse box brings it back")
+	var copy := Utilities.new()
+	copy.restore(utilities.capture())
+	_check(copy.mode == Utilities.Mode.BOUGHT_IN, "the setting is saved")
 	copy.free()
 	main.queue_free()

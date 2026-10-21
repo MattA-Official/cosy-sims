@@ -1,8 +1,8 @@
 class_name PrisonWorld
 ## Wires M12's outside world into the prison: the town's opinion and the
-## local paper, open days, community service, protestors, and seasons,
-## weather and festive days. Each system keeps to its own node; this only
-## connects them.
+## local paper, open days, community service, protestors, seasons,
+## weather and festive days, utilities, and small surprises. Each system
+## keeps to its own node; this only connects them.
 
 ## Below LOW_REPUTATION Safety loses a star; above HIGH_REPUTATION the
 ## grant gains HIGH_GRANT.
@@ -11,8 +11,14 @@ const HIGH_REPUTATION := 70.0
 const HIGH_GRANT := 1.1
 ## Goods sell for up to this much more or less with the town's opinion.
 const GOODS_SWING := 0.1
-## Good news counts this much more with the Public relations card.
+## Good news counts this much more with the Public relations card, and
+## with Open books.
 const PUBLIC_RELATIONS := 1.25
+const OPEN_BOOKS := 1.2
+## Town meetings: protest pressure eased each day, and a day of the week the
+## warden speaks in town.
+const TOWN_EASE := 5.0
+const TOWN_DAYS := 7
 ## Security incidents that make the news.
 const NEWS_KINDS: Array[StringName] = [&"escape", &"death", &"sit_in", &"fight", &"escape_plan"]
 ## Open days: when the town tours, how many come, how often one may be
@@ -33,6 +39,8 @@ const FESTIVE_SWAPS: Array[StringName] = [&"work", &"learn", &"club", &"yard"]
 ## Hotheads lose their temper this much sooner in a heatwave.
 const HEAT_TEMPER := 1.3
 const GRIT_KIND := &"grit"
+## The difficulty that brings the harder surprises.
+const HARD_DIFFICULTY := &"tough"
 const GRIT_SPOTS := 4
 const GRIT_STAGE_MINUTES := 10.0
 ## Community service: the hours out, a chance each day of slipping away
@@ -52,6 +60,8 @@ static func setup(main: Node) -> void:
 	_community_service(main)
 	_protest(main)
 	_seasons(main)
+	_utilities(main)
+	_surprises(main)
 
 
 static func _reputation(main: Node) -> void:
@@ -66,6 +76,17 @@ static func _reputation(main: Node) -> void:
 	reputation.change_scales.append(func(def: ReputationEventDef, _change: float) -> float:
 		return PUBLIC_RELATIONS if def.tone == ReputationEventDef.Tone.GOOD \
 				and research.mode != Research.Mode.OFF and research.has_flag(&"public_relations") else 1.0)
+	reputation.change_scales.append(func(def: ReputationEventDef, _change: float) -> float:
+		return OPEN_BOOKS if def.tone == ReputationEventDef.Tone.GOOD \
+				and research.mode != Research.Mode.OFF and research.has_flag(&"open_books") else 1.0)
+	# Town meetings: the warden speaks in town once a week, and campaigners
+	# lose heart sooner.
+	(main.clock as GameClock).day_changed.connect(func(day: int) -> void:
+		if research.mode == Research.Mode.OFF or not research.has_flag(&"town_meetings"):
+			return
+		(main.protest as Protest).ease(TOWN_EASE)
+		if day % TOWN_DAYS == 0:
+			reputation.report(&"town_meeting"))
 	var security: Security = main.security
 	if security != null:
 		security.counted.connect(func(kind: StringName) -> void:
@@ -96,6 +117,10 @@ static func _reputation(main: Node) -> void:
 		(main.protest as Protest).read_paper(lead.tone if lead != null else ReputationEventDef.Tone.NEUTRAL, about)
 		return out
 	standing.paper_name = func() -> String: return reputation.paper_name
+	reputation.reported.connect(func(entry: Dictionary) -> void:
+		var def := reputation.def_of(entry.id)
+		if def != null and def.tone == ReputationEventDef.Tone.BAD:
+			(main.counters as Counters).add(&"bad_news"))
 	# A good name brings more visitors and more custom for the workshop.
 	(main.visits as Visits).visit_scale = func() -> float: return 0.5 + reputation.score / 100.0
 	reputation.changed.connect(func(score: float) -> void:
@@ -154,16 +179,18 @@ static func _open_day(main: Node) -> void:
 		return true)
 
 
-## The town arrives for the open day. Returns the tourists.
-static func open_doors(main: Node) -> Array[Person]:
+## The town arrives for the open day, or a few others for a tour, such as
+## a film crew. Returns the tourists.
+static func open_doors(main: Node, count := TOURISTS, open_day := true) -> Array[Person]:
 	var people: People = main.people
 	var visits: Visits = main.visits
-	main.set_meta(&"last_open_day", (main.clock as GameClock).day())
+	if open_day:
+		main.set_meta(&"last_open_day", (main.clock as GameClock).day())
 	var out: Array[Person] = []
 	var spot: Array = visits.entrance.call() if visits.entrance.is_valid() else []
 	if spot.is_empty():
 		return out
-	for i in TOURISTS:
+	for i in count:
 		var tourist := people.add_person(spot[0], spot[1] + Vector2(i * 0.3, 0.0), "", Visits.VISITOR)
 		if tourist == null:
 			tourist = people.add_person(spot[0], spot[1], "", Visits.VISITOR)
@@ -182,13 +209,27 @@ static func open_doors(main: Node) -> Array[Person]:
 ## Returns the score, 0–100.
 static func close_doors(main: Node) -> float:
 	var people: People = main.people
-	var visits: Visits = main.visits
 	var reputation: Reputation = main.reputation
+	var tourists: Array = people.people.filter(func(p: Person) -> bool:
+		return p.profile.has("tour") and not p.profile.has("film_crew"))
+	var score := tour_score(main, tourists)
+	(main.protest as Protest).ease(OPEN_DAY_EASE)
+	if score > OPEN_GOOD:
+		reputation.report(&"open_day_good")
+	elif score < OPEN_BAD:
+		reputation.report(&"open_day_bad")
+	see_off(main, tourists)
+	return score
+
+
+## How nice the rooms the tourists saw were, 0–100: on average, or the
+## worst of them. Every named room when they saw none.
+static func tour_score(main: Node, tourists: Array, worst := false) -> float:
+	var people: People = main.people
 	var building: Building = main.building
 	var seen: Array = []
-	var tourists: Array = people.people.filter(func(p: Person) -> bool: return p.profile.has("tour"))
 	for tourist: Person in tourists:
-		for key: Array in tourist.profile["tour"]:
+		for key: Array in tourist.profile.get("tour", []):
 			if not seen.has(key):
 				seen.append(key)
 	var rooms: Array = []
@@ -199,22 +240,27 @@ static func close_doors(main: Node) -> float:
 			rooms.append([key[0], room])
 	if rooms.is_empty():
 		rooms = people._all_rooms().filter(func(pair: Array) -> bool: return (pair[1] as Room).type != &"")
+	if rooms.is_empty():
+		return 50.0
 	var sum := 0.0
+	var least := 100.0
 	for pair: Array in rooms:
 		var quality := people.quality(pair[0], pair[1])
-		sum += (quality.score - RoomQuality.MIN) / (RoomQuality.MAX - RoomQuality.MIN) * 100.0
-	var score := sum / rooms.size() if not rooms.is_empty() else 50.0
-	(main.protest as Protest).ease(OPEN_DAY_EASE)
-	if score > OPEN_GOOD:
-		reputation.report(&"open_day_good")
-	elif score < OPEN_BAD:
-		reputation.report(&"open_day_bad")
+		var score := (quality.score - RoomQuality.MIN) / (RoomQuality.MAX - RoomQuality.MIN) * 100.0
+		sum += score
+		least = minf(least, score)
+	return least if worst else sum / rooms.size()
+
+
+## Tourists go home.
+static func see_off(main: Node, tourists: Array) -> void:
+	var visits: Visits = main.visits
 	for tourist: Person in tourists:
 		tourist.profile.erase("tour")
 		tourist.profile.erase("guest")
+		tourist.profile.erase("film_crew")
 		tourist.passes_as = &""
 		visits.send_home(tourist)
-	return score
 
 
 ## Low-category prisoners on the community service programme go out into
@@ -361,6 +407,8 @@ static func _protest(main: Node) -> void:
 		office_window.have_a_word = func() -> bool: return have_a_word(main)
 		office_window.may_have_a_word = func() -> bool: return may_have_a_word(main)
 	protest.arrived.connect(func(count: int, friendly: bool) -> void:
+		if not friendly:
+			(main.counters as Counters).add(&"protestors")
 		var toasts := main.get_node_or_null("/root/Toasts")
 		if main.attract or toasts == null:
 			return
@@ -418,6 +466,9 @@ static func _seasons(main: Node) -> void:
 	calendar.clock = clock
 	main.add_child(calendar)
 	calendar.apply()
+	calendar.season_changed.connect(func(def: SeasonDef) -> void:
+		if def.id == &"winter":
+			(main.counters as Counters).add(&"winter"))
 	weather.name = "Weather"
 	weather.people = people
 	weather.calendar = calendar
@@ -437,7 +488,7 @@ static func _seasons(main: Node) -> void:
 		if def == null or not String(group).begins_with("prisoner"):
 			return def
 		var festive := calendar.festive_today()
-		if festive != null and festive.block != null and FESTIVE_SWAPS.has(def.id):
+		if festive != null and festive.block != null and FESTIVE_SWAPS.has(def.id) and seasonal_days(main):
 			return festive.block
 		if not weather.outdoors_ok() and def.wet_block != null:
 			return def.wet_block
@@ -479,12 +530,19 @@ static func _seasons(main: Node) -> void:
 		return out)
 
 
-## A festive day: festivities instead of work, a special dinner and a treat
-## for everyone.
+## Whether festive days bring festivities and a special dinner: with the
+## Seasonal days card, or with research off.
+static func seasonal_days(main: Node) -> bool:
+	var research: Research = main.research
+	return research.mode == Research.Mode.OFF or research.has_flag(&"seasonal_days")
+
+
+## A festive day: a treat for everyone, and with Seasonal days, festivities
+## instead of work and a special dinner.
 static func celebrate(main: Node, festive: FestiveDayDef) -> void:
 	var people: People = main.people
 	var kitchen: Kitchen = main.kitchen
-	if festive.menu != &"" and PrisonCatalogue.meal(festive.menu) != null:
+	if festive.menu != &"" and PrisonCatalogue.meal(festive.menu) != null and seasonal_days(main):
 		main.set_meta(&"usual_meal", kitchen.meal.id)
 		kitchen.meal = PrisonCatalogue.meal(festive.menu)
 	for person: Person in people.people:
@@ -524,3 +582,90 @@ static func grit_job(main: Node) -> Job:
 	(job.stages[-1] as Job.Stage).finish = func(_stage: Job.Stage, _worker: Person) -> void: weather.grit()
 	(main.jobs as JobBoard).post(job)
 	return job
+
+
+## Small surprises: one roll a morning, a card in the in-tray (or a
+## pop-up) when they need an answer, and a line under the clock while one
+## runs.
+static func _surprises(main: Node) -> void:
+	var surprises: Surprises = main.surprises
+	var people: People = main.people
+	var in_tray: InTray = main.in_tray
+	var standing: Standing = main.standing
+	var illnesses: Illnesses = main.illnesses
+	var weather: Weather = main.weather
+	surprises.name = "Surprises"
+	surprises.defs.assign(PrisonCatalogue.SURPRISES)
+	surprises.calendar = main.calendar
+	surprises.host = main
+	surprises.conditions = {
+		&"illness_on": func() -> bool: return illnesses.enabled,
+		&"prisoners_10": func() -> bool:
+			return people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size() >= 10,
+		&"has_kitchen": func() -> bool:
+			return people._all_rooms().any(func(pair: Array) -> bool: return (pair[1] as Room).type == &"kitchen"),
+		&"reputation_on": func() -> bool: return true,
+		&"weather_on": func() -> bool: return weather.enabled,
+		&"utilities_on": (main.utilities as Utilities).on,
+	}
+	surprises.hard = standing.difficulty != null and standing.difficulty.id == HARD_DIFFICULTY
+	standing.difficulty_changed.connect(func(def: DifficultyDef) -> void: surprises.hard = def.id == HARD_DIFFICULTY)
+	surprises.clock = main.clock
+	main.add_child(surprises)
+	(main.prison_tray as PrisonTray).surprises = surprises
+	for def in surprises.defs:
+		if not def.choices.is_empty():
+			in_tray.defs.append(PrisonTray.surprise(def))
+	illnesses.place_words = func(person: Person) -> String:
+		var here := people.room_of(person)
+		if here.is_empty():
+			return "outside"
+		var type: RoomTypeDef = people.access.room_types.get((here[1] as Room).type)
+		return "in the %s" % type.display_name.to_lower() if type != null else ""
+	surprises.started.connect(func(surprise: Surprise) -> void:
+		var def := surprise.def
+		(main.counters as Counters).add(def.id)
+		var toasts := main.get_node_or_null("/root/Toasts")
+		if def.choices.is_empty():
+			if not main.attract and toasts != null:
+				toasts.post(def.display_name, def.card_text)
+			return
+		if in_tray.cap() > 0:
+			in_tray.post_about(in_tray.find(StringName("surprise_%s" % def.id)), 0, "")
+			if not main.attract and toasts != null:
+				toasts.post(def.display_name, "A letter in the in-tray needs an answer.")
+		elif not main.attract and toasts != null and def.choices.size() > 1:
+			toasts.post_with(def.display_name, "%s %s unless you say otherwise." % [def.card_text,
+					def.choices[def.default_choice]], def.choices[1 - def.default_choice],
+					func() -> void: surprises.choose(1 - def.default_choice), Surprises.CHOICE_MINUTES / 6.0))
+	var lapse := func(surprise: Surprise) -> void:
+		var id := StringName("surprise_%s" % surprise.def.id)
+		for card: InTray.Card in in_tray.cards.duplicate():
+			if card.def.id == id:
+				in_tray.answer(card, card.def.default_choice, &"lapsed")
+	surprises.choice_due.connect(lapse)
+	surprises.finished.connect(lapse)
+	var clock_bar: Node = main.get(&"clock_bar")
+	if clock_bar != null:
+		clock_bar.surprises = surprises
+	standing.report_lines.append(func() -> Array[String]:
+		return [surprises.words() + "."] if surprises.running != null else ([] as Array[String]))
+
+
+## Power, water and sewage: billed by the hour when bought in, with the
+## heating by the day.
+static func _utilities(main: Node) -> void:
+	var utilities: Utilities = main.utilities
+	utilities.name = "Utilities"
+	utilities.building = main.building
+	utilities.people = main.people
+	utilities.ledger = main.ledger
+	utilities.day_night = main.day_night
+	utilities.calendar = main.calendar
+	utilities.clock = main.clock
+	main.add_child(utilities)
+	(main.standing as Standing).report_lines.append(func() -> Array[String]:
+		var words := utilities.words()
+		return [words + "."] if not words.is_empty() else ([] as Array[String]))
+	(main.inspector as Inspector).person_lines.append(func(person: Person) -> String:
+		return "In the dark: the power is off" if utilities.cut and person.moodlets.has(&"lights_out") else "")

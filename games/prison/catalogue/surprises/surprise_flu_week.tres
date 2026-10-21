@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurpriseDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/world/surprise_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://games/prison/world/surprises/flu_week.gd" id="2_script"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"flu_week"
+display_name = "Flu week"
+weight = 1.0
+seasons = Array[StringName]([])
+requires = Array[StringName]([&"illness_on", &"prisoners_10"])
+min_day = 4
+cooldown_days = 14
+hours = 72.0
+behaviour = ExtResource("2_script")
+card_text = "Flu has got in. A few prisoners are down with it, and it spreads to anyone close by. Nurses help it pass sooner."
+choices = Array[String]([])
+default_choice = 0

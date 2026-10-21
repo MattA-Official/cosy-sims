@@ -294,11 +294,14 @@ const ANIMALS: Array[AnimalDef] = [
 	preload("res://games/prison/catalogue/animal_therapy_dog.tres"),
 	preload("res://games/prison/catalogue/animal_rabbit.tres"),
 	preload("res://games/prison/catalogue/animal_budgie.tres"),
+	preload("res://games/prison/catalogue/animal_hen.tres"),
 ]
 
-## What prisoners catch (M11): colds only.
+## What prisoners catch: colds (M11), and flu when it gets in (a
+## surprise; nobody brings it in).
 const ILLNESSES: Array[IllnessDef] = [
 	preload("res://games/prison/catalogue/illness_cold.tres"),
+	preload("res://games/prison/catalogue/illness_flu.tres"),
 ]
 
 ## The year's seasons, in order (see Calendar), the weather they bring, and
@@ -344,6 +347,22 @@ const REPUTATION: Array[ReputationEventDef] = [
 	preload("res://games/prison/catalogue/reputation/rep_quiet_day.tres"),
 	preload("res://games/prison/catalogue/reputation/rep_release_did_well.tres"),
 	preload("res://games/prison/catalogue/reputation/rep_sit_in.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_film_good.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_film_bad.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_celebrity.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_hen.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_town_meeting.tres"),
+]
+
+## Small surprises, one roll a day (see Surprises).
+const SURPRISES: Array[SurpriseDef] = [
+	preload("res://games/prison/catalogue/surprises/surprise_escaped_hen.tres"),
+	preload("res://games/prison/catalogue/surprises/surprise_flu_week.tres"),
+	preload("res://games/prison/catalogue/surprises/surprise_celebrity_chef.tres"),
+	preload("res://games/prison/catalogue/surprises/surprise_film_crew.tres"),
+	preload("res://games/prison/catalogue/surprises/surprise_heatwave.tres"),
+	preload("res://games/prison/catalogue/surprises/surprise_snow_day.tres"),
+	preload("res://games/prison/catalogue/surprises/surprise_power_cut.tres"),
 ]
 
 const EVENTS: Array[EventDef] = [
@@ -357,6 +376,8 @@ const EVENTS: Array[EventDef] = [
 
 const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_cat_about.tres"),
+	preload("res://games/prison/catalogue/moodlet_laughed.tres"),
+	preload("res://games/prison/catalogue/moodlet_lights_out.tres"),
 	preload("res://games/prison/catalogue/moodlet_cat_on_lap.tres"),
 	preload("res://games/prison/catalogue/moodlet_my_pet.tres"),
 	preload("res://games/prison/catalogue/moodlet_lost_my_pet.tres"),

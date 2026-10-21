@@ -16,3 +16,4 @@ tags = Array[StringName]([&"cctv"])
 model = ExtResource("2_ext")
 price = 300
 sits = 1
+idle_uses = Dictionary[StringName, float]({&"power": 0.5})

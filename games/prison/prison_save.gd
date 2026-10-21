@@ -128,6 +128,8 @@ static func capture(main: Node) -> Dictionary:
 		"season_length": (main.calendar as Calendar).length,
 		"weather": (main.weather as Weather).capture(),
 		"weather_on": (main.weather as Weather).enabled,
+		"surprises": (main.surprises as Surprises).capture(),
+		"utilities": (main.utilities as Utilities).capture(),
 		"usual_meal": String(main.get_meta(&"usual_meal", "")),
 		"suggestions": (main.suggestions as Suggestions).capture(),
 		"visits": (main.visits as Visits).capture(),
@@ -372,6 +374,9 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	(main.weather as Weather).enabled = data.get("weather_on", true)
 	if data.has("weather"):
 		(main.weather as Weather).restore(data["weather"])
+	(main.utilities as Utilities).restore(data.get("utilities", {}))
+	if data.has("surprises"):
+		(main.surprises as Surprises).restore(data["surprises"])
 	if not String(data.get("usual_meal", "")).is_empty():
 		main.set_meta(&"usual_meal", StringName(data["usual_meal"]))
 	(main.illnesses as Illnesses).fill_in()

@@ -15,3 +15,4 @@ icon = ExtResource("2_icon")
 model = ExtResource("3_model")
 price = 600
 detects_metal = true
+electric = true

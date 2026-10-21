@@ -55,6 +55,9 @@ var catch_scales: Array[Callable] = []
 ## (person) -> bool: whether someone ill passes it on, such as not once
 ## kept apart. Optional; always otherwise.
 var spreads: Callable
+## Words for where someone is, such as "in the canteen": (Person) ->
+## String. Optional.
+var place_words: Callable
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -184,7 +187,7 @@ func treat(person: Person) -> void:
 
 
 func recover(person: Person) -> void:
-	for key in ["illness", "ill_days", "treated"]:
+	for key in ["illness", "ill_days", "treated", "caught_from"]:
 		person.profile.erase(key)
 	recovered.emit(person)
 
@@ -220,6 +223,8 @@ func spread() -> void:
 			var here := people.room_of(other)
 			var crowded := not here.is_empty() and crowds.has(here[1])
 			if _rng.randf() < def.spread_chance * catch_scale(other, crowded):
+				var where: String = place_words.call(other) if place_words.is_valid() else ""
+				other.profile["caught_from"] = sick.name + (" " + where if not where.is_empty() else "")
 				catch(other, def)
 
 
@@ -286,5 +291,7 @@ func words(person: Person) -> String:
 		var days := ceili(days_left(person))
 		lines.append("%s, %d day%s left%s" % [def.display_name, days, "" if days == 1 else "s",
 				" (seen to)" if is_treated(person) else ""])
+		if person.profile.has("caught_from"):
+			lines.append("Caught from %s" % person.profile["caught_from"])
 	lines.append("Age %d · fitness %d" % [age(person), roundi(fitness(person))])
 	return "\n".join(lines)

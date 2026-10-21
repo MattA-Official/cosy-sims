@@ -147,6 +147,8 @@ var reputation := Reputation.new()
 var protest := Protest.new()
 var calendar := Calendar.new()
 var weather := Weather.new()
+var surprises := Surprises.new()
+var utilities := Utilities.new()
 var health_tint := HealthTint.new()
 var knowhow := Knowhow.new()
 ## The research board in play.
@@ -474,6 +476,7 @@ func _ready() -> void:
 	vehicles.roads = roads
 	vehicles.cell_size = grid.cell_size
 	vehicles.ground_at = func(tile: Vector2) -> float: return terrain.height_at(tile)
+	vehicles.water_at = func(tile: Vector2) -> float: return water.level_at(tile) if water != null else -INF
 	vehicles.clock = clock
 	vehicles.front_turns[BUS] = -PI * 0.5
 	# Out of sight once inside a tunnel.
@@ -1525,6 +1528,8 @@ func _add_hud() -> void:
 	settings_window.protest = protest
 	settings_window.calendar = calendar
 	settings_window.weather = weather
+	settings_window.surprises = surprises
+	settings_window.utilities = utilities
 	pause_menu.clock = clock
 	pause_menu.subtitle = title
 	pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")

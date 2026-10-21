@@ -13,6 +13,7 @@ extends Node
 ##   {"resign": &"raise"}                 answers a resignation (StaffRoster.resign_answer)
 ##   {"hire": [&"security", 0]}           takes on a department's first applicant
 ##   {"trial": [&"roll_out", &"card-id"]}  answers a wing trial (Research)
+##   {"surprise": 0}                      answers the running surprise (Surprises)
 
 const PRISONER := &"prisoner"
 
@@ -22,6 +23,7 @@ var roster: StaffRoster
 var desk_work: DeskWork
 var heads: Heads
 var research: Research
+var surprises: Surprises
 var clock: GameClock
 var _rng := RandomNumberGenerator.new()
 
@@ -186,6 +188,19 @@ static func trial(card: ResearchCardDef) -> TrayCardDef:
 	return def
 
 
+## The card for a surprise with choices (Surprises); unanswered, it takes
+## the surprise's default.
+static func surprise(def: SurpriseDef) -> TrayCardDef:
+	var choices: Array = []
+	for i in def.choices.size():
+		choices.append(TrayCardDef.choice(def.choices[i], [{"surprise": i}], [], "%s: %s." % [def.display_name, def.choices[i].to_lower()]))
+	var card := TrayCardDef.make(StringName("surprise_%s" % def.id), &"surprise", &"", def.display_name, def.card_text,
+			choices, def.default_choice)
+	card.weight = 0.0
+	card.deadline_days = 1
+	return card
+
+
 ## What a choice costs: the money it pays out.
 static func cost(choice: TrayChoiceDef) -> int:
 	var out := 0
@@ -251,6 +266,8 @@ func apply(card: InTray.Card, choice: TrayChoiceDef) -> void:
 				heads.hire(waiting[effect.hire[1]])
 		if effect.has("paperwork") and heads != null and heads.warden() != null:
 			desk_work.add_paperwork(heads.warden().id, effect.paperwork)
+		if effect.has("surprise") and surprises != null:
+			surprises.choose(int(effect.surprise))
 		if effect.has("trial") and research != null:
 			var def := research.card(StringName(effect.trial[1]))
 			if def != null:

@@ -17,6 +17,8 @@ var illnesses: Illnesses
 var protest: Protest
 var calendar: Calendar
 var weather: Weather
+var surprises: Surprises
+var utilities: Utilities
 
 var _difficulty := OptionButton.new()
 var _about := Label.new()
@@ -30,6 +32,8 @@ var _protestors := CheckButton.new()
 var _seasons := CheckButton.new()
 var _season_length := OptionButton.new()
 var _weather := CheckButton.new()
+var _surprises := OptionButton.new()
+var _utilities := OptionButton.new()
 const SEASON_LENGTHS: Array[int] = [3, 5, 7, 10, 14, 30]
 
 
@@ -132,6 +136,22 @@ func _ready() -> void:
 		if weather != null:
 			weather.enabled = on)
 	box.add_child(_row("Weather", _weather))
+	for words in ["Off", "Rare", "Normal", "Lively"]:
+		_surprises.add_item(words)
+	_surprises.focus_mode = FOCUS_NONE
+	_surprises.tooltip_text = "How often small surprises come: an escaped hen, flu week, a film crew, a celebrity chef, a heatwave or a snow day. One roll each morning; never a game over."
+	_surprises.item_selected.connect(func(index: int) -> void:
+		if surprises != null:
+			surprises.frequency = index as Surprises.Frequency)
+	box.add_child(_row("Surprises", _surprises))
+	for words in ["Off", "Bought in"]:
+		_utilities.add_item(words)
+	_utilities.focus_mode = FOCUS_NONE
+	_utilities.tooltip_text = "Off, power, water and sewage just work. Bought in, the prison pays for what it uses by the hour, and for heating by the day (more in winter), and power cuts can happen."
+	_utilities.item_selected.connect(func(index: int) -> void:
+		if utilities != null:
+			utilities.mode = index as Utilities.Mode)
+	box.add_child(_row("Utilities", _utilities))
 	box.add_child(HSeparator.new())
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()
@@ -188,3 +208,7 @@ func refresh() -> void:
 		_season_length.select(maxi(SEASON_LENGTHS.find(calendar.length), 0))
 	if weather != null:
 		_weather.set_pressed_no_signal(weather.enabled)
+	if surprises != null:
+		_surprises.select(surprises.frequency)
+	if utilities != null:
+		_utilities.select(mini(utilities.mode, _utilities.item_count - 1))

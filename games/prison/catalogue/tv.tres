@@ -17,3 +17,4 @@ tags = Array[StringName]([&"tv"])
 model = ExtResource("2_ext")
 uses_before_breaking = 20
 price = 250
+uses = Dictionary[StringName, float]({&"power": 0.5})

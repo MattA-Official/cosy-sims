@@ -7,11 +7,16 @@ extends Node3D
 
 ## Tiles a vehicle drives in a game minute.
 const SPEED := 3.0
+## Tiles a flying vehicle takes to climb or land.
+const CLIMB := 4.0
 
 var roads: Roads
 var cell_size := 1.0
 ## (point: Vector2) -> float: the ground's height at a point in tiles.
 var ground_at: Callable
+## (tile spot) -> float: the water's surface there, or -INF; for boats.
+## Optional.
+var water_at: Callable
 ## (point: Vector2) -> bool: whether a vehicle there can be seen, not in
 ## a tunnel. Optional.
 var shown_at: Callable
@@ -52,6 +57,27 @@ func drive_in(model: PackedScene, to: Vector2, arrived := Callable(), stay := -1
 		points.append(to)
 	var vehicle := model.instantiate() as Node3D
 	vehicle.set_meta(&"turn", front_turns.get(model, 0.0))
+	add_child(vehicle)
+	_trips[vehicle] = [points, 0.0, arrived]
+	if stay >= 0.0:
+		_stays[vehicle] = stay
+	_place(vehicle, points, 0.0)
+	return vehicle
+
+
+## Brings a vehicle in along `points` (tiles) rather than the road, such
+## as a ferry over water or a helicopter through the air, `lift` tiles up
+## while under way. Otherwise like drive_in. Returns it, or null.
+func arrive_along(model: PackedScene, points: PackedVector2Array, arrived := Callable(), stay := -1.0,
+		lift := 0.0, afloat := false) -> Node3D:
+	if points.size() < 2 or model == null:
+		return null
+	var vehicle := model.instantiate() as Node3D
+	vehicle.set_meta(&"turn", front_turns.get(model, 0.0))
+	if lift > 0.0:
+		vehicle.set_meta(&"lift", lift)
+	if afloat:
+		vehicle.set_meta(&"afloat", true)
 	add_child(vehicle)
 	_trips[vehicle] = [points, 0.0, arrived]
 	if stay >= 0.0:
@@ -172,6 +198,12 @@ func _place(vehicle: Node3D, points: PackedVector2Array, along: float) -> void:
 	var gap := maxf(a.distance_to(b), 0.0001)
 	var at := a.lerp(b, clampf((along - before) / gap, 0.0, 1.0))
 	var height: float = ground_at.call(at) if ground_at.is_valid() else 0.0
+	if vehicle.has_meta(&"afloat") and water_at.is_valid():
+		height = maxf(height, water_at.call(at))
+	if vehicle.has_meta(&"lift"):
+		# Climbs from the start and lands at the end, CLIMB tiles each.
+		var left := Roads._length(points) - along
+		height += float(vehicle.get_meta(&"lift")) * clampf(minf(along, left) / CLIMB, 0.0, 1.0)
 	vehicle.position = Vector3(at.x * cell_size, height, at.y * cell_size)
 	vehicle.set_meta(&"at", at)
 	vehicle.visible = not shown_at.is_valid() or shown_at.call(at)

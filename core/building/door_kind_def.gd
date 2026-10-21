@@ -19,6 +19,8 @@ extends Resource
 @export var price := 0
 ## Beeps at anyone walking through carrying something metal.
 @export var detects_metal := false
+## Worked by power: in a power cut it fails locked (see Utilities).
+@export var electric := false
 
 
 func lets_through(group: StringName) -> bool:

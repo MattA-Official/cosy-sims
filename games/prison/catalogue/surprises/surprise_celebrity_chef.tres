@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurpriseDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/world/surprise_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://games/prison/world/surprises/celebrity_chef.gd" id="2_script"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"celebrity_chef"
+display_name = "Celebrity chef"
+weight = 0.7
+seasons = Array[StringName]([])
+requires = Array[StringName]([&"has_kitchen"])
+min_day = 6
+cooldown_days = 28
+hours = 168.0
+behaviour = ExtResource("2_script")
+card_text = "A television chef wants to spend a season cooking in your kitchen. Their meals would be lovely, and the papers would love it."
+choices = Array[String](["Welcome them", "No thanks"])
+default_choice = 0
