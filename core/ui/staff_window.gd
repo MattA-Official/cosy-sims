@@ -32,6 +32,9 @@ var programme_group: StringName = &"prisoner"
 var ledger: Ledger
 ## Staff by name. Optional.
 var roster: StaffRoster
+## () -> bool: there's a training room, so courses can be done on site.
+## Optional.
+var has_training_room: Callable
 
 ## Count labels by role, then by shift.
 var _counts: Dictionary[StringName, Dictionary] = {}
@@ -273,10 +276,13 @@ func _list_staff() -> void:
 		_payroll_box.add_child(_note("Nobody yet."))
 	for record in roster.records:
 		var role := shifts.role_def(record.role)
-		var words := "%s, %s shift, level %d. %s a day. Morale %d.%s" % [role.display_name if role != null else String(record.role),
+		var today := roster.clock.day() if roster.clock != null else 1
+		var words := "%s, %s shift, level %d. %s a day. Morale %d.%s%s%s" % [role.display_name if role != null else String(record.role),
 				record.shift, record.level, Ledger.text(roster.day_pay(record)), roundi(record.morale),
+				" %s." % role.perk_name if role != null and roster.has_perk(record) else "",
 				" Away (%s) until day %d." % [record.away if not record.away.is_empty() else "off", record.off_until]
-				if record.off_until >= (roster.clock.day() if roster.clock != null else 1) else ""]
+				if record.off_until >= today else "",
+				" In the training room on day %d." % record.training_day if record.training_day >= today else ""]
 		var raise := Button.new()
 		raise.text = "Raise"
 		raise.focus_mode = FOCUS_NONE
@@ -284,14 +290,30 @@ func _list_staff() -> void:
 		raise.pressed.connect(func() -> void:
 			roster.raise(record)
 			refresh())
+		var learn := ""
+		if role != null and not role.course_name.is_empty():
+			learn = " on %s" % role.course_name.to_lower()
+			if not record.trained:
+				learn += ", and they come back with their perk (%s: %s)" % [role.perk_name, role.perk_words.trim_suffix(".").to_lower()]
+		var busy := record.off_until >= today or record.training_day >= today
 		var course := Button.new()
 		course.text = "Course"
 		course.focus_mode = FOCUS_NONE
-		course.tooltip_text = "Send them on a course: %s, away tomorrow, and they come back with experience." \
-				% Ledger.text(StaffRoster.COURSE_FEE)
-		course.disabled = record.off_until >= (roster.clock.day() if roster.clock != null else 1)
+		course.tooltip_text = "Send them on a course%s: %s, away tomorrow. They also come back with experience." \
+				% [learn, Ledger.text(StaffRoster.COURSE_FEE)]
+		course.disabled = busy
 		course.pressed.connect(func() -> void:
 			roster.send_on_course(record)
+			refresh())
+		var train := Button.new()
+		train.text = "Train here"
+		train.focus_mode = FOCUS_NONE
+		train.tooltip_text = "Train them in the training room%s: %s, and they spend tomorrow's shift there. They also come back with experience." \
+				% [learn, Ledger.text(StaffRoster.TRAINING_FEE)]
+		train.disabled = busy
+		train.visible = has_training_room.is_valid() and has_training_room.call()
+		train.pressed.connect(func() -> void:
+			roster.send_on_course(record, true)
 			refresh())
 		var dismiss := Button.new()
 		dismiss.text = "Let go"
@@ -300,7 +322,7 @@ func _list_staff() -> void:
 		dismiss.pressed.connect(func() -> void:
 			roster.dismiss(record)
 			refresh())
-		var row := _person_row(record, words, [course, raise, dismiss])
+		var row := _person_row(record, words, [course, train, raise, dismiss])
 		if record.morale < StaffRoster.QUIT_MORALE + 10.0:
 			row.get_child(0).get_child(1).add_theme_color_override(&"font_color", Color(0.75, 0.35, 0.32))
 		_payroll_box.add_child(row)

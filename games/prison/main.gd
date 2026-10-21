@@ -119,6 +119,7 @@ var office := Office.new()
 var desk_work := DeskWork.new()
 ## Bonuses, such as department heads'.
 var modifiers := Modifiers.new()
+var training := Training.new()
 ## Department heads, hired from the warden's desk.
 var heads := Heads.new()
 ## Request cards for the warden, and what their answers do.
@@ -721,6 +722,13 @@ func _ready() -> void:
 	office.roster = roster
 	office.desk_work = desk_work
 	add_child(office)
+	training.name = "Training"
+	training.people = people
+	training.jobs = jobs
+	training.building = building
+	training.roster = roster
+	training.clock = clock
+	add_child(training)
 	desk_work.name = "DeskWork"
 	add_child(desk_work)
 	modifiers.name = "Modifiers"
@@ -785,6 +793,10 @@ func _ready() -> void:
 		if by == &"lapsed" and not attract:
 			Toasts.post("In-tray: %s" % card.def.title, "Nobody answered, so: %s" % choice.label.get_slice(" (", 0).to_lower()))
 	people.pace_scales.append(roster.pace)
+	fights.skilled = roster.skilled
+	cleaning.skilled = roster.skilled
+	wear.skilled = roster.skilled
+	kitchen.modifiers = modifiers
 	intake.name = "Intake"
 	intake.people = people
 	intake.building = building
@@ -1128,6 +1140,7 @@ func _add_hud() -> void:
 	staff_window.route_icon = load("res://core/ui/icons/tool_route.svg")
 	staff_window.ledger = ledger
 	staff_window.roster = roster
+	staff_window.has_training_room = training.has_room
 	staff_window.hire_refused.connect(func() -> void:
 		Toasts.post("Out of money", "Nobody new can be taken on until the balance is back above zero."))
 	book.add_page(&"staff", "Staff", "Who works here, and work programmes. P", "staff", staff_window)

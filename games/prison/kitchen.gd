@@ -12,6 +12,8 @@ extends Node
 const DELIVERY_HOUR := 6
 const MEALS_PER_BATCH := 8
 const COOK_MINUTES := 20.0
+## A good_meal moodlet this fresh was from the mealtime just ending.
+const FRESH_MEAL_MINUTES := 120.0
 ## Days of meals to keep in stock after a delivery.
 const STOCK_DAYS := 2
 ## The block whose own object is a table is a mealtime.
@@ -42,6 +44,9 @@ var building: Building
 var schedule: Schedule
 var crate := PrisonCatalogue.item(&"food_crate")
 var tray := PrisonCatalogue.item(&"meal_tray")
+## For skilled cooks' "tasty_meals". Optional.
+var modifiers: Modifiers
+var _rng := RandomNumberGenerator.new()
 
 
 ## Gets the day going from wherever the clock is: a delivery, and cooking
@@ -71,6 +76,7 @@ func _on_half_hour(slot: int) -> void:
 		cook()
 	if _meal_ends(slot):
 		clear_leftovers()
+		tasty_meals()
 
 
 ## Scrapes away whatever trays are left on the counters and cookers.
@@ -84,6 +90,26 @@ func clear_leftovers() -> int:
 				break
 			cleared += taken[1]
 	return cleared
+
+
+## With skilled cooks (the "tasty_meals" modifier), each prisoner who had a
+## good meal this mealtime has that chance of it having been lovely.
+## Returns how many.
+func tasty_meals() -> int:
+	var chance := modifiers.value(&"tasty_meals") if modifiers != null else 0.0
+	if chance <= 0.0:
+		return 0
+	var good: MoodletDef = PrisonCatalogue.moodlets()[&"good_meal"]
+	var count := 0
+	for person in people.people:
+		var left: float = person.moodlets.get(&"good_meal", 0.0)
+		# Only meals from this sitting: still nearly all their time to run.
+		if left <= 0.0 or left < good.hours * 60.0 - FRESH_MEAL_MINUTES or _rng.randf() >= chance:
+			continue
+		person.moodlets.erase(&"good_meal")
+		people.add_moodlet(person, &"lovely_meal")
+		count += 1
+	return count
 
 
 ## The lorry leaves enough crates on the delivery pallets to keep two

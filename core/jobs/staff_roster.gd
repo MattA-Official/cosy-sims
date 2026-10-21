@@ -15,8 +15,11 @@ extends Node
 ## (LEVEL_PACE) and is paid WAGE_STEP more a level. Low morale brings sick
 ## days: each night, under SICK_LINE, a chance of a day off tomorrow.
 ## With a `resign` handler, someone unhappy for QUIT_DAYS writes a letter
-## instead of just going (see resign_answer). Staff can be sent on a course
-## for COURSE_FEE: away tomorrow, back with COURSE_XP.
+## instead of just going (see resign_answer). Staff can be sent on their
+## role's course: away tomorrow for COURSE_FEE, or with a training room on
+## site for TRAINING_FEE, spending tomorrow's shift there. Either way they
+## come back with COURSE_XP and their role's perk (StaffRoleDef.perk_name),
+## which everyone also gets at PERK_LEVEL.
 
 signal changed
 ## Someone handed in their notice and won't be back.
@@ -49,7 +52,9 @@ const WAGE_STEP := 0.05
 const SICK_LINE := 40.0
 const SICK_CHANCE := 0.005
 const COURSE_FEE := 200
+const TRAINING_FEE := 80
 const COURSE_XP := 1.5
+const PERK_LEVEL := 3
 ## A resignation answered with a raise: this much more pay.
 const KEEP_RAISE := 0.2
 const LEAVE_DAYS := 3
@@ -74,6 +79,10 @@ class Record:
 	var away := ""
 	## Has written a resignation letter that's waiting for an answer.
 	var resigning := false
+	## Has done their role's course.
+	var trained := false
+	## The day they spend in the training room, or 0.
+	var training_day := 0
 	## Their way of working, for roles with styles (see `styles`), or &"".
 	var style: StringName = &""
 	## An applicant's last day of waiting.
@@ -158,17 +167,41 @@ func is_off(record: Record) -> bool:
 	return record.off_until >= _day()
 
 
-## Sends someone on a course: they're away tomorrow and come back with
-## COURSE_XP. Returns whether they went.
-func send_on_course(record: Record) -> bool:
-	if not records.has(record) or is_off(record) or record.off_until > _day():
+## Sends someone on their role's course, tomorrow: away for COURSE_FEE, or
+## on site in the training room for TRAINING_FEE. They come back with
+## COURSE_XP and their perk. Returns whether they went.
+func send_on_course(record: Record, on_site := false) -> bool:
+	if not records.has(record) or is_off(record) or record.off_until > _day() or record.training_day > _day():
 		return false
 	if charge.is_valid():
-		charge.call(COURSE_FEE, "Training")
-	record.off_until = _day() + 1
-	record.away = "on a course"
+		charge.call(TRAINING_FEE if on_site else COURSE_FEE, "Training")
+	if on_site:
+		record.training_day = _day() + 1
+	else:
+		record.off_until = _day() + 1
+		record.away = "on a course"
+	record.trained = true
 	add_xp(record, COURSE_XP)
 	return true
+
+
+## Whether someone spends today in the training room.
+func in_training(record: Record) -> bool:
+	return record != null and record.training_day == _day()
+
+
+## Whether someone has their role's perk: from PERK_LEVEL, or once they've
+## done their course.
+func has_perk(record: Record) -> bool:
+	if record == null:
+		return false
+	var role := _role(record.role)
+	return role != null and not role.perk_name.is_empty() and (record.level >= PERK_LEVEL or record.trained)
+
+
+## has_perk for someone on site; false for anyone not on staff.
+func skilled(person: Person) -> bool:
+	return has_perk(record_of(person))
 
 
 ## Answers a resignation letter: &"accept" lets them go (no notice),
@@ -413,9 +446,11 @@ func summary(person: Person) -> String:
 		return ""
 	var feeling := "happy at work" if record.morale >= 70.0 else "content" if record.morale >= 40.0 \
 			else "unhappy at work" if record.morale >= QUIT_MORALE else "thinking of quitting"
-	return "Level %d%s, morale %d (%s), %s a day, hired day %d" % [record.level,
+	var role := _role(record.role)
+	return "Level %d%s, morale %d (%s), %s a day, hired day %d%s" % [record.level,
 			" (%d%% faster)" % roundi((pace(person) - 1.0) * 100.0) if record.level > 1 else "",
-			roundi(record.morale), feeling, Ledger.text(day_pay(record)), record.hired_day]
+			roundi(record.morale), feeling, Ledger.text(day_pay(record)), record.hired_day,
+			". %s: %s" % [role.perk_name, role.perk_words] if has_perk(record) else ""]
 
 
 func _make(role: StringName, shift: StringName) -> Record:
@@ -448,7 +483,7 @@ func _data(record: Record) -> Dictionary:
 			"look_seed": record.look_seed, "until": record.until, "mood_sum": record.mood_sum,
 			"mood_hours": record.mood_hours, "level": record.level, "xp": record.xp,
 			"off_until": record.off_until, "away": record.away, "resigning": record.resigning,
-			"style": record.style}
+			"style": record.style, "trained": record.trained, "training_day": record.training_day}
 
 
 func _from(entry: Dictionary) -> Record:
@@ -475,6 +510,8 @@ func _from(entry: Dictionary) -> Record:
 	record.away = entry.get("away", "")
 	record.resigning = entry.get("resigning", false)
 	record.style = StringName(entry.get("style", ""))
+	record.trained = entry.get("trained", false)
+	record.training_day = entry.get("training_day", 0)
 	next_id = maxi(next_id, record.id + 1)
 	return record
 

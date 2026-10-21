@@ -12,3 +12,6 @@ job_kinds = Array[StringName]([&"clean", &"rubbish", &"laundry"])
 outfit_colour = Color(0.46, 0.56, 0.6, 1)
 icon = ExtResource("2_icon")
 wage = 40
+course_name = "Deep cleaning"
+perk_name = "Thorough"
+perk_words = "Sweeps up the litter on the tiles around them too."

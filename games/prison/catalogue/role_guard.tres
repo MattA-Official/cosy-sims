@@ -12,3 +12,6 @@ job_kinds = Array[StringName]([&"post", &"patrol", &"escort", &"search", &"break
 outfit_colour = Color(0.2, 0.25, 0.4, 1)
 icon = ExtResource("2_icon")
 wage = 80
+course_name = "De-escalation"
+perk_name = "Steady hands"
+perk_words = "Breaks up fights without taking a blow, and leaves the fighters calmer."

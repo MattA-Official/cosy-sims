@@ -12,3 +12,7 @@ job_kinds = Array[StringName]([&"treat", &"carry_patient"])
 outfit_colour = Color(0.55, 0.78, 0.82, 1)
 icon = ExtResource("2_icon")
 wage = 70
+course_name = "First aid"
+perk_name = "Gentle hands"
+perk_words = "Each one makes treatment in the infirmary 15% quicker."
+perk_bonus = Dictionary[StringName, float]({&"treat_speed": 0.15})

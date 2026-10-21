@@ -18,6 +18,8 @@ const DESK_MINUTES := 120.0
 const LEAST_MINUTES := 15.0
 ## Roles who work everyone's paperwork rather than a pile of their own.
 const CLERKS: Array[StringName] = [&"clerk"]
+## How much faster a clerk with their perk works.
+const SKILLED_CLERK := 1.25
 
 var people: People
 var claims: Claims
@@ -83,11 +85,15 @@ func desk_for(person: Person) -> Array[Vector2i]:
 	return office_desk() if person.role == WARDEN else []
 
 
-## How fast someone gets through desk work: morale helps or hinders.
+## How fast someone gets through desk work: morale helps or hinders, and
+## a clerk's perk helps.
 func desk_speed(record: StaffRoster.Record) -> float:
 	if record == null:
 		return 1.0
-	return 0.8 if record.morale < 30.0 else 1.1 if record.morale > 70.0 else 1.0
+	var speed := 0.8 if record.morale < 30.0 else 1.1 if record.morale > 70.0 else 1.0
+	if CLERKS.has(record.role) and roster != null and roster.has_perk(record):
+		speed *= SKILLED_CLERK
+	return speed
 
 
 ## Staff on site whose role works at a desk.

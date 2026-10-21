@@ -319,6 +319,7 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_guard_post.tres"),
 	preload("res://games/prison/catalogue/room_reception.tres"),
 	preload("res://games/prison/catalogue/room_office.tres"),
+	preload("res://games/prison/catalogue/room_training.tres"),
 ]
 
 

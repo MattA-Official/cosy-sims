@@ -13,3 +13,7 @@ outfit_colour = Color(0.55, 0.42, 0.6, 1)
 icon = ExtResource("2_icon")
 wage = 90
 only_shifts = Array[StringName]([&"day"])
+course_name = "Teaching skills"
+perk_name = "Inspiring"
+perk_words = "Each one lifts the chance of passing a course by 5%."
+perk_bonus = Dictionary[StringName, float]({&"course_pass": 0.05})

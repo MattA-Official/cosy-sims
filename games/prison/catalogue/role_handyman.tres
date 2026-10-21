@@ -12,3 +12,6 @@ job_kinds = Array[StringName]([&"carry", &"repair", &"build"])
 outfit_colour = Color(0.44, 0.4, 0.32, 1)
 icon = ExtResource("2_icon")
 wage = 50
+course_name = "Advanced repairs"
+perk_name = "Built to last"
+perk_words = "Whatever they mend lasts half as long again before it breaks."

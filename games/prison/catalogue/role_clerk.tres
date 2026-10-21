@@ -17,3 +17,6 @@ icon = ExtResource("2_icon")
 claims = &"office_desk"
 only_shifts = Array[StringName]([&"day"])
 dressing = Array[Resource]([ExtResource("3_name"), ExtResource("4_mug")])
+course_name = "Touch typing"
+perk_name = "Touch typist"
+perk_words = "Gets through desk work a quarter faster."

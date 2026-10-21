@@ -100,6 +100,7 @@ func _process(_delta: float) -> bool:
 	_test_regime()
 	_test_heads()
 	_test_in_tray()
+	_test_perks()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4619,6 +4620,46 @@ func _test_in_tray() -> void:
 	tray.restore(saved)
 	_check(tray.cards.size() == 1 and tray.cards[0].def.id == &"spicy" and tray.cards[0].words == spicy.words,
 			"the in-tray saves and loads")
+	main.queue_free()
+
+
+func _test_perks() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var roster: StaffRoster = main.roster
+	var ledger: Ledger = main.ledger
+	var modifiers: Modifiers = main.modifiers
+	var people: People = main.people
+	var cook: StaffRoster.Record = roster.take_on(&"cook", &"day")
+	_check(not roster.has_perk(cook), "a new cook has no perk yet")
+	var balance := ledger.balance
+	_check(roster.send_on_course(cook, true) and ledger.balance == balance - StaffRoster.TRAINING_FEE
+			and cook.training_day == (main.clock as GameClock).day() + 1 and roster.next_in(&"cook", &"day") != null,
+			"training on site is cheaper and they still come in")
+	_check(roster.has_perk(cook) and modifiers.value(&"tasty_meals") >= 0.2, "after their course a cook has their perk")
+	var guard: StaffRoster.Record = roster.take_on(&"guard", &"day")
+	roster.add_xp(guard, StaffRoster.LEVEL_XP[StaffRoster.PERK_LEVEL - 2])
+	_check(guard.level >= StaffRoster.PERK_LEVEL and roster.has_perk(guard), "a level 3 guard has their perk")
+	var clerk: StaffRoster.Record = roster.take_on(&"clerk", &"day")
+	var office: Office = main.office
+	var slow := office.desk_speed(clerk)
+	clerk.trained = true
+	_check(office.desk_speed(clerk) > slow, "a skilled clerk works faster")
+	modifiers.set_source(&"test_cooks", {&"tasty_meals": 1.0})
+	var prisoners := people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	for person: Person in prisoners:
+		person.moodlets.erase(&"lovely_meal")
+		people.add_moodlet(person, &"good_meal")
+	var had_good := prisoners.filter(func(p: Person) -> bool: return p.moodlets.has(&"good_meal")).size()
+	_check(had_good > 0 and (main.kitchen as Kitchen).tasty_meals() == had_good
+			and prisoners.all(func(p: Person) -> bool: return p.moodlets.has(&"lovely_meal") and not p.moodlets.has(&"good_meal")),
+			"a skilled kitchen turns good meals lovely")
+	var saved := roster.capture()
+	roster.restore(saved)
+	var again: StaffRoster.Record = roster.records.filter(func(r: StaffRoster.Record) -> bool: return r.id == cook.id)[0]
+	_check(again.trained and again.training_day == cook.training_day, "training saves and loads")
+	_check(not (main.training as Training).has_room(), "no training room in the sample")
 	main.queue_free()
 
 

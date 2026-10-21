@@ -52,6 +52,10 @@ var cell_size := 1.0
 var height_at: Callable
 ## Weapons may come out; off for scuffles only.
 var weapons := true
+## (guard: Person) -> bool: a guard with the knack of breaking up fights
+## calmly (StaffRoster.skilled). Optional.
+var skilled: Callable
+var calmed_moodlet: StringName = &"calmed"
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -222,9 +226,14 @@ func _post_break_up(fight: Fight) -> void:
 	stage.doing = "Breaking up a fight"
 	stage.finish = func(_stage: Job.Stage, guard: Person) -> void:
 		if fights.has(fight):
-			# No guns, just a cartoon baton; an armed one lands a blow first.
-			if fight.armed and not fight.fighters.is_empty():
+			var calm: bool = skilled.is_valid() and skilled.call(guard)
+			# No guns, just a cartoon baton; an armed one lands a blow first,
+			# unless the guard knows how to talk them down.
+			if fight.armed and not fight.fighters.is_empty() and not calm:
 				hit(fight.fighters[0], guard)
+			if calm:
+				for person in fight.fighters:
+					people.add_moodlet(person, calmed_moodlet)
 			end(fight)
 	job.stages = [stage]
 	jobs.post(job)

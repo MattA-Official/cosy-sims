@@ -26,6 +26,14 @@ extends Resource
 @export var claims: StringName
 ## What they set out on the free spots of what they claim, in order.
 @export var dressing: Array[ObjectDef] = []
+## Their role's course, such as "De-escalation"; empty for none.
+@export var course_name: String
+## What they get better at from level StaffRoster.PERK_LEVEL, or after their
+## course: a name, words for it, and Modifiers each of them adds while on
+## the payroll (systems may also ask StaffRoster.has_perk for one person).
+@export var perk_name: String
+@export_multiline var perk_words: String
+@export var perk_bonus: Dictionary[StringName, float] = {}
 
 
 ## Whether they work a shift at all.

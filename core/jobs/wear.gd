@@ -12,6 +12,9 @@ signal mended(key: Vector2i)
 const REPAIR_MINUTES := 20.0
 ## Metres above the object the broken marker floats.
 const MARKER_HEIGHT := 0.5
+## How much longer a skilled mender's repairs last, as a share of the
+## object's uses.
+const SKILLED_MEND := 0.5
 
 var people: People:
 	set(value):
@@ -29,6 +32,9 @@ var building: Building:
 		building = value
 		building.changed.connect(_tidy)
 var cell_size := 1.0
+## (worker: Person) -> bool: a skilled mender, whose repairs last
+## SKILLED_MEND longer (StaffRoster.skilled). Optional.
+var skilled: Callable
 var marker: Texture2D = preload("res://core/ui/markers/broken.svg")
 ## Uses since each object was last mended, by (level, object id).
 var uses: Dictionary[Vector2i, int] = {}
@@ -76,7 +82,10 @@ func break_object(key: Vector2i) -> void:
 	var mend := Job.at(Job.Do.WORK, key.x, key.y)
 	mend.minutes = REPAIR_MINUTES
 	mend.doing = "Mending the %s" % placed.def.display_name.to_lower()
-	mend.finish = func(_stage: Job.Stage, _worker: Person) -> void: fix(key)
+	mend.finish = func(_stage: Job.Stage, worker: Person) -> void:
+		fix(key)
+		if skilled.is_valid() and skilled.call(worker):
+			uses[key] = -roundi(placed.def.uses_before_breaking * SKILLED_MEND)
 	job.stages = [mend]
 	_repairs[key] = jobs.post(job)
 	broke.emit(key)

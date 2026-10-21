@@ -33,6 +33,9 @@ var jobs: JobBoard
 var items: ItemStore
 var building: Building
 var bag := PrisonCatalogue.item(&"rubbish_bag")
+## (worker: Person) -> bool: a thorough cleaner, who sweeps the tiles
+## around them too (StaffRoster.skilled). Optional.
+var skilled: Callable
 
 ## Litter being swept, by floor tile, and bins being emptied, by (level,
 ## object id), with the job for each.
@@ -77,6 +80,8 @@ func _sweep_job(key: Vector3i, to_bin: bool) -> Job:
 	sweep.doing = "Sweeping up"
 	sweep.finish = func(stage: Job.Stage, worker: Person) -> void:
 		var swept := items.take_from_floor(Vector3i(stage.level, stage.tile.x, stage.tile.y), LITTER, 999)
+		if skilled.is_valid() and skilled.call(worker):
+			swept = _sweep_round(stage.level, stage.tile, swept)
 		if to_bin and not swept.is_empty():
 			items.pick_up(worker, swept)
 	job.stages = [sweep]
@@ -85,6 +90,31 @@ func _sweep_job(key: Vector3i, to_bin: bool) -> Job:
 		put.doing = "Putting litter in the bin"
 		job.stages.append(put)
 	return job
+
+
+## A thorough sweep: the litter on the eight tiles around too, added to
+## what was swept (as one pile of the first kind), and their sweeping
+## jobs called off if nobody has started them.
+func _sweep_round(level: int, tile: Vector2i, swept: Array) -> Array:
+	for x in range(-1, 2):
+		for y in range(-1, 2):
+			var key := Vector3i(level, tile.x + x, tile.y + y)
+			if (x == 0 and y == 0) or not items.on_floor.has(key):
+				continue
+			var job: Job = _sweeping.get(key)
+			if job != null and job.worker != null:
+				continue
+			var more := items.take_from_floor(key, LITTER, 999)
+			if more.is_empty():
+				continue
+			if swept.is_empty():
+				swept = more
+			else:
+				swept = [swept[0], swept[1] + more[1]]
+			if job != null:
+				jobs.cancel(job)
+				_sweeping.erase(key)
+	return swept
 
 
 func _empty_job(key: Vector2i, to_skip: bool) -> Job:

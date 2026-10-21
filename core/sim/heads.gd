@@ -180,12 +180,15 @@ func refresh_bonuses() -> void:
 	if modifiers == null:
 		return
 	for id: StringName in modifiers.sources.keys():
-		if String(id).begins_with("style_"):
+		if String(id).begins_with("style_") or String(id).begins_with("perk_"):
 			modifiers.clear_source(id)
 	for record in roster.records:
 		var style := roster.style_of(record)
 		if not style.is_empty():
 			modifiers.set_source(StringName("style_%d" % record.id), style["bonus"])
+		var role := roster._role(record.role)
+		if roster.has_perk(record) and not role.perk_bonus.is_empty():
+			modifiers.set_source(StringName("perk_%d" % record.id), role.perk_bonus)
 	for department in departments:
 		var record := head(department)
 		if record == null:
