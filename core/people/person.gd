@@ -108,6 +108,8 @@ var led := false
 ## When set, doors treat them as this group instead of their own (someone
 ## slipping out behind a vehicle through a staff-only gate).
 var passes_as: StringName = &""
+## Game minutes spent in the line at a counter.
+var queue_minutes := 0.0
 ## How close they are to acting up, 0 to 100 (see MisconductModel).
 var temper := 0.0
 ## Game minutes spent under each misconduct rung's mood, by rung id.

@@ -112,6 +112,7 @@ func _process(_delta: float) -> bool:
 	_test_planning_permission()
 	_test_morning_paper()
 	_test_meals_and_snacks()
+	_test_serving_queue()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1597,6 +1598,53 @@ func _test_meals_and_snacks() -> void:
 	_check(not people._may_use(prisoner, 0, machine), "but only one a day")
 	prisoner.profile["snack_day"] = clock.day() - 1
 	_check(people._may_use(prisoner, 0, machine), "tomorrow they can have another")
+	main.queue_free()
+
+
+func _test_serving_queue() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var people: People = main.people
+	var items: ItemStore = main.items
+	var map: BuildingMap = main.map
+	var counter := map.objects.values().filter(func(p: BuildingMap.PlacedObject) -> bool:
+			return p.def.id == &"serving_counter")[0] as BuildingMap.PlacedObject
+	var table := map.objects.values().filter(func(p: BuildingMap.PlacedObject) -> bool:
+			return p.def.tags.has(&"table"))[0] as BuildingMap.PlacedObject
+	var source := Vector2i(0, counter.id)
+	items.put_in(source, counter, PrisonCatalogue.item(&"meal_tray"), 4)
+	var front: Vector2 = people._spots_beside(0, counter, counter.centre)[0]
+	var line: Array[Person] = []
+	var spots: Array[Vector2] = []
+	for i in 4:
+		var person := people.add_person(0, front + Vector2(i, 0))
+		person.traits.clear()
+		person.block = load("res://games/prison/catalogue/activity_eat.tres")
+		person.fetch_from = source
+		person.target = Vector2i(0, table.id)
+		person.target_tag = &"table"
+		spots.append(people._queue_spot(person, source, front))
+		person.position = Vector3(spots[i].x, 0.0, spots[i].y)
+		line.append(person)
+	_check(spots[0] == front and spots.all(func(a: Vector2) -> bool:
+		return spots.all(func(b: Vector2) -> bool: return a == b or a.distance_to(b) >= 0.4)),
+			"people queue one behind another, not in a crowd")
+	_check(line.all(func(p: Person) -> bool: return people.queue_place(p) == line.find(p)), "in the order they came")
+	for person in line:
+		people._arrive(person)
+	_check(line[0].activity == "Being served" and line[1].activity.begins_with("Queuing"), "the front is served while the rest wait")
+	people._wait_in_queue(line[0], 0.1)
+	_check(items.carrying(line[0]) == null, "serving takes a moment")
+	line[0].timer = 0.0
+	people._wait_in_queue(line[0], 0.1)
+	_check(items.carrying(line[0]) != null and people.queue_place(line[1]) == 0, "then they get a tray, and the next moves up")
+	people._wait_in_queue(line[1], 0.1)
+	_check(line[1].state == Person.State.WALKING, "walking up to the counter")
+	line[3].queue_minutes = People.QUEUE_GIVE_UP
+	people._wait_in_queue(line[3], 1.0)
+	_check(line[3].fetch_from == Person.NO_OBJECT and not (people.queues.get(source, []) as Array).has(line[3]),
+			"someone waiting too long gives up")
 	main.queue_free()
 
 

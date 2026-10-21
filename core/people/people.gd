@@ -63,6 +63,12 @@ const LITTER_MOST := 3.0
 const RETRY_MINUTES := 8.0
 ## How long people use an object that sees to no need, such as a bench.
 const USE_MINUTES := 20.0
+## Queues at counters that hand things out: game minutes to serve each
+## person, tiles between people in the line, and how long someone waits
+## before giving up.
+const SERVE_MINUTES := 0.4
+const QUEUE_GAP := 0.75
+const QUEUE_GIVE_UP := 45.0
 ## How far beyond a surface's edge, in tiles, a chair still counts as
 ## beside it.
 const SEAT_REACH := 0.75
@@ -183,6 +189,10 @@ var deciders: Array[Callable] = []
 ## (person, PlacedObject) -> bool: false keeps someone off an object for
 ## now, such as a second snack in a day.
 var use_filters: Array[Callable] = []
+## Who is queuing at each counter (level, object id), front first, and
+## where its line starts.
+var queues: Dictionary[Vector2i, Array] = {}
+var _queue_fronts: Dictionary[Vector2i, Vector2] = {}
 
 var _dirty := true
 ## Whether the ground under the building has changed too (terrain, water or
@@ -834,6 +844,9 @@ func _think(person: Person, minutes: float) -> void:
 		return
 	if person.has_object() and target_object(person) == null:
 		_stop(person) # The object went while they were on their way.
+	if person.fetch_from != Person.NO_OBJECT and person.state == Person.State.IDLE:
+		_wait_in_queue(person, since)
+		return
 	match person.state:
 		Person.State.WALKING:
 			if person.wandering and _has_errand(person):
@@ -1265,6 +1278,8 @@ func _seek(person: Person, tags: Array[StringName], need: StringName = &"", unre
 		var spots := _spots_beside(source.x if going_to != placed else n, going_to, person.flat())
 		if seat != null and going_to == placed:
 			spots = _seat_spots(n, seat, person.flat())
+		if going_to != placed and not spots.is_empty():
+			spots = [_queue_spot(person, source, spots[0])]
 		for spot in spots:
 			if _walk_to(person, source.x if going_to != placed else n, spot):
 				if seat != null:
@@ -1784,7 +1799,13 @@ func _arrive(person: Person) -> void:
 		jobs.arrived(person)
 		return
 	if person.fetch_from != Person.NO_OBJECT:
-		_fetch_item(person)
+		person.state = Person.State.IDLE
+		person.queue_minutes = 0.0
+		if queue_place(person) == 0:
+			person.timer = SERVE_MINUTES
+			person.activity = "Being served"
+		else:
+			person.activity = "Queuing at the %s" % _queue_giver_name(person)
 		return
 	if person.has_target() and not person.has_object():
 		# Somewhere to be or someone to be with, rather than an object.
@@ -1813,9 +1834,93 @@ func _arrive(person: Person) -> void:
 	person.activity = def.doing if def != null else "Using the %s" % placed.def.display_name.to_lower()
 
 
+## Where someone stands in the line at the counter they're fetching from:
+## 0 at the front. Joins them at the back if they're not in it.
+func queue_place(person: Person) -> int:
+	var source := person.fetch_from
+	var line: Array = queues.get_or_add(source, [])
+	# Anyone no longer heading for this counter has left the line.
+	for other: Person in line.duplicate():
+		if other.fetch_from != source:
+			line.erase(other)
+	if not line.has(person):
+		line.append(person)
+	return line.find(person)
+
+
+## Joins the line at a counter, and where to stand in it: the line starts
+## at `front` (the first joiner's spot beside it) and runs straight back.
+func _queue_spot(person: Person, source: Vector2i, front: Vector2) -> Vector2:
+	var line: Array = queues.get_or_add(source, [])
+	line.erase(person)
+	line.append(person)
+	if line.size() == 1 or not _queue_fronts.has(source):
+		_queue_fronts[source] = front
+	return _place_in_line(source, line.size() - 1)
+
+
+func _place_in_line(source: Vector2i, index: int) -> Vector2:
+	var front: Vector2 = _queue_fronts.get(source, Vector2.ZERO)
+	var giver := building.levels[source.x].objects.get(source.y) as BuildingMap.PlacedObject
+	if giver == null or index == 0:
+		return front
+	var back := (front - giver.centre).normalized()
+	if back == Vector2.ZERO:
+		back = Vector2.DOWN
+	var spot := front + back * QUEUE_GAP * index
+	# Round a wall or a table: as near the line as can be stood on.
+	if nav().point_at(source.x, spot) == -1:
+		var side := Vector2(-back.y, back.x)
+		for step in [0.5, -0.5, 1.0, -1.0]:
+			if nav().point_at(source.x, spot + side * step) != -1:
+				return spot + side * step
+		return front
+	return spot
+
+
+func _queue_giver_name(person: Person) -> String:
+	var giver := building.levels[person.fetch_from.x].objects.get(person.fetch_from.y) as BuildingMap.PlacedObject
+	return giver.def.display_name.to_lower() if giver != null else "counter"
+
+
+func _leave_queue(person: Person) -> void:
+	for source: Vector2i in queues.keys():
+		var line: Array = queues[source]
+		if line.has(person):
+			line.erase(person)
+			if line.is_empty():
+				queues.erase(source)
+				_queue_fronts.erase(source)
+
+
+## In a line at a counter: moving up as it goes down, served at the front,
+## giving up after a long wait or if the block moves on.
+func _wait_in_queue(person: Person, minutes: float) -> void:
+	person.queue_minutes += minutes
+	var placed := target_object(person)
+	if placed == null or person.queue_minutes > QUEUE_GIVE_UP or person.block == null \
+			or person.block.main_tag != person.target_tag:
+		_stop(person)
+		if placed != null and person.queue_minutes > QUEUE_GIVE_UP:
+			person.activity = "Gave up queuing"
+			person.timer = 1.0
+		_decide(person, false)
+		return
+	var index := queue_place(person)
+	var spot := _place_in_line(person.fetch_from, index)
+	if person.flat().distance_to(spot) > 0.3:
+		if _walk_to(person, person.fetch_from.x, spot):
+			person.state = Person.State.WALKING
+			person.activity = "Moving up the queue"
+		return
+	if index == 0 and person.timer <= 0.0:
+		_fetch_item(person)
+
+
 ## At the counter: take the item and carry it on to the object.
 func _fetch_item(person: Person) -> void:
 	var source := person.fetch_from
+	_leave_queue(person)
 	person.fetch_from = Person.NO_OBJECT
 	var placed := target_object(person)
 	var got := items.take_from(source, placed.def.needs_item, 1) if placed != null else []
@@ -1896,6 +2001,7 @@ func _release(person: Person) -> void:
 	if person.has_object() and _claimed.get(person.target) == person:
 		_claimed.erase(person.target)
 	_leave_seat(person)
+	_leave_queue(person)
 	person.fetch_from = Person.NO_OBJECT
 	if items != null and person.job == null:
 		items.put_down(person) # A tray they were taking somewhere.
