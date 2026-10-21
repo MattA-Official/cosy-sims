@@ -276,6 +276,7 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_hearty_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_had_a_snack.tres"),
 	preload("res://games/prison/catalogue/moodlet_no_soap.tres"),
+	preload("res://games/prison/catalogue/moodlet_no_bed.tres"),
 	preload("res://games/prison/catalogue/moodlet_rowdy.tres"),
 	preload("res://games/prison/catalogue/moodlet_phoned_home.tres"),
 	preload("res://games/prison/catalogue/moodlet_saw_a_fight.tres"),

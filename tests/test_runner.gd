@@ -115,6 +115,7 @@ func _process(_delta: float) -> bool:
 	_test_serving_queue()
 	_test_headcount()
 	_test_supplies()
+	_test_moving_cells()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1709,6 +1710,49 @@ func _test_supplies() -> void:
 	people.used.emit(prisoner, shower)
 	_check(prisoner.needs[&"hygiene"] == Supplies.SOAPLESS_HYGIENE and prisoner.moodlets.has(&"no_soap"),
 			"with none left, showers come without soap")
+	main.queue_free()
+
+
+func _test_moving_cells() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var people: People = main.people
+	var homes := people.home_rooms()
+	_check(homes.size() >= 2, "the prison has cells to choose from")
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool:
+		return p.group == &"prisoner" and not people.home_room(p).is_empty())
+	var mover: Person = prisoners[0]
+	var home := people.home_room(mover)
+	var free_rooms := homes.filter(func(e: Array) -> bool: return e[3] > 0 and e[1] != home[1])
+	if not free_rooms.is_empty():
+		var target: Array = free_rooms[0]
+		_check(people.move_home(mover, target[0], target[1]) and people.home_room(mover)[1] == target[1],
+				"moved to a cell with a free bed")
+	var full := people.home_rooms().filter(func(e: Array) -> bool: return e[3] == 0 and e[1] != people.home_room(mover)[1])
+	_check(not full.is_empty(), "there's a full cell")
+	var other: Person = people.owners_in(full[0][0], full[0][1])[0]
+	var was := people.home_room(mover)[1] as Room
+	_check(people.move_home(mover, full[0][0], full[0][1]) and people.home_room(mover)[1] == full[0][1]
+			and people.home_room(other)[1] == was, "into a full cell, they swap beds with someone")
+	_check(not people.move_home(mover, full[0][0], full[0][1]), "moving to the cell they're in does nothing")
+	# Without a bed, held in reception.
+	var homeless := people.add_person(0, mover.flat())
+	people.assign_beds()
+	for i in 30:
+		if people.home_room(homeless).is_empty():
+			break
+		homeless = people.add_person(0, mover.flat())
+		people.assign_beds()
+	_check(people.home_room(homeless).is_empty(), "once the beds run out, someone has none")
+	if people.home_room(homeless).is_empty():
+		homeless.block = load("res://games/prison/catalogue/activity_sleep.tres")
+		var rooms := people.place_rooms(homeless)
+		_check(not rooms.is_empty() and rooms.all(func(r: Array) -> bool: return (r[1] as Room).type == &"reception"),
+				"someone with no bed is held in reception at bedtime")
+		_check((main.homeless_prisoners() as Array).has(homeless), "and counted as needing a bed")
+		_check((main.clock_bar.warnings.call() as Array).any(func(line: String) -> bool: return line.contains("held in reception")),
+				"which the clock bar warns about")
 	main.queue_free()
 
 

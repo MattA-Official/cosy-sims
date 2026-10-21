@@ -37,6 +37,8 @@ const PASSING_CARS := Vector2(20.0, 90.0)
 const ENTRANCE_TRIES := 60
 ## The hour the game saves itself each day.
 const AUTOSAVE_HOUR := 6
+## When prisoners who slept without a bed feel it.
+const HOLDING_MOOD_HOUR := 7
 const TITLE_SCENE := "res://games/prison/title.tscn"
 ## The key for each page of the management book.
 const BOOK_KEYS: Dictionary[StringName, StringName] = {&"timetable": &"timetable_toggle",
@@ -280,6 +282,12 @@ func _ready() -> void:
 	people.moodlet_defs = PrisonCatalogue.moodlets()
 	people.room_types = PrisonCatalogue.ROOM_TYPES
 	people.home_room_types = PrisonCatalogue.HOME_ROOM_TYPES
+	people.holding_room_types = [&"reception"]
+	# A night without a bed of their own is felt in the morning.
+	clock.hour_changed.connect(func(hour: int) -> void:
+		if hour == HOLDING_MOOD_HOUR:
+			for person: Person in homeless_prisoners():
+				people.add_moodlet(person, &"no_bed"))
 	for def in PrisonCatalogue.PRIVILEGES:
 		people.privileges[def.id] = def
 	for def in PrisonCatalogue.ACTIVITIES:
@@ -1024,6 +1032,28 @@ func _ready() -> void:
 	# Fizzy pop makes them rowdy: quicker to lose their temper.
 	misconduct.temper_scales.append(func(person: Person) -> float:
 		return Contraband.ROWDY_TEMPER if person.moodlets.has(&"rowdy") else 1.0)
+	inspector.person_pickers.append(["Cell", "Move them to another cell or dorm. In a full one, they swap beds with someone.",
+		func(_person: Person) -> Array:
+			var out: Array = []
+			var counts: Dictionary[StringName, int] = {}
+			for entry: Array in people.home_rooms():
+				var room: Room = entry[1]
+				var type := people.room_type(room.type)
+				var name := type.display_name if type != null else "Room"
+				counts[name] = counts.get(name, 0) + 1
+				out.append([StringName("%d:%d:%d" % [entry[0], room.cells[0].x, room.cells[0].y]),
+						"%s %d (%d of %d beds free)" % [name, counts[name], entry[3], entry[2]]])
+			return out,
+		func(person: Person) -> StringName:
+			var home := people.home_room(person)
+			return &"" if home.is_empty() else StringName("%d:%d:%d" % [home[0], (home[1] as Room).cells[0].x, (home[1] as Room).cells[0].y]),
+		func(person: Person, id: StringName) -> void:
+			var parts := String(id).split(":")
+			var level := int(parts[0])
+			var room := (building.levels[level] as BuildingMap).room_at(Vector2i(int(parts[1]), int(parts[2])))
+			if room == null or not people.move_home(person, level, room):
+				Toasts.post("Can't move them", "There's no bed they may have there."),
+		func(person: Person) -> bool: return person.group == &"prisoner"])
 	inspector.person_pickers.append(["Course", "Put them on a course now, or take them off one.",
 		func(_person: Person) -> Array:
 			var out: Array = [[&"", "None"]]
@@ -1305,7 +1335,12 @@ func _add_hud() -> void:
 	clock_bar.ledger = ledger
 	clock_bar.regime = regime
 	clock_bar.in_tray = in_tray
-	clock_bar.warnings = func() -> Array: return standing.warnings
+	clock_bar.warnings = func() -> Array:
+		var held := homeless_prisoners().size()
+		if held == 0:
+			return standing.warnings
+		return standing.warnings + ["%d %s no bed and %s held in reception. Build more cells." % [held,
+				"prisoner has" if held == 1 else "prisoners have", "is" if held == 1 else "are"]]
 	clock_bar.warnings_pressed.connect(book.toggle.bind(&"office"))
 	clock_bar.tray_pressed.connect(book.toggle.bind(&"in_tray"))
 	clock_bar.money_pressed.connect(book.toggle.bind(&"money"))
@@ -1519,6 +1554,12 @@ func _apply_difficulty() -> void:
 
 
 ## An operation's time came round in the regime.
+## Prisoners with no bed of their own, held in reception meanwhile.
+func homeless_prisoners() -> Array:
+	return people.people.filter(func(p: Person) -> bool:
+		return p.group == &"prisoner" and not p.going_home and people.home_room(p).is_empty())
+
+
 func _on_operation(id: StringName, index: int) -> void:
 	match id:
 		&"kitchen_lorry":

@@ -189,6 +189,9 @@ var deciders: Array[Callable] = []
 ## (person, PlacedObject) -> bool: false keeps someone off an object for
 ## now, such as a second snack in a day.
 var use_filters: Array[Callable] = []
+## Where people without a bed of their own are held at bedtime and lock-up,
+## such as reception.
+var holding_room_types: Array[StringName] = []
 ## Who is queuing at each counter (level, object id), front first, and
 ## where its line starts.
 var queues: Dictionary[Vector2i, Array] = {}
@@ -697,6 +700,10 @@ func place_rooms(person: Person) -> Array:
 		var home := home_room(person)
 		if not home.is_empty():
 			out.append(home)
+		elif access.gets_bed(person.group):
+			# No bed: held wherever there's room for them meanwhile.
+			for pair in holding_rooms(person):
+				out.append(pair)
 		return out
 	var by_group: Dictionary = _rooms_for.get_or_add(block, {})
 	var key := access.key_of(person.group, person.category)
@@ -707,6 +714,18 @@ func place_rooms(person: Person) -> Array:
 					out.append([n, room])
 		by_group[key] = out
 	return by_group[key]
+
+
+## Rooms of the holding types someone may be in, as [level, Room].
+func holding_rooms(person: Person) -> Array:
+	var out: Array = []
+	if holding_room_types.is_empty():
+		return out
+	for n: int in building.levels:
+		for room: Room in building.levels[n].rooms():
+			if holding_room_types.has(room.type) and may_enter(person, room):
+				out.append([n, room])
+	return out
 
 
 ## Somewhere in the nearest room someone's block wants them in, as
@@ -806,6 +825,71 @@ func assign_beds() -> void:
 		var room := map.room_at_point(map.objects[person.bed.y].centre)
 		_homes[person] = [person.bed.x, room]
 		_sleepers.get_or_add(room, []).append(person)
+
+
+## Every home room (cells, dorms) with beds in it, as [level, Room, beds,
+## free beds].
+func home_rooms() -> Array:
+	if _beds_dirty:
+		assign_beds()
+	var out: Array = []
+	for n: int in building.levels:
+		var map := building.levels[n]
+		var counts: Dictionary[Room, Array] = {}
+		for placed: BuildingMap.PlacedObject in map.objects.values():
+			if not _is_owned_tag_object(placed):
+				continue
+			var room := map.room_at_point(placed.centre)
+			if room == null or not home_room_types.has(room.type):
+				continue
+			var count: Array = counts.get_or_add(room, [0, 0])
+			count[0] += 1
+			if not _bed_owners.has(Vector2i(n, placed.id)):
+				count[1] += 1
+		for room: Room in counts:
+			out.append([n, room, counts[room][0], counts[room][1]])
+	return out
+
+
+## Moves someone to a bed in another home room: a free one if there is
+## one, otherwise swapping beds with whoever sleeps there (if they may be
+## in each other's rooms). Returns whether they moved.
+func move_home(person: Person, level: int, room: Room) -> bool:
+	if _beds_dirty:
+		assign_beds()
+	if not access.gets_bed(person.group) or not may_enter(person, room):
+		return false
+	var map := building.levels[level]
+	var beds: Array[Vector2i] = []
+	for placed: BuildingMap.PlacedObject in map.objects.values():
+		if _is_owned_tag_object(placed) and map.room_at_point(placed.centre) == room:
+			beds.append(Vector2i(level, placed.id))
+	if beds.is_empty() or beds.has(person.bed):
+		return false
+	var old := person.bed
+	for key in beds:
+		if not _bed_owners.has(key):
+			_take_bed(person, key)
+			_beds_dirty = true
+			return true
+	# Full: swap with someone who may sleep where they did.
+	for key in beds:
+		var other: Person = _bed_owners[key]
+		var old_room: Room = building.levels[old.x].room_at_point(building.levels[old.x].objects[old.y].centre) \
+				if person.has_bed() else null
+		if old_room != null and may_enter(other, old_room):
+			_take_bed(person, key)
+			_take_bed(other, old)
+			_beds_dirty = true
+			return true
+	return false
+
+
+func _take_bed(person: Person, key: Vector2i) -> void:
+	if person.has_bed() and _bed_owners.get(person.bed) == person:
+		_bed_owners.erase(person.bed)
+	person.bed = key
+	_bed_owners[key] = person
 
 
 ## Locks or unlocks a door on a straight wall, for everyone without keys.
@@ -1537,7 +1621,7 @@ func _place_name(person: Person, room: Room) -> String:
 ## Why someone isn't where their block wants them, in words.
 func _why_not_in_place(person: Person) -> String:
 	var block := person.block
-	if block.place == ActivityDef.Place.OWN_ROOM and home_room(person).is_empty():
+	if block.place == ActivityDef.Place.OWN_ROOM and home_room(person).is_empty() and holding_rooms(person).is_empty():
 		return "Has no bed of their own"
 	if place_rooms(person).is_empty():
 		for pair: Array in _all_rooms():
