@@ -408,9 +408,9 @@ func _test_daily_routine() -> void:
 			"03:00":
 				if not checked.has("asleep"):
 					checked["asleep"] = true
-					# Bar anyone up for the toilet.
+					# Bar anyone up for the toilet, or on their way back to bed.
 					var awake := people.people.filter(func(p: Person) -> bool:
-							return p.activity != "Sleeping" and p.target_tag != &"toilet")
+							return p.activity != "Sleeping" and p.target_tag != &"toilet" and p.target_tag != &"bed")
 					_check(awake.is_empty(), "in the night everyone is asleep (not %s)" % [awake.map(
 							func(p: Person) -> String: return "%s: %s, %s" % [p.name, p.activity, p.reason])])
 	_check(checked.size() == 4, "the day ran through (checked %s)" % [checked.keys()])
@@ -4562,6 +4562,10 @@ func _test_courses() -> void:
 	clock.jump_to_hour(15)
 	var sat := false
 	var taught := false
+	# Topped up, so a low need doesn't make them late for class.
+	for need: StringName in student.needs:
+		student.needs[need] = 100.0
+	people.stop(student)
 	while clock.hour() < 17:
 		clock.advance(1.0)
 		sat = sat or (student.job != null and student.job.kind == &"attend" and student.seat != Person.NO_OBJECT)
