@@ -2,10 +2,12 @@ class_name ClockBar
 extends PanelContainer
 ## The clock in the top-left corner: the day, the time, the timetable
 ## block everyone is in, buttons for the speed (Space pauses, , and . go
-## slower and faster), and the balance, which opens the money page (M).
+## slower and faster), the balance, which opens the money page (M), and a
+## count of the regime's clashes when there are any, which opens it.
 ## The other management windows live in the ManagementBook below it.
 
 signal money_pressed
+signal clashes_pressed
 
 const ICONS := "res://core/ui/icons/%s.svg"
 const SPEED_ICONS: Array[String] = ["speed_pause", "speed_1", "speed_2", "speed_3"]
@@ -21,6 +23,8 @@ var clock: GameClock
 var runner: ScheduleRunner
 ## The prison's money, shown as a balance. Optional.
 var ledger: Ledger
+## For the clash count. Optional.
+var regime: Regime
 
 var _day := Label.new()
 var _time := Label.new()
@@ -29,6 +33,7 @@ var _chip := PanelContainer.new()
 var _chip_box := StyleBoxFlat.new()
 var _speeds: Array[CosyButton] = []
 var _money: Button
+var _clashes := Button.new()
 
 
 func _ready() -> void:
@@ -88,6 +93,16 @@ func _ready() -> void:
 				&"icon_hover_pressed_color", &"icon_focus_color"]:
 			_money.add_theme_color_override(state, ink)
 
+	if regime != null:
+		_clashes.theme_type_variation = &"DangerButton"
+		_clashes.focus_mode = FOCUS_NONE
+		_clashes.size_flags_vertical = SIZE_SHRINK_CENTER
+		_clashes.tooltip_text = "Things in the regime that don't add up. Opens the regime. T"
+		_clashes.pressed.connect(clashes_pressed.emit)
+		row.add_child(_clashes)
+		regime.changed.connect(count_clashes)
+		clock.hour_changed.connect(func(_hour: int) -> void: count_clashes())
+		count_clashes()
 	clock.speed_changed.connect(func(_index: int) -> void: _show_speed())
 	_show_speed()
 	_refresh()
@@ -116,6 +131,13 @@ func _refresh() -> void:
 		_block.text = def.display_name
 		_chip_box.bg_color = def.colour
 		_chip.tooltip_text = def.description
+
+
+## Counts the regime's clashes again.
+func count_clashes() -> void:
+	var count := regime.clashes().size() if regime != null else 0
+	_clashes.visible = count > 0
+	_clashes.text = "%d clash%s" % [count, "" if count == 1 else "es"]
 
 
 func _show_speed() -> void:

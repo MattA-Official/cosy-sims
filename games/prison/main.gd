@@ -1020,7 +1020,9 @@ func _add_hud() -> void:
 	clock_bar.clock = clock
 	clock_bar.runner = runner
 	clock_bar.ledger = ledger
+	clock_bar.regime = regime
 	clock_bar.money_pressed.connect(book.toggle.bind(&"money"))
+	clock_bar.clashes_pressed.connect(book.toggle.bind(&"timetable"))
 	hud.add_child(clock_bar)
 
 	# The management book: each window is a page behind a bookmark.
@@ -1030,7 +1032,8 @@ func _add_hud() -> void:
 	timetable.categories.assign(PrisonCatalogue.CATEGORIES)
 	timetable.activities = PrisonCatalogue.ACTIVITIES
 	timetable.clock = clock
-	book.add_page(&"timetable", "Timetable", "Who should be where, hour by hour. T", "timetable", timetable)
+	timetable.regime = regime
+	book.add_page(&"timetable", "Regime", "The week: timetable, sessions, rota and the prison's own jobs. T", "timetable", timetable)
 	staff_window.roles = PrisonCatalogue.ROLES
 	staff_window.programmes = PrisonCatalogue.PROGRAMMES
 	staff_window.people = people
@@ -1195,15 +1198,20 @@ func _on_operation(id: StringName, index: int) -> void:
 			contraband.count_tools()
 
 
-## The rota lane: each shift's staff by role, such as "Guards, day: 4".
+## The rota lane: a row per shift with its staff, such as "Days: Guard 2,
+## Cook 1".
 func _rota_rows() -> Array:
 	var out: Array = []
 	for shift in shifts.shifts:
+		var parts := PackedStringArray()
+		var total := 0
 		for role in PrisonCatalogue.ROLES:
 			var count := shifts.wanted_for(role.id, shift.id)
 			if count > 0:
-				out.append(["%s, %s" % [role.display_name, shift.display_name.to_lower()],
-						shift.start_hour * 2, shift.hours * 2, count])
+				parts.append("%s %d" % [role.display_name, count])
+				total += count
+		if total > 0:
+			out.append(["%s: %s" % [shift.display_name, ", ".join(parts)], shift.start_hour * 2, shift.hours * 2, total])
 	return out
 
 

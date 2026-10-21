@@ -3554,6 +3554,13 @@ func _test_category_timetables() -> void:
 	window.show_timetable(&"prisoner/high")
 	_check(window.schedule == split and window.timetable_name(&"prisoner/high") == "High security",
 			"the timetable window can paint the high security timetable")
+	window.every_day = false
+	window.show_day(2)
+	var before: ActivityDef = split.at_slot(20)
+	window.paint_slot(20)
+	_check(split.at_slot(2 * Schedule.SLOTS_PER_DAY + 20).id == &"sleep" and split.at_slot(20) == before and before.id != &"sleep"
+			and not split.same_every_day(), "painting one day leaves the others alone")
+	window.every_day = true
 	var data := PrisonSave.capture(main)
 	runner.merge(&"prisoner/high")
 	_check(not runner.schedules.has(&"prisoner/high") and runner.current_for(high) == was, "merging puts them back")

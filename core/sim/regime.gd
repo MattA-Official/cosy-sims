@@ -46,13 +46,15 @@ var on_duty: Callable
 ## (room type: StringName) -> int: how many rooms of a type there are.
 var rooms: Callable
 ## Rows for the rota lane: [words, first half hour of the day, half hours,
-## how many]. Optional.
+## how many staff]. Optional.
 var rota: Callable
 ## Each operation's times, as half hours of the day, by id.
 var times: Dictionary[StringName, Array] = {}
 ## Sessions a week the player offers, by session id.
 var offered: Dictionary[StringName, int] = {}
 var placements: Array[Placement] = []
+## Sessions a week that couldn't be placed at the last fill, by session id.
+var unplaced: Dictionary[StringName, int] = {}
 
 
 func start() -> void:
@@ -163,6 +165,7 @@ func fill() -> void:
 						placements.append(placed)
 						have += 1
 						break
+		unplaced[def.id] = want - have
 	placements.sort_custom(func(a: Placement, b: Placement) -> bool: return a.slot < b.slot)
 	changed.emit()
 
@@ -231,6 +234,17 @@ func _problems(def: SessionDef, slot: int, moving: Placement, first_only := fals
 	return out
 
 
+## The first thing that stops a session in a block that allows it, in
+## lower case, such as "no teacher on duty for reading".
+func _why_unplaced(def: SessionDef) -> String:
+	for slot in Schedule.SLOTS:
+		if _allowed(def, schedule.at_slot(slot)):
+			var problems := _problems(def, slot, null)
+			if not problems.is_empty():
+				return problems[0].to_lower()
+	return "no block in the timetable allows it"
+
+
 func _allowed(def: SessionDef, block: ActivityDef) -> bool:
 	if block == null:
 		return false
@@ -255,6 +269,11 @@ func clashes() -> Array:
 		var problems := _problems(placed.session, placed.slot, placed)
 		for words in problems:
 			out.append([placed.slot, words])
+	for def in sessions:
+		var short: int = unplaced.get(def.id, 0)
+		if short > 0:
+			out.append([-1, "%s: %d of %d a week can't be placed (%s)" % [def.display_name, short,
+					offered.get(def.id, def.per_week), _why_unplaced(def)]])
 	for op in operations:
 		var list: Array = times.get(op.id, op.times)
 		for i in list.size():
