@@ -22,13 +22,14 @@ static func capture(main: Node) -> Dictionary:
 	var people: People = main.people
 	var everyone: Array = []
 	for person in people.people:
-		if person.going_home:
+		# Staff on their way home are gone; prisoners going home set off again.
+		if person.going_home and person.group != &"prisoner":
 			continue
 		var traits: Array = []
 		for t in person.traits:
 			traits.append(t.id)
 		everyone.append({
-			"id": person.id, "name": person.name, "group": person.group, "role": person.role,
+			"id": person.id, "name": person.name, "look_seed": person.look_seed, "group": person.group, "role": person.role,
 			"shift": person.shift, "programme": person.programme, "category": person.category,
 			# Off whatever they were using, where they stood to use it.
 			"level": person.level,
@@ -94,6 +95,10 @@ static func capture(main: Node) -> Dictionary:
 				"yesterday": (main.parole as Parole).yesterday.duplicate(true),
 				"granted": (main.parole as Parole).granted_total},
 		"sentence_length": (main.sentences as Sentences).length,
+		"release": {"alumni": (main.release as Release).alumni.duplicate(true),
+				"postcards": (main.release as Release).postcards.duplicate(true),
+				"today": (main.release as Release).today_lines.duplicate(),
+				"yesterday": (main.release as Release).yesterday_lines.duplicate()},
 		"searching": {"policy": (main.searching as Searching).random_per_day,
 				"shakedown": (main.searching as Searching).shakedown_tonight,
 				"today": (main.searching as Searching).searches_today,
@@ -134,6 +139,7 @@ static func apply_world(main: Node, data: Dictionary) -> void:
 		if person == null:
 			continue
 		person.id = entry["id"]
+		person.look_seed = entry.get("look_seed", -1)
 		person.needs.assign(entry["needs"])
 		person.mood = entry["mood"]
 		person.moodlets.assign(entry["moodlets"])
@@ -284,6 +290,12 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 		if by_id.has(id):
 			parole.queue.append(by_id[id])
 	(main.sentences as Sentences).length = data.get("sentence_length", Sentences.Length.NORMAL)
+	var release_data: Dictionary = data.get("release", {})
+	var release: Release = main.release
+	release.alumni.assign(release_data.get("alumni", []))
+	release.postcards.assign(release_data.get("postcards", []))
+	release.today_lines.assign(release_data.get("today", []))
+	release.yesterday_lines.assign(release_data.get("yesterday", []))
 	for entry: Dictionary in data.get("sit_ins", []):
 		var map: BuildingMap = (main.building as Building).levels.get(entry["level"])
 		var room := map.room_at(entry["cell"]) if map != null else null

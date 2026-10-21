@@ -1978,7 +1978,7 @@ func _make_body(person: Person) -> Node3D:
 	if body_model != null:
 		var model := body_model.instantiate() as Node3D
 		var rng := RandomNumberGenerator.new()
-		rng.seed = person.id
+		rng.seed = person.look_seed if person.look_seed >= 0 else person.id
 		var skin := skin_tones[rng.randi() % skin_tones.size()] if not skin_tones.is_empty() else head_colour
 		var hair := hair_colours[rng.randi() % hair_colours.size()] if not hair_colours.is_empty() \
 				else head_colour

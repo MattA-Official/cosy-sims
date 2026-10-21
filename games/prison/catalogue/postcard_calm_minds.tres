@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="PostcardDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://games/prison/postcard_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+key = &"calm_minds"
+plans = PackedStringArray("make things right with family", "help other people")
+lines = PackedStringArray("Back with my family. I count to ten now, every time. {name}", "Volunteering at a youth club, teaching the breathing thing. {name}")

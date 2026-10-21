@@ -45,6 +45,9 @@ var prisoner_group: StringName = &"prisoner"
 ## Run at midnight before grading, such as a day served and the night's
 ## reform.
 var nightly: Array[Callable] = []
+## () -> Array[String]: more lines for the morning report, such as who
+## went home.
+var report_lines: Array[Callable] = []
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -189,6 +192,9 @@ func write_report() -> String:
 			lines.append("Incidents: %s." % ", ".join(incidents))
 	var money := Ledger.total(ledger.yesterday)
 	lines.append("Money: %s%s, balance %s." % ["+" if money > 0 else "", Ledger.text(money), Ledger.text(ledger.balance)])
+	for more in report_lines:
+		for line: String in more.call():
+			lines.append(line)
 	var story := _story()
 	if not story.is_empty():
 		lines.append(story)

@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="PostcardDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://games/prison/postcard_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+key = &"woodwork"
+plans = PackedStringArray("make furniture", "work for a joiner", "fix boats")
+lines = PackedStringArray("Made my mum a rocking chair. She cried. Thanks for the workshop. {name}", "Taken on by a joiner. Still have all my fingers! {name}", "Fixing up old boats on the river. Smells better than the workshop. {name}")

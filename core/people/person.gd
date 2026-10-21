@@ -13,6 +13,8 @@ const NO_OBJECT := Vector2i(0, -1)
 
 var id := 0
 var name := ""
+## Seeds how they look; -1 to go by id. Someone coming back keeps theirs.
+var look_seed := -1
 ## Who they are in the game, such as &"prisoner". Each group follows its own
 ## timetable.
 var group: StringName = &"prisoner"

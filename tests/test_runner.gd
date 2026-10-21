@@ -86,6 +86,7 @@ func _process(_delta: float) -> bool:
 	_test_sentences_and_reform()
 	_test_courses()
 	_test_parole()
+	_test_release()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3845,4 +3846,81 @@ func _test_parole() -> void:
 	_check(not parole.hear(other, 0.99) and not parole.eligible(other)
 			and other.moodlets.has(Parole.REFUSED), "a refusal waits a few days")
 	_check(parole.hear(good, 0.0) and file.release_day == clock.day() + 1, "a grant brings release to tomorrow")
+	main.free()
+
+
+func _test_release() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var release: Release = main.release
+	var reform: Reform = main.reform
+	var ledger: Ledger = main.ledger
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	(main.intake as Intake).limit = 0
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	for p: Person in prisoners:
+		PrisonerFile.of(p).release_day = clock.day() + 50
+		PrisonerFile.of(p).parole_from_day = clock.day() + 50
+	var good: Person = prisoners[0]
+	var bad: Person = prisoners[1]
+	reform.progress.set_value(good, 70.0)
+	PrisonerFile.of(good).passed.append(&"cooking")
+	PrisonerFile.of(good).raise_skill(&"cooking", 50)
+	reform.progress.set_value(bad, 20.0)
+	_check(is_equal_approx(release.return_chance(good), 0.08), "reform 70 and a course: 8% come back")
+	_check(is_equal_approx(release.return_chance(bad), 0.43), "reform 20: 43% come back")
+	var good_name := good.name
+	var bad_name := bad.name
+	var bad_look := bad.id
+	var bad_traits: Array = bad.traits.map(func(t: TraitDef) -> StringName: return t.id)
+	clock.jump_to_hour(7)
+	for p: Person in [good, bad]:
+		PrisonerFile.of(p).release_day = clock.day()
+		PrisonerFile.of(p).due_out = true
+	var before := prisoners.size()
+	var bonus_before: int = ledger.today.get("Reform bonus", 0)
+	var signed := false
+	while clock.hour() < 14 and (people.people.has(good) or people.people.has(bad)):
+		clock.advance(1.0)
+		if people.people.has(good) and release.is_leaving(good) and good.activity.begins_with("Signing out"):
+			signed = true
+	_check(signed, "leavers sign out at reception")
+	while (main.intake as Intake).bus_here() and clock.hour() < 14:
+		clock.advance(1.0)
+	_check(not people.people.has(good) and not people.people.has(bad), "both have gone by the afternoon")
+	_check(people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size() == before - 2,
+			"two fewer prisoners")
+	_check(ledger.today.get("Reform bonus", 0) - bonus_before == Release.REFORM_BONUS, "the reformed one brings a bonus")
+	_check(release.alumni.size() == 2 and release.alumni.any(func(e: Dictionary) -> bool: return e.name == good_name),
+			"both are remembered")
+	var good_entry: Dictionary = release.alumni.filter(func(e: Dictionary) -> bool: return e.name == good_name)[0]
+	var bad_entry: Dictionary = release.alumni.filter(func(e: Dictionary) -> bool: return e.name == bad_name)[0]
+	_check(good_entry.best_skill == &"cooking" and not good_entry.plan.is_empty(), "the record has what they'll do")
+	_check(release.today_lines.any(func(line: String) -> bool: return line.begins_with(good_name)),
+			"a line for the report")
+	good_entry.postcard_day = clock.day() + 1
+	good_entry.will_return_day = -1
+	bad_entry.will_return_day = clock.day() + 1
+	clock.jump_to_hour(0)
+	_check(release.postcards.size() == 1 and release.postcards[0].from == good_name
+			and (release.postcards[0].text as String).ends_with(good_name.get_slice(" ", 0)), "a postcard comes")
+	_check(release.report_lines().any(func(line: String) -> bool: return line.contains("postcard from " + good_name)),
+			"the postcard is in the report")
+	_check(release.returning_today().size() == 1, "one is due back")
+	clock.jump_to_hour(Intake.BUS_HOUR)
+	var back: Array = []
+	while clock.hour() < 13 and back.is_empty():
+		clock.advance(1.0)
+		back = people.people.filter(func(p: Person) -> bool: return p.name == bad_name)
+	_check(back.size() == 1, "the reoffender comes back on the bus")
+	if back.size() == 1:
+		var again: Person = back[0]
+		_check(again.look_seed == bad_look and again.traits.map(func(t: TraitDef) -> StringName: return t.id) == bad_traits,
+				"looking the same, with the same traits")
+		_check(PrisonerFile.of(again).came_back == 1 and is_equal_approx(reform.value(again), Sentences.REOFFENDER_REFORM),
+				"marked as back, starting low")
+		_check(release.week().back == 1, "counted as came back")
 	main.free()

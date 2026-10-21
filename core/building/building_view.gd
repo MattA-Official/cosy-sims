@@ -34,6 +34,9 @@ extends Node3D
 ## Models for doors of a kind (see DoorKindDef), such as a security gate,
 ## in place of `door_model`.
 @export var door_models: Dictionary[StringName, PackedScene] = {}
+## Optional: (placed, model) -> void, to change an object's model as it's
+## drawn, such as showing how many postcards are on a board.
+var dress_model: Callable
 @export var walls_low := false:
 	set(value):
 		walls_low = value
@@ -211,6 +214,11 @@ func _ready() -> void:
 func _on_terrain_changed() -> void:
 	if map == null or map.has_build_near(terrain.last_changed):
 		queue_rebuild()
+
+
+## Redraws just the objects, such as after dress_model would change.
+func redraw_objects() -> void:
+	_queue_objects()
 
 
 func queue_rebuild() -> void:
@@ -837,6 +845,8 @@ func _build_objects() -> void:
 		if model != null:
 			model.position = Vector3(centre.x, ground + 0.03, centre.y)
 			model.rotation.y = -placed.angle
+			if dress_model.is_valid():
+				dress_model.call(placed, model)
 			_objects.add_child(model)
 			_add_dressing(placed, ground + 0.03)
 			continue

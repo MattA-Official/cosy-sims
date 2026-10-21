@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="PostcardDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://games/prison/postcard_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+key = &"laundry"
+plans = PackedStringArray("run a launderette", "work at a hotel")
+lines = PackedStringArray("Running a launderette. Folding is very calming. {name}", "Housekeeping at a big hotel. The sheets are softer than yours. {name}")

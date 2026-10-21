@@ -137,6 +137,7 @@ func hear(person: Person, roll := -1.0) -> bool:
 	person.profile["parole_hearings"] = person.profile.get("parole_hearings", 0) + 1
 	if granted:
 		file.release_day = _day() + 1
+		person.profile["paroled"] = true
 		people.add_moodlet(person, GRANTED)
 		file.add_log(_day(), "Granted parole")
 		person.bubble = "Parole! Home tomorrow!"

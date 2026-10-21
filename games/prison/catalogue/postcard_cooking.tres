@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="PostcardDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://games/prison/postcard_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+key = &"cooking"
+plans = PackedStringArray("open a bakery", "cook in a seaside café", "run a food van")
+lines = PackedStringArray("Opened a little bakery. The scones are a hit! Thank you for the kitchen. {name}", "I cook at a café by the sea now. Nobody complains about the gravy. {name}", "Got my own food van! Queue round the block on Fridays. {name}")

@@ -54,6 +54,11 @@ func drive_in(model: PackedScene, to: Vector2, arrived := Callable(), stay := -1
 	return vehicle
 
 
+## Whether a vehicle could drive in to the road point nearest `to`.
+func has_route_to(to: Vector2) -> bool:
+	return roads != null and roads.route_in(to).size() >= 2
+
+
 ## Puts a vehicle already parked at `to`, off the road, as if it had
 ## driven in. Returns it, or null if no road leads there.
 func park(model: PackedScene, to: Vector2) -> Node3D:

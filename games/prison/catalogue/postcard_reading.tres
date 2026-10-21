@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="PostcardDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://games/prison/postcard_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+key = &"reading"
+plans = PackedStringArray("go to college", "work in a library", "write a book")
+lines = PackedStringArray("Started college! I read a whole book on the train. {name}", "Working at the library. I'm the one who says shh now. {name}", "Writing a book about my time inside. You're in chapter three. {name}")

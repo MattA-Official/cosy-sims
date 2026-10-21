@@ -53,6 +53,14 @@ var accepted: Dictionary[StringName, bool] = {&"low": true, &"medium": true, &"h
 ## Drives the bus in, when there's a road.
 var vehicles: Vehicles
 var bus_model: PackedScene
+## Optional: () -> int, prisoners waiting to leave on the bus, so it comes
+## even with nobody to bring.
+var leavers: Callable
+## Optional: () -> Array, people coming back today (see Release), who
+## come first on the bus, and (person, entry) -> void to make each new
+## arrival that person again.
+var returning: Callable
+var on_return: Callable
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -99,8 +107,9 @@ func start() -> void:
 ## entrance straight away, and come back at once. Returns those already
 ## here.
 func bus() -> Array[Person]:
-	var count := mini(todays_count(), free_beds())
-	if count <= 0 or _reception().is_empty() or entrance.is_empty() or _bus != null:
+	var count := mini(maxi(todays_count(), _returners().size()), free_beds())
+	var leaving: int = leavers.call() if leavers.is_valid() else 0
+	if (count <= 0 and leaving <= 0) or _reception().is_empty() or entrance.is_empty() or _bus != null:
 		return []
 	if vehicles != null:
 		_bus = vehicles.drive_in(bus_model, stop_point(), func(_vehicle: Node3D) -> void:
@@ -116,6 +125,15 @@ func bus_here() -> bool:
 	return _bus != null
 
 
+## Is the bus stopped at the stop, doors open?
+func bus_parked() -> bool:
+	return _bus != null and not vehicles.is_driving(_bus)
+
+
+func _returners() -> Array:
+	return returning.call() if returning.is_valid() else []
+
+
 func _step_off(count: int) -> Array[Person]:
 	var came: Array[Person] = []
 	var room := _reception()
@@ -123,7 +141,8 @@ func _step_off(count: int) -> Array[Person]:
 	if room.is_empty() or at.is_empty():
 		return came
 	var choices := _categories()
-	count = mini(count, free_beds())
+	var back := _returners()
+	count = mini(maxi(count, back.size()), free_beds())
 	for i in count:
 		var spot: Vector2 = at[1] + Vector2(_rng.randf_range(-0.6, 0.6), _rng.randf_range(-0.6, 0.6))
 		var person := people.add_person(at[0], spot, "", prisoner_group)
@@ -132,6 +151,8 @@ func _step_off(count: int) -> Array[Person]:
 		if person == null:
 			continue
 		person.category = choices[_rng.randi() % choices.size()]
+		if i < back.size() and on_return.is_valid():
+			on_return.call(person, back[i])
 		person.led = true
 		ledger.add(FEE, "Intake fees")
 		people.add_moodlet(person, FIRST_NIGHT)

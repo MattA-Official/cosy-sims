@@ -4,13 +4,15 @@ extends PanelContainer
 ## one row per course with how many places it has, who's on it and who's
 ## waiting, and what's stopping it if it can't run; then today's parole
 ## list, with a chance for each and a box to hold someone back. Work
-## programmes stay in the Staff window. Toggle with L.
+## programmes stay in the Staff window. Last, who went home this week and
+## the latest postcards. Toggle with L.
 
 const REFRESH_SECONDS := 0.5
 
 var courses: Courses
 var reform: Reform
 var parole: Parole
+var release: Release
 
 var _summary := Label.new()
 var _rows: Dictionary[StringName, Array] = {}
@@ -18,6 +20,7 @@ var _wait := 0.0
 var _parole_words := Label.new()
 var _parole_rows := VBoxContainer.new()
 var _shown_parole: Array = []
+var _release_words := Label.new()
 
 
 func _ready() -> void:
@@ -80,6 +83,14 @@ func _ready() -> void:
 		box.add_child(_parole_words)
 		_parole_rows.add_theme_constant_override(&"separation", 2)
 		box.add_child(_parole_rows)
+	if release != null:
+		box.add_child(HSeparator.new())
+		var release_heading := Label.new()
+		release_heading.text = "Gone home"
+		release_heading.theme_type_variation = &"HeaderLabel"
+		box.add_child(release_heading)
+		_release_words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(_release_words)
 	visible = false
 
 
@@ -148,6 +159,8 @@ func refresh() -> void:
 	if parole != null:
 		_parole_words.text = parole_text()
 		_show_parole()
+	if release != null:
+		_release_words.text = release_text()
 
 
 ## Average reform and how many are over the line.
@@ -167,6 +180,21 @@ func state_text(def: CourseDef) -> String:
 	if not problem.is_empty() and problem != "No places set":
 		words += " · " + problem
 	return words
+
+
+## "This week: 9 went home, 5 reformed, 2 came back", and the last
+## postcards.
+func release_text() -> String:
+	var week := release.week()
+	var lines := PackedStringArray(["This week: %d went home, %d reformed, %d came back." % [week.left,
+			week.reformed, week.back]])
+	if release.due().size() > 0:
+		lines.append("%d due to go home." % release.due().size())
+	for card in release.postcards.slice(0, 3):
+		lines.append("Day %d, from %s: \"%s\"" % [card.day, card.from, card.text])
+	if release.postcards.is_empty():
+		lines.append("No postcards yet. Reformed leavers sometimes write.")
+	return "\n".join(lines)
 
 
 ## When hearings are, and how yesterday's went.

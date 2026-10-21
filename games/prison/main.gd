@@ -115,6 +115,8 @@ var sentences := Sentences.new()
 var reform := Reform.new()
 var courses := Courses.new()
 var parole := Parole.new()
+## Going home, postcards and those who come back.
+var release := Release.new()
 var programmes_window := ProgrammesWindow.new()
 ## Ctrl+Z and Ctrl+Y for building and landscaping.
 var undo := UndoHistory.new()
@@ -172,6 +174,7 @@ func _ready() -> void:
 	view.room_types = PrisonCatalogue.ROOM_TYPES
 	view.door_model = PrisonCatalogue.DOOR_MODEL
 	view.door_models = PrisonCatalogue.door_models()
+	view.dress_model = _dress_model
 	view.map = map
 	views[0] = view
 	building.level_added.connect(_add_level_view)
@@ -693,8 +696,32 @@ func _ready() -> void:
 	parole.heard.connect(func(person: Person, granted: bool) -> void:
 		Toasts.post("Parole granted" if granted else "Parole refused", "%s %s." % [person.name,
 				"goes home tomorrow" if granted else "can try again in %d days" % Parole.RETRY_DAYS]))
+	release.name = "Release"
+	release.people = people
+	release.building = building
+	release.ledger = ledger
+	release.intake = intake
+	release.reform = reform
+	release.postcard_defs = PrisonCatalogue.POSTCARDS
+	release.clock = clock
+	add_child(release)
+	intake.leavers = release.waiting_for_bus
+	intake.returning = release.returning_today
+	intake.on_return = release.bring_back
+	release.going.connect(func(count: int) -> void:
+		Toasts.post("Going home", "%d %s home today." % [count,
+				"prisoner goes" if count == 1 else "prisoners go"]))
+	release.returned.connect(func(person: Person, entry: Dictionary) -> void:
+		Toasts.post("Back again", "%s is back, %d days after leaving." % [person.name,
+				clock.day() - entry.left_day]))
+	release.postcard_came.connect(func(card: Dictionary) -> void:
+		Toasts.post("A postcard from %s" % card.from, card.text, 10.0)
+		for n: int in views:
+			views[n].redraw_objects())
 	standing.nightly.append(sentences.tick)
 	standing.nightly.append(reform.grade_night)
+	standing.nightly.append(release.nightly)
+	standing.report_lines.append(release.report_lines)
 	inspector.person_lines.append(func(person: Person) -> String:
 		if person.group != &"prisoner":
 			return ""
@@ -832,6 +859,7 @@ func _add_hud() -> void:
 	programmes_window.courses = courses
 	programmes_window.reform = reform
 	programmes_window.parole = parole
+	programmes_window.release = release
 	hud.add_child(programmes_window)
 	saves_window.save = func(slot: String) -> void:
 		if PrisonSave.write(slot, PrisonSave.capture(self)) == OK:
@@ -900,6 +928,17 @@ func _ghost(level: int, point: Vector2) -> void:
 	tween.chain().tween_callback(ghost.queue_free)
 
 
+## Postcard boards show the latest cards that came.
+func _dress_model(placed: BuildingMap.PlacedObject, model: Node3D) -> void:
+	if placed.def.id != &"postcard_board":
+		return
+	var shown := mini(release.postcards.size(), Release.BOARD_CARDS)
+	for i in Release.BOARD_CARDS:
+		var card := model.find_child("card_%d" % (i + 1), true, false)
+		if card != null:
+			card.visible = i < shown
+
+
 func _add_level_view(level: int, level_map: BuildingMap) -> void:
 	var level_view := BuildingView.new()
 	level_view.name = "BuildingView%d" % level
@@ -910,6 +949,7 @@ func _add_level_view(level: int, level_map: BuildingMap) -> void:
 	level_view.door_model = PrisonCatalogue.DOOR_MODEL
 	level_view.door_models = PrisonCatalogue.door_models()
 	level_view.visible = building == null or level <= building.active
+	level_view.dress_model = _dress_model
 	grid.add_child(level_view)
 	level_view.map = level_map
 	views[level] = level_view

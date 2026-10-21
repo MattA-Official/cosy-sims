@@ -55,6 +55,7 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/medicine_cabinet.tres"),
 	preload("res://games/prison/catalogue/class_desk.tres"),
 	preload("res://games/prison/catalogue/whiteboard.tres"),
+	preload("res://games/prison/catalogue/postcard_board.tres"),
 	preload("res://games/prison/catalogue/armchair.tres"),
 ]
 
@@ -398,6 +399,18 @@ static func reform_progress() -> Progress:
 		if file.begins_with("reform_") and (file.ends_with(".tres") or file.ends_with(".tres.remap")):
 			sources.append(load("res://games/prison/catalogue/" + file.trim_suffix(".remap")))
 	return Progress.new(load("res://games/prison/catalogue/reform.tres"), sources)
+
+
+## What leavers go on to do, and the postcards they send.
+const POSTCARDS: Array[PostcardDef] = [
+	preload("res://games/prison/catalogue/postcard_cooking.tres"),
+	preload("res://games/prison/catalogue/postcard_woodwork.tres"),
+	preload("res://games/prison/catalogue/postcard_reading.tres"),
+	preload("res://games/prison/catalogue/postcard_laundry.tres"),
+	preload("res://games/prison/catalogue/postcard_cleaning.tres"),
+	preload("res://games/prison/catalogue/postcard_calm_minds.tres"),
+	preload("res://games/prison/catalogue/postcard_anyone.tres"),
+]
 
 
 ## Courses prisoners can take, in the order the Programmes window shows.
