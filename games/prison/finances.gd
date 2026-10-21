@@ -41,10 +41,7 @@ var workshop: Workshop:
 
 ## Wages for a shift's staff, as it starts.
 func shift_wages(shift: ShiftDef) -> int:
-	var sum := 0.0
-	for role: StringName in roles:
-		sum += roles[role].wage * shift.pay_scale * shifts.wanted_for(role, shift.id)
-	return roundi(sum * wage_scale)
+	return roundi(shifts.wage_bill(shift.id) * shift.pay_scale * wage_scale)
 
 
 ## The grant for today's prisoners, by their category.

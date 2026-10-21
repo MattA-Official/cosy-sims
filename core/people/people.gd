@@ -414,8 +414,7 @@ func add_person(level: int, spot: Vector2, person_name := "", group: StringName 
 	var person := Person.new()
 	person.id = _next_id
 	_next_id += 1
-	person.name = person_name if not person_name.is_empty() else "%s %s" % [
-			FIRST_NAMES[_rng.randi() % FIRST_NAMES.size()], SURNAMES[_rng.randi() % SURNAMES.size()]]
+	person.name = person_name if not person_name.is_empty() else random_name()
 	person.group = group
 	person.level = level
 	person.position = Vector3(spot.x, height, spot.y)
@@ -429,6 +428,11 @@ func add_person(level: int, spot: Vector2, person_name := "", group: StringName 
 	_beds_dirty = true
 	person_added.emit(person)
 	return person
+
+
+## A first name and a surname.
+func random_name() -> String:
+	return "%s %s" % [FIRST_NAMES[_rng.randi() % FIRST_NAMES.size()], SURNAMES[_rng.randi() % SURNAMES.size()]]
 
 
 ## The id the next person added will get.
@@ -1020,8 +1024,13 @@ func _block_moodlets(person: Person, old: ActivityDef, new: ActivityDef) -> void
 ## Two traits that aren't the same or opposites, or none if the game has
 ## none.
 func _pick_traits() -> Array[TraitDef]:
+	return pick_traits(traits)
+
+
+## Two traits from a pool that aren't the same or opposites.
+func pick_traits(from: Array[TraitDef]) -> Array[TraitDef]:
 	var out: Array[TraitDef] = []
-	var pool := traits.duplicate()
+	var pool := from.duplicate()
 	while out.size() < 2 and not pool.is_empty():
 		var pick: TraitDef = pool.pop_at(_rng.randi() % pool.size())
 		if out.any(func(t: TraitDef) -> bool: return t.opposite == pick.id or pick.opposite == t.id):

@@ -91,6 +91,7 @@ func _process(_delta: float) -> bool:
 	_test_goals_and_difficulty()
 	_test_escape_plans()
 	_test_budget()
+	_test_staff_roster()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4115,6 +4116,63 @@ func _test_escape_plans() -> void:
 	clock.advance(5.0)
 	_check(not plans.plans.has(cutter), "and finds the cut")
 	main.free()
+
+
+func _test_staff_roster() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var roster: StaffRoster = main.roster
+	var shifts: Shifts = main.shifts
+	var ledger: Ledger = main.ledger
+	var people: People = main.people
+	var staff: Array = people.people.filter(func(p: Person) -> bool: return p.role != &"" and not p.going_home)
+	_check(not staff.is_empty() and staff.all(func(p: Person) -> bool:
+			var r := roster.record_of(p)
+			return r != null and r.name == p.name and r.person == p), "everyone at work is on the roster by name")
+	_check(roster.records.size() == staff.size() + roster.count(&"guard", &"night") + roster.count(&"cook", &"night")
+			+ roster.count(&"cleaner", &"night") + roster.count(&"nurse", &"night") + roster.count(&"handyman", &"night"),
+			"and so is the night shift, at home")
+	var now := shifts.on_now().id
+	var guard: StaffRoster.Record = roster.cheapest(&"guard", now)
+	_check(guard != null and roster.applicants_for(&"warden", &"night").is_empty(), "applicants for each shift a role works")
+	var before := shifts.wanted_for(&"guard", now)
+	_check(roster.hire(guard) == guard and shifts.wanted_for(&"guard", now) == before + 1
+			and not roster.applicants.has(guard), "hiring an applicant puts them on the shift")
+	shifts.balance(true)
+	_check(guard.person != null and guard.person.name == guard.name and guard.person.look_seed == guard.look_seed
+			and guard.person.traits == guard.traits, "they come in as themselves")
+	var wages: int = ledger.today.get("Wages", 0)
+	var person := guard.person
+	roster.dismiss(guard)
+	shifts.balance()
+	_check(ledger.today.get("Wages", 0) == wages - roster.day_pay(guard) and person.going_home
+			and shifts.wanted_for(&"guard", now) == before, "letting someone go pays a day's notice and sends them home")
+	var cook: StaffRoster.Record = roster.on(&"cook", now)[0]
+	var wage := cook.wage
+	roster.raise(cook)
+	_check(cook.wage > wage and roster.pay_feeling(cook) > (float(wage) / 60.0 - 1.0) * 100.0, "a raise, and they feel it")
+	cook.wage = 15
+	var quit: Array = []
+	roster.quit.connect(func(r: StaffRoster.Record) -> void: quit.append(r))
+	for i in 25:
+		roster.nightly()
+	shifts.balance()
+	_check(quit.has(cook) and not roster.records.has(cook) and cook.person.going_home, "badly paid and miserable, they quit")
+	_check(roster.applicants.all(func(a: StaffRoster.Record) -> bool: return a.until >= (main.clock as GameClock).day()),
+			"applicants wait a few days")
+	var names: Array = roster.records.map(func(r: StaffRoster.Record) -> String: return r.name)
+	var saved := PrisonSave.capture(main)
+	main.queue_free()
+	main = load("res://games/prison/main.tscn").instantiate()
+	PrisonSave.pending = saved
+	root.add_child(main)
+	roster = main.roster
+	_check(roster.records.map(func(r: StaffRoster.Record) -> String: return r.name) == names
+			and (main.people as People).people.all(func(p: Person) -> bool:
+				return p.role == &"" or p.going_home or roster.record_of(p) != null and roster.record_of(p).person == p),
+			"the roster saves, and staff at work rejoin it")
+	main.queue_free()
 
 
 func _test_budget() -> void:

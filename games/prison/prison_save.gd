@@ -109,6 +109,7 @@ static func capture(main: Node) -> Dictionary:
 		"overrides": (main.runner as ScheduleRunner).overrides.duplicate(),
 		"pinned": (main.runner as ScheduleRunner).pinned.duplicate(),
 		"wanted": (main.shifts as Shifts).wanted.duplicate(true),
+		"staff": (main.roster as StaffRoster).capture(),
 		"entrance": (main.shifts as Shifts).entrance.duplicate(),
 		"routes": routes,
 		"money": {"balance": ledger.balance, "sandbox": ledger.sandbox, "today": ledger.today.duplicate(),

@@ -98,6 +98,8 @@ var sit_ins := SitIns.new()
 var coverage_tint := CoverageTint.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
+## Staff by name: who's hired, from which applicants.
+var roster := StaffRoster.new()
 ## The prison's money, and what comes in and goes out.
 var ledger := Ledger.new()
 var build_costs := BuildCosts.new()
@@ -350,6 +352,17 @@ func _ready() -> void:
 	shifts.start_spot = _staff_spot
 	shifts.clock = clock
 	add_child(shifts)
+	roster.name = "StaffRoster"
+	roster.people = people
+	roster.roles = PrisonCatalogue.ROLES
+	roster.shifts = PrisonCatalogue.SHIFTS
+	roster.trait_pool.assign(PrisonCatalogue.TRAITS.filter(func(t: TraitDef) -> bool: return t.id != &"light_fingered"))
+	roster.clock = clock
+	add_child(roster)
+	if saved.has("staff"):
+		roster.restore(saved["staff"])
+	shifts.roster = roster
+	roster.start()
 	_set_entrance()
 	if saved.is_empty():
 		_lay_road()
@@ -783,6 +796,11 @@ func _ready() -> void:
 			clock.toggle_pause()
 		fail_card.show_for(rule.reason, standing.history))
 	_apply_difficulty()
+	roster.pay = func(amount: int) -> void: ledger.add(-amount, "Wages")
+	roster.quit.connect(func(record: StaffRoster.Record) -> void:
+		Toasts.post("%s quit" % record.name, "%s, a %s on the %s shift, has handed in their notice." % [
+				record.first_name(), shifts.role_def(record.role).display_name.to_lower(), record.shift]))
+	inspector.person_lines.append(roster.summary)
 	inspector.person_lines.append(func(person: Person) -> String:
 		if person.group != &"prisoner":
 			return ""
@@ -898,6 +916,7 @@ func _add_hud() -> void:
 	staff_window.routes = routes
 	staff_window.route_icon = load("res://core/ui/icons/tool_route.svg")
 	staff_window.ledger = ledger
+	staff_window.roster = roster
 	staff_window.hire_refused.connect(func() -> void:
 		Toasts.post("Out of money", "Nobody new can be taken on until the balance is back above zero."))
 	hud.add_child(staff_window)
