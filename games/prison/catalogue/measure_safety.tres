@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="MeasureDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/measure_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"safety"
+display_name = "Safety"
+lines = Array[float]([2.0, 1.0, 0.5, 0.2])
+lower_is_better = true

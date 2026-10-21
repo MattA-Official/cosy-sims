@@ -117,7 +117,9 @@ static func capture(main: Node) -> Dictionary:
 		"intake": {"limit": (main.intake as Intake).limit, "accepted": (main.intake as Intake).accepted.duplicate(),
 				"arriving": (main.intake as Intake).arriving_ids()},
 		"standing": {"grade": standing.grade, "measures": standing.measures.duplicate(), "goals_done": goals_done,
-				"report": standing.report, "graded": standing.measures_known()},
+				"report": standing.report, "graded": standing.measures_known(),
+				"values": standing.values.duplicate(), "why": standing.why.duplicate(),
+				"held_by": standing.held_by, "history": standing.history.duplicate(true)},
 	}
 
 

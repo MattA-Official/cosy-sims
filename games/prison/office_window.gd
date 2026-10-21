@@ -196,13 +196,29 @@ func _row(text: String, control: Control) -> HBoxContainer:
 	return row
 
 
+## A line per measure with why, any measure holding the grade down, and
+## the last few nights.
+func measures_text() -> String:
+	if not standing.measures_known():
+		return "First graded at midnight."
+	var lines := PackedStringArray()
+	for measure: String in standing.measures:
+		var stars: int = standing.measures[measure]
+		var words := "%s %s" % [measure, "★".repeat(stars) + "☆".repeat(5 - stars)]
+		if standing.why.has(measure):
+			words += "  " + standing.why[measure]
+		lines.append(words)
+	if not standing.held_by.is_empty():
+		lines.append("Held to %d★ by %s." % [standing.grade, standing.held_by])
+	if standing.history.size() > 1:
+		lines.append("Last %d nights: %s" % [standing.history.size(), " ".join(standing.history.map(
+				func(night: Dictionary) -> String: return "%d★" % night.grade))])
+	return "\n".join(lines)
+
+
 func _show_standing(warden: bool) -> void:
 	_grade.text = "Grade  %s%s" % ["★".repeat(standing.grade), "☆".repeat(5 - standing.grade)]
-	var parts := PackedStringArray()
-	for measure: String in standing.measures:
-		parts.append("%s %d★" % [measure, standing.measures[measure]])
-	_measures.text = ("  ·  ".join(parts) if standing.measures_known() else "First graded at midnight.") \
-			+ "\nUp to %d arrivals a day at this grade." % intake.max_limit
+	_measures.text = measures_text() + "\nUp to %d arrivals a day at this grade." % intake.max_limit
 	for child in _goals.get_children():
 		_goals.remove_child(child)
 		child.queue_free()

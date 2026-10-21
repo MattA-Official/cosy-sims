@@ -722,6 +722,8 @@ func _ready() -> void:
 	standing.nightly.append(reform.grade_night)
 	standing.nightly.append(release.nightly)
 	standing.report_lines.append(release.report_lines)
+	standing.reform = reform
+	standing.release = release
 	inspector.person_lines.append(func(person: Person) -> String:
 		if person.group != &"prisoner":
 			return ""

@@ -87,6 +87,7 @@ func _process(_delta: float) -> bool:
 	_test_courses()
 	_test_parole()
 	_test_release()
+	_test_balanced_grade()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3923,4 +3924,41 @@ func _test_release() -> void:
 		_check(PrisonerFile.of(again).came_back == 1 and is_equal_approx(reform.value(again), Sentences.REOFFENDER_REFORM),
 				"marked as back, starting low")
 		_check(release.week().back == 1, "counted as came back")
+	main.free()
+
+
+func _test_balanced_grade() -> void:
+	var safety: MeasureDef = load("res://games/prison/catalogue/measure_safety.tres")
+	_check(safety.stars(0.0) == 5 and safety.stars(3.0) == 1, "fewer incidents, more stars")
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var standing: Standing = main.standing
+	var release: Release = main.release
+	var reform: Reform = main.reform
+	standing.measure_value["Safety"] = func() -> Array: return [0.0, "calm"]
+	standing.measure_value["Wellbeing"] = func() -> Array: return [90.0, "happy"]
+	standing.measure_value["Money"] = func() -> Array: return [5000.0, "rich"]
+	var weak := func() -> Array: return [0.0, "nobody reformed"]
+	standing.measure_value["Reform"] = weak
+	standing.grade_day()
+	_check(standing.measures["Reform"] == 1 and standing.grade == 3 and standing.held_by == "Reform",
+			"5, 5, 5 and 1 star grade 3, held by Reform")
+	_check(standing.write_report().contains("Held to 3★ by Reform"), "the report says what held it")
+	standing.measure_value["Reform"] = func() -> Array: return [0.5, "fine"]
+	standing.grade_day()
+	_check(standing.grade == 5 and standing.held_by.is_empty() and standing.history.size() == 2,
+			"with Reform at 4 nothing holds it back, and both nights are kept")
+	# The real Reform measure: half average reform, half this week's leavers.
+	standing.measure_value.erase("Reform")
+	standing.start()
+	for p: Person in main.people.people:
+		if p.group == &"prisoner":
+			reform.progress.set_value(p, 40.0)
+	var got: Array = standing.measure_value["Reform"].call()
+	_check(is_equal_approx(got[0], 0.4), "with nobody gone home, reform is the average")
+	release.alumni.append({"left_day": main.clock.day(), "reform": 70.0, "will_return_day": -1})
+	release.alumni.append({"left_day": main.clock.day(), "reform": 20.0, "will_return_day": main.clock.day(), "returned": true})
+	got = standing.measure_value["Reform"].call()
+	_check(is_equal_approx(got[0], 0.2 + 0.5 / 3.0), "a comeback counts twice against the leavers' share")
 	main.free()
