@@ -108,6 +108,7 @@ static func capture(main: Node) -> Dictionary:
 		"in_tray": (main.in_tray as InTray).capture(),
 		"suggestions": (main.suggestions as Suggestions).capture(),
 		"visits": (main.visits as Visits).capture(),
+		"garden": (main.garden as Garden).capture(),
 		"category_timetables": category_hours,
 		"locks": people.access.locked.duplicate(),
 		"overrides": (main.runner as ScheduleRunner).overrides.duplicate(),
@@ -302,6 +303,8 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 		(main.desk_work as DeskWork).restore(data.desk_work)
 	if data.has("visits"):
 		(main.visits as Visits).restore(data.visits)
+	if data.has("garden"):
+		(main.garden as Garden).restore(data.garden)
 	if data.has("suggestions"):
 		(main.suggestions as Suggestions).restore(data.suggestions)
 	if data.has("in_tray"):

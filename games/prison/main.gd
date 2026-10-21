@@ -123,6 +123,7 @@ var training := Training.new()
 var suggestions := Suggestions.new()
 var rounds := Rounds.new()
 var visits := Visits.new()
+var garden := Garden.new()
 ## Department heads, hired from the warden's desk.
 var heads := Heads.new()
 ## Request cards for the warden, and what their answers do.
@@ -899,6 +900,13 @@ func _ready() -> void:
 	visits.clock = clock
 	add_child(visits)
 	visits.start()
+	garden.name = "Garden"
+	garden.jobs = jobs
+	garden.items = items
+	garden.building = building
+	garden.clock = clock
+	add_child(garden)
+	garden.look()
 	sentences.name = "Sentences"
 	sentences.people = people
 	sentences.intake = intake
@@ -1058,6 +1066,9 @@ func _ready() -> void:
 				record.first_name(), shifts.role_def(record.role).display_name.to_lower(), record.shift]))
 	inspector.person_lines.append(roster.summary)
 	inspector.person_lines.append(office.pile_words)
+	inspector.object_lines.append(func(level: int, id: int) -> String:
+		var placed := building.object_at(Vector2i(level, id))
+		return garden.words(Vector2i(level, id)) if placed != null and placed.def.tags.has(&"veg_bed") else "")
 	# Morale: a staff room helps, an overloaded desk doesn't, and trouble on
 	# their shift stays with them a few days.
 	roster.morale_parts.append(func(record: StaffRoster.Record) -> Array:

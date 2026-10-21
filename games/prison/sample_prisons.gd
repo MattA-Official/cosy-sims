@@ -415,7 +415,7 @@ static func _staff_wing(site: Site, kitchen := false, guards := false, intake :=
 	for i in 6:
 		var prisoner := site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
 		if kitchen:
-			prisoner.programme = [&"kitchen", &"laundry", &"cleaning", &"workshop", &"workshop", &""][i]
+			prisoner.programme = [&"kitchen", &"laundry", &"cleaning", &"workshop", &"workshop", &"garden" if classes else &""][i]
 	for i in 3 if kitchen else 2:
 		var member := site.people.add_person(0, Vector2(staff_room.position) + Vector2(1.5 - i, 3.5 - i % 2), "", &"staff")
 		if kitchen:
@@ -505,7 +505,8 @@ static func _workshop(ground: BuildingMap, yard: Rect2i) -> void:
 
 
 ## A classroom next to the workshop, off the yard, with a whiteboard and
-## six desks, and a counselling room through it with two armchairs.
+## six desks, a counselling room through it with two armchairs, then a
+## visiting room and a library, and a garden below the laundry.
 static func _classrooms(ground: BuildingMap, yard: Rect2i) -> void:
 	var classroom := Rect2i(Vector2i(yard.position.x + 6, yard.end.y), Vector2i(6, 5))
 	_room(ground, classroom, &"wood", &"plaster", &"classroom")
@@ -535,6 +536,23 @@ static func _classrooms(ground: BuildingMap, yard: Rect2i) -> void:
 	ground.place_object(PrisonCatalogue.object(&"chair"), visit_corner + Vector2(0, 1), 0)
 	ground.place_object(PrisonCatalogue.object(&"chair"), visit_corner + Vector2(3, 1), 0)
 	ground.place_object(PrisonCatalogue.object(&"payphone"), visit_corner + Vector2(3, 0), 0)
+	# A library beyond that, lined with bookshelves.
+	var library := Rect2i(visiting.position + Vector2i(4, 0), Vector2i(4, 3))
+	_room(ground, library, &"wood", &"plaster", &"library")
+	_door(ground, library.position + Vector2i(1, 2), Vector2i.DOWN)
+	for i in 3:
+		ground.place_object(PrisonCatalogue.object(&"bookshelf"), Vector2(library.position) + Vector2(i + 0.5, 0), 0)
+	ground.place_object(PrisonCatalogue.object(&"plant_pot"), Vector2(library.position) + Vector2(3.5, 1.5), 0)
+	# And a fenced garden below the laundry, with veg beds.
+	var garden := Rect2i(Vector2i(yard.position.x - 7, yard.end.y + 1), Vector2i(6, 5))
+	ground.build_room(garden, &"lawn", &"fence")
+	ground.set_room_type(ground.room_at(garden.position), &"garden")
+	_door(ground, garden.position + Vector2i(3, 0), Vector2i.UP)
+	var plot := Vector2(garden.position)
+	for row in 2:
+		ground.place_object(PrisonCatalogue.object(&"veg_bed"), plot + Vector2(1, 0.5 + row * 2), 0)
+	ground.place_object(PrisonCatalogue.object(&"planter"), plot + Vector2(4, 0), 0)
+	ground.place_object(PrisonCatalogue.object(&"bench"), plot + Vector2(3.5, 4.5), 2)
 
 
 ## A laundry under the kitchen, through a door from it, with a basket and

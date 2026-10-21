@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"planter"
+display_name = "Planter"
+category = "Leisure"
+size = Vector2(1, 1)
+height = 0.6
+colour = Color(0.55, 0.7, 0.4, 1)
+tags = Array[StringName]([&"planter", &"decor"])
+price = 60

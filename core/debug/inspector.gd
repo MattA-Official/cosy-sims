@@ -28,6 +28,8 @@ var person_pickers: Array = []
 ## (person) -> String: lines the game adds at the top of a person's
 ## details, such as a prisoner's sentence. Empty strings are skipped.
 var person_lines: Array[Callable] = []
+## Likewise for objects: Callable(level, id) -> String, empty for none.
+var object_lines: Array[Callable] = []
 
 var _layer := CanvasLayer.new()
 var _panel := PanelContainer.new()
@@ -441,6 +443,10 @@ func _show_object(level: int, id: int) -> void:
 		placed.centre.x, placed.centre.y, roundi(rad_to_deg(placed.angle)),
 		"%s by %s" % [String.num(placed.def.size.x), String.num(placed.def.size.y)],
 		user.name if user != null else "no", "\nBelongs to: %s" % owner.name if owner != null else ""])
+	for extra in object_lines:
+		var line: String = extra.call(level, id)
+		if not line.is_empty():
+			_text(line)
 	if user != null:
 		_button("Inspect %s" % user.name, func() -> void: select(user))
 	if owner != null and owner != user:

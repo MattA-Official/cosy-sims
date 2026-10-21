@@ -15,6 +15,9 @@ const BAD_MOOD := 30.0
 const STREAK_DAYS := 3
 ## Cell stars for the nice cell bonus.
 const NICE_CELL_STARS := 3.0
+## Rooms where using something of a tag counts towards reform, as
+## room type -> [object tag, source].
+const QUIET_PLACES := {&"library": [&"book", &"library"], &"garden": [&"planter", &"garden"]}
 ## Losses on harder difficulties scale by this.
 var loss_scale := 1.0
 
@@ -27,6 +30,7 @@ var clock: GameClock
 
 func start() -> void:
 	jobs.job_finished.connect(_on_job_finished)
+	people.used.connect(_on_used)
 	people.pace_scales.append(_skill_pace)
 
 
@@ -99,6 +103,18 @@ func _on_job_finished(job: Job, worker: Person) -> void:
 	progress.add(worker, &"work_shift")
 	if programme != null and programme.skill != &"":
 		PrisonerFile.of(worker).raise_skill(programme.skill, programme.skill_per_job)
+
+
+## A book in the library or a planter in the garden: a little reform.
+func _on_used(person: Person, placed: BuildingMap.PlacedObject) -> void:
+	if person.group != prisoner_group or placed == null:
+		return
+	var here := people.room_of(person)
+	if here.is_empty() or not QUIET_PLACES.has(here[1].type):
+		return
+	var place: Array = QUIET_PLACES[here[1].type]
+	if placed.def.tags.has(place[0]):
+		progress.add(person, place[1])
 
 
 ## Skilled workers are quicker: half as fast again at 100.

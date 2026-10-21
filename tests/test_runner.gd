@@ -102,6 +102,7 @@ func _process(_delta: float) -> bool:
 	_test_in_tray()
 	_test_perks()
 	_test_visits()
+	_test_garden_and_library()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4771,6 +4772,44 @@ func _test_visits() -> void:
 	for i in Visits.LEAVE_MINUTES + 1:
 		visits.tick()
 	_check(not people.people.has(visitor), "and leave")
+	main.queue_free()
+
+
+func _test_garden_and_library() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var garden: Garden = main.garden
+	var jobs: JobBoard = main.jobs
+	var items: ItemStore = main.items
+	var building: Building = main.building
+	var people: People = main.people
+	var beds := building.objects_tagged(Garden.BEDS)
+	_check(beds.size() == 2 and jobs.of_kind(Garden.KIND).size() == 2, "each veg bed has a tending job waiting")
+	var gardener: Person = people.people.filter(func(p: Person) -> bool: return p.programme == &"garden")[0]
+	_check(jobs.may_take(gardener, jobs.of_kind(Garden.KIND)[0]), "gardeners take them")
+	garden.tend(beds[0], gardener)
+	garden.look()
+	_check(jobs.of_kind(Garden.KIND).size() == 2, "a bed tended today waits for tomorrow")
+	garden.growth[beds[0]] = Garden.GROW_DAYS - 1
+	var job := garden._tend_job(beds[0])
+	_check(job.stages.size() == 2, "on picking day the gardener brings the crop in")
+	garden.tend(beds[0], gardener)
+	_check(garden.growth[beds[0]] == 0 and items.carrying(gardener) == garden.crate, "a crate of veg for the kitchen")
+	items.put_down(gardener)
+	var restored := Garden.new()
+	restored.restore(garden.capture())
+	_check(restored.growth == garden.growth, "beds keep their growth in a save")
+	var reform: Progress = main.reform.progress
+	var reader: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	var shelf: Vector2i = building.objects_tagged([&"book"]).filter(func(k: Vector2i) -> bool:
+		var room := building.levels[k.x].room_at_point(building.object_at(k).centre)
+		return room != null and room.type == &"library")[0]
+	reader.level = shelf.x
+	reader.position = Vector3(building.object_at(shelf).centre.x, 0, building.object_at(shelf).centre.y + 0.6)
+	var before := reform.value(reader)
+	people.used.emit(reader, building.object_at(shelf))
+	_check(reform.value(reader) > before, "reading in the library counts towards reform")
 	main.queue_free()
 
 

@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="PostcardDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://games/prison/postcard_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+key = &"gardening"
+plans = PackedStringArray("work at a garden centre", "grow veg on an allotment", "start a gardening round")
+lines = PackedStringArray("Got a job at the garden centre. I know every rose by name now. {name}", "Took on an allotment. Prize marrow at the village show! {name}", "I've got my own gardening round. Hedges are my speciality. {name}")

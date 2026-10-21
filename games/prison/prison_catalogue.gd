@@ -55,6 +55,8 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/medicine_cabinet.tres"),
 	preload("res://games/prison/catalogue/filing_cabinet.tres"),
 	preload("res://games/prison/catalogue/payphone.tres"),
+	preload("res://games/prison/catalogue/planter.tres"),
+	preload("res://games/prison/catalogue/veg_bed.tres"),
 	preload("res://games/prison/catalogue/class_desk.tres"),
 	preload("res://games/prison/catalogue/whiteboard.tres"),
 	preload("res://games/prison/catalogue/postcard_board.tres"),
@@ -174,6 +176,7 @@ const SHIFTS: Array[ShiftDef] = [
 const PROGRAMMES: Array[WorkProgrammeDef] = [
 	preload("res://games/prison/catalogue/programme_kitchen.tres"),
 	preload("res://games/prison/catalogue/programme_laundry.tres"),
+	preload("res://games/prison/catalogue/programme_garden.tres"),
 	preload("res://games/prison/catalogue/programme_cleaning.tres"),
 	preload("res://games/prison/catalogue/programme_workshop.tres"),
 ]
@@ -328,6 +331,8 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_training.tres"),
 	preload("res://games/prison/catalogue/room_staff.tres"),
 	preload("res://games/prison/catalogue/room_visiting.tres"),
+	preload("res://games/prison/catalogue/room_library.tres"),
+	preload("res://games/prison/catalogue/room_garden.tres"),
 ]
 
 
@@ -434,6 +439,7 @@ const POSTCARDS: Array[PostcardDef] = [
 	preload("res://games/prison/catalogue/postcard_woodwork.tres"),
 	preload("res://games/prison/catalogue/postcard_reading.tres"),
 	preload("res://games/prison/catalogue/postcard_laundry.tres"),
+	preload("res://games/prison/catalogue/postcard_gardening.tres"),
 	preload("res://games/prison/catalogue/postcard_cleaning.tres"),
 	preload("res://games/prison/catalogue/postcard_calm_minds.tres"),
 	preload("res://games/prison/catalogue/postcard_anyone.tres"),
