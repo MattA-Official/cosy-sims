@@ -159,6 +159,20 @@ so blocks stay level on walls at any angle.
 The parts of a model that share a material are joined into one mesh named
 after the material, so each model is only a few draw calls.
 
+## Sounds and effects
+
+- **Build sounds** (`core/audio/sounds/`, made by `core/audio/src/sounds.py`):
+  `build_place`, `build_remove`, `build_rotate`, `build_paint`,
+  `build_error`, `build_finished` (the blueprint chime), `build_wall` and
+  `build_floor`, each as `_1` to `_3` variations to pick between at random.
+  16-bit mono 44.1 kHz .wav, all soft and rounded; the loudest peak at
+  -3 dB, quieter ones (rotate, paint, floor) already turned down so they
+  don't nag. Rebuild with `cd core/audio/src && python3 sounds.py ../sounds`.
+- **Demolish dust** (`core/building/effects/demolish_dust.tscn`): a one-shot
+  puff of soft dust (`dust_puff.png`) and a few crumbs, about 0.6 s, sized
+  for one tile. Add it where the thing stood, scaled to the footprint; it
+  frees itself.
+
 ## Rebuilding
 
 ```
