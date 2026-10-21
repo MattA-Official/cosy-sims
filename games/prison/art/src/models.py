@@ -1362,6 +1362,18 @@ def fizzy_pop():
     return p
 
 
+def meeting_table(name="meeting_table", top="wood", legs="paint"):
+    """2 x 1 oval table for meetings, top at 0.53 like the desks, on two
+    pedestals so chairs fit all the way round."""
+    p = Prop(name)
+    p.cyl(top, 0.45, 0.05, (0, 0, 0.505), bevel=0.02, segs=3, n=48, scale=(2.1, 1, 1))
+    for x in (-0.5, 0.5):
+        p.tube(legs, [(x, 0, 0.03), (x, 0, 0.48)], 0.04, 0, n=12)
+        p.box(legs, (0.08, 0.6, 0.04), (x, 0, 0.02), 0.015, 2)
+    p.box(legs, (1.0, 0.05, 0.04), (0, 0, 0.46), 0.012, 1)
+    return p
+
+
 # ---------------------------------------------------------------- office paperwork
 
 def filing_cabinet():
@@ -1885,7 +1897,7 @@ def lorry():
     return p
 
 
-MODELS = dict(snack_machine=snack_machine, mobile_phone=mobile_phone, sweets=sweets,
+MODELS = dict(**_looks(meeting_table), snack_machine=snack_machine, mobile_phone=mobile_phone, sweets=sweets,
               fruit=fruit, fizzy_pop=fizzy_pop,
               payphone=payphone, planter=planter, veg_bed=veg_bed,
               filing_cabinet=filing_cabinet, paper_stack_small=paper_stack_small,

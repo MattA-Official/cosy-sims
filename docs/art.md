@@ -43,6 +43,8 @@ colours a real prison would plausibly use.
 - Office: filing_cabinet (1 x 1, 1.3 m, two four-drawer cabinets against
   the wall at -z, drawers to +z), paper_stack_small, paper_stack_tall and
   paper_stack_teetering (0.3 x 0.22 desk dressing, 0.06 / 0.16 / 0.3 m).
+- Meetings: meeting_table (2 x 1 oval on two pedestals, top 0.53, chairs fit
+  all round; looks _pine, _metal, _painted).
 - Snacks: snack_machine (1 x 1, 1.8 m vending machine, front to +z, its
   window standing proud of the body). Contraband items: mobile_phone (the
   `phone` item; phone.glb is the wall phone), sweets, fruit, fizzy_pop.
