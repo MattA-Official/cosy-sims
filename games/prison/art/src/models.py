@@ -133,6 +133,11 @@ PALETTE = dict(
     fabric=("#93a48f", 1.0, 0),         # counselling armchair, soft sage
     cork=("#c8a275", 1.0, 0),
     soil=("#6e5644", 1.0, 0),
+    walnut=("#7a5638", 0.45, 0),        # piano and dark wood
+    fur_ginger=("#d6915a", 1.0, 0),
+    fur_rabbit=("#a8978a", 1.0, 0),
+    fur_dog=("#dcb47c", 1.0, 0),
+    budgie=("#86c06a", 0.7, 0),
     pop=("#a9cf8f", 0.25, 0),           # cloudy green home-brew
     trunk_dark=("#6b5240", 0.9, 0),     # fruit stalks
     knit=("#bf9a66", 1.0, 0),           # teacher's cardigan, camel
@@ -1374,6 +1379,230 @@ def meeting_table(name="meeting_table", top="wood", legs="paint"):
     return p
 
 
+# ---------------------------------------------------------------- prisoner life (M11)
+
+def easel():
+    """1 x 1 painting easel, about 1.15 m: an A-frame holding a canvas with
+    a half-done landscape, a paint palette on the ledge and a pot of
+    brushes at its foot. The painter stands at the front (Godot +z)."""
+    p = Prop("easel")
+    for x in (-0.24, 0.24):
+        p.tube("pine", [(x, -0.06, 0), (x * 0.35, 0.0, 1.15)], 0.018, 0, n=8)
+    p.tube("pine", [(0, 0.3, 0), (0, 0.01, 1.0)], 0.016, 0, n=8)  # back leg
+    p.box("pine", (0.5, 0.06, 0.03), (0, -0.07, 0.52), 0.008, 1)  # ledge
+    p.box("pine", (0.12, 0.03, 0.03), (0, -0.03, 1.05), 0.006, 1)  # top clamp
+    cy, cz, w, h = -0.06, 0.78, 0.46, 0.5
+    tilt = (-6, 0, 0)
+    p.box("sheet", (w, 0.025, h), (0, cy, cz), 0.006, 1, rot=tilt)  # canvas
+    p.box("poster_a", (w - 0.06, 0.006, h * 0.45), (0, cy - 0.015, cz + h * 0.2), 0.002, 1, rot=tilt)
+    p.ball("poster_b", 0.15, (-0.06, cy - 0.016, cz - 0.04), scale=(1.2, 0.05, 0.55), rot=tilt, u=16, v=6)
+    p.ball("poster_c", 0.045, (0.13, cy - 0.016, cz + 0.15), scale=(1, 0.08, 1), rot=tilt, u=12, v=6)
+    # The palette with blobs of paint, and a jar of brushes on the floor.
+    p.cyl("pine", 0.1, 0.01, (0.1, -0.1, 0.545), bevel=0.003, n=18, scale=(1.3, 0.8, 1))
+    for k, mat in enumerate(("food_c", "poster_c", "sign_blue", "leaf", "sheet")):
+        a = 0.6 + k * 0.9
+        p.ball(mat, 0.016, (0.1 + 0.08 * math.cos(a), -0.1 + 0.05 * math.sin(a), 0.553),
+               scale=(1, 1, 0.5), u=8, v=6)
+    p.cyl("glass", 0.05, 0.12, (-0.3, -0.25, 0.06), bevel=0.01, n=16)
+    for k, mat in enumerate(("food_c", "sign_blue", "leaf")):
+        x = -0.32 + k * 0.02
+        p.tube("pine", [(x, -0.25, 0.04), (x + (k - 1) * 0.03, -0.25 + (k - 1) * 0.01, 0.24)], 0.007, 0, n=6)
+        p.ball(mat, 0.012, (x + (k - 1) * 0.033, -0.25 + (k - 1) * 0.011, 0.25), scale=(1, 1, 1.6), u=8, v=6)
+    return p
+
+
+def piano():
+    """2 x 1 upright piano against the wall behind (Godot -z), keys about
+    0.45 up, with a padded stool in front for the player."""
+    p = Prop("piano")
+    w, d, h, yb = 1.4, 0.42, 0.88, 0.25  # body centre towards the wall
+    yf = yb - d / 2
+    p.box("walnut", (w, d, h), (0, yb, h / 2), 0.03, 3)
+    p.box("walnut", (w + 0.04, d + 0.04, 0.04), (0, yb, h + 0.01), 0.015, 2)  # lid
+    for x in (-w / 2 + 0.04, w / 2 - 0.04):  # cheeks and toes
+        p.box("walnut", (0.07, 0.3, 0.42), (x, yf - 0.12, 0.27), 0.02, 2)
+        p.box("walnut", (0.08, 0.08, 0.05), (x, yf - 0.24, 0.025), 0.015, 1)
+    p.box("walnut", (w - 0.14, 0.22, 0.04), (0, yf - 0.1, 0.42), 0.01, 1)  # keybed
+    p.box("sheet", (w - 0.16, 0.13, 0.025), (0, yf - 0.14, 0.45), 0.004, 1)  # white keys
+    for k in range(36):
+        if k % 7 in (2, 6):
+            continue
+        x = -(w - 0.2) / 2 + (k + 0.5) * (w - 0.2) / 36
+        p.box("bag", (0.018, 0.075, 0.022), (x, yf - 0.115, 0.47), 0.004, 1)
+    p.box("walnut", (w - 0.14, 0.03, 0.12), (0, yf - 0.015, 0.53), 0.01, 1)  # fallboard
+    p.box("walnut", (0.5, 0.03, 0.04), (0, yf - 0.03, 0.62), 0.008, 1)  # music rest
+    p.box("paper", (0.36, 0.012, 0.2), (0, yf - 0.025, 0.72), 0.003, 1, rot=(-10, 0, 0))
+    for z in (0.66, 0.7, 0.74, 0.78):
+        p.box("bag", (0.3, 0.004, 0.004), (0, yf - 0.034, z), 0, 0, rot=(-10, 0, 0))
+    for x in (-0.12, 0.12):  # pedals
+        p.box("gold", (0.04, 0.08, 0.015), (x, yf - 0.05, 0.03), 0.005, 1)
+    # Stool.
+    p.box("vinyl", (0.6, 0.3, 0.06), (0, -0.25, 0.31), 0.025, 3)
+    for x in (-0.25, 0.25):
+        for y in (-0.36, -0.14):
+            p.tube("walnut", [(x, y, 0), (x, y, 0.29)], 0.018, 0, n=8)
+    return p
+
+
+def knitting_chair():
+    """1 x 1: a cosy armchair with a crocheted blanket over its back and a
+    wicker basket of wool beside it, needles poking out."""
+    p = Prop("knitting_chair")
+    _armchair(p, "cushion", dx=-0.1, dy=0.08)
+    p.box("book_b", (0.5, 0.06, 0.3), (-0.1, 0.36, 0.46), 0.03, 3, rot=(-8, 0, 0))  # blanket
+    for k in range(4):
+        p.box("poster_c", (0.5, 0.062, 0.025), (-0.1, 0.36, 0.36 + k * 0.07), 0.01, 1, rot=(-8, 0, 0))
+    bx, by = 0.36, -0.2
+    p.cyl("crate", 0.12, 0.16, (bx, by, 0.08), r2=0.135, bevel=0.02, n=20)
+    p.tube("crate", [(bx - 0.12, by, 0.16), (bx, by, 0.27), (bx + 0.12, by, 0.16)], 0.012, 0.08, n=8)
+    for k, mat in enumerate(("food_c", "sign_blue", "poster_c")):
+        a = k * 2.1
+        p.ball(mat, 0.06, (bx + 0.05 * math.cos(a), by + 0.05 * math.sin(a), 0.18), u=12, v=8)
+    for dx in (-0.02, 0.02):
+        p.tube("steel", [(bx + dx, by, 0.15), (bx + dx + 0.05, by - 0.03, 0.33)], 0.005, 0, n=6)
+    return p
+
+
+def till():
+    """1 x 1 shop counter with a till on top, the shopkeeper behind at the
+    back (Godot -z) and customers in front."""
+    p = Prop("till")
+    p.box("pine", (0.95, 0.5, 0.05), (0, -0.05, 0.505), 0.015, 2)  # counter top
+    p.box("painted", (0.9, 0.45, 0.48), (0, -0.05, 0.24), 0.02, 2)
+    p.box("pine", (0.9, 0.02, 0.06), (0, -0.28, 0.24), 0.008, 1)  # front rail
+    # The till: a chunky cream box with a little display and a drawer.
+    tx = 0.18
+    p.box("cream", (0.3, 0.26, 0.1), (tx, 0.0, 0.58), 0.02, 2)
+    p.taper("cream", (0.3, 0.16), (0.3, 0.1), 0.08, (tx, 0.03, 0.67), 0.015, 1)
+    for r in range(3):
+        for c in range(4):
+            p.box("steel_dark", (0.03, 0.025, 0.012), (tx - 0.075 + c * 0.05, 0.02 + r * 0.03, 0.715), 0.004, 1)
+    p.box("cream", (0.1, 0.03, 0.08), (tx, 0.1, 0.76), 0.01, 1)  # display post
+    p.box("screen", (0.09, 0.012, 0.05), (tx, 0.08, 0.765), 0.004, 1)
+    p.box("cross", (0.05, 0.014, 0.012), (tx, 0.075, 0.77), 0.002, 1)
+    p.box("paper", (0.06, 0.012, 0.06), (tx + 0.11, -0.05, 0.665), 0.003, 1, rot=(20, 0, 0))  # receipt
+    # A jar of sweets and a little stack of choc bars for sale.
+    p.cyl("glass", 0.07, 0.16, (-0.25, -0.12, 0.61), bevel=0.02, n=18)
+    p.cyl("food_c", 0.075, 0.03, (-0.25, -0.12, 0.705), bevel=0.01, n=18)
+    for k, mat in enumerate(("food_c", "poster_c", "food_b", "sign_blue", "poster_c")):
+        a = k * 1.3
+        p.ball(mat, 0.025, (-0.25 + 0.035 * math.cos(a), -0.12 + 0.035 * math.sin(a), 0.56 + (k % 2) * 0.04), u=8, v=6)
+    for k in range(3):
+        p.box(("book_b", "sign_blue", "food_c")[k], (0.15, 0.06, 0.02), (-0.05, -0.18, 0.54 + k * 0.021), 0.006, 1,
+              rot=(0, 0, k * 8))
+    return p
+
+
+def pet_cage():
+    """1 x 1 wooden hutch on legs, about 0.95 m: a wire front, a sloping roof,
+    straw on the floor and a water bottle. Front to Godot +z."""
+    p = Prop("pet_cage")
+    z0, z1 = 0.4, 0.82
+    for x in (-0.4, 0.4):
+        for y in (-0.3, 0.3):
+            p.box("crate", (0.06, 0.06, z0), (x, y, z0 / 2), 0.012, 2)
+    p.box("crate", (0.88, 0.68, 0.04), (0, 0, z0), 0.012, 2)  # floor
+    p.box("crate", (0.88, 0.04, z1 - z0), (0, 0.32, (z0 + z1) / 2), 0.012, 2)  # back
+    for x in (-0.42, 0.42):
+        p.box("crate", (0.04, 0.68, z1 - z0), (x, 0, (z0 + z1) / 2), 0.012, 2)
+    p.box("crate", (0.3, 0.6, z1 - z0), (0.27, 0.02, (z0 + z1) / 2), 0.012, 2)  # bedroom end
+    p.cyl("dark", 0.07, 0.02, (0.27, -0.29, z0 + 0.12), bevel=0.0, n=16, rot=(90, 0, 0), scale=(1, 1.3, 1))
+    p.box("pine", (0.98, 0.8, 0.04), (0, 0.0, z1 + 0.06), 0.015, 2, rot=(-8, 0, 0))  # roof
+    p.box("sheet", (0.5, 0.6, 0.02), (-0.15, 0.0, z0 + 0.03), 0.01, 1)  # straw
+    for k in range(8):
+        x = -0.38 + k * 0.08
+        p.tube("galv", [(x, -0.32, z0 + 0.02), (x, -0.32, z1)], 0.005, 0, n=6)
+    for z in (z0 + 0.14, z0 + 0.28):
+        p.tube("galv", [(-0.4, -0.32, z), (0.1, -0.32, z)], 0.005, 0, n=6)
+    p.box("crate", (0.56, 0.04, 0.04), (-0.13, -0.33, z1 - 0.01), 0.008, 1)
+    p.cyl("glass", 0.025, 0.14, (-0.36, 0.28, z0 + 0.25), bevel=0.008, n=12)  # water bottle
+    p.tube("steel", [(-0.36, 0.28, z0 + 0.18), (-0.36, 0.24, z0 + 0.12)], 0.005, 0, n=6)
+    return p
+
+
+def visit_table():
+    """2 x 1 visiting table bolted down, top at 0.53 with a low divider down
+    the middle: a prisoner on one long side, visitors on the other."""
+    p = Prop("visit_table")
+    p.box("wood", (1.85, 0.8, 0.05), (0, 0, 0.505), 0.025, 3)
+    p.box("paint", (1.75, 0.04, 0.08), (0, 0, 0.57), 0.015, 2)  # divider
+    for x in (-0.6, 0.6):
+        p.tube("paint", [(x, 0, 0), (x, 0, 0.48)], 0.04, 0, n=12)
+        p.box("paint", (0.1, 0.5, 0.03), (x, 0, 0.015), 0.012, 2)
+    return p
+
+
+# Animals: built at size 1 and chunky like the people, facing Godot +z,
+# origin under the middle of the body.
+
+def _eyes(p, x, y, z, r=0.012):
+    for side in (-1, 1):
+        p.ball("shoes", r, (side * x, y, z), scale=(1, 0.6, 1.2), u=8, v=6)
+
+
+def cat():
+    p = Prop("cat")  # a sitting-up ginger cat, about 0.3 m
+    p.ball("fur_ginger", 0.1, (0, 0.02, 0.1), scale=(0.9, 1.1, 1.05), u=16, v=10)
+    p.ball("fur_ginger", 0.085, (0, -0.06, 0.24), u=16, v=10)
+    for side in (-1, 1):
+        p.cyl("fur_ginger", 0.03, 0.06, (side * 0.05, -0.06, 0.32), r2=0.0, bevel=0.0, n=8)
+        p.capsule("fur_ginger", 0.025, 0.04, (side * 0.04, -0.09, 0.03), scale=(1, 1.4, 0.8))  # front paws
+    p.ball("cream", 0.04, (0, -0.13, 0.22), scale=(1.1, 0.6, 0.8), u=12, v=8)  # muzzle
+    p.ball("pot", 0.01, (0, -0.15, 0.235), u=8, v=6)  # nose
+    _eyes(p, 0.035, -0.135, 0.26)
+    p.tube("fur_ginger", [(0.07, 0.1, 0.03), (0.15, 0.04, 0.03), (0.14, -0.06, 0.04)], 0.022, 0.06, n=10)
+    p.ball("cream", 0.06, (0, -0.05, 0.13), scale=(1, 0.7, 1.3), u=12, v=8)  # pale chest
+    return p
+
+
+def rabbit():
+    p = Prop("rabbit")  # a round grey-brown bunny, about 0.32 m to the ear tips
+    p.ball("fur_rabbit", 0.1, (0, 0.03, 0.09), scale=(0.95, 1.2, 0.9), u=16, v=10)
+    p.ball("fur_rabbit", 0.07, (0, -0.08, 0.16), u=16, v=10)
+    for side in (-1, 1):
+        p.capsule("fur_rabbit", 0.022, 0.09, (side * 0.03, -0.06, 0.27), scale=(1, 0.6, 1), rot=(-10, side * 12, 0))
+        p.capsule("cream", 0.012, 0.07, (side * 0.03, -0.072, 0.27), scale=(1, 0.4, 1), rot=(-10, side * 12, 0))
+        p.capsule("fur_rabbit", 0.025, 0.03, (side * 0.04, -0.07, 0.025), scale=(1, 1.4, 0.7))
+    p.ball("sheet", 0.04, (0, 0.17, 0.09), u=12, v=8)  # tail
+    p.ball("pot", 0.01, (0, -0.145, 0.16), u=8, v=6)
+    _eyes(p, 0.035, -0.12, 0.18)
+    return p
+
+
+def budgie():
+    p = Prop("budgie")  # a little green budgie, about 0.16 m, perched upright
+    p.ball("budgie", 0.045, (0, 0.0, 0.06), scale=(1, 1.1, 1.3), u=14, v=10)
+    p.ball("poster_c", 0.035, (0, -0.015, 0.12), u=14, v=10)  # yellow head
+    p.cyl("pot", 0.012, 0.025, (0, -0.048, 0.115), r2=0.0, bevel=0.0, n=8, rot=(110, 0, 0))  # beak
+    _eyes(p, 0.02, -0.04, 0.13, r=0.007)
+    p.taper("sign_blue", (0.02, 0.01), (0.04, 0.012), 0.09, (0, 0.06, 0.03), 0.004, 1)  # tail
+    for side in (-1, 1):
+        p.ball("budgie", 0.03, (side * 0.04, 0.01, 0.065), scale=(0.35, 1.2, 1.1), u=10, v=8)  # wings
+        p.tube("pot", [(side * 0.015, 0, 0.02), (side * 0.015, -0.01, 0.0)], 0.005, 0, n=6)
+    return p
+
+
+def therapy_dog():
+    """A friendly golden dog in a little blue therapy vest, about 0.45 m."""
+    p = Prop("therapy_dog")
+    p.capsule("fur_dog", 0.1, 0.16, (0, 0.03, 0.22), rot=(90, 0, 0))
+    p.ball("fur_dog", 0.09, (0, -0.2, 0.36), u=16, v=10)
+    p.ball("fur_dog", 0.05, (0, -0.28, 0.33), scale=(0.9, 1.2, 0.8), u=12, v=8)  # snout
+    p.ball("shoes", 0.018, (0, -0.335, 0.345), u=8, v=6)  # nose
+    _eyes(p, 0.04, -0.27, 0.39, r=0.013)
+    for side in (-1, 1):
+        p.capsule("walnut", 0.03, 0.06, (side * 0.085, -0.19, 0.33), scale=(0.6, 1, 1), rot=(0, side * 15, 0))  # ears
+        for y in (-0.1, 0.15):
+            p.capsule("fur_dog", 0.035, 0.12, (side * 0.06, y, 0.1))
+    p.capsule("fur_dog", 0.028, 0.1, (0, 0.27, 0.3), rot=(-50, 0, 0))  # tail, up and wagging
+    p.capsule("sign_blue", 0.104, 0.1, (0, 0.02, 0.225), rot=(90, 0, 0), scale=(1, 1, 1))  # vest
+    p.box("sheet", (0.012, 0.06, 0.02), (0.105, 0.02, 0.25), 0.004, 1)
+    p.box("sheet", (0.012, 0.02, 0.06), (0.105, 0.02, 0.25), 0.004, 1)
+    p.box("sheet", (0.012, 0.06, 0.02), (-0.105, 0.02, 0.25), 0.004, 1)
+    p.box("sheet", (0.012, 0.02, 0.06), (-0.105, 0.02, 0.25), 0.004, 1)
+    return p
+
+
 # ---------------------------------------------------------------- office paperwork
 
 def filing_cabinet():
@@ -1500,15 +1729,19 @@ def armchair():
     """0.75 x 0.75 soft armchair for counselling, seat top about 0.3, the
     sitter facing the front (Godot +z)."""
     p = Prop("armchair")
-    p.box("fabric", (0.66, 0.6, 0.2), (0, 0.02, 0.15), 0.06, 3)  # base
-    p.box("fabric", (0.46, 0.5, 0.1), (0, -0.04, 0.26), 0.045, 3)  # seat cushion
-    p.box("fabric", (0.6, 0.18, 0.46), (0, 0.24, 0.42), 0.08, 3, rot=(-8, 0, 0))  # back
+    _armchair(p)
+    return p
+
+
+def _armchair(p, fabric="fabric", dx=0.0, dy=0.0):
+    p.box(fabric, (0.66, 0.6, 0.2), (dx, dy + 0.02, 0.15), 0.06, 3)  # base
+    p.box(fabric, (0.46, 0.5, 0.1), (dx, dy - 0.04, 0.26), 0.045, 3)  # seat cushion
+    p.box(fabric, (0.6, 0.18, 0.46), (dx, dy + 0.24, 0.42), 0.08, 3, rot=(-8, 0, 0))  # back
     for x in (-0.28, 0.28):
-        p.box("fabric", (0.13, 0.62, 0.3), (x, 0.0, 0.3), 0.06, 3)  # arms
+        p.box(fabric, (0.13, 0.62, 0.3), (dx + x, dy, 0.3), 0.06, 3)  # arms
     for x in (-0.27, 0.27):
         for y in (-0.24, 0.27):
-            p.cyl("wood", 0.025, 0.06, (x, y, 0.03), r2=0.03, bevel=0.008, n=12)
-    return p
+            p.cyl("wood", 0.025, 0.06, (dx + x, dy + y, 0.03), r2=0.03, bevel=0.008, n=12)
 
 
 def postcard_board():
@@ -1897,7 +2130,9 @@ def lorry():
     return p
 
 
-MODELS = dict(**_looks(meeting_table), snack_machine=snack_machine, mobile_phone=mobile_phone, sweets=sweets,
+MODELS = dict(easel=easel, piano=piano, knitting_chair=knitting_chair, till=till,
+              pet_cage=pet_cage, visit_table=visit_table, cat=cat, rabbit=rabbit, budgie=budgie,
+              therapy_dog=therapy_dog, **_looks(meeting_table), snack_machine=snack_machine, mobile_phone=mobile_phone, sweets=sweets,
               fruit=fruit, fizzy_pop=fizzy_pop,
               payphone=payphone, planter=planter, veg_bed=veg_bed,
               filing_cabinet=filing_cabinet, paper_stack_small=paper_stack_small,

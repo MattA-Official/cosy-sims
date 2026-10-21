@@ -43,6 +43,13 @@ colours a real prison would plausibly use.
 - Office: filing_cabinet (1 x 1, 1.3 m, two four-drawer cabinets against
   the wall at -z, drawers to +z), paper_stack_small, paper_stack_tall and
   paper_stack_teetering (0.3 x 0.22 desk dressing, 0.06 / 0.16 / 0.3 m).
+- Prisoner life: easel (1 x 1, 1.15 m, painter at +z), piano (2 x 1 upright
+  against the wall at -z, stool in front), knitting_chair (1 x 1 armchair
+  with a wool basket), till (1 x 1 shop counter, shopkeeper at -z), pet_cage
+  (1 x 1 hutch on legs, wire front at +z), visit_table (2 x 1, top 0.53,
+  divider along x). Animals, built at size 1 facing +z with the origin under
+  the body: cat (0.3 m), rabbit (0.32 m), budgie (0.16 m), therapy_dog
+  (0.45 m, blue vest).
 - Meetings: meeting_table (2 x 1 oval on two pedestals, top 0.53, chairs fit
   all round; looks _pine, _metal, _painted).
 - Snacks: snack_machine (1 x 1, 1.8 m vending machine, front to +z, its
