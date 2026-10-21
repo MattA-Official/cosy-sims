@@ -34,6 +34,9 @@ var prisoner_group: StringName = &"prisoner"
 var guard_role: StringName = &"guard"
 ## Off for none of it, such as in a sandbox.
 var enabled := true
+## (person) -> float: anything else that cools or heats tempers, such as
+## Calm Minds therapy. Multiplied together.
+var temper_scales: Array[Callable] = []
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -185,6 +188,8 @@ func _temper_scale(person: Person) -> float:
 	var category: CategoryDef = people.categories.get(person.category)
 	if category != null:
 		scale *= category.temper_scale
+	for extra in temper_scales:
+		scale *= extra.call(person)
 	return scale
 
 

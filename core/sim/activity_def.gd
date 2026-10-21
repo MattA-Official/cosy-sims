@@ -40,6 +40,8 @@ enum DoorRule {
 @export var door_rule := DoorRule.OPEN
 ## Prisoners on a work programme take jobs from the jobs board.
 @export var jobs := false
+## People on a course go to class (see Courses).
+@export var classes := false
 ## What the block is for, in a line, for the timetable window.
 @export_multiline var description := ""
 

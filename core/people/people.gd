@@ -198,6 +198,9 @@ var poses := PersonPoses.new()
 ## keep some groups out), worked out when first wanted.
 var _rooms_for: Dictionary[ActivityDef, Dictionary] = {}
 ## Each room's quality, worked out when first wanted after a build change.
+## (person) -> float: anything else that speeds up or slows down someone's
+## work, such as a prisoner's skill at it. Multiplied together.
+var pace_scales: Array[Callable] = []
 var _qualities: Dictionary[Room, RoomQuality] = {}
 ## People by (level, x, z) in squares NEARBY tiles across, for finding
 ## who is close, refilled when first wanted each step.
@@ -304,7 +307,10 @@ func walk_to(person: Person, level: int, spot: Vector2, doing: String) -> bool:
 
 ## How fast someone works: slower when worn out.
 func work_pace(person: Person) -> float:
-	return TIRED_PACE if person.needs.get(tired_need, 100.0) < TIRED_LINE else 1.0
+	var pace := TIRED_PACE if person.needs.get(tired_need, 100.0) < TIRED_LINE else 1.0
+	for scale in pace_scales:
+		pace *= scale.call(person)
+	return pace
 
 
 ## Keeps someone at a job where they stand for some game minutes.

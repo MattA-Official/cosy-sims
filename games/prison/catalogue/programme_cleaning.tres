@@ -10,3 +10,4 @@ display_name = "Cleaning"
 description = "Sweep up litter and empty the bins."
 job_kinds = Array[StringName]([&"clean", &"rubbish"])
 icon = ExtResource("2_icon")
+skill = &"cleaning"

@@ -10,3 +10,4 @@ display_name = "Workshop"
 description = "Make wooden toys and birdhouses at the workbenches, sold when the lorry collects them."
 job_kinds = Array[StringName]([&"make"])
 icon = ExtResource("2_icon")
+skill = &"woodwork"

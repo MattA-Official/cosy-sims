@@ -21,6 +21,13 @@ var runner: ScheduleRunner
 ## Buttons offered under a person, each [text, tooltip, pressed (person),
 ## shown (person) -> bool], such as the prison's "Search them".
 var person_actions: Array = []
+## Drop-downs offered under a person, each [title, tooltip, choices
+## (person) -> Array of [value, words], current (person) -> value, pick
+## (person, value), shown (person) -> bool], such as a prisoner's course.
+var person_pickers: Array = []
+## (person) -> String: lines the game adds at the top of a person's
+## details, such as a prisoner's sentence. Empty strings are skipped.
+var person_lines: Array[Callable] = []
 
 var _layer := CanvasLayer.new()
 var _panel := PanelContainer.new()
@@ -227,6 +234,9 @@ func _show_person(person: Person) -> void:
 		_text("\n".join(traits)).theme_type_variation = &"SubtleLabel"
 	if people.jobs != null and person.role == &"" and not people.jobs.programmes.is_empty():
 		_show_programme(person)
+	for picker: Array in person_pickers:
+		if (picker[5] as Callable).call(person):
+			_picker(person, picker)
 	for action: Array in person_actions:
 		if (action[3] as Callable).call(person):
 			_button(action[0], func() -> void: (action[2] as Callable).call(person)).tooltip_text = action[1]
@@ -271,6 +281,30 @@ func _show_person(person: Person) -> void:
 		people.remove_person(person))
 
 
+## A game's drop-down for a person (see person_pickers).
+func _picker(person: Person, picker: Array) -> void:
+	var row := HBoxContainer.new()
+	var label := Label.new()
+	label.text = picker[0]
+	label.tooltip_text = picker[1]
+	label.mouse_filter = Control.MOUSE_FILTER_PASS
+	row.add_child(label)
+	var choices: Array = (picker[2] as Callable).call(person)
+	var current: Variant = (picker[3] as Callable).call(person)
+	var drop := OptionButton.new()
+	drop.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	drop.tooltip_text = picker[1]
+	for choice: Array in choices:
+		drop.add_item(choice[1])
+		if choice[0] == current:
+			drop.selected = drop.item_count - 1
+	drop.item_selected.connect(func(index: int) -> void:
+		(picker[4] as Callable).call(person, choices[index][0])
+		_rebuild.call_deferred())
+	row.add_child(drop)
+	_box.add_child(row)
+
+
 ## Which work programme someone is on, to change.
 func _show_programme(person: Person) -> void:
 	var row := HBoxContainer.new()
@@ -307,7 +341,12 @@ func _refresh_person(person: Person) -> void:
 			", ".join(why) if not why.is_empty() else "nothing much"]
 	var target := people.target_object(person)
 	var group: GroupDef = people.access.groups.get(person.group)
-	var lines := PackedStringArray([
+	var lines := PackedStringArray()
+	for extra in person_lines:
+		var line: String = extra.call(person)
+		if not line.is_empty():
+			lines.append(line)
+	lines.append_array(PackedStringArray([
 		"Group: %s" % (group.display_name if group != null else String(person.group))
 				+ (", %s" % _role_name(person) if person.role != &"" else "")
 				+ (", %s shift" % person.shift if person.shift != &"" else "")
@@ -319,7 +358,7 @@ func _refresh_person(person: Person) -> void:
 				floori(person.position.x), floori(person.position.z), person.position.y],
 		"Heading for: %s" % (target.def.display_name if target != null else "nothing in particular"),
 		"Steps left on the way: %d" % person.route.size(),
-	])
+	]))
 	if person.job != null:
 		var stage := person.job.current()
 		lines.append("Job: %s%s" % [person.job.title, ", %s" % stage.doing.to_lower()

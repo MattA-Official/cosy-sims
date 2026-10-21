@@ -5,7 +5,8 @@ class_name SamplePrisons
 ## Main node (Sample) or from the F3 inspector.
 
 const NAMES: Array[String] = ["Starter block", "Two storeys", "Hillside", "Island", "Long way round",
-		"Basement", "Crowded canteen", "Locked out", "Staff wing", "Working prison", "Guarded prison", "Paying prison"]
+		"Basement", "Crowded canteen", "Locked out", "Staff wing", "Working prison", "Guarded prison", "Paying prison",
+		"Reforming prison"]
 
 ## What each one tests, shown in the inspector.
 const CHALLENGES: Array[String] = [
@@ -21,6 +22,7 @@ const CHALLENGES: Array[String] = [
 	"The staff wing with a kitchen, a laundry and a workshop: the morning lorry's crates go to the fridge, the cook fills the serving counter before each meal, prisoners take a tray to a table, the cleaner sweeps up and washes uniforms, and in work blocks prisoners on programmes help out or make toys and birdhouses.",
 	"The working prison with a guard post: the canteen's door to the yard is a security gate that opens only while a guard sits at the post. Two guards by day and one by night patrol where the prisoners are and walk back anyone out of place.",
 	"The guarded prison with money on: a warden in the office, a reception by the corridor, and a spare cell. The bus brings new prisoners each morning; wages, food and building cost money, and the grant and goals pay it back.",
+	"The paying prison with a classroom and a counselling room off the yard: a teacher runs Reading and a counsellor Calm Minds in the afternoon Learn block, and prisoners work towards parole and release.",
 ]
 
 ## Set before reloading the scene to start in a different sample.
@@ -37,6 +39,8 @@ class Site:
 	var people: People
 	## Staff wanted on the night shift, by role, for samples with staff.
 	var night_staff: Dictionary[StringName, int] = {}
+	## Places on each course, by course id, for samples with classrooms.
+	var course_places: Dictionary[StringName, int] = {}
 
 	func land() -> Rect2i:
 		return building.land[0]
@@ -64,6 +68,7 @@ static func build(index: int, site: Site) -> bool:
 		9: _staff_wing(site, true)
 		10: _staff_wing(site, true, true)
 		11: _staff_wing(site, true, true, true)
+		12: _staff_wing(site, true, true, true, true)
 		_: return false
 	return true
 
@@ -336,7 +341,7 @@ static func _locked_out(site: Site) -> void:
 	for i in 4:
 		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 2, 3.5 + (i % 2)))
 
-static func _staff_wing(site: Site, kitchen := false, guards := false, intake := false) -> void:
+static func _staff_wing(site: Site, kitchen := false, guards := false, intake := false, classes := false) -> void:
 	_landscape(site)
 	var o := site.land().get_center() - Vector2i(10, 8)
 	var ground := site.map()
@@ -389,6 +394,8 @@ static func _staff_wing(site: Site, kitchen := false, guards := false, intake :=
 		_kitchen(ground, canteen)
 		_laundry(ground, canteen, showers)
 		_workshop(ground, yard)
+	if classes:
+		_classrooms(ground, yard)
 	if guards:
 		_guard_post(ground, staff_room, canteen)
 	if intake:
@@ -421,6 +428,11 @@ static func _staff_wing(site: Site, kitchen := false, guards := false, intake :=
 	if intake:
 		var warden := site.people.add_person(0, Vector2(office.position) + Vector2(2.5, 2.5), "", &"staff")
 		site.people.set_role(warden, &"warden")
+	if classes:
+		for i in 2:
+			var tutor := site.people.add_person(0, Vector2(staff_room.position) + Vector2(2.5 + i, 1.5), "", &"staff")
+			site.people.set_role(tutor, [&"teacher", &"counsellor"][i])
+		site.course_places = {&"reading": 4, &"calm_minds": 1}
 
 
 ## A guard post under the staff room, through a staff door, with a CCTV
@@ -484,6 +496,29 @@ static func _workshop(ground: BuildingMap, yard: Rect2i) -> void:
 	ground.place_object(PrisonCatalogue.object(&"workbench"), corner + Vector2(0, 3), 0)
 	ground.place_object(PrisonCatalogue.object(&"workbench"), corner + Vector2(3, 3), 0)
 	ground.place_object(PrisonCatalogue.object(&"goods_shelf"), corner + Vector2(5, 0), 0)
+
+
+## A classroom next to the workshop, off the yard, with a whiteboard and
+## six desks, and a counselling room through it with two armchairs.
+static func _classrooms(ground: BuildingMap, yard: Rect2i) -> void:
+	var classroom := Rect2i(Vector2i(yard.position.x + 6, yard.end.y), Vector2i(6, 5))
+	_room(ground, classroom, &"wood", &"plaster", &"classroom")
+	_door(ground, classroom.position + Vector2i(1, 0), Vector2i.UP)
+	var corner := Vector2(classroom.position)
+	ground.place_object(PrisonCatalogue.object(&"whiteboard"), corner + Vector2(2.25, 4.75), 2)
+	for row in 2:
+		for column in 3:
+			var desk := ground.place_object(PrisonCatalogue.object(&"class_desk"),
+					corner + Vector2(0.5 + column * 2, 1.25 + row * 1.5), 2)
+			ground.place_beside(PrisonCatalogue.object(&"chair"), desk, Vector2(0, 0.55))
+	var counselling := Rect2i(classroom.position + Vector2i(6, 0), Vector2i(4, 4))
+	_room(ground, counselling, &"wood", &"plaster", &"counselling")
+	_door(ground, counselling.position + Vector2i(0, 1), Vector2i.LEFT)
+	var middle := Vector2(counselling.position) + Vector2(2.0, 2.0)
+	for side in [-1.0, 1.0]:
+		var at: Vector2 = middle + Vector2(side * 0.6, 0.0)
+		ground.place_object_at(PrisonCatalogue.object(&"armchair"), at, BuildingMap.facing(at, middle))
+	ground.place_object(PrisonCatalogue.object(&"plant_pot"), Vector2(counselling.position) + Vector2(3.5, 0), 0)
 
 
 ## A laundry under the kitchen, through a door from it, with a basket and

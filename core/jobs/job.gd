@@ -48,6 +48,9 @@ var priority := 3
 ## Empty lets any role or programme that takes jobs of its kind.
 var roles: Array[StringName] = []
 var programmes: Array[StringName] = []
+## Only this person may take it, whatever their role or programme, such as
+## a student's place in class. Null for anyone allowed.
+var only_for: Person
 var stages: Array[Stage] = []
 ## The stage being worked on.
 var stage := 0

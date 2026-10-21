@@ -42,6 +42,9 @@ var workshop: Workshop
 ## how many prisoners were walked back.
 var security: Security
 var prisoner_group: StringName = &"prisoner"
+## Run at midnight before grading, such as a day served and the night's
+## reform.
+var nightly: Array[Callable] = []
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -136,6 +139,8 @@ func check_goals() -> Array[Goal]:
 
 ## Grades the day just gone. Called at midnight.
 func grade_day() -> void:
+	for step in nightly:
+		step.call()
 	_graded = true
 	var prisoners := maxi(_prisoners(), 1)
 	var walked_back: int = _moodlets.get(&"walked_back", 0)

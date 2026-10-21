@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ProgressSourceDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/progress_source_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"visit"
+text = "Visit"
+amount = 3.0
+per_day_cap = 3.0

@@ -10,3 +10,4 @@ display_name = "Kitchen"
 description = "Help the cooks: cook meals and fill the serving counter."
 job_kinds = Array[StringName]([&"cook"])
 icon = ExtResource("2_icon")
+skill = &"cooking"

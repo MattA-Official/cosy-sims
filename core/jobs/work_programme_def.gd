@@ -10,3 +10,7 @@ extends Resource
 ## The Job kinds people on it take.
 @export var job_kinds: Array[StringName] = []
 @export var icon: Texture2D
+## The skill it trains, such as &"cooking", and how much each job done
+## adds (0 to 100). Skill speeds the work up, half as fast again at 100.
+@export var skill: StringName
+@export var skill_per_job := 1

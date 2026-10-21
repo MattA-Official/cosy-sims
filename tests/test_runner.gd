@@ -82,6 +82,9 @@ func _process(_delta: float) -> bool:
 	_test_category_zones()
 	_test_trading_and_tools()
 	_test_shakedown_and_deaths()
+	_test_progress()
+	_test_sentences_and_reform()
+	_test_courses()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3643,3 +3646,146 @@ func _test_shakedown_and_deaths() -> void:
 	_check(died == [c] and not people.people.has(c), "with deaths on, someone beaten to nothing dies")
 	_check((main.security as Security).today.get(&"death", 0) == 1, "which counts heavily against Safety")
 	main.queue_free()
+
+
+## The shared progress engine: source caps, the day's cap, milestones,
+## losses and clamping.
+func _test_progress() -> void:
+	var def := ProgressDef.new()
+	def.id = &"reform"
+	def.start = 20.0
+	def.daily_cap = 8.0
+	var make := func(id: StringName, text: String, amount: float, cap: float, milestone := false) -> ProgressSourceDef:
+		var source := ProgressSourceDef.new()
+		source.id = id
+		source.text = text
+		source.amount = amount
+		source.per_day_cap = cap
+		source.milestone = milestone
+		return source
+	var progress := Progress.new(def, [make.call(&"good", "Good day", 2.0, 2.0), make.call(&"work", "Work", 3.0, 0.0),
+			make.call(&"bad", "Bad day", -3.0, 0.0), make.call(&"pass", "Passed", 15.0, 0.0, true)])
+	var person := Person.new()
+	_check(progress.value(person) == 20.0, "progress starts at the def's start")
+	progress.add(person, &"good")
+	progress.add(person, &"good")
+	_check(progress.value(person) == 22.0, "a source gives no more than its cap a day")
+	progress.add(person, &"work", 3.0)
+	_check(progress.value(person) == 28.0, "all gains together stop at the day's cap")
+	progress.add(person, &"pass")
+	_check(progress.value(person) == 43.0, "a milestone isn't held back by the day's cap")
+	progress.add(person, &"bad")
+	_check(progress.value(person) == 40.0, "losses always count")
+	_check(progress.today_text(person) == "+20 today: Good day +2, Work +6, Passed +15, Bad day -3",
+			"today's parts explain the change (%s)" % progress.today_text(person))
+	progress.new_day([person] as Array[Person])
+	progress.add(person, &"good")
+	_check(progress.value(person) == 42.0 and progress.today_text(person) == "+2 today: Good day +2",
+			"a new day resets the caps")
+	progress.set_value(person, 99.0)
+	progress.add(person, &"pass")
+	_check(progress.value(person) == 100.0, "progress tops out at 100")
+
+
+## Sentences roll on arrival and count down at midnight; reform moves with
+## good and bad days.
+func _test_sentences_and_reform() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 8
+	root.add_child(main)
+	var people: People = main.people
+	var sentences: Sentences = main.sentences
+	var reform: Reform = main.reform
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	_check(not prisoners.is_empty() and prisoners.all(func(p: Person) -> bool:
+			var file := PrisonerFile.of(p)
+			return file.has_sentence() and file.served_days < file.sentence_days and file.release_day > clock.day()),
+			"everyone already here has a sentence part-served")
+	var low: Person = prisoners[0]
+	low.category = &"low"
+	low.profile.clear()
+	sentences.open_file(low)
+	var file := PrisonerFile.of(low)
+	_check(file.sentence_days >= 2 and file.sentence_days <= 6 and file.served_days == 0
+			and file.release_day == clock.day() + file.sentence_days, "a low-security sentence is 2 to 6 days")
+	_check(file.parole_from_day == clock.day() + ceili(file.sentence_days * 0.5), "parole comes halfway through")
+	_check(reform.value(low) == Sentences.STARTING_REFORM, "and reform starts at 20")
+	file.release_day = clock.day() + 1
+	var happy: Person = prisoners[1]
+	var cross: Person = prisoners[2]
+	var happy_before := reform.value(happy)
+	var cross_before := reform.value(cross)
+	# Hold moods steady through to midnight.
+	var hold := func(_minute: int) -> void:
+		happy.mood = 80.0
+		cross.mood = 20.0
+	clock.minute_passed.connect(hold)
+	var served := PrisonerFile.of(happy).served_days
+	while clock.day() == 1:
+		clock.advance(30.0)
+	clock.minute_passed.disconnect(hold)
+	_check(PrisonerFile.of(happy).served_days == served + 1, "a day is served each midnight")
+	_check(file.due_out, "someone whose time is up is due out")
+	_check(reform.value(happy) >= happy_before + 2.0, "a good day lifts reform")
+	_check(is_equal_approx(reform.value(cross), cross_before - 3.0), "a bad day takes it down")
+	_check(sentences.summary(happy).begins_with("Day ") and reform.summary(happy).begins_with("Reform "),
+			"the inspector shows the sentence and reform")
+	main.free()
+
+
+## Classes: places fill lowest reform first, a teacher teaches in the
+## Learn block, students sit at desks, sessions count, and the exam passes
+## or sends them back.
+func _test_courses() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var courses: Courses = main.courses
+	var reform: Reform = main.reform
+	var clock: GameClock = main.clock
+	var building: Building = main.building
+	(main.misconduct as Misconduct).enabled = false
+	_check(building.objects_tagged([&"whiteboard"]).size() == 1 and building.objects_tagged([&"class_desk"]).size() == 6
+			and building.objects_tagged([&"armchair"]).size() == 2, "the reforming prison has a classroom and a counselling room")
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	courses.set_places(&"calm_minds", 0)
+	var lowest: Person = prisoners[0]
+	for p: Person in prisoners:
+		reform.progress.set_value(p, 50.0)
+	reform.progress.set_value(lowest, 5.0)
+	courses.set_places(&"reading", 0)
+	courses.set_places(&"reading", 1)
+	_check(courses.enrolled(&"reading").size() == 1 and courses.enrolled(&"reading")[0] == lowest, "the least reformed get the first place")
+	courses.set_places(&"reading", 4)
+	_check(courses.enrolled(&"reading").size() == 4 and courses.problem(courses.def(&"reading")).is_empty(),
+			"places fill and the course can run")
+	var student: Person = courses.enrolled(&"reading")[0]
+	var before := courses.attended(student)
+	clock.jump_to_hour(15)
+	var sat := false
+	var taught := false
+	while clock.hour() < 17:
+		clock.advance(1.0)
+		sat = sat or (student.job != null and student.job.kind == &"attend" and student.seat != Person.NO_OBJECT)
+		taught = taught or people.people.any(func(p: Person) -> bool:
+				return p.role == &"teacher" and p.job != null and p.job.kind == &"teach" and p.state == Person.State.USING)
+	_check(taught, "the teacher teaches at the whiteboard in the Learn block")
+	_check(sat, "students sit at a desk")
+	_check(courses.attended(student) == before + 1, "a session sat through counts (%d)" % courses.attended(student))
+	var course := courses.def(&"reading")
+	student.profile["course_attended"] = course.sessions - 1
+	var passing := reform.value(student)
+	_check(not courses.exam(student, course, 0.99) and courses.attended(student) == course.sessions - Courses.RESIT_BACK,
+			"a failed exam goes back two sessions")
+	_check(courses.exam(student, course, 0.0) and PrisonerFile.of(student).passed.has(&"reading")
+			and PrisonerFile.of(student).skill(&"reading") >= 30 and reform.value(student) >= passing + 15.0
+			and courses.course_of(student) == null, "a pass lifts reform and the skill and frees the place")
+	_check(not courses.waiting(&"reading").has(student), "nobody takes a course they've passed")
+	var calm := courses.def(&"calm_minds")
+	courses.enrol(student, &"calm_minds")
+	courses.exam(student, calm, 0.0)
+	_check(courses.calm_scale(student) < 1.0, "Calm Minds cools tempers after a pass")
+	main.free()

@@ -9,7 +9,8 @@
 [ext_resource type="Resource" path="res://games/prison/catalogue/activity_free.tres" id="7_84gby"]
 [ext_resource type="Resource" path="res://games/prison/catalogue/activity_lockup.tres" id="8_o4oyc"]
 [ext_resource type="Script" path="res://core/sim/schedule.gd" id="9_wex7j"]
+[ext_resource type="Resource" path="res://games/prison/catalogue/activity_learn.tres" id="10_learn"]
 
 [resource]
 script = ExtResource("9_wex7j")
-hours = Array[ExtResource("1_hmmp8")]([ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("3_brp7n"), ExtResource("4_npyak"), ExtResource("5_3ohyt"), ExtResource("5_3ohyt"), ExtResource("5_3ohyt"), ExtResource("3_brp7n"), ExtResource("6_qafgp"), ExtResource("6_qafgp"), ExtResource("5_3ohyt"), ExtResource("5_3ohyt"), ExtResource("3_brp7n"), ExtResource("7_84gby"), ExtResource("7_84gby"), ExtResource("8_o4oyc"), ExtResource("8_o4oyc"), ExtResource("2_1n8un"), ExtResource("2_1n8un")])
+hours = Array[ExtResource("1_hmmp8")]([ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("2_1n8un"), ExtResource("3_brp7n"), ExtResource("4_npyak"), ExtResource("5_3ohyt"), ExtResource("5_3ohyt"), ExtResource("5_3ohyt"), ExtResource("3_brp7n"), ExtResource("6_qafgp"), ExtResource("6_qafgp"), ExtResource("10_learn"), ExtResource("10_learn"), ExtResource("3_brp7n"), ExtResource("7_84gby"), ExtResource("7_84gby"), ExtResource("8_o4oyc"), ExtResource("8_o4oyc"), ExtResource("2_1n8un"), ExtResource("2_1n8un")])

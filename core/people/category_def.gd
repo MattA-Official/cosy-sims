@@ -16,3 +16,6 @@ extends Resource
 @export var search_weight := 1.0
 ## Tiles from a guard at which they're spotted out of place.
 @export var watch_distance := 3.0
+## How long they stay, in game days: a sentence, or a hospital stay.
+@export var stay_days_min := 5
+@export var stay_days_max := 12

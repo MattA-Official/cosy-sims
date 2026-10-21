@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CourseDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/jobs/course_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/programmes.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"cooking"
+display_name = "Cooking"
+description = "Kitchen basics, safe knives and a decent stew. Passing makes kitchen work quicker."
+icon = ExtResource("2_icon")
+room_type = &"classroom"
+teacher_role = &"teacher"
+teacher_tag = &"whiteboard"
+student_tag = &"class_desk"
+sessions = 8
+session_minutes = 120.0
+skill = &"cooking"
+trait_bonus = Dictionary[StringName, float]({&"foodie": 0.15})
+session_source = &"course_session"
+after_pass = &""

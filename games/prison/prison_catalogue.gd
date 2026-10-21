@@ -4,7 +4,7 @@ class_name PrisonCatalogue
 
 ## Tabs of the objects menu, in order (see ObjectDef.category).
 const OBJECT_CATEGORIES: Array[String] = ["Cells", "Kitchen", "Work", "Leisure",
-		"Staff", "Decoration"]
+		"Classes", "Staff", "Decoration"]
 const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/bed.tres"),
 	preload("res://games/prison/catalogue/toilet.tres"),
@@ -53,6 +53,9 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/bus_stop.tres"),
 	preload("res://games/prison/catalogue/infirmary_bed.tres"),
 	preload("res://games/prison/catalogue/medicine_cabinet.tres"),
+	preload("res://games/prison/catalogue/class_desk.tres"),
+	preload("res://games/prison/catalogue/whiteboard.tres"),
+	preload("res://games/prison/catalogue/armchair.tres"),
 ]
 
 ## Things people carry about.
@@ -142,6 +145,8 @@ const ROLES: Array[StaffRoleDef] = [
 	preload("res://games/prison/catalogue/role_handyman.tres"),
 	preload("res://games/prison/catalogue/role_guard.tres"),
 	preload("res://games/prison/catalogue/role_warden.tres"),
+	preload("res://games/prison/catalogue/role_teacher.tres"),
+	preload("res://games/prison/catalogue/role_counsellor.tres"),
 ]
 
 ## Staff shifts. Days start at 06:00 so the cook is in for breakfast;
@@ -227,6 +232,10 @@ const MISCONDUCT: Array[MisconductDef] = [
 ]
 
 const MOODLETS: Array[MoodletDef] = [
+	preload("res://games/prison/catalogue/moodlet_proud.tres"),
+	preload("res://games/prison/catalogue/moodlet_parole_granted.tres"),
+	preload("res://games/prison/catalogue/moodlet_parole_refused.tres"),
+	preload("res://games/prison/catalogue/moodlet_going_home.tres"),
 	preload("res://games/prison/catalogue/moodlet_good_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_missed_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_saw_vandalism.tres"),
@@ -272,10 +281,11 @@ const ACTIVITIES: Array[ActivityDef] = [
 	preload("res://games/prison/catalogue/activity_yard.tres"),
 	preload("res://games/prison/catalogue/activity_free.tres"),
 	preload("res://games/prison/catalogue/activity_work.tres"),
+	preload("res://games/prison/catalogue/activity_learn.tres"),
 ]
 
 ## The prisoners' day: 11 hours in their cells overnight, three meals, a
-## shower, the yard and free time. Work is free time until jobs arrive.
+## shower, work in the morning, the yard, classes and free time.
 const SCHEDULE: Schedule = preload("res://games/prison/catalogue/schedule_prisoners.tres")
 
 ## Rooms where a bed is someone's own.
@@ -292,6 +302,8 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_kitchen.tres"),
 	preload("res://games/prison/catalogue/room_laundry.tres"),
 	preload("res://games/prison/catalogue/room_workshop.tres"),
+	preload("res://games/prison/catalogue/room_classroom.tres"),
+	preload("res://games/prison/catalogue/room_counselling.tres"),
 	preload("res://games/prison/catalogue/room_guard_post.tres"),
 	preload("res://games/prison/catalogue/room_reception.tres"),
 	preload("res://games/prison/catalogue/room_office.tres"),
@@ -377,3 +389,21 @@ static func room_type(id: StringName) -> RoomTypeDef:
 		if def.id == id:
 			return def
 	return null
+
+
+## Reform, with every source that moves it.
+static func reform_progress() -> Progress:
+	var sources: Array = []
+	for file in DirAccess.get_files_at("res://games/prison/catalogue/"):
+		if file.begins_with("reform_") and (file.ends_with(".tres") or file.ends_with(".tres.remap")):
+			sources.append(load("res://games/prison/catalogue/" + file.trim_suffix(".remap")))
+	return Progress.new(load("res://games/prison/catalogue/reform.tres"), sources)
+
+
+## Courses prisoners can take, in the order the Programmes window shows.
+const COURSES: Array[CourseDef] = [
+	preload("res://games/prison/catalogue/course_reading.tres"),
+	preload("res://games/prison/catalogue/course_cooking.tres"),
+	preload("res://games/prison/catalogue/course_woodwork.tres"),
+	preload("res://games/prison/catalogue/course_calm_minds.tres"),
+]

@@ -88,6 +88,8 @@ static func capture(main: Node) -> Dictionary:
 		"policies": {"privilege_days": (main.consequences as Consequences).privilege_days,
 				"quiet_room": (main.consequences as Consequences).quiet_room_on},
 		"deaths": (main.infirmary as Infirmary).deaths,
+		"course_places": (main.courses as Courses).places.duplicate(),
+		"sentence_length": (main.sentences as Sentences).length,
 		"searching": {"policy": (main.searching as Searching).random_per_day,
 				"shakedown": (main.searching as Searching).shakedown_tonight,
 				"today": (main.searching as Searching).searches_today,
@@ -268,6 +270,8 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 		if person != null:
 			people.resume_doing(person, entry.get("doing", {}))
 			(main.jobs as JobBoard).resume_work(person, entry.get("work", {}))
+	(main.courses as Courses).places.assign(data.get("course_places", {}))
+	(main.sentences as Sentences).length = data.get("sentence_length", Sentences.Length.NORMAL)
 	for entry: Dictionary in data.get("sit_ins", []):
 		var map: BuildingMap = (main.building as Building).levels.get(entry["level"])
 		var room := map.room_at(entry["cell"]) if map != null else null

@@ -12,3 +12,5 @@ daily_grant = 50
 temper_scale = 1.0
 search_weight = 1.0
 watch_distance = 3.0
+stay_days_min = 5
+stay_days_max = 12

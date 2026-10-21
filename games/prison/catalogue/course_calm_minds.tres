@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CourseDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/jobs/course_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/programmes.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"calm_minds"
+display_name = "Calm Minds"
+description = "Talking therapy with a counsellor in a counselling room. Each session calms them for a few days; a pass for the rest of their stay."
+icon = ExtResource("2_icon")
+room_type = &"counselling"
+teacher_role = &"counsellor"
+teacher_tag = &"armchair"
+student_tag = &"armchair"
+sessions = 5
+session_minutes = 90.0
+skill = &""
+trait_bonus = Dictionary[StringName, float]({&"hothead": -0.1, &"gentle": 0.1})
+session_source = &"therapy_session"
+after_pass = &"calmer"

@@ -110,6 +110,11 @@ var office := Office.new()
 var claims := Claims.new()
 ## The grade, grant goals and the daily report.
 var standing := Standing.new()
+## Sentences and prisoner files, and how far each prisoner has come.
+var sentences := Sentences.new()
+var reform := Reform.new()
+var courses := Courses.new()
+var programmes_window := ProgrammesWindow.new()
 ## Ctrl+Z and Ctrl+Y for building and landscaping.
 var undo := UndoHistory.new()
 var land_plots := LandPlots.new()
@@ -635,6 +640,56 @@ func _ready() -> void:
 	standing.clock = clock
 	add_child(standing)
 	standing.start()
+	reform.name = "Reform"
+	reform.people = people
+	reform.jobs = jobs
+	reform.progress = PrisonCatalogue.reform_progress()
+	reform.clock = clock
+	add_child(reform)
+	reform.start()
+	sentences.name = "Sentences"
+	sentences.people = people
+	sentences.intake = intake
+	sentences.categories = PrisonCatalogue.categories()
+	sentences.reform = reform.progress
+	sentences.clock = clock
+	add_child(sentences)
+	sentences.start()
+	courses.name = "Courses"
+	courses.people = people
+	courses.jobs = jobs
+	courses.building = building
+	courses.runner = runner
+	courses.reform = reform.progress
+	courses.defs = PrisonCatalogue.COURSES
+	courses.clock = clock
+	add_child(courses)
+	courses.places.assign(site.course_places)
+	misconduct.temper_scales.append(courses.calm_scale)
+	inspector.person_pickers.append(["Course", "Put them on a course now, or take them off one.",
+		func(_person: Person) -> Array:
+			var out: Array = [[&"", "None"]]
+			for def in courses.defs:
+				out.append([def.id, def.display_name])
+			return out,
+		func(person: Person) -> StringName: return person.profile.get("course", &""),
+		func(person: Person, id: StringName) -> void:
+			if id == &"":
+				courses.leave(person)
+			else:
+				courses.enrol(person, id)
+				courses.places[id] = maxi(courses.places.get(id, 0), courses.enrolled(id).size()),
+		func(person: Person) -> bool: return person.group == &"prisoner"])
+	courses.passed.connect(func(person: Person, def: CourseDef) -> void:
+		Toasts.post("Course passed", "%s passed %s." % [person.name, def.display_name]))
+	standing.nightly.append(sentences.tick)
+	standing.nightly.append(reform.grade_night)
+	inspector.person_lines.append(func(person: Person) -> String:
+		if person.group != &"prisoner":
+			return ""
+		var file := sentences.summary(person)
+		var lines := PackedStringArray([file, reform.summary(person), courses.summary(person)])
+		return "\n".join(Array(lines).filter(func(line: String) -> bool: return not line.is_empty())))
 	standing.report_ready.connect(func(text: String) -> void: Toasts.post("Daily report", text, 12.0))
 	standing.goal_done.connect(func(goal: Standing.Goal) -> void:
 		Toasts.post("Goal done: " + goal.title, "A grant of %s came in." % Ledger.text(goal.grant)))
@@ -722,6 +777,7 @@ func _add_hud() -> void:
 	clock_bar.money_pressed.connect(finance_window.toggle)
 	clock_bar.office_pressed.connect(office_window.toggle)
 	clock_bar.security_pressed.connect(security_window.toggle)
+	clock_bar.programmes_pressed.connect(programmes_window.toggle)
 	clock_bar.timetable_pressed.connect(timetable.toggle)
 	hud.add_child(clock_bar)
 	timetable.schedule = schedule
@@ -762,6 +818,9 @@ func _add_hud() -> void:
 		building.active = level
 		camera_rig.focus_on(Vector3(point.x * grid.cell_size, people.nav().height_at(level, point), point.y * grid.cell_size)))
 	hud.add_child(security_window)
+	programmes_window.courses = courses
+	programmes_window.reform = reform
+	hud.add_child(programmes_window)
 	saves_window.save = func(slot: String) -> void:
 		if PrisonSave.write(slot, PrisonSave.capture(self)) == OK:
 			Toasts.post("Saved", PrisonSave.describe(PrisonSave.read(slot)))
@@ -803,6 +862,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("security_toggle"):
 		security_window.toggle()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("programmes_toggle"):
+		programmes_window.toggle()
 		get_viewport().set_input_as_handled()
 
 
