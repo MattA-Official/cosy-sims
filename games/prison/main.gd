@@ -109,6 +109,7 @@ var roster := StaffRoster.new()
 var ledger := Ledger.new()
 var build_costs := BuildCosts.new()
 var build_feel := BuildFeel.new()
+var blueprints := Blueprints.new()
 var finances := Finances.new()
 ## New prisoners arriving on the morning bus.
 var intake := Intake.new()
@@ -627,7 +628,24 @@ func _ready() -> void:
 	build_costs.ledger = ledger
 	build_costs.door_kinds = people.access.door_kinds
 	add_child(build_costs)
+	# Blueprints watch the building before costs do, so what becomes a plan
+	# isn't charged until a handyman starts on it.
+	blueprints.name = "Blueprints"
+	blueprints.building = building
+	blueprints.terrain = terrain
+	blueprints.jobs = jobs
+	blueprints.ledger = ledger
+	blueprints.build_costs = build_costs
+	blueprints.cell_size = grid.cell_size
+	# A new game builds over time unless it's a sandbox; prisons opened
+	# straight from a sample (for trying things out) build at once.
+	blueprints.instant = not NewGame.pending or Standing.next_difficulty == &"sandbox"
+	blueprints.active = func() -> bool:
+		return controller.tool != BuildController.Tool.NONE and not undo.restoring()
+	add_child(blueprints)
+	blueprints.start()
 	build_costs.start()
+	controller.blueprints = blueprints
 	controller.spending_allowed = ledger.can_spend
 	controller.build_costs = build_costs
 	controller.find_object = PrisonCatalogue.object
@@ -902,7 +920,7 @@ func _ready() -> void:
 	build_feel.cell_size = grid.cell_size
 	build_feel.view_for = func(level: int) -> BuildingView: return views.get(level)
 	build_feel.active = func() -> bool:
-		return controller.tool != BuildController.Tool.NONE and not undo.restoring()
+		return (controller.tool != BuildController.Tool.NONE and not undo.restoring()) or blueprints.finishing
 	add_child(build_feel)
 	build_feel.start()
 	# Land bought stays bought: undo starts again from the new boundary.
@@ -1058,6 +1076,7 @@ func _add_hud() -> void:
 		get_tree().reload_current_scene()
 	settings_window.standing = standing
 	settings_window.sentences = sentences
+	settings_window.blueprints = blueprints
 	pause_menu.clock = clock
 	pause_menu.subtitle = title
 	pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")

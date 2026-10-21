@@ -121,6 +121,17 @@ var _room_zones: Dictionary[Vector2i, StringName] = {}
 ## The DoorKindDef id of each door that has one, such as a staff door.
 ## Plain doors have none.
 var door_kinds: Dictionary[Vector3i, StringName] = {}
+## Building work planned but not done yet, waiting for a handyman (see
+## Blueprints). Floor by cell: [style, height, batch]; walls by edge:
+## [kind, style, window kind, door kind, batch], what the wall will be
+## once built. Planned walls and doors already block people; planned floor
+## is still ground, though objects may stand on it.
+var planned_floors: Dictionary[Vector2i, Array] = {}
+var planned_walls: Dictionary[Vector3i, Array] = {}
+## Batches of planned work already paid for, and how many pieces each
+## had when planned (for its progress).
+var paid_batches: Dictionary[int, bool] = {}
+var batch_sizes: Dictionary[int, int] = {}
 var _next_object_id := 1
 ## What stood on objects lifted by lift_objects(): [thing, turn from the
 ## surface] pairs by the surface's id.
@@ -338,6 +349,13 @@ func is_outdoor_wall(edge: Vector3i) -> bool:
 	return def != null and def.outdoor
 
 
+## Whether people can pass an edge: no wall, or a built door, and nothing
+## planned there.
+func passable(edge: Vector3i) -> bool:
+	var kind := wall_at(edge)
+	return (kind == Wall.NONE or kind == Wall.DOOR) and not planned_walls.has(edge)
+
+
 ## Can people walk from one cell to its neighbour? Walls and windows
 ## block; doors do not. Between two floors, a drop bigger than MAX_STEP
 ## blocks too.
@@ -345,8 +363,7 @@ func can_walk_between(a: Vector2i, b: Vector2i) -> bool:
 	var edge := edge_between(a, b)
 	if edge == NO_EDGE or not owns(a) or not owns(b):
 		return false
-	var kind := wall_at(edge)
-	if kind != Wall.NONE and kind != Wall.DOOR:
+	if not passable(edge):
 		return false
 	if floors.has(a) and floors.has(b):
 		return absf(edge_height(a, b - a) - edge_height(b, a - b)) <= MAX_STEP + EPSILON \
@@ -453,6 +470,16 @@ func set_door(edge: Vector3i, is_door: bool, door_kind: StringName = &"") -> boo
 ## as a staff door. Returns whether anything changed.
 func set_opening(edge: Vector3i, kind: Wall, window: StringName = WINDOW_GLASS,
 		door_kind: StringName = &"") -> bool:
+	if wall_at(edge) == Wall.NONE and planned_walls.has(edge) and kind != Wall.NONE:
+		# A door or window in a wall not built yet goes into its plan.
+		var plan: Array = planned_walls[edge]
+		if kind == Wall.WINDOW and wall_def(plan[1]) != null and wall_def(plan[1]).outdoor:
+			return false
+		plan[0] = kind
+		plan[2] = window if kind == Wall.WINDOW else &""
+		plan[3] = door_kind if kind == Wall.DOOR else &""
+		_changed()
+		return true
 	if wall_at(edge) == Wall.NONE or kind == Wall.NONE:
 		return false
 	if kind == Wall.WINDOW and is_outdoor_wall(edge):
@@ -846,7 +873,7 @@ func can_place_at(def: ObjectDef, centre: Vector2, angle: float) -> bool:
 				Vector2(cell) + Vector2.ONE, Vector2(cell) + Vector2(0, 1)])
 		if Geometry2D.intersect_polygons(inner, square).is_empty():
 			continue
-		if not has_floor(cell) or ramp_at(cell) != null or stairs_at(cell) != null or stepped.has(cell):
+		if not (has_floor(cell) or planned_floors.has(cell)) or ramp_at(cell) != null or stairs_at(cell) != null or stepped.has(cell):
 			return false
 	for placed: PlacedObject in objects.values():
 		# Chairs tuck under tables and desks.
@@ -1039,6 +1066,11 @@ func put_object(placed: PlacedObject, centre: Vector2, angle: float) -> bool:
 	_lifted.erase(placed.id)
 	_changed()
 	return true
+
+
+## Tells everyone watching that planned work changed.
+func planned_changed() -> void:
+	_changed()
 
 
 ## Takes away things left standing on surfaces that are gone.
@@ -1308,6 +1340,10 @@ func to_data() -> Dictionary:
 		"room_types": _room_types.duplicate(),
 		"room_zones": _room_zones.duplicate(),
 		"door_kinds": door_kinds.duplicate(),
+		"planned_floors": planned_floors.duplicate(true),
+		"planned_walls": planned_walls.duplicate(true),
+		"paid_batches": paid_batches.duplicate(),
+		"batch_sizes": batch_sizes.duplicate(),
 		"next_object_id": _next_object_id,
 		"next_stairs_id": _next_stairs_id,
 	}
@@ -1328,6 +1364,10 @@ func load_data(data: Dictionary, find_object: Callable) -> void:
 	wall_paints.assign(data.get("wall_paints", {}).duplicate(true))
 	slant_paints.assign(data.get("slant_paints", {}).duplicate(true))
 	piece_styles.assign(data.get("piece_styles", {}).duplicate(true))
+	planned_floors.assign(data.get("planned_floors", {}).duplicate(true))
+	planned_walls.assign(data.get("planned_walls", {}).duplicate(true))
+	paid_batches.assign(data.get("paid_batches", {}))
+	batch_sizes.assign(data.get("batch_sizes", {}))
 	objects.clear()
 	for entry: Array in data.get("objects", []):
 		var def: ObjectDef = find_object.call(entry[1])
@@ -1400,6 +1440,13 @@ func demolish_cells(cells: Array[Vector2i]) -> void:
 
 func _demolish(cells: Array[Vector2i], edges: Array) -> void:
 	var count := 0
+	for cell in cells:
+		if planned_floors.erase(cell):
+			floor_heights.erase(cell)
+			count += 1
+	for edge: Vector3i in edges:
+		if planned_walls.erase(edge):
+			count += 1
 	for cell in cells:
 		count += _clear_floor(Rect2i(cell, Vector2i.ONE))
 	var inside: Dictionary[Vector2i, bool] = {}

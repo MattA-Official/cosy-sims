@@ -286,9 +286,9 @@ func _join_floors(n: int) -> void:
 				continue
 			var next_cell: Vector2i = cell + BuildingMap.DIRECTIONS[tag]
 			var edge := BuildingMap.edge_between(cell, next_cell)
-			var kind := map.wall_at(edge)
-			if kind != BuildingMap.Wall.NONE and kind != BuildingMap.Wall.DOOR:
+			if not map.passable(edge):
 				continue
+			var kind := map.wall_at(edge)
 			var door_key := Vector4i(n, edge.x, edge.y, edge.z)
 			if map.door_has_steps(edge):
 				# Door steps make up the difference; the low side's tile is
@@ -395,8 +395,7 @@ func _add_lifts() -> void:
 					Vector3(middle.x, map.floor_height(cell), middle.y), LIFT_COST)
 			cars.append(car)
 			for d in BuildingMap.DIRECTIONS:
-				var kind := map.wall_at(BuildingMap.edge_between(cell, cell + d))
-				if kind == BuildingMap.Wall.NONE or kind == BuildingMap.Wall.DOOR:
+				if map.passable(BuildingMap.edge_between(cell, cell + d)):
 					_join(car, point_at(n, middle + Vector2(d)))
 		_join(cars[0], cars[1])
 

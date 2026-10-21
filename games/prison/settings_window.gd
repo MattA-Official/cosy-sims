@@ -1,19 +1,22 @@
 class_name SettingsWindow
 extends PanelContainer
-## How the game plays and sounds: difficulty, sentence length and volumes. Changing difficulty
-## starts the Ministry's counts again. Toggle with F4.
+## How the game plays and sounds: difficulty, sentence length, instant
+## building and volumes. Changing difficulty starts the Ministry's counts
+## again. Toggle with F4.
 
 ## A volume slider per sound bus: [bus, words].
 const VOLUMES := [[&"Master", "All sound"], [&"Effects", "Building and the prison"],
 		[&"Interface", "Menus and clicks"], [&"Ambience", "Surroundings"], [&"Music", "Music"]]
 
 var standing: Standing
+var blueprints: Blueprints
 var sentences: Sentences
 
 var _difficulty := OptionButton.new()
 var _about := Label.new()
 var _length := OptionButton.new()
 var _worries := Label.new()
+var _instant := CheckButton.new()
 
 
 func _ready() -> void:
@@ -61,6 +64,12 @@ func _ready() -> void:
 	_length.tooltip_text = "How long new arrivals are sent here for. Prisoners already here keep theirs."
 	_length.item_selected.connect(func(index: int) -> void: sentences.length = index as Sentences.Length)
 	box.add_child(_row("Sentence length", _length))
+	_instant.focus_mode = FOCUS_NONE
+	_instant.tooltip_text = "On, everything goes up the moment you place it. Off, walls, floors, doors and windows go down as blueprints for handymen to build, paid for when they start. Objects are always instant."
+	_instant.toggled.connect(func(on: bool) -> void:
+		if blueprints != null:
+			blueprints.instant = on)
+	box.add_child(_row("Instant building", _instant))
 	box.add_child(HSeparator.new())
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()
@@ -102,3 +111,5 @@ func refresh() -> void:
 	_worries.visible = not standing.warnings.is_empty()
 	if sentences != null:
 		_length.select(sentences.length)
+	if blueprints != null:
+		_instant.set_pressed_no_signal(blueprints.instant)

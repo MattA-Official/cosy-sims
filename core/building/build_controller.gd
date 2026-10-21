@@ -237,6 +237,8 @@ var build_costs: BuildCosts
 ## (StringName) -> ObjectDef, for putting the map back when a move doesn't
 ## fit.
 var find_object: Callable
+## Building over time. Optional: without it everything goes up at once.
+var blueprints: Blueprints
 ## Templates to take up with the move tool. Optional.
 var templates: TemplateStore
 ## What Ctrl+C copied last, shared by every game in the session.
@@ -752,6 +754,9 @@ func _drop_price() -> int:
 		return 0
 	if _pasting:
 		return build_costs.clip_price(_carried, true)
+	if blueprints != null and not blueprints.instant:
+		# The walls and floor are planned again, and paid for when built.
+		return 0
 	return build_costs.clip_price(_carried, false) if _carried.is_structure() else 0
 
 
@@ -787,15 +792,21 @@ func _put_carried(at: Vector2i) -> String:
 		if not clip.taken.is_empty():
 			map.demolish_cells(clip.taken)
 	var area := Rect2i(at, clip.size)
+	if blueprints != null:
+		blueprints.hold()
 	var misfits := clip.put(map, at, build_height(area) if clip.is_structure() else 0.0, lifted)
 	if misfits > 0:
 		map.load_data(before, find_object)
+		if blueprints != null:
+			blueprints.release()
 		if build_costs != null:
 			build_costs.resume()
 		return "It doesn't fit there." if misfits == clip.objects.size() else \
 				"Some of the furniture doesn't fit there."
 	if clip.is_structure():
 		settle_ground(area)
+	if blueprints != null:
+		blueprints.release()
 	if build_costs != null:
 		# A paste pays for what it added; a move for its structure anew.
 		build_costs.resume(maxi(build_costs.worth() - worth_before, 0) if _pasting else price)
@@ -1481,7 +1492,7 @@ func _draw_preview() -> void:
 			_shapes.slant(key, ok_colour if ok else bad_colour)
 		Tool.OPENING:
 			var edge := _hover_edge()
-			var ok := map.wall_at(edge) != BuildingMap.Wall.NONE
+			var ok := map.wall_at(edge) != BuildingMap.Wall.NONE or map.planned_walls.has(edge)
 			if opening == BuildingMap.Wall.WINDOW and map.is_outdoor_wall(edge):
 				ok = false
 			if opening == BuildingMap.Wall.DOOR and not map.can_put_door(edge):

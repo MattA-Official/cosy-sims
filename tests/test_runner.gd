@@ -96,6 +96,7 @@ func _process(_delta: float) -> bool:
 	_test_move_and_copy()
 	_test_templates()
 	_test_build_feel()
+	_test_blueprints()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4327,6 +4328,75 @@ func _test_build_feel() -> void:
 	effects = feel.get_child_count()
 	map.demolish(Rect2i(spot, Vector2i(3, 3)))
 	_check(feel.get_child_count() > effects, "and demolishing puffs up dust")
+	main.free()
+
+
+func _test_blueprints() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var map: BuildingMap = main.map
+	var blueprints: Blueprints = main.blueprints
+	var controller: BuildController = main.controller
+	var ledger: Ledger = main.ledger
+	var jobs: JobBoard = main.jobs
+	var clock: GameClock = main.clock
+	clock.speed_index = 0
+	ledger.sandbox = false
+	ledger.balance = 50000
+	_check(blueprints.instant, "a sample opened to try things out builds at once")
+	blueprints.instant = false
+	var land: Rect2i = map.land_bounds()
+	var rect := Rect2i()
+	for z in range(land.end.y - 8, land.position.y, -1):
+		for x in range(land.end.x - 8, land.position.x, -1):
+			if not map.in_use(Rect2i(x - 2, z - 2, 8, 8)) and map.owns(Vector2i(x - 2, z - 2)):
+				rect = Rect2i(x, z, 3, 3)
+				break
+		if rect.has_area():
+			break
+	controller.tool = BuildController.Tool.ROOM
+	var before := ledger.balance
+	map.build_room(rect)
+	_check(not map.has_floor(rect.position) and map.planned_floors.size() == 9 and map.planned_walls.size() == 12,
+			"with instant building off, a room goes down as a blueprint")
+	_check(ledger.balance == before, "and costs nothing yet")
+	_check(not map.can_walk_between(rect.position, rect.position + Vector2i(-1, 0)),
+			"its planned walls already stop people")
+	var door := BuildingMap.edge_between(rect.position + Vector2i(1, 2), rect.position + Vector2i(1, 3))
+	map.set_door(door, true)
+	_check(map.planned_walls[door][0] == BuildingMap.Wall.DOOR, "a door in a planned wall is planned too")
+	var job: Job = jobs.of_kind(&"build")[0] if not jobs.of_kind(&"build").is_empty() else null
+	_check(job != null and jobs.of_kind(&"build").size() == 1, "and a job goes up for a handyman (%s)" % jobs.of_kind(&"build").size())
+	controller.tool = BuildController.Tool.NONE
+	var bed := PrisonCatalogue.object(&"bed")
+	_check(map.place_object(bed, Vector2(rect.position), 0) != 0, "objects can go on planned floor straight away")
+	var minutes := 0
+	var built_some := false
+	while not map.planned_floors.is_empty() or not map.planned_walls.is_empty():
+		clock.advance(1.0)
+		blueprints._process(0.0)
+		minutes += 1
+		built_some = built_some or (map.has_floor(rect.position) and not map.planned_walls.is_empty())
+		if minutes > 600:
+			break
+	_check(map.has_floor(rect.position) and map.has_floor(rect.end - Vector2i.ONE)
+			and map.wall_at(door) == BuildingMap.Wall.DOOR, "a handyman builds it, door and all (%d min)" % minutes)
+	_check(built_some, "floor first, then the walls")
+	var floor_price := map.floor_def(BuildingMap.DEFAULT_FLOOR).price
+	_check(before - ledger.balance >= 9 * floor_price and before - ledger.balance < 9 * floor_price + 13 * 300,
+			"paid for once, when work started (%d)" % (before - ledger.balance))
+	_check(jobs.of_kind(&"build").is_empty(), "and the job is done")
+	# Cancelling a plan before work starts is free.
+	controller.tool = BuildController.Tool.ROOM
+	var other := Rect2i(rect.position + Vector2i(0, -5), Vector2i(2, 2))
+	map.build_room(other)
+	before = ledger.balance
+	_check(not map.planned_floors.is_empty(), "another plan")
+	controller.tool = BuildController.Tool.DEMOLISH
+	map.demolish(other)
+	_check(map.planned_floors.is_empty() and map.planned_walls.is_empty() and ledger.balance == before
+			and jobs.of_kind(&"build").is_empty(), "is cancelled with the demolish tool, for nothing")
 	main.free()
 
 

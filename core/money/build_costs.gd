@@ -97,6 +97,22 @@ func resume(charge := 0) -> void:
 		ledger.add(-charge, line)
 
 
+## A tile of floor in a style.
+func floor_price(style: StringName) -> int:
+	var def := building.ground().floor_def(style)
+	return def.price if def != null else 0
+
+
+## A length of straight wall as it will be: [kind, style, window kind,
+## door kind], as BuildingMap.planned_walls keeps them. `new_wall` adds
+## the wall itself, not just its door or window.
+func wall_entry_price(entry: Array, new_wall := true) -> int:
+	var sum := _opening_price(entry[0], entry[3], entry[2])
+	if new_wall:
+		sum += _wall_price(building.ground().wall_def(entry[1]), 1.0)
+	return sum
+
+
 ## What building a clip new would cost: its floor, walls, doors and
 ## windows, and its objects if asked.
 func clip_price(clip: BuildClip, with_objects := true) -> int:

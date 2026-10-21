@@ -114,6 +114,7 @@ static func capture(main: Node) -> Dictionary:
 		"staff": (main.roster as StaffRoster).capture(),
 		"entrance": (main.shifts as Shifts).entrance.duplicate(),
 		"routes": routes,
+		"instant_building": (main.blueprints as Blueprints).instant,
 		"money": {"balance": ledger.balance, "sandbox": ledger.sandbox, "today": ledger.today.duplicate(),
 				"yesterday": ledger.yesterday.duplicate(), "closing": ledger.closing.duplicate(),
 				"spent": ledger.spent.duplicate()},
@@ -265,6 +266,8 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	(main.searching as Searching).found_today.assign(searching.get("found", []))
 	items.changed.emit()
 	items.floor_changed.emit()
+	# Saves from before blueprints built at once.
+	(main.blueprints as Blueprints).instant = data.get("instant_building", true)
 	var money: Dictionary = data.get("money", {})
 	var ledger: Ledger = main.ledger
 	ledger.balance = money.get("balance", ledger.balance)
