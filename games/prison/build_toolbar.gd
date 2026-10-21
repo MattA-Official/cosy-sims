@@ -77,7 +77,8 @@ const WATER_MODES := [
 ]
 
 const LAND_MODES := [
-	[true, "Buy land", "money", "Buy a strip of land along one side."],
+	[1, "Buy land", "money", "Buy plots next to your land, one at a time or several with a drag."],
+	[2, "Sell land", "money", "Sell empty plots back for half what they cost."],
 ]
 
 ## Each is [wall kind, window kind, name, icon, what it does].
@@ -370,12 +371,14 @@ func _add_brush_choices() -> void:
 	_icon_tiles("Water", WATER_MODES, controller.water_mode if not buying else null,
 			func(mode: BuildController.WaterMode) -> void: _terrain_mode(mode, false), group)
 	if controller.land_plots != null:
-		_icon_tiles("Land", LAND_MODES, buying if buying else null,
-				func(_buy: bool) -> void: _terrain_mode(BuildController.WaterMode.NONE, true), group)
-	if buying:
+		_icon_tiles("Land", LAND_MODES, (2 if controller.selling_land else 1) if buying else null,
+				func(mode: Variant) -> void:
+					controller.selling_land = mode == 2
+					_terrain_mode(BuildController.WaterMode.NONE, true), group)
+	if buying and not controller.selling_land:
 		var flatten := CheckBox.new()
 		flatten.text = "Flatten when bought"
-		flatten.tooltip_text = "Level the new plot with your land along their shared edge, for a fee."
+		flatten.tooltip_text = "Level new plots with your land along their shared edges, for a fee."
 		flatten.button_pressed = controller.flatten_land
 		flatten.toggled.connect(func(on: bool) -> void:
 			controller.flatten_land = on
@@ -388,7 +391,7 @@ func _add_brush_choices() -> void:
 ## Switches the terrain tool between sculpting, water and buying land, laying
 ## the options out again when buying land comes or goes.
 func _terrain_mode(water: BuildController.WaterMode, buy: bool) -> void:
-	var relay := buy != controller.buying_land
+	var relay := buy != controller.buying_land or buy
 	controller.water_mode = water
 	controller.buying_land = buy
 	_hint.text = controller.hint()

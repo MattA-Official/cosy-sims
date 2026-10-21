@@ -26,6 +26,9 @@ var _name := LineEdit.new()
 var _start_about := Label.new()
 var _difficulty_about := Label.new()
 var _start := -1
+var _map_size := 0
+var _map_box: Control
+var _map_about := Label.new()
 var _difficulty := 2
 var _length := Sentences.Length.NORMAL
 var _extras: Dictionary[String, bool] = {}
@@ -79,6 +82,21 @@ func _ready() -> void:
 	_start_about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_start_about)
 
+	# Only empty land comes in sizes; the samples are laid out already.
+	_map_box = VBoxContainer.new()
+	_map_box.add_child(_heading("Map size"))
+	var sizes: Array = []
+	var offered := _offered_sizes()
+	for i in offered.size():
+		sizes.append([offered[i].display_name, i])
+	_map_box.add_child(_choices(sizes, _map_size, func(value: int) -> void:
+		_map_size = value
+		_show_about()))
+	_map_about.theme_type_variation = &"SubtleLabel"
+	_map_about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_map_box.add_child(_map_about)
+	box.add_child(_map_box)
+
 	box.add_child(_heading("Difficulty"))
 	var levels: Array = []
 	for i in Standing.DIFFICULTIES.size():
@@ -126,6 +144,7 @@ func _go() -> void:
 	NewGame.pending = true
 	NewGame.prison_name = _name.text.strip_edges() if _name.text.strip_edges() != "" else NewGame.random_name()
 	NewGame.start = _start
+	SamplePrisons.next_map_size = _offered_sizes()[_map_size].id
 	NewGame.sentence_length = _length
 	NewGame.staff_cars = _extras.staff_cars
 	NewGame.split_levels = _extras.split_levels
@@ -137,6 +156,12 @@ func _go() -> void:
 func _show_about() -> void:
 	_start_about.text = EMPTY_ABOUT if _start < 0 else START_ABOUT.get(_start, SamplePrisons.CHALLENGES[_start])
 	_difficulty_about.text = Standing.DIFFICULTIES[_difficulty].description
+	_map_box.visible = _start < 0
+	_map_about.text = _offered_sizes()[_map_size].description
+
+
+func _offered_sizes() -> Array:
+	return PrisonCatalogue.MAP_SIZES.filter(func(d: MapSizeDef) -> bool: return d.offered)
 
 
 func _heading(text: String) -> Label:

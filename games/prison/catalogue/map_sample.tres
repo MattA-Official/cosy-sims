@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MapSizeDef" format=3]
+
+[ext_resource type="Script" path="res://core/building/map_size_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"sample"
+display_name = "Sample"
+description = "The ready-made samples: 2 × 2 plots, up to 4 × 4."
+plots = 4
+start_plots = 2
+margin = 24
+offered = false

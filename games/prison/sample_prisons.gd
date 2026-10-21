@@ -25,8 +25,12 @@ const CHALLENGES: Array[String] = [
 	"The paying prison with a classroom and a counselling room off the yard: a teacher runs Reading and a counsellor Calm Minds in the afternoon Learn block, and prisoners work towards parole and release.",
 ]
 
-## Set before reloading the scene to start in a different sample.
+## Set before reloading the scene to start in a different sample, or on
+## EMPTY land.
 static var next := -1
+const EMPTY := -2
+## The map size for the next prison started on empty land.
+static var next_map_size: StringName = &"small"
 
 
 ## Everything a sample builds on.
@@ -37,6 +41,8 @@ class Site:
 	var foliage: FoliageLayer
 	var paths: PathNetwork
 	var people: People
+	## The land for sale, in tiles.
+	var area := Rect2i()
 	## Staff wanted on the night shift, by role, for samples with staff.
 	var night_staff: Dictionary[StringName, int] = {}
 	## Places on each course, by course id, for samples with classrooms.
@@ -79,7 +85,7 @@ static func _starter(site: Site) -> void:
 	_landscape(site)
 	var o := site.land().get_center() - Vector2i(8, 7)
 	SampleLayout.build(site.map(), o)
-	StartingLandscape.plant(site.foliage, site.terrain, site.map(), o)
+	StartingLandscape.plant(site.foliage, site.terrain, site.map(), o, 7, true, site.area)
 	for i in 6:
 		site.people.add_person(0, Vector2(o) + Vector2(1.5 + i * 1.7, 3.5 + (i % 2)))
 
@@ -565,12 +571,14 @@ static func _kitchen(ground: BuildingMap, canteen: Rect2i) -> void:
 static func _landscape(site: Site, base: Callable = Callable()) -> void:
 	var land := site.land()
 	var pond := Vector2(land.end.x + 9, land.get_center().y + 6)
-	StartingLandscape.shape(site.terrain, land, pond, 6.0, 7, base)
+	StartingLandscape.shape(site.terrain, land, pond, 6.0, 7, base, site.area)
 	site.water.fill_at(Vector2i(pond))
+	var clear: Array[Vector2] = [pond]
+	StartingLandscape.features(site.building, site.terrain, site.water, site.foliage, site.area, land, clear)
 
 
 static func _plant(site: Site, garden := false) -> void:
-	StartingLandscape.plant(site.foliage, site.terrain, site.map(), site.land().position, 7, garden)
+	StartingLandscape.plant(site.foliage, site.terrain, site.map(), site.land().position, 7, garden, site.area)
 
 
 static func _room(map: BuildingMap, rect: Rect2i, floor_style: StringName = &"concrete",

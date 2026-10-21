@@ -16,6 +16,9 @@ var capture: Callable
 ## (Dictionary) -> void: puts the world back as a capture left it.
 var restore: Callable
 
+## () -> bool: something else to undo once every step is undone, such as
+## the latest land bought. Optional.
+var nothing_to_undo: Callable
 var _undo: Array[Dictionary] = []
 var _redo: Array[Dictionary] = []
 var _current: Dictionary = {}
@@ -42,7 +45,7 @@ func can_redo() -> bool:
 func undo() -> bool:
 	_flush()
 	if _undo.is_empty():
-		return false
+		return nothing_to_undo.call() if nothing_to_undo.is_valid() else false
 	_redo.append(_current)
 	_put_back(_undo.pop_back())
 	undone.emit()

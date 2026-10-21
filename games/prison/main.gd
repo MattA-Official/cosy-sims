@@ -170,6 +170,8 @@ var pause_menu := PauseMenu.new()
 var attract := false
 ## The prison's name in saves: the sample's, or the save's it was loaded from.
 var title := "My prison"
+## How big the map is: the plots for sale and the ground round them.
+var map_size: MapSizeDef
 ## The F3 inspector for people, objects and rooms.
 var inspector := Inspector.new()
 ## Grid lines at the height of the level being built on, off the ground.
@@ -195,8 +197,18 @@ func _ready() -> void:
 	Building.split_levels = split_levels
 	Building.door_steps = door_steps
 	CarPark.enabled = staff_cars
-	# The grid is the whole world; you start owning the middle of it.
-	var land := Rect2i(grid.size / 4, grid.size / 2)
+	if SamplePrisons.next == SamplePrisons.EMPTY:
+		sample = -1
+		SamplePrisons.next = -1
+	elif SamplePrisons.next >= 0:
+		sample = SamplePrisons.next
+		SamplePrisons.next = -1
+	# The grid is the whole world: the land for sale in plots, with a margin
+	# round it fading into fog. You start owning plots in the middle.
+	map_size = _choose_map_size()
+	grid.size = Vector2i.ONE * map_size.tiles(LandPlots.SIZE)
+	terrain.size = grid.size
+	var land := map_size.start(LandPlots.SIZE)
 	building = Building.new(land, PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
 	map = building.ground()
 	view.room_types = PrisonCatalogue.ROOM_TYPES
@@ -295,6 +307,7 @@ func _ready() -> void:
 	day_night.sun = sun
 	day_night.environment = world_environment.environment
 	day_night.clock = clock
+	day_night.fog_material = terrain.ground_material as ShaderMaterial
 	add_child(day_night)
 	level_grid.name = "LevelGrid"
 	level_grid.grid = grid
@@ -311,10 +324,8 @@ func _ready() -> void:
 	inspector.clock = clock
 	inspector.runner = runner
 	grid.add_child(inspector)
-	if SamplePrisons.next >= 0:
-		sample = SamplePrisons.next
-		SamplePrisons.next = -1
 	var site := SamplePrisons.Site.new()
+	site.area = map_size.area(LandPlots.SIZE)
 	site.building = building
 	site.terrain = terrain
 	site.water = water
@@ -621,6 +632,15 @@ func _ready() -> void:
 	land_plots.terrain = terrain
 	land_plots.water = water
 	land_plots.ledger = ledger
+	land_plots.paths = paths
+	land_plots.clock = clock
+	land_plots.area = map_size.area(LandPlots.SIZE)
+	if map_size.margin > 0:
+		var area_rect := Rect2(land_plots.area)
+		(terrain.ground_material as ShaderMaterial).set_shader_parameter("fog_rect",
+				Vector4(area_rect.position.x, area_rect.position.y, area_rect.size.x, area_rect.size.y) * grid.cell_size)
+	for key: Vector2i in saved.get("land_paid", {}):
+		land_plots.paid[key] = saved["land_paid"][key]
 	controller.land_plots = land_plots
 	controller.land_refused.connect(func() -> void:
 		Toasts.post("Not enough money", "That plot costs more than you have."))
@@ -872,6 +892,11 @@ func _ready() -> void:
 	land_plots.bought.connect(func(_plot: Rect2i) -> void:
 		_extend_roads(tunnel_ends)
 		undo.reset())
+	# With nothing left to undo, the latest land bought goes back for a full
+	# refund, within the hour.
+	undo.nothing_to_undo = land_plots.undo_last
+	# Land given back stays given back.
+	land_plots.sold.connect(func(_plot: Rect2i) -> void: undo.reset())
 	jobs_panel.name = "JobsPanel"
 	jobs_panel.debug_overlay = debug_overlay
 	jobs_panel.jobs = jobs
@@ -885,7 +910,12 @@ func _ready() -> void:
 		get_tree().reload_current_scene()
 	inspector.offer_samples(SamplePrisons.NAMES, SamplePrisons.CHALLENGES, sample, load_sample)
 
-	camera_rig.bounds = grid.world_rect()
+	var area := Rect2(land_plots.area)
+	camera_rig.bounds = Rect2(grid.to_global(Vector3(area.position.x, 0, area.position.y)).x,
+			grid.to_global(Vector3(area.position.x, 0, area.position.y)).z, area.size.x, area.size.y) \
+			if area.has_area() else grid.world_rect()
+	# Far enough out to see the land for sale.
+	camera_rig.max_distance = maxf(camera_rig.max_distance, area.size.x * 0.55)
 	camera_rig.position = grid.centre()
 	camera_rig.focus_on(grid.centre())
 
@@ -1182,10 +1212,13 @@ func _extend_roads(ends: Array) -> void:
 		if not land.grow(-Roads.EDGE).has_point(from):
 			continue
 		var to := from
-		while land.has_point(to + out * 0.5):
+		while map.owns(Vector2i((to + out * 0.5).floor())):
 			to += out * 0.5
 		to = to.clamp(land.position, land.end)
-		if water.body_at(Vector2i(((from + to) * 0.5).floor())) == null:
+		var strip := Rect2(from, to - from).abs().grow(PrisonCatalogue.path(&"road").width * 0.5)
+		# Not through a pond, or a barn that came with the land.
+		if water.body_at(Vector2i(((from + to) * 0.5).floor())) == null \
+				and not building.in_use(Rect2i(Vector2i(strip.position.floor()), Vector2i(strip.size.ceil()))):
 			_road_between(from, to)
 
 
@@ -1266,6 +1299,19 @@ func _process(_delta: float) -> void:
 
 
 ## The build and the land as plain data, for undo and saving.
+## A save's map size (older saves had no plots), a sample's, or the one
+## chosen for a new prison.
+func _choose_map_size() -> MapSizeDef:
+	var def: MapSizeDef = null
+	if not PrisonSave.pending.is_empty():
+		def = PrisonCatalogue.map_size(PrisonSave.pending.get("map_size", &"legacy"))
+	elif build_sample_layout and sample >= 0:
+		def = PrisonCatalogue.map_size(&"sample")
+	else:
+		def = PrisonCatalogue.map_size(SamplePrisons.next_map_size)
+	return def if def != null else PrisonCatalogue.MAP_SIZES[0]
+
+
 func capture_world() -> Dictionary:
 	return {
 		"building": building.to_data(),

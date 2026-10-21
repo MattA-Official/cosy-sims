@@ -19,6 +19,12 @@ extends Node
 @export var night_ambient := 0.22
 @export var night_sky_top := Color(0.12, 0.16, 0.32)
 @export var night_sky_horizon := Color(0.25, 0.28, 0.45)
+## The fog past the edge of the map, by day and by night. The sky below
+## the horizon takes it too, so the ground melts into it.
+@export var day_fog := Color(0.74, 0.81, 0.76)
+@export var night_fog := Color(0.2, 0.23, 0.33)
+## The ground's material, whose fog_colour follows the light. Optional.
+var fog_material: ShaderMaterial
 
 var clock: GameClock
 ## Keeps it midday whatever the time.
@@ -76,6 +82,11 @@ func apply() -> void:
 	if sky != null:
 		sky.sky_top_color = night_sky_top.lerp(_day_sky_top, light)
 		sky.sky_horizon_color = night_sky_horizon.lerp(_day_sky_horizon, light)
+		var fog := night_fog.lerp(day_fog, light)
+		sky.ground_horizon_color = fog
+		sky.ground_bottom_color = fog
+		if fog_material != null:
+			fog_material.set_shader_parameter("fog_colour", fog)
 
 
 func _sky_material() -> ProceduralSkyMaterial:

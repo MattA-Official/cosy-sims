@@ -62,6 +62,8 @@ static func capture(main: Node) -> Dictionary:
 	return {
 		"version": VERSION,
 		"title": main.title,
+		"map_size": (main.map_size as MapSizeDef).id,
+		"land_paid": (main.land_plots as LandPlots).paid.duplicate(),
 		"world": main.capture_world(),
 		"minutes": (main.clock as GameClock).total_minutes,
 		"people": everyone,

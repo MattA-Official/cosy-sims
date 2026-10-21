@@ -110,6 +110,17 @@ func add_land(rect: Rect2i) -> void:
 		map.add_land(rect)
 
 
+func remove_land(rect: Rect2i) -> void:
+	land.assign(BuildingMap.subtract_rect(land, rect))
+	for map: BuildingMap in levels.values():
+		map.remove_land(rect)
+
+
+## Whether anything is built in a rectangle on any level.
+func in_use(rect: Rect2i) -> bool:
+	return levels.values().any(func(map: BuildingMap) -> bool: return map.in_use(rect))
+
+
 ## Levels in order from the lowest basement up.
 func sorted_levels() -> Array[int]:
 	var out: Array[int] = []
