@@ -24,6 +24,8 @@ const SECTIONS := [
 		["V", "Change an object's look"],
 		["[ / ]", "Turn step, or brush size"],
 		["F", "Hold to turn to face the mouse"],
+		["I or middle-click", "Eyedropper: pick up what's under the mouse"],
+		["Ctrl+Z / Ctrl+Y", "Undo or redo; undo gives back land bought this hour"],
 	]],
 	["Time and the book", [
 		["Space", "Pause, or carry on"],

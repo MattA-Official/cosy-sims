@@ -92,6 +92,7 @@ func _process(_delta: float) -> bool:
 	_test_escape_plans()
 	_test_budget()
 	_test_staff_roster()
+	_test_readout_and_eyedropper()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4133,6 +4134,42 @@ func _test_escape_plans() -> void:
 	_check(not plans.quiet_at(cut.spot), "a guard nearby stops the cutting")
 	clock.advance(5.0)
 	_check(not plans.plans.has(cutter), "and finds the cut")
+	main.free()
+
+
+func _test_readout_and_eyedropper() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 0
+	root.add_child(main)
+	var controller: BuildController = main.controller
+	var map: BuildingMap = main.map
+	var land: Rect2i = map.land_bounds()
+	var spot := land.end - Vector2i(10, 10)
+	controller.tool = BuildController.Tool.ROOM
+	controller._has_hover = true
+	controller._dragging = true
+	controller._drag_start_cell = spot
+	controller._hover_point = Vector2(spot + Vector2i(3, 2)) + Vector2(0.5, 0.5)
+	var said: Array = controller.readout()
+	var floor_price := map.floor_def(controller.floor_style).price
+	var wall_price := map.wall_def(controller.wall_style).price
+	_check(said.size() == 2 and (said[0] as String).begins_with("4 × 3")
+			and (said[0] as String).ends_with(Ledger.text(12 * floor_price + 14 * wall_price)) and said[1],
+			"dragging a room shows its size and cost")
+	(main.ledger as Ledger).sandbox = false
+	(main.ledger as Ledger).balance = 10
+	_check(not controller.readout()[1], "and says when you can't afford it")
+	controller._dragging = false
+	# The eyedropper picks up what's under the mouse.
+	var placed: BuildingMap.PlacedObject = map.objects.values()[0]
+	controller._hover_point = placed.centre
+	_check(controller.eyedrop() and controller.tool == BuildController.Tool.OBJECT
+			and controller.object_def == placed.def, "the eyedropper picks up an object")
+	var floored: Vector2i = map.floors.keys()[0]
+	controller._hover_point = Vector2(floored) + Vector2(0.5, 0.5)
+	if map.object_at(controller._hover_point) == null:
+		_check(controller.eyedrop() and controller.tool == BuildController.Tool.FLOOR
+				and controller.floor_style == map.floors[floored], "and a floor")
 	main.free()
 
 

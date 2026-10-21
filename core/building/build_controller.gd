@@ -222,6 +222,10 @@ var plant_density := 1.0:
 		plant_density = clampf(value, MIN_PLANT_DENSITY, 1.0)
 		brush_changed.emit()
 
+## () -> int: money to hand, so readouts can say when you can't afford
+## something. Optional.
+var balance: Callable
+
 ## Makes the floor and wall tools remove instead of build, as if Ctrl were
 ## held. Mainly for tests.
 var force_erase := false
@@ -238,6 +242,7 @@ var _preview_material := MeshShapes.vertex_colour_material(true)
 var _shapes := PreviewShapes.new()
 var _drag_start_point := Vector2.ZERO
 var _free_rotating := false
+var _middle_from := Vector2.INF
 var _rotate_anchor := Vector2.ZERO
 var _path_preview := MeshInstance3D.new()
 var _path_status := ""
@@ -298,6 +303,13 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	# A middle click that doesn't drag the camera is the eyedropper.
+	var middle := event as InputEventMouseButton
+	if middle != null and middle.button_index == MOUSE_BUTTON_MIDDLE and tool != Tool.NONE:
+		if middle.pressed:
+			_middle_from = middle.position
+		elif middle.position.distance_to(_middle_from) < 4.0:
+			eyedrop()
 	# Finish a drag even if the button is let go over the toolbar.
 	if event is InputEventMouseButton and not event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
@@ -356,6 +368,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_brush_bigger") and _uses_brush():
 		brush_radius = minf(brush_radius + 1.0, max_brush_radius)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("build_eyedropper") and tool != Tool.NONE:
+		eyedrop()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_toggle_walls"):
 		next_wall_view()
@@ -1308,6 +1323,116 @@ func _buying() -> bool:
 
 ## The plots a click or drag picks: those for sale (or, selling, yours)
 ## under it.
+## What the drag or hover under the mouse would build and cost, for a label
+## at the cursor: [text, affordable], or [] when there's nothing to say.
+func readout() -> Array:
+	if not _has_hover or map == null:
+		return []
+	match tool:
+		Tool.ROOM when _dragging:
+			var rect := _drag_rect()
+			return _priced("%d × %d" % [rect.size.x, rect.size.y], _room_cost(rect))
+		Tool.FLOOR when _dragging and floor_mode == FloorMode.LAY:
+			var rect := _drag_rect()
+			if _erasing():
+				return ["%d × %d" % [rect.size.x, rect.size.y], true]
+			var cells := {}
+			for piece in planned_floor():
+				if map.floors.get(piece.cell, &"") != floor_style:
+					cells[piece.cell] = true
+			var def := map.floor_def(floor_style)
+			return _priced("%d × %d" % [rect.size.x, rect.size.y], cells.size() * (def.price if def != null else 0))
+		Tool.WALL when _dragging and wall_mode == WallMode.BUILD:
+			var end := _wall_end_corner()
+			var length := Vector2(_drag_start_corner).distance_to(Vector2(end))
+			var words := "%s m" % (str(roundi(length)) if is_equal_approx(length, roundf(length)) else "%.1f" % length)
+			if _erasing():
+				return [words, true]
+			var def := map.wall_def(wall_style)
+			var cost := 0
+			for edge in BuildingMap.edges_on_line(_drag_start_corner, end):
+				if map.wall_at(edge) == BuildingMap.Wall.NONE:
+					cost += def.price if def != null else 0
+			for key in BuildingMap.slants_on_line(_drag_start_corner, end):
+				if map.slant_at(key) == BuildingMap.Wall.NONE:
+					cost += roundi((def.price if def != null else 0) * Vector2(key.x, key.y).distance_to(Vector2(key.z, key.w)))
+			return _priced(words, cost)
+		Tool.DEMOLISH when _dragging:
+			var rect := _drag_rect()
+			return ["%d × %d" % [rect.size.x, rect.size.y], true]
+		Tool.OBJECT when object_def != null and object_def.price > 0:
+			return _priced(object_def.display_name, object_def.price)
+		Tool.ROOM_TYPE when room_type != null:
+			var room := map.room_at_point(_hover_point)
+			if room == null:
+				return []
+			var problems := room_type.problems(room, map)
+			if problems.is_empty():
+				return ["Ready to be a %s" % room_type.display_name.to_lower(), true]
+			return ["%s:\n%s" % [room_type.display_name, "\n".join(problems)], false]
+	return []
+
+
+## A room's floor and its new walls, at the chosen styles.
+func _room_cost(rect: Rect2i) -> int:
+	var floor_def := map.floor_def(floor_style)
+	var wall_def := map.wall_def(wall_style)
+	var cost := 0
+	for cell in BuildingMap.cells_in(rect):
+		if map.owns(cell) and map.floors.get(cell, &"") != floor_style:
+			cost += floor_def.price if floor_def != null else 0
+	for edge in BuildingMap.rect_perimeter(rect):
+		if map.wall_at(edge) == BuildingMap.Wall.NONE:
+			cost += wall_def.price if wall_def != null else 0
+	return cost
+
+
+func _priced(words: String, cost: int) -> Array:
+	if cost <= 0:
+		return [words, true]
+	var ok: bool = not balance.is_valid() or balance.call() >= cost
+	return ["%s · %s" % [words, Ledger.text(cost)], ok]
+
+
+## Picks up the style of whatever is under the mouse (an object and its
+## look, a wall, a floor, a path or a plant) and switches to its tool.
+func eyedrop() -> bool:
+	if not _has_hover or map == null:
+		return false
+	var placed := map.object_at(_hover_point)
+	if placed != null:
+		object_def = placed.def
+		object_look = placed.look
+		object_angle = placed.angle
+		tool = Tool.OBJECT
+		return true
+	var edge := _hover_edge()
+	if map.wall_at(edge) != BuildingMap.Wall.NONE and _edge_distance() < 0.25:
+		wall_style = map.wall_style(edge)
+		wall_mode = WallMode.BUILD
+		tool = Tool.WALL
+		return true
+	if foliage != null and _level() == 0:
+		for plant in foliage.plants:
+			if plant.position.distance_to(_hover_point) < 0.6:
+				plant_def = plant.def
+				tool = Tool.PLANTS
+				return true
+	if paths != null and _level() == 0:
+		var near := paths.closest(_hover_point)
+		if not near.is_empty() and near[2] < 0.6:
+			path_tool.style = (near[0] as PathNetwork.Segment).style
+			tool = Tool.PATH
+			return true
+	var cell := _hover_cell()
+	if map.has_floor(cell):
+		floor_style = map.floors[cell]
+		floor_mode = FloorMode.LAY
+		tool = Tool.FLOOR
+		return true
+	return false
+
+
 func _land_choice() -> Array[Rect2i]:
 	var end := _hover_cell()
 	var start := _drag_start_cell if _dragging else end

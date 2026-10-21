@@ -628,6 +628,7 @@ func _ready() -> void:
 	add_child(build_costs)
 	build_costs.start()
 	controller.spending_allowed = ledger.can_spend
+	controller.balance = func() -> int: return 1 << 30 if ledger.sandbox else ledger.balance
 	land_plots.building = building
 	land_plots.terrain = terrain
 	land_plots.water = water
@@ -1011,6 +1012,9 @@ func _add_hud() -> void:
 
 	help_card.sections = PrisonHelp.SECTIONS
 	hud.add_child(help_card)
+	var readout := CursorReadout.new()
+	readout.controller = controller
+	hud.add_child(readout)
 	fail_card.keep_playing = func() -> void:
 		standing.lost = false
 		standing.set_difficulty(Standing.DIFFICULTIES[0])
