@@ -39,6 +39,9 @@ var searches_today := 0
 var shakedown_tonight := false
 var lockup_block: StringName = &"lockup"
 var found_today: Array[String] = []
+## (level, room) -> void: anything else a cell search turns up, such as a
+## tunnel.
+var room_checks: Array[Callable] = []
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -212,6 +215,8 @@ func _search_room(level: int, room: Room) -> void:
 			for i in stash[def]:
 				items.unhide(key, def)
 				_confiscate(owner, def, "in %s" % where)
+	for check in room_checks:
+		check.call(level, room)
 	for owner in owners:
 		people.add_moodlet(owner, searched_moodlet)
 

@@ -117,6 +117,8 @@ var courses := Courses.new()
 var parole := Parole.new()
 ## Going home, postcards and those who come back.
 var release := Release.new()
+## Tunnels and fence cuts.
+var escape_plans := EscapePlans.new()
 var programmes_window := ProgrammesWindow.new()
 ## Difficulty and sentence length, on F4.
 var settings_window := SettingsWindow.new()
@@ -724,6 +726,23 @@ func _ready() -> void:
 	standing.nightly.append(sentences.tick)
 	standing.nightly.append(reform.grade_night)
 	standing.nightly.append(release.nightly)
+	escape_plans.name = "EscapePlans"
+	escape_plans.people = people
+	escape_plans.secure_area = secure_area
+	escape_plans.escapes = escapes
+	escape_plans.security = security
+	escape_plans.cell_size = grid.cell_size
+	escape_plans.height_at = func(level: int, point: Vector2) -> float: return people.nav().height_at(level, point)
+	escape_plans.clock = clock
+	grid.add_child(escape_plans)
+	escape_plans.start()
+	standing.nightly.append(escape_plans.nightly)
+	searching.room_checks.append(escape_plans.search_room)
+	escape_plans.found.connect(func(person: Person, words: String) -> void:
+		Toasts.post("Escape plan found", "%s. %s has it on their record now." % [words, person.name]))
+	escape_plans.broke_out.connect(func(person: Person, kind: StringName) -> void:
+		Toasts.post("Break-out!", "%s came out through %s." % [person.name,
+				"a tunnel" if kind == EscapePlans.TUNNEL else "a cut in the fence"]))
 	standing.report_lines.append(release.report_lines)
 	standing.reform = reform
 	standing.release = release
@@ -750,7 +769,8 @@ func _ready() -> void:
 		if person.group != &"prisoner":
 			return ""
 		var file := sentences.summary(person)
-		var lines := PackedStringArray([file, reform.summary(person), courses.summary(person), parole.summary(person)])
+		var lines := PackedStringArray([file, reform.summary(person), courses.summary(person), parole.summary(person),
+				escape_plans.summary(person)])
 		return "\n".join(Array(lines).filter(func(line: String) -> bool: return not line.is_empty())))
 	standing.report_ready.connect(func(text: String) -> void: Toasts.post("Daily report", text, 12.0))
 	standing.goal_done.connect(func(goal: GoalDef) -> void:

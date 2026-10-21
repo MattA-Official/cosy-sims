@@ -89,6 +89,7 @@ func _process(_delta: float) -> bool:
 	_test_release()
 	_test_balanced_grade()
 	_test_goals_and_difficulty()
+	_test_escape_plans()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4018,4 +4019,74 @@ func _test_goals_and_difficulty() -> void:
 	_check(lost.size() == 1 and standing.warnings.size() == 1 and not standing.warnings[0].contains("nights"),
 			"Standard only warns")
 	_check(PrisonSave.capture(main)["standing"]["difficulty"] == &"standard", "the difficulty saves")
+	main.free()
+
+
+func _test_escape_plans() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 10
+	root.add_child(main)
+	var people: People = main.people
+	var plans: EscapePlans = main.escape_plans
+	var escapes: Escapes = main.escapes
+	var clock: GameClock = main.clock
+	escapes.enabled = true
+	(main.misconduct as Misconduct).enabled = false
+	(main.searching as Searching).random_per_day = 0
+	people.assign_beds()
+	var map: BuildingMap = main.building.ground()
+	var land := map.land_bounds()
+	map.build_walls(BuildingMap.rect_perimeter(land.grow(-6)), &"perimeter_fence")
+	_check((main.secure_area as SecureArea).has_perimeter, "a perimeter to get past")
+	var digger: Person = null
+	for p: Person in people.people:
+		if p.group == &"prisoner" and p.has_bed() and p.bed.x == 0:
+			digger = p
+			break
+	var spoon := PrisonCatalogue.item(&"spoon")
+	var screwdriver := PrisonCatalogue.item(&"screwdriver")
+	digger.pocket.append(spoon)
+	PrisonerFile.of(digger).release_day = clock.day() + 30
+	_check(not plans.should_plot(digger), "a content prisoner doesn't plot")
+	digger.profile["low_nights"] = EscapePlans.PLOT_NIGHTS
+	_check(plans.should_plot(digger), "three miserable nights, time left and a spoon: they plot")
+	var plan := plans.plot(digger)
+	_check(plan != null and plan.kind == EscapePlans.TUNNEL and plan.needed >= 1, "a ground-floor cell means a tunnel")
+	plan.needed = 3
+	plans.work_night()
+	_check(plan.done == 1 and plan.mark != null, "a night's digging leaves a pile of dirt")
+	var room := map.room_at_point(Vector2(plan.spot) + Vector2(0.5, 0.5))
+	plans.search_room(0, room)
+	_check(not plans.plans.has(digger) and digger.record.any(func(r: Array) -> bool: return r[1] == &"escape"),
+			"a cell search finds the tunnel")
+	# Dug through, they break out and run.
+	plan = plans.plot(digger)
+	plan.done = plan.needed - 1
+	var ran: Array = []
+	escapes.running.connect(func(p: Person) -> void: ran.append(p))
+	plans.work_night()
+	_check(not plans.plans.has(digger) and not (main.secure_area as SecureArea).is_secure(Vector2i(digger.flat().floor()))
+			and ran.has(digger), "through the tunnel, out and running")
+	# A fence cut, found by a guard passing.
+	var cutter: Person = null
+	for p: Person in people.people:
+		if p.group == &"prisoner" and p != digger:
+			cutter = p
+			break
+	digger.pocket.clear()
+	cutter.pocket.append(screwdriver)
+	PrisonerFile.of(cutter).release_day = clock.day() + 30
+	for p: Person in people.people.duplicate():
+		if p.role == &"guard":
+			people.remove_person(p)
+	var cut := plans.plot(cutter)
+	_check(cut != null and cut.kind == EscapePlans.FENCE_CUT and cut.needed == EscapePlans.CUT_NIGHTS,
+			"with a screwdriver, a fence cut")
+	plans.work_night()
+	_check(cut.done == 1, "cutting where nobody watches")
+	var guard := people.add_person(0, Vector2(cut.spot) + Vector2(0.5, 0.5), "", &"staff")
+	people.set_role(guard, &"guard")
+	_check(not plans.quiet_at(cut.spot), "a guard nearby stops the cutting")
+	clock.advance(5.0)
+	_check(not plans.plans.has(cutter), "and finds the cut")
 	main.free()

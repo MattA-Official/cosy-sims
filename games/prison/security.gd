@@ -23,6 +23,7 @@ const WEIGHTS: Dictionary[StringName, float] = {
 	&"fight": 1.0,
 	&"knocked_out": 3.0,
 	&"escape": 10.0,
+	&"escape_plan": 3.0,
 	&"sit_in": 1.0,
 	&"death": 20.0,
 }
@@ -33,6 +34,7 @@ const NAMES: Dictionary[StringName, String] = {
 	&"fight": "Fights",
 	&"knocked_out": "Knocked out",
 	&"escape": "Escape attempts",
+	&"escape_plan": "Escape plans found",
 	&"sit_in": "Sit-in hours",
 	&"missing_tool": "Tools missing",
 	&"metal_detector": "Metal detector beeps",

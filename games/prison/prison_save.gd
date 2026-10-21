@@ -92,6 +92,7 @@ static func capture(main: Node) -> Dictionary:
 				"yesterday": (main.parole as Parole).yesterday.duplicate(true),
 				"granted": (main.parole as Parole).granted_total},
 		"sentence_length": (main.sentences as Sentences).length,
+		"escape_plans": (main.escape_plans as EscapePlans).capture(),
 		"release": {"alumni": (main.release as Release).alumni.duplicate(true),
 				"postcards": (main.release as Release).postcards.duplicate(true),
 				"today": (main.release as Release).today_lines.duplicate(),
@@ -292,6 +293,7 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 		if by_id.has(id):
 			parole.queue.append(by_id[id])
 	(main.sentences as Sentences).length = data.get("sentence_length", Sentences.Length.NORMAL)
+	(main.escape_plans as EscapePlans).restore(data.get("escape_plans", []))
 	var release_data: Dictionary = data.get("release", {})
 	var release: Release = main.release
 	release.alumni.assign(release_data.get("alumni", []))
