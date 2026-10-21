@@ -101,6 +101,7 @@ func _process(_delta: float) -> bool:
 	_test_heads()
 	_test_in_tray()
 	_test_perks()
+	_test_visits()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4739,6 +4740,37 @@ func _test_perks() -> void:
 	wanted[0] = false
 	box.morning()
 	_check(box.open.is_empty() and suggester.morale > 50.0, "taking up a suggestion cheers up whoever made it")
+	main.queue_free()
+
+
+func _test_visits() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var visits: Visits = main.visits
+	var people: People = main.people
+	var jobs: JobBoard = main.jobs
+	var prisoners := people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	_check(prisoners.all(func(p: Person) -> bool: return p.needs.has(&"family")), "prisoners miss their family")
+	visits._rng.seed = 3
+	var letters := 0
+	for i in 10:
+		letters += visits.post()
+	_check(letters > 0 and prisoners.any(func(p: Person) -> bool: return p.moodlets.has(&"letter_from_home")),
+			"the morning post brings letters from home")
+	_check(visits.seat_pairs().size() == 1, "the classroom prison's visiting room has a table for one visit")
+	var lonely: Person = prisoners[0]
+	lonely.needs[&"family"] = 5.0
+	_check(visits.start_visits() == 1 and visits.visitors().size() == 1, "family come to see whoever misses them most")
+	var visitor: Person = visits.visitors()[0]
+	_check(visitor.group == &"visitor" and jobs.of_kind(Visits.JOB).size() == 2, "the visitor and the prisoner each sit down for it")
+	visits.visit_done(lonely)
+	_check(is_equal_approx(lonely.needs[&"family"], 100.0) and lonely.moodlets.has(&"had_a_visit"), "a visit fills the family need")
+	visits.end_visits()
+	_check(visits.visitors().is_empty(), "at the end of visiting hours visitors head out")
+	for i in Visits.LEAVE_MINUTES + 1:
+		visits.tick()
+	_check(not people.people.has(visitor), "and leave")
 	main.queue_free()
 
 

@@ -525,6 +525,16 @@ static func _classrooms(ground: BuildingMap, yard: Rect2i) -> void:
 		var at: Vector2 = middle + Vector2(side * 0.6, 0.0)
 		ground.place_object_at(PrisonCatalogue.object(&"armchair"), at, BuildingMap.facing(at, middle))
 	ground.place_object(PrisonCatalogue.object(&"plant_pot"), Vector2(counselling.position) + Vector2(3.5, 0), 0)
+	# A visiting room beyond it, with its own door out, a table for one
+	# visit and a payphone.
+	var visiting := Rect2i(counselling.position + Vector2i(4, 0), Vector2i(4, 3))
+	_room(ground, visiting, &"wood", &"plaster", &"visiting")
+	_door(ground, visiting.position + Vector2i(1, 2), Vector2i.DOWN)
+	var visit_corner := Vector2(visiting.position)
+	ground.place_object(PrisonCatalogue.object(&"table"), visit_corner + Vector2(1, 1), 0)
+	ground.place_object(PrisonCatalogue.object(&"chair"), visit_corner + Vector2(0, 1), 0)
+	ground.place_object(PrisonCatalogue.object(&"chair"), visit_corner + Vector2(3, 1), 0)
+	ground.place_object(PrisonCatalogue.object(&"payphone"), visit_corner + Vector2(3, 0), 0)
 
 
 ## A laundry under the kitchen, through a door from it, with a basket and

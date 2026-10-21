@@ -54,6 +54,7 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/infirmary_bed.tres"),
 	preload("res://games/prison/catalogue/medicine_cabinet.tres"),
 	preload("res://games/prison/catalogue/filing_cabinet.tres"),
+	preload("res://games/prison/catalogue/payphone.tres"),
 	preload("res://games/prison/catalogue/class_desk.tres"),
 	preload("res://games/prison/catalogue/whiteboard.tres"),
 	preload("res://games/prison/catalogue/postcard_board.tres"),
@@ -194,6 +195,7 @@ const NEEDS: Array[NeedDef] = [
 	preload("res://games/prison/catalogue/need_recreation.tres"),
 	preload("res://games/prison/catalogue/need_outdoors.tres"),
 	preload("res://games/prison/catalogue/need_social.tres"),
+	preload("res://games/prison/catalogue/need_family.tres"),
 	preload("res://games/prison/catalogue/need_energy.tres"),
 ]
 
@@ -250,6 +252,9 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_parole_refused.tres"),
 	preload("res://games/prison/catalogue/moodlet_going_home.tres"),
 	preload("res://games/prison/catalogue/moodlet_good_meal.tres"),
+	preload("res://games/prison/catalogue/moodlet_rang_home.tres"),
+	preload("res://games/prison/catalogue/moodlet_letter_from_home.tres"),
+	preload("res://games/prison/catalogue/moodlet_had_a_visit.tres"),
 	preload("res://games/prison/catalogue/moodlet_missed_meal.tres"),
 	preload("res://games/prison/catalogue/moodlet_saw_vandalism.tres"),
 	preload("res://games/prison/catalogue/moodlet_searched.tres"),
@@ -322,6 +327,7 @@ const ROOM_TYPES: Array[RoomTypeDef] = [
 	preload("res://games/prison/catalogue/room_office.tres"),
 	preload("res://games/prison/catalogue/room_training.tres"),
 	preload("res://games/prison/catalogue/room_staff.tres"),
+	preload("res://games/prison/catalogue/room_visiting.tres"),
 ]
 
 

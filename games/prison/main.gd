@@ -122,6 +122,7 @@ var modifiers := Modifiers.new()
 var training := Training.new()
 var suggestions := Suggestions.new()
 var rounds := Rounds.new()
+var visits := Visits.new()
 ## Department heads, hired from the warden's desk.
 var heads := Heads.new()
 ## Request cards for the warden, and what their answers do.
@@ -887,6 +888,17 @@ func _ready() -> void:
 	reform.clock = clock
 	add_child(reform)
 	reform.start()
+	visits.name = "Visits"
+	visits.people = people
+	visits.jobs = jobs
+	visits.building = building
+	visits.progress = reform.progress
+	visits.contraband.assign(PrisonCatalogue.CONTRABAND.filter(func(d: ItemDef) -> bool:
+			return d.id in [&"biscuit", &"spoon", &"screwdriver"]))
+	visits.entrance = func() -> Array: return shifts.entrance
+	visits.clock = clock
+	add_child(visits)
+	visits.start()
 	sentences.name = "Sentences"
 	sentences.people = people
 	sentences.intake = intake
