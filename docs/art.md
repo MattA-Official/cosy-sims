@@ -40,6 +40,9 @@ colours a real prison would plausibly use.
   litter_wrapper.
 - Security: cctv_camera (0.5 x 0.5, 2.2 m post, lens along +z).
 - Memorial: memorial_plaque (0.5 x 0.25, 0.5 m stone stand, brass plate facing +z).
+- Office: filing_cabinet (1 x 1, 1.3 m, two four-drawer cabinets against
+  the wall at -z, drawers to +z), paper_stack_small, paper_stack_tall and
+  paper_stack_teetering (0.3 x 0.22 desk dressing, 0.06 / 0.16 / 0.3 m).
 - Reform and release: class_desk (1 x 0.5, top 0.5, sitter at +z), whiteboard
   (1.5 x 0.25, 1.1 m, writing at +z), armchair (0.75 x 0.75, seat 0.3),
   postcard_board (1 x 0.1 on the wall, 0.6 to 1.2 m up; cards are meshes

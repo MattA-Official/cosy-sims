@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="ObjectDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/paper_stack_teetering.glb" id="2_model"]
 
 [resource]
 script = ExtResource("1_def")
@@ -11,6 +12,7 @@ size = Vector2(0.3, 0.22)
 snap = 1
 height = 0.32
 colour = Color(0.96, 0.95, 0.9, 1)
+model = ExtResource("2_model")
 tags = Array[StringName]([&"decor"])
 price = 0
 sits = 1

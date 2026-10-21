@@ -21,6 +21,7 @@ the wall behind); people face +Y, which is where the game walks them.
 """
 import math
 import os
+import random
 import sys
 
 import bpy  # noqa: E402  (must come before bmesh)
@@ -1259,6 +1260,85 @@ def wall_shelf():
 
 
 
+# ---------------------------------------------------------------- office paperwork
+
+def filing_cabinet():
+    """1 x 1 tile, 1.3 m: two four-drawer cabinets side by side against the
+    wall behind, drawers to the front (Godot +z). One drawer is left a
+    little open with folders peeking out, and a box file sits on top."""
+    p = Prop("filing_cabinet")
+    h, d, yb = 1.3, 0.6, 0.18  # height, depth, centre (towards the wall)
+    for x in (-0.23, 0.23):
+        p.box("paint", (0.44, d, h - 0.03), (x, yb, (h - 0.03) / 2 + 0.03), 0.015, 2)
+        p.box("steel_dark", (0.42, d - 0.04, 0.03), (x, yb, 0.015), 0.006, 1)  # plinth
+        for k in range(4):
+            z = 0.03 + (k + 0.5) * (h - 0.06) / 4
+            out = 0.12 if (x > 0 and k == 1) else 0.0
+            yf = yb - d / 2 - 0.006 - out
+            p.box("paint", (0.4, 0.024, 0.29), (x, yf, z), 0.012, 2)
+            p.box("steel", (0.16, 0.03, 0.025), (x, yf - 0.02, z + 0.06), 0.01, 2)  # handle
+            p.box("steel", (0.09, 0.02, 0.045), (x, yf - 0.012, z + 0.11), 0.004, 1)  # label holder
+            p.box("paper", (0.075, 0.022, 0.03), (x, yf - 0.014, z + 0.11), 0.002, 1)
+            if out:
+                for j, (mat, tilt) in enumerate((("book_d", -6), ("book_a", 4), ("cream", -2), ("book_c", 7))):
+                    p.box(mat, (0.34, 0.012, 0.05), (x, yf + 0.02 + j * 0.028, z + 0.16), 0.004, 1,
+                          rot=(tilt, 0, 0))
+    p.box("book_b", (0.08, 0.3, 0.26), (-0.32, yb + 0.05, h + 0.13), 0.012, 2)  # box file
+    p.cyl("steel", 0.02, 0.012, (-0.32, yb - 0.1, h + 0.19), bevel=0.003, n=12, rot=(90, 0, 0))
+    p.box("cream", (0.3, 0.22, 0.03), (0.15, yb + 0.02, h + 0.015), 0.006, 1, rot=(0, 0, 6))
+    return p
+
+
+def _paper_stack(p, layers, lean=0.0, wobble=1.0, seed=1):
+    """Bundles of A4 piled up from the floor of the prop. `layers` is a list
+    of (material, thickness); each bundle is nudged and turned a little,
+    and `lean` pushes every one further along x than the last."""
+    rng = random.Random(seed)
+    z = 0.0
+    for i, (mat, th) in enumerate(layers):
+        dx = lean * i + rng.uniform(-0.008, 0.008) * wobble
+        dy = rng.uniform(-0.008, 0.008) * wobble
+        turn = rng.uniform(-5, 5) * wobble
+        p.box(mat, (0.29, 0.205, th), (dx, dy, z + th / 2), min(0.004, th / 3), 1, rot=(0, 0, turn))
+        z += th
+    return z
+
+
+PAPER = ("paper", "sheet")
+
+
+def paper_stack_small():
+    """0.3 x 0.22, 0.06 m: a tidy little pile."""
+    p = Prop("paper_stack_small")
+    _paper_stack(p, [(PAPER[i % 2], 0.015) for i in range(4)], seed=3)
+    return p
+
+
+def paper_stack_tall():
+    """0.3 x 0.22, 0.16 m: a pile with a couple of folders in it and a
+    bulldog clip on top."""
+    p = Prop("paper_stack_tall")
+    layers = [("paper", 0.025), ("book_a", 0.012), ("sheet", 0.03), ("paper", 0.025),
+              ("book_d", 0.012), ("sheet", 0.028), ("paper", 0.028)]
+    top = _paper_stack(p, layers, wobble=1.6, seed=5)
+    p.box("steel_dark", (0.05, 0.03, 0.02), (0.0, -0.1, top - 0.004), 0.005, 1)
+    p.tube("steel", [(-0.015, -0.1, top + 0.005), (-0.015, -0.07, top + 0.03)], 0.003, 0, n=6)
+    p.tube("steel", [(0.015, -0.1, top + 0.005), (0.015, -0.07, top + 0.03)], 0.003, 0, n=6)
+    return p
+
+
+def paper_stack_teetering():
+    """0.3 x 0.22, 0.32 m: far too much paper, piled crooked and leaning,
+    with a sheet sliding off the top."""
+    p = Prop("paper_stack_teetering")
+    mats = ("paper", "sheet", "paper", "book_c", "sheet", "paper", "sheet", "book_a",
+            "paper", "sheet", "paper", "cream", "sheet", "paper")
+    layers = [(m, 0.012 if m.startswith("book") or m == "cream" else 0.024) for m in mats]
+    top = _paper_stack(p, layers, lean=0.0045, wobble=3.0, seed=11)
+    p.box("sheet", (0.29, 0.205, 0.003), (0.1, 0.01, top + 0.012), 0.001, 1, rot=(0, -12, 18))
+    return p
+
+
 # ---------------------------------------------------------------- reform and release (M8)
 
 def class_desk():
@@ -1642,7 +1722,9 @@ def lorry():
     return p
 
 
-MODELS = dict(class_desk=class_desk, whiteboard=whiteboard, armchair=armchair,
+MODELS = dict(filing_cabinet=filing_cabinet, paper_stack_small=paper_stack_small,
+              paper_stack_tall=paper_stack_tall, paper_stack_teetering=paper_stack_teetering,
+              class_desk=class_desk, whiteboard=whiteboard, armchair=armchair,
               postcard_board=postcard_board, phone=phone,
               metal_detector=metal_detector, memorial_plaque=memorial_plaque,
               cctv_camera=cctv_camera, people_gate=people_gate, vehicle_gate=vehicle_gate, biscuit=biscuit, spoon=spoon, rolling_pin=rolling_pin, frying_pan=frying_pan,
