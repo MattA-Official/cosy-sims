@@ -129,6 +129,10 @@ PALETTE = dict(
     galv=("#a3a9ad", 0.45, 0.4),        # galvanised fence wire and posts
     hazard=("#e2b13c", 0.6, 0),         # warning yellow
     gold=("#e0b65a", 0.35, 0.6),        # staff badge
+    fabric=("#93a48f", 1.0, 0),         # counselling armchair, soft sage
+    cork=("#c8a275", 1.0, 0),
+    knit=("#bf9a66", 1.0, 0),           # teacher's cardigan, camel
+    scarf=("#b06f5c", 1.0, 0),          # counsellor's scarf, muted rust
     trunk=("#ffffff", 0.9, 0),
     canopy=("#ffffff", 0.9, 0),
     stem=("#5d8f4a", 0.9, 0),
@@ -183,6 +187,7 @@ class Prop:
         self.parts = {}  # (material, group) -> [bmesh]
         self.group = None
         self.pivots = {}
+        self.plain = set()  # groups whose mesh is named just the group
 
     def add(self, material, bm, bevel=0.0, segs=3, xf=Matrix()):
         _bevel(bm, bevel, segs)
@@ -288,7 +293,7 @@ class Prop:
                 bm.free()
             if self.turn:
                 joined.transform(Matrix.Rotation(math.radians(self.turn), 4, "Z"))
-            name = material if group is None else "%s_%s" % (material, group)
+            name = material if group is None else group if group in self.plain else "%s_%s" % (material, group)
             pivot = Vector(self.pivots.get(group, (0, 0, 0)))
             joined.transform(Matrix.Translation(-pivot))
             me = bpy.data.meshes.new(name)
@@ -1007,7 +1012,7 @@ def person():
     (outfit_arms, skin_arms) forward to carry. Parts named after a group
     or role only show on those people: *_staff (a badge), *_guard (a
     peaked cap), *_warden (a cap with a gold band, and a tie), *_cook (a
-    chef's hat)."""
+    chef's hat), *_teacher (a cardigan), *_counsellor (a scarf)."""
     p = Prop("person")
     # Legs and body: a soft pill, a touch wider at the hips.
     p.capsule("outfit", 0.16, 0.2, (0, 0, 0.38), scale=(1, 0.85, 1))
@@ -1031,7 +1036,7 @@ def person():
     p.ball("hair", 0.172, (0, -0.02, 0.73), scale=(1.02, 0.98, 0.88))
     # Staff: a badge on the chest.
     p.group = "staff"
-    p.cyl("gold", 0.035, 0.012, (0.07, -0.126, 0.47), bevel=0.004, n=16, rot=(90, 0, 0))
+    p.cyl("gold", 0.035, 0.012, (0.07, 0.142, 0.47), bevel=0.004, n=16, rot=(90, 0, 0))
     # Guards: a peaked cap over the hair.
     p.group = "guard"
     p.ball("navy", 0.178, (0, -0.01, 0.75), scale=(1.02, 1.0, 0.72))
@@ -1045,6 +1050,17 @@ def person():
     p.cyl("gold", 0.173, 0.025, (0, 0.0, 0.77), bevel=0.006, n=24)
     p.box("navy", (0.05, 0.02, 0.04), (0, 0.142, 0.55), 0.008, 1)
     p.taper("navy", (0.065, 0.02), (0.04, 0.02), 0.14, (0, 0.145, 0.46), 0.008, 1)
+    # Teachers: a camel cardigan with buttons.
+    p.group = "teacher"
+    p.capsule("knit", 0.168, 0.06, (0, 0, 0.45), scale=(1.0, 0.88, 1.0))
+    for z in (0.36, 0.42, 0.48):
+        p.ball("cream", 0.013, (-0.03, 0.146, z), scale=(1, 0.5, 1), u=8, v=6)
+    # Counsellors: a soft scarf wrapped at the neck with one end hanging.
+    p.group = "counsellor"
+    ring = [(0.15 * math.cos(a), 0.13 * math.sin(a), 0.565)
+            for a in (math.radians(d) for d in range(0, 360, 30))]
+    p.tube("scarf", ring + [ring[0], ring[1]], 0.035, 0.03, n=10)
+    p.capsule("scarf", 0.035, 0.12, (-0.06, 0.15, 0.45), scale=(1.1, 0.55, 1), rot=(8, 0, 6))
     # Cooks: a soft white chef's hat.
     p.group = "cook"
     p.cyl("sheet", 0.15, 0.1, (0, -0.01, 0.84), bevel=0.03, n=24)
@@ -1241,6 +1257,109 @@ def wall_shelf():
     p.box("cream", (0.16, 0.1, 0.12), (0.33, 0.01, z + 0.06), 0.02, 2)
     return p
 
+
+
+# ---------------------------------------------------------------- reform and release (M8)
+
+def class_desk():
+    """1 x 0.5 school desk, top at 0.5, a pencil groove along the front
+    (the sitter's side, Godot +z) and a wire book tray under the back."""
+    p = Prop("class_desk")
+    p.box("wood", (0.95, 0.46, 0.04), (0, 0, 0.48), 0.015, 2)
+    p.box("steel_dark", (0.5, 0.025, 0.006), (0, -0.19, 0.5), 0.003, 1)  # pencil groove
+    for x in (-0.43, 0.43):
+        for y in (-0.19, 0.19):
+            p.tube("paint", [(x, y, 0), (x, y, 0.46)], 0.018, 0, n=10)
+            p.ball("rubber", 0.022, (x, y, 0.012), scale=(1, 1, 0.6), u=8, v=6)
+        p.tube("paint", [(x, -0.19, 0.12), (x, 0.19, 0.12)], 0.012, 0, n=8)
+    p.box("paint", (0.86, 0.22, 0.012), (0, 0.08, 0.36), 0.004, 1)  # book tray
+    p.box("paint", (0.86, 0.012, 0.06), (0, -0.03, 0.39), 0.004, 1)
+    p.box("book_a", (0.22, 0.17, 0.03), (-0.2, 0.08, 0.38), 0.008, 1)
+    p.box("book_c", (0.2, 0.16, 0.025), (-0.19, 0.09, 0.405), 0.008, 1, rot=(0, 0, 8))
+    return p
+
+
+def whiteboard():
+    """1.5 x 0.25 whiteboard on two legs with feet, about 1.1 m tall,
+    writing on the front (Godot +z)."""
+    p = Prop("whiteboard")
+    z0, z1, w = 0.42, 1.08, 1.36
+    for x in (-0.7, 0.7):
+        p.tube("steel_dark", [(x, 0, 0.03), (x, 0, z1)], 0.02, 0, n=10)
+        p.box("steel_dark", (0.05, 0.24, 0.03), (x, 0, 0.015), 0.01, 1)
+        for y in (-0.11, 0.11):
+            p.ball("rubber", 0.022, (x, y, 0.012), scale=(1, 1, 0.6), u=8, v=6)
+    p.box("steel", (w + 0.04, 0.035, z1 - z0 + 0.04), (0, 0, (z0 + z1) / 2), 0.012, 2)
+    p.box("sheet", (w, 0.04, z1 - z0), (0, 0, (z0 + z1) / 2), 0.004, 1)
+    p.box("steel", (w * 0.7, 0.07, 0.02), (0, -0.04, z0 - 0.01), 0.006, 1)  # pen tray
+    for x, mat in ((-0.2, "sign_blue"), (-0.1, "food_c"), (0.0, "leaf")):
+        p.cyl(mat, 0.011, 0.11, (x, -0.05, z0 + 0.01), bevel=0.004, n=10, rot=(0, 90, 0))
+    p.box("cream", (0.1, 0.04, 0.04), (0.2, -0.05, z0 + 0.02), 0.012, 2)  # rubber
+    # A few lines of writing and a tick.
+    for k, (x, ln) in enumerate(((-0.35, 0.5), (-0.4, 0.4), (-0.38, 0.46), (-0.42, 0.32))):
+        p.box("sign_blue", (ln, 0.008, 0.016), (x, -0.022, z1 - 0.1 - k * 0.09), 0.003, 1)
+    p.tube("food_c", [(0.25, -0.022, 0.95), (0.35, -0.022, 0.83), (0.5, -0.022, 0.98)], 0.007, 0.01, n=6)
+    return p
+
+
+def armchair():
+    """0.75 x 0.75 soft armchair for counselling, seat top about 0.3, the
+    sitter facing the front (Godot +z)."""
+    p = Prop("armchair")
+    p.box("fabric", (0.66, 0.6, 0.2), (0, 0.02, 0.15), 0.06, 3)  # base
+    p.box("fabric", (0.46, 0.5, 0.1), (0, -0.04, 0.26), 0.045, 3)  # seat cushion
+    p.box("fabric", (0.6, 0.18, 0.46), (0, 0.24, 0.42), 0.08, 3, rot=(-8, 0, 0))  # back
+    for x in (-0.28, 0.28):
+        p.box("fabric", (0.13, 0.62, 0.3), (x, 0.0, 0.3), 0.06, 3)  # arms
+    for x in (-0.27, 0.27):
+        for y in (-0.24, 0.27):
+            p.cyl("wood", 0.025, 0.06, (x, y, 0.03), r2=0.03, bevel=0.008, n=12)
+    return p
+
+
+def postcard_board():
+    """1 x 0.1 corkboard against the wall behind, 0.6 tall, its bottom 0.6 m
+    up. Six cards, meshes card_1 to card_6, so the game can show and hide
+    them one by one."""
+    p = Prop("postcard_board")
+    y, z0, z1 = 0.035, 0.6, 1.2
+    p.box("wood", (0.92, 0.03, z1 - z0), (0, y, (z0 + z1) / 2), 0.01, 2)
+    p.box("cork", (0.84, 0.032, z1 - z0 - 0.08), (0, y - 0.003, (z0 + z1) / 2), 0.004, 1)
+    cards = (("poster_a", -0.26, 1.04, 6), ("paper", 0.0, 1.05, -4), ("poster_b", 0.26, 1.03, 3),
+             ("book_d", -0.26, 0.77, -3), ("poster_c", 0.0, 0.76, 5), ("book_b", 0.26, 0.78, -6))
+    for k, (mat, x, z, tilt) in enumerate(cards):
+        p.group = "card_%d" % (k + 1)
+        p.plain.add(p.group)
+        p.box(mat, (0.19, 0.008, 0.13), (x, y - 0.02, z), 0.003, 1, rot=(0, tilt, 0))
+        p.ball(mat, 0.011, (x, y - 0.026, z + 0.05), u=8, v=6)  # its drawing pin
+    p.group = None
+    return p
+
+
+def phone():
+    """0.4 x 0.2 wall payphone against the wall behind, about 0.9 m tall:
+    a steel phone in a little hood, handset on the left."""
+    p = Prop("phone")
+    yb = 0.08  # the wall face, behind
+    p.box("steel_dark", (0.38, 0.03, 0.56), (0, yb, 0.62), 0.012, 2)  # back plate
+    for x in (-0.18, 0.18):
+        p.box("steel_dark", (0.025, 0.17, 0.5), (x, yb - 0.08, 0.64), 0.01, 1)  # hood sides
+    p.box("steel_dark", (0.38, 0.17, 0.025), (0, yb - 0.08, 0.89), 0.01, 1)  # hood top
+    p.box("steel", (0.2, 0.09, 0.3), (0.02, yb - 0.06, 0.6), 0.02, 2)  # body
+    p.box("screen", (0.1, 0.01, 0.035), (0.03, yb - 0.106, 0.71), 0.004, 1)
+    for r in range(4):
+        for c in range(3):
+            p.box("steel_dark", (0.022, 0.012, 0.018), (0.0 + c * 0.03, yb - 0.106, 0.65 - r * 0.028), 0.004, 1)
+    p.box("steel_dark", (0.008, 0.012, 0.04), (0.095, yb - 0.106, 0.68), 0.002, 1)  # coin slot
+    # Handset hanging on the left side, with a coiled cord.
+    p.box("steel", (0.03, 0.05, 0.04), (-0.095, yb - 0.06, 0.62), 0.008, 1)
+    p.capsule("bag", 0.025, 0.12, (-0.12, yb - 0.07, 0.6), scale=(1, 1.1, 1))
+    for z in (0.69, 0.51):
+        p.ball("bag", 0.034, (-0.12, yb - 0.075, z), scale=(1, 1.2, 0.8), u=12, v=8)
+    pts = [(-0.11 + 0.012 * math.cos(k * 1.4), yb - 0.06 + 0.012 * math.sin(k * 1.4), 0.5 - k * 0.012)
+           for k in range(12)]
+    p.tube("steel_dark", pts + [(-0.04, yb - 0.04, 0.47)], 0.005, 0.0, n=6)
+    return p
 
 
 # ---------------------------------------------------------------- items and jobs (M4)
@@ -1523,7 +1642,9 @@ def lorry():
     return p
 
 
-MODELS = dict(metal_detector=metal_detector, memorial_plaque=memorial_plaque,
+MODELS = dict(class_desk=class_desk, whiteboard=whiteboard, armchair=armchair,
+              postcard_board=postcard_board, phone=phone,
+              metal_detector=metal_detector, memorial_plaque=memorial_plaque,
               cctv_camera=cctv_camera, people_gate=people_gate, vehicle_gate=vehicle_gate, biscuit=biscuit, spoon=spoon, rolling_pin=rolling_pin, frying_pan=frying_pan,
               screwdriver=screwdriver, mallet=mallet, soap_sock=soap_sock,
               infirmary_bed=infirmary_bed, medicine_cabinet=medicine_cabinet, dust_cloud=dust_cloud,

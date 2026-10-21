@@ -40,6 +40,10 @@ colours a real prison would plausibly use.
   litter_wrapper.
 - Security: cctv_camera (0.5 x 0.5, 2.2 m post, lens along +z).
 - Memorial: memorial_plaque (0.5 x 0.25, 0.5 m stone stand, brass plate facing +z).
+- Reform and release: class_desk (1 x 0.5, top 0.5, sitter at +z), whiteboard
+  (1.5 x 0.25, 1.1 m, writing at +z), armchair (0.75 x 0.75, seat 0.3),
+  postcard_board (1 x 0.1 on the wall, 0.6 to 1.2 m up; cards are meshes
+  `card_1` to `card_6`), phone (0.4 x 0.2 wall payphone, 0.9 m).
 - Contraband items (same size and origin as other items): biscuit, spoon,
   rolling_pin, frying_pan, screwdriver, mallet, soap_sock.
 - Infirmary: infirmary_bed (1 x 2, head to the front like the cell bed;
@@ -129,7 +133,9 @@ surface's own frame (front is +z, as for every object).
   Meshes named `*_<group>` or `*_<role>` only show on people in that
   group or with that role: the staff badge (`gold_staff`), the guard's
   peaked cap (`navy_guard`), the warden's banded cap and tie
-  (`navy_warden`, `gold_warden`) and the cook's hat (`sheet_cook`).
+  (`navy_warden`, `gold_warden`), the cook's hat (`sheet_cook`), the
+  teacher's cardigan (`knit_teacher`, `cream_teacher`) and the
+  counsellor's scarf (`scarf_counsellor`).
 - **Plants**: `FoliageDef.model`. A mesh named `trunk` takes
   `trunk_colour`; ones named `canopy` or `bloom` take `colour`; the rest
   (flower stems) keep their own colour. So the round tree and the blossom
