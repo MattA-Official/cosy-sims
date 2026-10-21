@@ -96,7 +96,7 @@ func _ready() -> void:
 	security.toggle_mode = false
 	security.pressed.connect(security_pressed.emit)
 	row.add_child(security)
-	var programmes := _button("Programmes", "Courses, therapy and how reformed everyone is. L", "programmes")
+	var programmes := _button("Programmes", "Courses, therapy, parole and how reformed everyone is. L", "programmes")
 	programmes.toggle_mode = false
 	programmes.pressed.connect(programmes_pressed.emit)
 	row.add_child(programmes)

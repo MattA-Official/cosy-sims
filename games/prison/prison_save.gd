@@ -89,6 +89,10 @@ static func capture(main: Node) -> Dictionary:
 				"quiet_room": (main.consequences as Consequences).quiet_room_on},
 		"deaths": (main.infirmary as Infirmary).deaths,
 		"course_places": (main.courses as Courses).places.duplicate(),
+		"parole": {"queue": (main.parole as Parole).queue.map(func(p: Person) -> int: return p.id),
+				"today": (main.parole as Parole).today.duplicate(true),
+				"yesterday": (main.parole as Parole).yesterday.duplicate(true),
+				"granted": (main.parole as Parole).granted_total},
 		"sentence_length": (main.sentences as Sentences).length,
 		"searching": {"policy": (main.searching as Searching).random_per_day,
 				"shakedown": (main.searching as Searching).shakedown_tonight,
@@ -271,6 +275,14 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 			people.resume_doing(person, entry.get("doing", {}))
 			(main.jobs as JobBoard).resume_work(person, entry.get("work", {}))
 	(main.courses as Courses).places.assign(data.get("course_places", {}))
+	var parole_data: Dictionary = data.get("parole", {})
+	var parole: Parole = main.parole
+	parole.today = parole_data.get("today", [])
+	parole.yesterday = parole_data.get("yesterday", [])
+	parole.granted_total = parole_data.get("granted", 0)
+	for id: int in parole_data.get("queue", []):
+		if by_id.has(id):
+			parole.queue.append(by_id[id])
 	(main.sentences as Sentences).length = data.get("sentence_length", Sentences.Length.NORMAL)
 	for entry: Dictionary in data.get("sit_ins", []):
 		var map: BuildingMap = (main.building as Building).levels.get(entry["level"])

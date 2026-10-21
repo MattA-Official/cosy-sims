@@ -85,6 +85,7 @@ func _process(_delta: float) -> bool:
 	_test_progress()
 	_test_sentences_and_reform()
 	_test_courses()
+	_test_parole()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -3788,4 +3789,60 @@ func _test_courses() -> void:
 	courses.enrol(student, &"calm_minds")
 	courses.exam(student, calm, 0.0)
 	_check(courses.calm_scale(student) < 1.0, "Calm Minds cools tempers after a pass")
+	main.free()
+
+
+## Parole: who's eligible, the chance, the warden hearing cases at the
+## desk, and what granted and refused mean.
+func _test_parole() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var parole: Parole = main.parole
+	var reform: Reform = main.reform
+	var clock: GameClock = main.clock
+	(main.misconduct as Misconduct).enabled = false
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	var good: Person = prisoners[0]
+	var file := PrisonerFile.of(good)
+	file.sentence_days = 10
+	file.release_day = clock.day() + 6
+	file.parole_from_day = clock.day() + 1
+	_check(not parole.eligible(good) and parole.why_not(good).begins_with("Not until"), "no hearing before parole day")
+	file.parole_from_day = clock.day()
+	_check(parole.eligible(good), "eligible from parole day")
+	reform.progress.set_value(good, 30.0)
+	_check(is_equal_approx(parole.chance(good)[0], 0.26), "reform 30 alone gives a 26% chance")
+	reform.progress.set_value(good, 60.0)
+	file.passed.append(&"reading")
+	file.raise_skill(&"reading", 60)
+	_check(is_equal_approx(parole.chance(good)[0], 0.6), "reform 60, a course and a skill give 60%")
+	good.record.append([clock.day(), &"grumble", "grumbled"])
+	_check(not parole.eligible(good), "trouble in the last few days rules them out")
+	good.record.clear()
+	good.profile["parole_held_back"] = true
+	_check(not parole.eligible(good), "held back, they aren't put forward")
+	good.profile.erase("parole_held_back")
+	for p: Person in prisoners:
+		if p != good:
+			PrisonerFile.of(p).parole_from_day = clock.day() + 50
+	clock.jump_to_hour(13)
+	_check(parole.queue.size() == 1 and parole.queue[0] == good, "13:00 draws up the list")
+	var granted := false
+	while clock.hour() < 17 and parole.today.is_empty():
+		clock.advance(1.0)
+	_check(parole.today.size() == 1, "the warden hears the case at the desk")
+	granted = parole.today[0][1]
+	if granted:
+		_check(file.release_day == clock.day() + 1 and good.moodlets.has(Parole.GRANTED), "granted, they go home tomorrow")
+	else:
+		_check(good.profile.get("parole_next", 0) == clock.day() + Parole.RETRY_DAYS, "refused, they wait to try again")
+	var other: Person = prisoners[1]
+	var other_file := PrisonerFile.of(other)
+	other_file.parole_from_day = clock.day()
+	other_file.release_day = clock.day() + 6
+	_check(not parole.hear(other, 0.99) and not parole.eligible(other)
+			and other.moodlets.has(Parole.REFUSED), "a refusal waits a few days")
+	_check(parole.hear(good, 0.0) and file.release_day == clock.day() + 1, "a grant brings release to tomorrow")
 	main.free()

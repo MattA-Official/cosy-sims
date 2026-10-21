@@ -1,18 +1,23 @@
 class_name ProgrammesWindow
 extends PanelContainer
-## Courses and therapy: one row per course with how many places it has,
-## who's on it and who's waiting, and what's stopping it if it can't run.
-## Above them, how reformed the prison is. Work programmes stay in the
-## Staff window. Toggle with L.
+## Reform and release. How reformed the prison is; courses and therapy,
+## one row per course with how many places it has, who's on it and who's
+## waiting, and what's stopping it if it can't run; then today's parole
+## list, with a chance for each and a box to hold someone back. Work
+## programmes stay in the Staff window. Toggle with L.
 
 const REFRESH_SECONDS := 0.5
 
 var courses: Courses
 var reform: Reform
+var parole: Parole
 
 var _summary := Label.new()
 var _rows: Dictionary[StringName, Array] = {}
 var _wait := 0.0
+var _parole_words := Label.new()
+var _parole_rows := VBoxContainer.new()
+var _shown_parole: Array = []
 
 
 func _ready() -> void:
@@ -64,6 +69,17 @@ func _ready() -> void:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.theme_type_variation = &"SubtleLabel"
 	box.add_child(hint)
+	if parole != null:
+		box.add_child(HSeparator.new())
+		var parole_heading := Label.new()
+		parole_heading.text = "Parole"
+		parole_heading.theme_type_variation = &"HeaderLabel"
+		box.add_child(parole_heading)
+		_parole_words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_parole_words.theme_type_variation = &"SubtleLabel"
+		box.add_child(_parole_words)
+		_parole_rows.add_theme_constant_override(&"separation", 2)
+		box.add_child(_parole_rows)
 	visible = false
 
 
@@ -129,6 +145,9 @@ func refresh() -> void:
 		var row: Array = _rows[def.id]
 		(row[0] as Label).text = state_text(def)
 		(row[1] as Label).text = str(courses.places.get(def.id, 0))
+	if parole != null:
+		_parole_words.text = parole_text()
+		_show_parole()
 
 
 ## Average reform and how many are over the line.
@@ -148,3 +167,70 @@ func state_text(def: CourseDef) -> String:
 	if not problem.is_empty() and problem != "No places set":
 		words += " · " + problem
 	return words
+
+
+## When hearings are, and how yesterday's went.
+func parole_text() -> String:
+	var words := "The warden hears up to %d cases from %02d:00, most reformed first." % [Parole.HEARINGS_PER_DAY,
+			Parole.HEARING_HOUR]
+	var results: Array = parole.today if not parole.today.is_empty() else parole.yesterday
+	if not results.is_empty():
+		var granted := results.filter(func(entry: Array) -> bool: return entry[1]).size()
+		words += " %s: %d heard, %d granted." % ["Today" if results == parole.today else "Yesterday",
+				results.size(), granted]
+	return words
+
+
+## Who could go before a hearing next, with their chance and a hold back
+## box: today's list once it's drawn up, else everyone eligible.
+func _show_parole() -> void:
+	var list: Array[Person] = []
+	if not parole.queue.is_empty():
+		list = parole.queue.duplicate()
+	else:
+		for person in courses.people.people:
+			if person.group == parole.prisoner_group and PrisonerFile.of(person).has_sentence() \
+					and (parole.eligible(person) or person.profile.get("parole_held_back", false)):
+				list.append(person)
+		list.sort_custom(func(a: Person, b: Person) -> bool: return reform.value(a) > reform.value(b))
+		list = list.slice(0, 6)
+	var key: Array = list.map(func(p: Person) -> Array:
+		return [p.id, roundi(parole.chance(p)[0] * 100.0), p.profile.get("parole_held_back", false)])
+	if key == _shown_parole:
+		return
+	_shown_parole = key
+	for child in _parole_rows.get_children():
+		_parole_rows.remove_child(child)
+		child.queue_free()
+	if list.is_empty():
+		var none := Label.new()
+		none.text = "Nobody is due a hearing yet."
+		none.theme_type_variation = &"SubtleLabel"
+		_parole_rows.add_child(none)
+		return
+	for person in list:
+		var row := HBoxContainer.new()
+		var name_label := Label.new()
+		name_label.text = person.name
+		name_label.size_flags_horizontal = SIZE_EXPAND_FILL
+		name_label.tooltip_text = parole.summary(person)
+		name_label.mouse_filter = MOUSE_FILTER_PASS
+		row.add_child(name_label)
+		var odds := Label.new()
+		odds.text = "%d%%" % roundi(parole.chance(person)[0] * 100.0)
+		odds.custom_minimum_size = Vector2(48, 0)
+		odds.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		row.add_child(odds)
+		var hold := CheckBox.new()
+		hold.text = "Hold back"
+		hold.focus_mode = FOCUS_NONE
+		hold.tooltip_text = "Keep them from parole hearings until you untick this."
+		hold.button_pressed = person.profile.get("parole_held_back", false)
+		hold.toggled.connect(func(on: bool) -> void:
+			if on:
+				person.profile["parole_held_back"] = true
+				parole.queue.erase(person)
+			else:
+				person.profile.erase("parole_held_back"))
+		row.add_child(hold)
+		_parole_rows.add_child(row)

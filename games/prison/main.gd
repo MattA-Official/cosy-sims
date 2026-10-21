@@ -114,6 +114,7 @@ var standing := Standing.new()
 var sentences := Sentences.new()
 var reform := Reform.new()
 var courses := Courses.new()
+var parole := Parole.new()
 var programmes_window := ProgrammesWindow.new()
 ## Ctrl+Z and Ctrl+Y for building and landscaping.
 var undo := UndoHistory.new()
@@ -682,13 +683,23 @@ func _ready() -> void:
 		func(person: Person) -> bool: return person.group == &"prisoner"])
 	courses.passed.connect(func(person: Person, def: CourseDef) -> void:
 		Toasts.post("Course passed", "%s passed %s." % [person.name, def.display_name]))
+	parole.name = "Parole"
+	parole.people = people
+	parole.office = office
+	parole.jobs = jobs
+	parole.reform = reform
+	parole.clock = clock
+	add_child(parole)
+	parole.heard.connect(func(person: Person, granted: bool) -> void:
+		Toasts.post("Parole granted" if granted else "Parole refused", "%s %s." % [person.name,
+				"goes home tomorrow" if granted else "can try again in %d days" % Parole.RETRY_DAYS]))
 	standing.nightly.append(sentences.tick)
 	standing.nightly.append(reform.grade_night)
 	inspector.person_lines.append(func(person: Person) -> String:
 		if person.group != &"prisoner":
 			return ""
 		var file := sentences.summary(person)
-		var lines := PackedStringArray([file, reform.summary(person), courses.summary(person)])
+		var lines := PackedStringArray([file, reform.summary(person), courses.summary(person), parole.summary(person)])
 		return "\n".join(Array(lines).filter(func(line: String) -> bool: return not line.is_empty())))
 	standing.report_ready.connect(func(text: String) -> void: Toasts.post("Daily report", text, 12.0))
 	standing.goal_done.connect(func(goal: Standing.Goal) -> void:
@@ -820,6 +831,7 @@ func _add_hud() -> void:
 	hud.add_child(security_window)
 	programmes_window.courses = courses
 	programmes_window.reform = reform
+	programmes_window.parole = parole
 	hud.add_child(programmes_window)
 	saves_window.save = func(slot: String) -> void:
 		if PrisonSave.write(slot, PrisonSave.capture(self)) == OK:
