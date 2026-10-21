@@ -19,6 +19,21 @@ static var sentence_length := Sentences.Length.NORMAL
 static var staff_cars := false
 static var split_levels := false
 static var door_steps := false
+## The warden picked: their work trait ids, empty for the default warden.
+static var warden_traits: Array[StringName] = []
+
+
+## Three warden candidates, each two different warden work traits (ids).
+static func warden_candidates() -> Array:
+	var ids: Array = PrisonStaffTraits.all().filter(func(t: StaffTraitDef) -> bool: return t.roles.has(&"warden")) \
+			.map(func(t: StaffTraitDef) -> StringName: return t.id)
+	var out: Array = []
+	while out.size() < 3:
+		ids.shuffle()
+		var pair := [ids[0], ids[1]]
+		if not out.any(func(o: Array) -> bool: return o.has(pair[0]) and o.has(pair[1])):
+			out.append(pair)
+	return out
 
 
 static func random_name() -> String:

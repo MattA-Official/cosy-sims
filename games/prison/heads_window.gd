@@ -148,8 +148,10 @@ func _row(department: DepartmentDef) -> Control:
 		words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		words.size_flags_horizontal = SIZE_EXPAND_FILL
 		_live.append([words, func() -> String:
-			return "%s, morale %d, %s a day. %s" % [head.name, roundi(head.morale),
-					Ledger.text(heads.roster.day_pay(head)), _desk_text(head, head.first_name())]])
+			return "%s, level %d, morale %d, %s a day.%s %s" % [head.name, head.level, roundi(head.morale),
+					Ledger.text(heads.roster.day_pay(head)),
+					" %s." % heads.roster.work_trait_words(head) if not head.work_traits.is_empty() else "",
+					_desk_text(head, head.first_name())]])
 		line.add_child(words)
 		line.add_child(_button("Let go", "Pays %d days' wages as notice. Their department's bonus stops." % Heads.NOTICE_DAYS,
 				func() -> void: heads.let_go(head)))
@@ -160,9 +162,11 @@ func _row(department: DepartmentDef) -> Control:
 		waiting.theme_type_variation = &"SubtleLabel"
 		row.add_child(waiting)
 		for applicant in applicants:
-			var traits := ", ".join(applicant.traits.map(func(t: TraitDef) -> String: return t.display_name))
+			var traits := ", ".join(applicant.work_traits.map(func(t: StaffTraitDef) -> String: return t.display_name))
 			row.add_child(_button("Take on %s · %s a day%s" % [applicant.name, Ledger.text(applicant.wage),
-					" · %s" % traits if not traits.is_empty() else ""], "They start on the next day shift.",
+					" · %s" % traits if not traits.is_empty() else ""],
+					"%s. They start on the next day shift." % heads.roster.work_trait_words(applicant) if not traits.is_empty()
+					else "They start on the next day shift.",
 					func() -> void: heads.hire(applicant)))
 	elif heads.hiring() == department:
 		var line := HBoxContainer.new()

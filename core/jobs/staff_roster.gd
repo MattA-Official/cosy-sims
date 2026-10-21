@@ -55,6 +55,8 @@ const COURSE_FEE := 200
 const TRAINING_FEE := 80
 const COURSE_XP := 1.5
 const PERK_LEVEL := 3
+## Places on a day's course in the training room.
+const TRAINING_PLACES := 4
 ## A resignation answered with a raise: this much more pay.
 const KEEP_RAISE := 0.2
 const LEAVE_DAYS := 3
@@ -83,8 +85,8 @@ class Record:
 	var trained := false
 	## The day they spend in the training room, or 0.
 	var training_day := 0
-	## Their way of working, for roles with styles (see `styles`), or &"".
-	var style: StringName = &""
+	## How they work (StaffTraitDef): applicants roll them for their role.
+	var work_traits: Array[StaffTraitDef] = []
 	## An applicant's last day of waiting.
 	var until := 0
 	## On site now, or null; and on their way in by car or bus.
@@ -109,10 +111,17 @@ var charge: Callable
 ## (record) -> void: someone unhappy writes a resignation letter. Without
 ## it, they just quit.
 var resign: Callable
-## Ways of working applicants for a role may have, each with a bonus while
-## they're on the payroll: role -> [{id, name, words, bonus}], such as the
-## warden's "Stickler: guards search 10% faster".
-var styles: Dictionary[StringName, Array] = {}
+## Ways of working applicants may have, by role (StaffTraitDef.roles),
+## such as the warden's "Stickler: guards search 10% faster".
+var work_trait_pool: Array[StaffTraitDef] = []
+## How many an applicant for a role rolls, when not 1, such as the
+## warden's 2.
+var work_trait_counts: Dictionary[StringName, int] = {}
+## Work traits picked ahead for a role, such as the warden chosen on the
+## new game screen: applicants for it have them, until one is taken on.
+var preset_traits: Dictionary[StringName, Array] = {}
+## Optional: for "staff_xp", such as a mentoring head's.
+var modifiers: Modifiers
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -173,6 +182,8 @@ func is_off(record: Record) -> bool:
 func send_on_course(record: Record, on_site := false) -> bool:
 	if not records.has(record) or is_off(record) or record.off_until > _day() or record.training_day > _day():
 		return false
+	if on_site and not training_places():
+		return false
 	if charge.is_valid():
 		charge.call(TRAINING_FEE if on_site else COURSE_FEE, "Training")
 	if on_site:
@@ -183,6 +194,11 @@ func send_on_course(record: Record, on_site := false) -> bool:
 	record.trained = true
 	add_xp(record, COURSE_XP)
 	return true
+
+
+## Whether tomorrow's course in the training room has a place left.
+func training_places() -> bool:
+	return records.filter(func(r: Record) -> bool: return r.training_day == _day() + 1).size() < TRAINING_PLACES
 
 
 ## Whether someone spends today in the training room.
@@ -226,20 +242,48 @@ func resign_answer(record: Record, answer: StringName) -> void:
 	changed.emit()
 
 
-## Gives an applicant one of their role's styles, if it has any. Staff
+## Gives an applicant their role's work traits, if it has any. Staff
 ## taken on without applying (samples, old saves) have none.
-func _pick_style(record: Record) -> void:
-	var pool: Array = styles.get(record.role, [])
-	if not pool.is_empty():
-		record.style = pool[_rng.randi() % pool.size()]["id"]
+func _pick_work_traits(record: Record) -> void:
+	if preset_traits.has(record.role):
+		record.work_traits.assign(preset_traits[record.role])
+		return
+	var pool := work_trait_pool.filter(func(t: StaffTraitDef) -> bool: return t.roles.has(record.role))
+	pool.shuffle()
+	record.work_traits.assign(pool.slice(0, work_trait_counts.get(record.role, 1)))
 
 
-## A record's style entry ({id, name, words, bonus}), or an empty one.
-func style_of(record: Record) -> Dictionary:
-	for entry: Dictionary in styles.get(record.role, []):
-		if entry["id"] == record.style:
-			return entry
-	return {}
+## Picks a role's work traits ahead (by id): someone already on the payroll
+## in it without any gets them now, or else its applicants will.
+func preset(role: StringName, ids: Array) -> void:
+	var traits: Array[StaffTraitDef] = []
+	for id: Variant in ids:
+		var def := find_work_trait(StringName(id))
+		if def != null:
+			traits.append(def)
+	for record in records:
+		if record.role == role and record.work_traits.is_empty():
+			record.work_traits = traits
+			changed.emit()
+			return
+	preset_traits[role] = traits
+	for applicant in applicants:
+		if applicant.role == role:
+			applicant.work_traits = traits.duplicate()
+	changed.emit()
+
+
+func find_work_trait(id: StringName) -> StaffTraitDef:
+	for def in work_trait_pool:
+		if def.id == id:
+			return def
+	return null
+
+
+## Their work traits in words, such as "Calm: morale moves half as fast".
+func work_trait_words(record: Record) -> String:
+	return "; ".join(record.work_traits.map(func(t: StaffTraitDef) -> String:
+			return "%s: %s" % [t.display_name, t.description.to_lower()]))
 
 
 ## Experience for someone, levelling them up as they pass each line.
@@ -259,13 +303,18 @@ func job_done(job: Job, worker: Person) -> void:
 	var minutes := 0.0
 	for stage in job.stages:
 		minutes += stage.minutes if stage.do == Job.Do.WORK else 2.0
-	add_xp(record, minutes / XP_MINUTES)
+	add_xp(record, minutes / XP_MINUTES * Modifiers.scale(modifiers, &"staff_xp"))
 
 
 ## How fast someone works for their level; 1 for anyone not on staff.
 func pace(person: Person) -> float:
 	var record := record_of(person)
-	return LEVEL_PACE[record.level - 1] if record != null else 1.0
+	if record == null:
+		return 1.0
+	var out := LEVEL_PACE[record.level - 1]
+	for def in record.work_traits:
+		out *= def.work_speed
+	return out
 
 
 ## Takes on an applicant. Returns their record, or null.
@@ -273,6 +322,7 @@ func hire(applicant: Record) -> Record:
 	if not applicants.has(applicant):
 		return null
 	applicants.erase(applicant)
+	preset_traits.erase(applicant.role)
 	applicant.hired_day = _day()
 	applicant.morale = MORALE_START
 	records.append(applicant)
@@ -354,14 +404,23 @@ func pay_feeling(record: Record) -> float:
 ## Where their morale is heading: how they feel at work, and their pay.
 func morale_target(record: Record) -> float:
 	var mood := record.mood_sum / record.mood_hours if record.mood_hours > 0 else 60.0
-	return clampf(mood + 10.0 + pay_feeling(record), 0.0, 100.0)
+	var traits := 0.0
+	for def in record.work_traits:
+		traits += def.morale
+	for other in records:
+		for def in other.work_traits:
+			traits += def.staff_morale
+	return clampf(mood + 10.0 + pay_feeling(record) + traits, 0.0, 100.0)
 
 
 ## Midnight: morale moves, the unhappy quit, and new applicants come.
 func nightly() -> void:
 	for record: Record in records.duplicate():
 		var target := morale_target(record)
-		record.morale = move_toward(record.morale, target, MORALE_STEP)
+		var rate := 1.0
+		for def in record.work_traits:
+			rate *= def.morale_rate
+		record.morale = move_toward(record.morale, target, MORALE_STEP * rate)
 		record.mood_sum = 0.0
 		record.mood_hours = 0
 		record.low_days = record.low_days + 1 if record.morale < QUIT_MORALE else 0
@@ -394,7 +453,7 @@ func refresh_applicants() -> void:
 			var want := _rng.randi_range(APPLICANTS.x, APPLICANTS.y)
 			for i in want - waiting:
 				var applicant := _make(def.id, shift.id)
-				_pick_style(applicant)
+				_pick_work_traits(applicant)
 				applicant.until = today + APPLICANT_DAYS - 1
 				applicants.append(applicant)
 	changed.emit()
@@ -403,7 +462,7 @@ func refresh_applicants() -> void:
 ## A new applicant for a role and shift, waiting `days` days.
 func add_applicant(role: StringName, shift: StringName, days := APPLICANT_DAYS) -> Record:
 	var applicant := _make(role, shift)
-	_pick_style(applicant)
+	_pick_work_traits(applicant)
 	applicant.until = _day() + days - 1
 	applicants.append(applicant)
 	changed.emit()
@@ -425,7 +484,10 @@ func cheapest(role: StringName, shift: StringName) -> Record:
 
 ## The roster as plain data for a save.
 func capture() -> Dictionary:
-	return {"next_id": next_id, "records": records.map(_data), "applicants": applicants.map(_data)}
+	var presets := {}
+	for role: StringName in preset_traits:
+		presets[role] = preset_traits[role].map(func(t: StaffTraitDef) -> StringName: return t.id)
+	return {"next_id": next_id, "records": records.map(_data), "applicants": applicants.map(_data), "presets": presets}
 
 
 func restore(data: Dictionary) -> void:
@@ -436,6 +498,15 @@ func restore(data: Dictionary) -> void:
 		records.append(_from(entry))
 	for entry: Dictionary in data.get("applicants", []):
 		applicants.append(_from(entry))
+	preset_traits.clear()
+	var presets: Dictionary = data.get("presets", {})
+	for role: Variant in presets:
+		var traits: Array[StaffTraitDef] = []
+		for id: Variant in presets[role]:
+			var def := find_work_trait(StringName(id))
+			if def != null:
+				traits.append(def)
+		preset_traits[StringName(role)] = traits
 	changed.emit()
 
 
@@ -483,7 +554,7 @@ func _data(record: Record) -> Dictionary:
 			"look_seed": record.look_seed, "until": record.until, "mood_sum": record.mood_sum,
 			"mood_hours": record.mood_hours, "level": record.level, "xp": record.xp,
 			"off_until": record.off_until, "away": record.away, "resigning": record.resigning,
-			"style": record.style, "trained": record.trained, "training_day": record.training_day}
+			"work_traits": record.work_traits.map(func(t: StaffTraitDef) -> StringName: return t.id), "trained": record.trained, "training_day": record.training_day}
 
 
 func _from(entry: Dictionary) -> Record:
@@ -509,7 +580,12 @@ func _from(entry: Dictionary) -> Record:
 	record.off_until = entry.get("off_until", 0)
 	record.away = entry.get("away", "")
 	record.resigning = entry.get("resigning", false)
-	record.style = StringName(entry.get("style", ""))
+	# Old saves had a single "style", now a work trait of the same id.
+	var ids: Array = entry.get("work_traits", [entry["style"]] if not String(entry.get("style", "")).is_empty() else [])
+	for id: Variant in ids:
+		var def := find_work_trait(StringName(id))
+		if def != null:
+			record.work_traits.append(def)
 	record.trained = entry.get("trained", false)
 	record.training_day = entry.get("training_day", 0)
 	next_id = maxi(next_id, record.id + 1)

@@ -4513,14 +4513,14 @@ func _test_heads() -> void:
 				"the warden has a desk job of their own")
 	heads.let_go(head)
 	_check(heads.head(security) == null and modifiers.value(&"search_speed") == 0.0, "letting a head go ends the bonus")
-	warden.style = &"stickler"
+	warden.work_traits = [heads.roster.find_work_trait(&"stickler")]
 	heads.refresh_bonuses()
 	_check(is_equal_approx(modifiers.value(&"search_speed"), 0.1), "a stickler warden has guards search faster")
-	warden.style = &"old_hand"
+	warden.work_traits = [heads.roster.find_work_trait(&"old_hand")]
 	heads.refresh_bonuses()
 	_check(modifiers.value(&"search_speed") == 0.0 and heads.start_hire(medical) == heads.available(medical)
 			and (heads.hire_card() == null or heads.hire_card().total < medical.hire_minutes), "an old hand works hire cards quicker")
-	warden.style = &""
+	warden.work_traits.clear()
 	heads.cancel_hire()
 	heads.refresh_bonuses()
 	# Clerks take the biggest paperwork pile first.
@@ -4660,6 +4660,16 @@ func _test_perks() -> void:
 	var again: StaffRoster.Record = roster.records.filter(func(r: StaffRoster.Record) -> bool: return r.id == cook.id)[0]
 	_check(again.trained and again.training_day == cook.training_day, "training saves and loads")
 	_check(not (main.training as Training).has_room(), "no training room in the sample")
+	var warden: StaffRoster.Record = roster.records.filter(func(r: StaffRoster.Record) -> bool: return r.role == &"warden")[0]
+	warden.work_traits.clear()
+	roster.preset(&"warden", [&"stickler", &"penny_pincher"])
+	_check(warden.work_traits.size() == 2 and NewGame.warden_candidates().size() == 3, "the warden picked at a new game gets their traits")
+	var target := roster.morale_target(cook)
+	warden.work_traits.clear()
+	_check(roster.morale_target(cook) > target, "a penny pinching warden makes staff less happy")
+	var level := Heads.level_scale(warden)
+	roster.add_xp(warden, 20.0)
+	_check(Heads.level_scale(warden) > level, "a higher level head gives a bigger bonus")
 	var box: Suggestions = main.suggestions
 	var tray: InTray = main.in_tray
 	tray.cards.clear()

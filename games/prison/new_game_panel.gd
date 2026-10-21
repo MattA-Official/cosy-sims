@@ -32,6 +32,11 @@ var _map_about := Label.new()
 var _difficulty := 2
 var _length := Sentences.Length.NORMAL
 var _extras: Dictionary[String, bool] = {}
+## Warden candidates (pairs of work trait ids), and which is picked: 0 for
+## the default warden.
+var _candidates := NewGame.warden_candidates()
+var _warden := 0
+var _warden_about := Label.new()
 
 
 func _ready() -> void:
@@ -108,6 +113,21 @@ func _ready() -> void:
 	_difficulty_about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_difficulty_about)
 
+	box.add_child(_heading("Warden"))
+	var traits := PrisonStaffTraits.all()
+	var words := func(ids: Array) -> String:
+		return " and ".join(ids.map(func(id: StringName) -> String:
+				return traits.filter(func(t: StaffTraitDef) -> bool: return t.id == id)[0].display_name))
+	var wardens: Array = [["Default", 0]]
+	for i in _candidates.size():
+		wardens.append([words.call(_candidates[i]), i + 1])
+	box.add_child(_choices(wardens, _warden, func(value: int) -> void:
+		_warden = value
+		_show_about()))
+	_warden_about.theme_type_variation = &"SubtleLabel"
+	_warden_about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_warden_about)
+
 	box.add_child(_heading("Sentences"))
 	var lengths: Array = []
 	for i in Sentences.LENGTH_NAMES.size():
@@ -150,6 +170,7 @@ func _go() -> void:
 	NewGame.split_levels = _extras.split_levels
 	NewGame.door_steps = _extras.door_steps
 	Standing.next_difficulty = Standing.DIFFICULTIES[_difficulty].id
+	NewGame.warden_traits.assign(_candidates[_warden - 1] if _warden > 0 else [])
 	started.emit()
 
 
@@ -157,6 +178,13 @@ func _show_about() -> void:
 	_start_about.text = EMPTY_ABOUT if _start < 0 else START_ABOUT.get(_start, SamplePrisons.CHALLENGES[_start])
 	_difficulty_about.text = Standing.DIFFICULTIES[_difficulty].description
 	_map_box.visible = _start < 0
+	if _warden == 0:
+		_warden_about.text = "A steady pair of hands, with no particular way of working."
+	else:
+		var traits := PrisonStaffTraits.all()
+		_warden_about.text = ". ".join(_candidates[_warden - 1].map(func(id: StringName) -> String:
+				var def: StaffTraitDef = traits.filter(func(t: StaffTraitDef) -> bool: return t.id == id)[0]
+				return "%s: %s" % [def.display_name, def.description.to_lower()])) + "."
 	_map_about.text = _offered_sizes()[_map_size].description
 
 

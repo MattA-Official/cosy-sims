@@ -14,6 +14,10 @@ extends Node
 signal applicants_ready(department: DepartmentDef)
 signal hired(department: DepartmentDef, record: StaffRoster.Record)
 
+## A head's experience for each card they finish, and each level's share
+## more bonus.
+const CARD_XP := 1.0
+const LEVEL_BONUS := 0.05
 const APPLICANTS := 2
 const APPLY_DAYS := 3
 ## Days of pay as notice for letting a head go.
@@ -180,12 +184,15 @@ func refresh_bonuses() -> void:
 	if modifiers == null:
 		return
 	for id: StringName in modifiers.sources.keys():
-		if String(id).begins_with("style_") or String(id).begins_with("perk_"):
+		if String(id).begins_with("traits_") or String(id).begins_with("perk_"):
 			modifiers.clear_source(id)
 	for record in roster.records:
-		var style := roster.style_of(record)
-		if not style.is_empty():
-			modifiers.set_source(StringName("style_%d" % record.id), style["bonus"])
+		var bonus := {}
+		for def in record.work_traits:
+			for key: StringName in def.modifiers:
+				bonus[key] = bonus.get(key, 0.0) + def.modifiers[key]
+		if not bonus.is_empty():
+			modifiers.set_source(StringName("traits_%d" % record.id), bonus)
 		var role := roster._role(record.role)
 		if roster.has_perk(record) and not role.perk_bonus.is_empty():
 			modifiers.set_source(StringName("perk_%d" % record.id), role.perk_bonus)
@@ -194,14 +201,25 @@ func refresh_bonuses() -> void:
 		if record == null:
 			modifiers.clear_source(department.id)
 			continue
-		var share := 0.5 if desk_work.is_overloaded(record.id) else 1.0
+		var share := (0.5 if desk_work.is_overloaded(record.id) else 1.0) * level_scale(record)
 		var amounts := {}
 		for key: StringName in department.bonus:
 			amounts[key] = department.bonus[key] * share
 		modifiers.set_source(department.id, amounts)
 
 
-func _on_finished(_owner: int, item: DeskWork.Item) -> void:
+## How much a head's level adds to their bonus: LEVEL_BONUS a level.
+static func level_scale(record: StaffRoster.Record) -> float:
+	return 1.0 + LEVEL_BONUS * (record.level - 1)
+
+
+func _on_finished(owner: int, item: DeskWork.Item) -> void:
+	# Heads learn from each card they finish (not routine paperwork).
+	if item.kind != &"paperwork":
+		for department in departments:
+			var record := head(department)
+			if record != null and record.id == owner:
+				roster.add_xp(record, CARD_XP)
 	if item.kind != &"research":
 		return
 	var department := find(StringName(item.ref))

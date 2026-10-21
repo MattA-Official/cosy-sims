@@ -407,7 +407,9 @@ func _ready() -> void:
 	roster.name = "StaffRoster"
 	roster.people = people
 	roster.roles = PrisonCatalogue.all_roles()
-	roster.styles[&"warden"] = PrisonDepartments.warden_styles()
+	roster.work_trait_pool = PrisonStaffTraits.all()
+	roster.work_trait_counts[&"warden"] = 2
+	roster.modifiers = modifiers
 	roster.shifts = PrisonCatalogue.SHIFTS
 	roster.trait_pool.assign(PrisonCatalogue.TRAITS.filter(func(t: TraitDef) -> bool: return t.id != &"light_fingered"))
 	roster.clock = clock
@@ -1113,6 +1115,8 @@ func _ready() -> void:
 	_apply_wall_view()
 	var new_game := NewGame.pending
 	NewGame.pending = false
+	if new_game and not NewGame.warden_traits.is_empty():
+		roster.preset(&"warden", NewGame.warden_traits)
 	if attract:
 		hud.visible = false
 	elif not saved.is_empty():

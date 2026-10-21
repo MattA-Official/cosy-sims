@@ -9,5 +9,6 @@ id = &"training"
 display_name = "Training room"
 colour = Color(0.7, 0.8, 0.72, 1)
 required_tags = Array[StringName]([&"whiteboard", &"chair"])
+required_counts = Dictionary[StringName, int]({&"chair": 4})
 icon = ExtResource("2_icon")
 zone = &"staff"

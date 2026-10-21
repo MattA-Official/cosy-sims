@@ -310,7 +310,7 @@ func _list_staff() -> void:
 		train.focus_mode = FOCUS_NONE
 		train.tooltip_text = "Train them in the training room%s: %s, and they spend tomorrow's shift there. They also come back with experience." \
 				% [learn, Ledger.text(StaffRoster.TRAINING_FEE)]
-		train.disabled = busy
+		train.disabled = busy or not roster.training_places()
 		train.visible = has_training_room.is_valid() and has_training_room.call()
 		train.pressed.connect(func() -> void:
 			roster.send_on_course(record, true)
@@ -341,9 +341,8 @@ func _person_row(record: StaffRoster.Record, words: String, buttons: Array) -> H
 	text.add_child(about)
 	if not record.traits.is_empty():
 		text.add_child(_note(", ".join(record.traits.map(func(t: TraitDef) -> String: return t.display_name))))
-	var style := roster.style_of(record)
-	if not style.is_empty():
-		text.add_child(_note("%s: %s" % [style["name"], String(style["words"]).to_lower()]))
+	if not record.work_traits.is_empty():
+		text.add_child(_note(roster.work_trait_words(record)))
 	row.add_child(text)
 	for button: Button in buttons:
 		button.size_flags_vertical = SIZE_SHRINK_CENTER
