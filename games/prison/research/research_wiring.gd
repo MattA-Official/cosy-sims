@@ -50,6 +50,7 @@ static func setup(main: Node) -> void:
 	_count(main)
 	_effects(main)
 	_trials(main)
+	_feedback(main)
 	clock.hour_changed.connect(func(_hour: int) -> void: research.check_reveals())
 
 
@@ -64,6 +65,8 @@ static func _setting(main: Node, id: StringName) -> Variant:
 			return not (main.people as People).needs_off.has(&"staff")
 		&"red_tape":
 			return (main.desk_work as DeskWork).red_tape != DeskWork.RedTape.OFF
+		&"no_road":
+			return not (main.roads as Roads).has_roads()
 	return null
 
 
@@ -146,6 +149,21 @@ static func _count(main: Node) -> void:
 		if counters.today.get(&"fight", 0) == 0 and standing._average_mood() >= CALM_MOOD \
 				and people.people.any(func(p: Person) -> bool: return p.group == &"prisoner"):
 			counters.add(&"calm_day"))
+
+
+## Toasts as cards finish and turn up, and the morning report's lines.
+static func _feedback(main: Node) -> void:
+	var research: Research = main.research
+	(main.standing as Standing).report_lines.append(research.report_lines)
+	var toast := func(title: String, body: String) -> void:
+		var toasts := main.get_node_or_null("/root/Toasts")
+		if not main.attract and toasts != null:
+			toasts.post(title, body)
+	research.finished.connect(func(def: ResearchCardDef, owner: int) -> void:
+		toast.call("Research done: %s" % def.display_name, "%s %s" % [research.finished_words(def, owner), def.gives_text]))
+	research.revealed.connect(func(def: ResearchCardDef, why: String) -> void:
+		if why != "From the start":
+			toast.call("A new idea: %s" % def.display_name, "Turned up: %s. See the research board (N)." % why.to_lower()))
 
 
 ## Wing trials report through the in-tray.

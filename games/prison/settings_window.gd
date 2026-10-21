@@ -1,7 +1,7 @@
 class_name SettingsWindow
 extends PanelContainer
 ## How the game plays and sounds: difficulty, sentence length, instant
-## building, red tape and volumes. Changing difficulty starts the
+## building, red tape, research and volumes. Changing difficulty starts the
 ## Ministry's counts again. Toggle with F4.
 
 ## A volume slider per sound bus: [bus, words].
@@ -12,6 +12,7 @@ var standing: Standing
 var blueprints: Blueprints
 var desk_work: DeskWork
 var sentences: Sentences
+var research: Research
 
 var _difficulty := OptionButton.new()
 var _about := Label.new()
@@ -19,6 +20,7 @@ var _length := OptionButton.new()
 var _worries := Label.new()
 var _instant := CheckButton.new()
 var _red_tape := OptionButton.new()
+var _research := OptionButton.new()
 
 
 func _ready() -> void:
@@ -80,6 +82,14 @@ func _ready() -> void:
 		if desk_work != null:
 			desk_work.red_tape = index as DeskWork.RedTape)
 	box.add_child(_row("Red tape", _red_tape))
+	for words in ["Full", "Warden only", "Off"]:
+		_research.add_item(words)
+	_research.focus_mode = FOCUS_NONE
+	_research.tooltip_text = "Full: the warden and each head research their own trees, with joint cards and wing trials. Warden only: one desk, the warden's, works every card at full speed. Off: every card is done at once, and pick-one pairs become policies to choose on the research board. Cards done stay done if you switch back."
+	_research.item_selected.connect(func(index: int) -> void:
+		if research != null:
+			research.set_mode(index as Research.Mode))
+	box.add_child(_row("Research", _research))
 	box.add_child(HSeparator.new())
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()
@@ -125,3 +135,5 @@ func refresh() -> void:
 		_instant.set_pressed_no_signal(blueprints.instant)
 	if desk_work != null:
 		_red_tape.select(desk_work.red_tape)
+	if research != null:
+		_research.select(research.mode)

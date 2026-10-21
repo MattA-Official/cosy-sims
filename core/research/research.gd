@@ -109,6 +109,10 @@ var trials: Dictionary[StringName, Dictionary] = {}
 var conferences: Dictionary[int, Array] = {}
 ## Roster id -> the card turned up as their pet project.
 var pet_projects: Dictionary[int, StringName] = {}
+## What happened on the board today, and yesterday's for the morning
+## report: "Ada Moss finished Cell searches."
+var news: Array[String] = []
+var yesterday_news: Array[String] = []
 
 var knowhow: Knowhow
 var counters: Counters
@@ -162,6 +166,24 @@ func start() -> void:
 		building.changed.connect(check_reveals)
 	set_mode(mode)
 	check_reveals()
+	# After the cards face up from the start, so only new ones are news.
+	revealed.connect(func(def: ResearchCardDef, why: String) -> void:
+		news.append("A new idea: %s (%s)." % [def.display_name, why.to_lower() if why != "Word of mouth" else "word of mouth"]))
+	finished.connect(func(def: ResearchCardDef, owner: int) -> void: news.append(finished_words(def, owner)))
+
+
+## "Ada Moss finished Cell searches."
+func finished_words(def: ResearchCardDef, owner: int) -> String:
+	var record := _record(owner)
+	return "%s finished %s." % [record.name if record != null else "The warden", def.display_name]
+
+
+## Lines for the morning report: yesterday's news and the character.
+func report_lines() -> Array[String]:
+	var out: Array[String] = yesterday_news.duplicate()
+	if mode != Mode.OFF:
+		out.append("Character: %s." % lean_words().to_lower())
+	return out
 
 
 ## A fresh game's know-how.
@@ -231,7 +253,7 @@ func why_not(def: ResearchCardDef) -> String:
 			return "Done."
 	if mode == Mode.OFF:
 		return "Research is off."
-	var met := def.requires.filter(is_done).size()
+	var met := def.requires.filter(_counts_as_done).size()
 	if met < def.needed():
 		return "Needs %s first." % _needs_words(def)
 	var stars: int = GATES.get(def.tier, 0)
@@ -246,7 +268,7 @@ func why_not(def: ResearchCardDef) -> String:
 		if department == null:
 			return "No such department."
 		if mode == Mode.WARDEN_ONLY:
-			return "Research is warden only."
+			return "With research Warden only, hire heads from the Heads page (H)."
 		return heads.why_not(department)
 	var slot := free_slot(def)
 	if slot == &"":
@@ -561,6 +583,8 @@ func reveal_in(department: StringName, count: int, why: String) -> Array[Researc
 ## mouth and grade reveals.
 func nightly() -> void:
 	var today := _day()
+	yesterday_news = news
+	news = []
 	if has_flag(&"department_budgets") and pay.is_valid():
 		var spend := 0
 		for department: StringName in budget:
@@ -1016,8 +1040,13 @@ func _addon_owned(def: ResearchCardDef) -> bool:
 	return def.addon == &"" or addons.has(def.addon)
 
 
+## Done, or a hire card under Warden only, where no card waits on a head.
+func _counts_as_done(id: StringName) -> bool:
+	return is_done(id) or mode == Mode.WARDEN_ONLY and _department_of_hire.has(id)
+
+
 func _needs_words(def: ResearchCardDef) -> String:
-	var names := def.requires.filter(func(id: StringName) -> bool: return not is_done(id)) \
+	var names := def.requires.filter(func(id: StringName) -> bool: return not _counts_as_done(id)) \
 			.map(func(id: StringName) -> String: return card(id).display_name)
 	if def.rule == 0:
 		return " and ".join(names)
@@ -1210,7 +1239,8 @@ func capture() -> Dictionary:
 	return {"cards": cards, "queues": saved_queues, "mode": mode, "lean_shifts": lean_shifts.duplicate(true),
 			"addons": addons.map(func(id: StringName) -> String: return String(id)),
 			"budget": _strings(budget), "refinements": _strings(refinements), "trials": saved_trials,
-			"conferences": conferences.duplicate(true), "pet_projects": _strings(pet_projects)}
+			"conferences": conferences.duplicate(true), "pet_projects": _strings(pet_projects),
+			"news": news.duplicate(), "yesterday_news": yesterday_news.duplicate()}
 
 
 ## Loads card states; cards the board no longer has are dropped, and new
@@ -1253,6 +1283,8 @@ func restore(data: Dictionary) -> void:
 	for key: Variant in data.get("conferences", {}):
 		conferences[int(key)] = data.conferences[key]
 	pet_projects.clear()
+	news.assign(data.get("news", []))
+	yesterday_news.assign(data.get("yesterday_news", []))
 	for key: Variant in data.get("pet_projects", {}):
 		pet_projects[int(key)] = StringName(data.pet_projects[key])
 	mode = int(data.get("mode", Mode.FULL)) as Mode

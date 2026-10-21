@@ -1484,6 +1484,7 @@ func _add_hud() -> void:
 	settings_window.sentences = sentences
 	settings_window.blueprints = blueprints
 	settings_window.desk_work = desk_work
+	settings_window.research = research
 	pause_menu.clock = clock
 	pause_menu.subtitle = title
 	pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")

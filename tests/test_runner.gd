@@ -2020,6 +2020,24 @@ func _test_research_effects() -> void:
 	root.add_child(main)
 	var research: Research = main.research
 	var modifiers: Modifiers = main.modifiers
+	# Every reveal can happen: a setting the game has, an event something
+	# counts, or word of mouth.
+	var wiring := FileAccess.get_file_as_string("res://games/prison/research/research_wiring.gd")
+	var stuck: Array[String] = []
+	for hint: String in PrisonResearch.REVEALS:
+		var row: Array = PrisonResearch.REVEALS[hint]
+		# Cards waiting on a later milestone's events turn up with it.
+		if row[4] or hint.contains("(M1"):
+			continue
+		match row[0]:
+			RevealDef.Kind.SETTING:
+				if ResearchWiring._setting(main, row[1]) == null:
+					stuck.append(hint)
+			RevealDef.Kind.COUNT, RevealDef.Kind.FIRST, RevealDef.Kind.EVENT, RevealDef.Kind.PRISONER:
+				for id in String(row[1]).split("|"):
+					if not wiring.contains('&"%s"' % id):
+						stuck.append(hint)
+	_check(stuck.is_empty(), "every card can turn up (stuck: %s)" % ", ".join(stuck))
 	var plots: LandPlots = main.land_plots
 	var plot: Rect2i = plots.plots().filter(plots.for_sale)[0]
 	var before := plots.price(plot)

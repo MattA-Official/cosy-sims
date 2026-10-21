@@ -30,8 +30,9 @@ const REVEALS := {
 	"Staff needs setting on": [RevealDef.Kind.SETTING, &"staff_needs", 1, true, false],
 	"Red tape setting on": [RevealDef.Kind.SETTING, &"red_tape", 1, true, false],
 	"5 course passes": [RevealDef.Kind.COUNT, &"course_passed", 5, null, true],
-	"Utilities set to Self-sufficient": [RevealDef.Kind.SETTING, &"utilities", 1, &"self_sufficient", false],
-	"Utilities set to Bought in": [RevealDef.Kind.SETTING, &"utilities", 1, &"bought_in", false],
+	# No utilities setting yet: word of mouth turns these up.
+	"Utilities set to Self-sufficient": [RevealDef.Kind.SETTING, &"utilities", 1, &"self_sufficient", true],
+	"Utilities set to Bought in": [RevealDef.Kind.SETTING, &"utilities", 1, &"bought_in", true],
 	"A kitchen, laundry or workshop is built": [RevealDef.Kind.BUILT, &"kitchen|laundry|workshop", 1, null, true],
 	"An infirmary is built (M7)": [RevealDef.Kind.BUILT, &"infirmary", 1, null, true],
 	"A classroom is built (M8)": [RevealDef.Kind.BUILT, &"classroom", 1, null, true],
