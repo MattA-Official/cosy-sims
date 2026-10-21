@@ -55,6 +55,9 @@ const WOBBLE := 0.1
 const NO_TAGS: Array[StringName] = []
 ## No item to be had for an object that needs one (see _item_source).
 const NONE_LEFT := Vector2i(0, -2)
+
+## How sending someone to one object went.
+enum Tried { GOING, FAILED, NONE_LEFT }
 ## Room quality lost for each piece of litter, and at most.
 const LITTER_EACH := 0.5
 const LITTER_MOST := 3.0
@@ -186,6 +189,9 @@ var litter_tag: StringName = &"litter"
 ## their needs and the timetable can take over, such as misconduct or a
 ## player in control.
 var deciders: Array[Callable] = []
+## Group id -> the Brain its people decide with; a NeedsBrain otherwise.
+## Someone's own Person.brain comes before their group's.
+var brains: Dictionary[StringName, Brain] = {}
 ## (person, PlacedObject) -> bool: false keeps someone off an object for
 ## now, such as a second snack in a day.
 var use_filters: Array[Callable] = []
@@ -206,6 +212,7 @@ var _ground_dirty := true
 var _ground_wait := -1.0
 var _beds_dirty := true
 var _next_id := 1
+var _needs_brain := NeedsBrain.new()
 var _rng := RandomNumberGenerator.new()
 ## (level, object id): the person using or heading for it.
 var _claimed: Dictionary[Vector2i, Person] = {}
@@ -1172,13 +1179,27 @@ func _has_errand(person: Person) -> bool:
 	return _main_tag(person) != &"" or _pressing_need(person) != &""
 
 
-## Works out what someone does next, in the order the class comment gives.
+## Works out what someone does next: anything in `deciders` first, then
+## their own brain, then their group's (a NeedsBrain unless set).
 func _decide(person: Person, may_wander: bool) -> void:
-	var block := person.block
 	# Anything else deciding for them first, such as someone up to no good.
 	for decider in deciders:
 		if decider.call(person, may_wander):
 			return
+	if person.brain != null and person.brain.decide(self, person, may_wander):
+		return
+	brain_of(person.group).decide(self, person, may_wander)
+
+
+## The brain a group decides with when its people have none of their own.
+func brain_of(group: StringName) -> Brain:
+	return brains.get(group, _needs_brain)
+
+
+## What someone does next by their needs and the timetable, in the order
+## the class comment gives. NeedsBrain calls this.
+func decide_by_needs(person: Person, may_wander: bool) -> void:
+	var block := person.block
 	if _leave_if_kept_out(person):
 		return
 	var urgent := _urgent_need(person)
@@ -1346,40 +1367,11 @@ func _seek(person: Person, tags: Array[StringName], need: StringName = &"", unre
 	var candidates := _candidates(person, tags, unrestricted)
 	var none_left: BuildingMap.PlacedObject = null
 	for entry: Array in candidates.slice(0, 5):
-		var n: int = entry[1]
-		var placed: BuildingMap.PlacedObject = entry[2]
-		var source := _item_source(person, placed, entry[3])
-		if source == NONE_LEFT:
-			none_left = placed
-			continue
-		var going_to := placed if source == Person.NO_OBJECT \
-				else building.levels[source.x].objects[source.y] as BuildingMap.PlacedObject
-		var seat: BuildingMap.PlacedObject = null
-		if placed.def.seated:
-			seat = free_seat(n, placed, person.flat())
-			if seat == null:
-				continue
-		var spots := _spots_beside(source.x if going_to != placed else n, going_to, person.flat())
-		if seat != null and going_to == placed:
-			spots = _seat_spots(n, seat, person.flat())
-		if going_to != placed and not spots.is_empty():
-			spots = [_queue_spot(person, source, spots[0])]
-		for spot in spots:
-			if _walk_to(person, source.x if going_to != placed else n, spot):
-				if seat != null:
-					_take_seat(person, Vector2i(n, seat.id))
-				person.target = Vector2i(n, placed.id)
-				person.target_tag = entry[3]
-				person.target_need = need
-				person.fetch_from = source
-				_claimed[person.target] = person
-				var def := need_def(need)
-				if going_to != placed:
-					person.activity = "Fetching a %s" % String(placed.def.needs_item).replace("_", " ")
-				else:
-					person.activity = "Going to a %s" % placed.def.display_name.to_lower() \
-							+ (" for %s" % def.display_name.to_lower() if def != null else "")
-				return true
+		var tried := _try_object(person, entry[1], entry[2], entry[3], need)
+		if tried == Tried.GOING:
+			return true
+		if tried == Tried.NONE_LEFT:
+			none_left = entry[2]
 	if none_left != null:
 		_give_up(person, tags, need)
 		add_moodlet(person, none_left.def.without_item_moodlet)
@@ -1391,6 +1383,44 @@ func _seek(person: Person, tags: Array[StringName], need: StringName = &"", unre
 			% String(tags[0]).replace("_", " ")
 	person.timer = 2.0
 	return false
+
+
+## Sends someone to use one object on level n for its tag, taking a seat,
+## or queuing to fetch the item it needs first.
+func _try_object(person: Person, n: int, placed: BuildingMap.PlacedObject, tag: StringName,
+		need: StringName) -> Tried:
+	var source := _item_source(person, placed, tag)
+	if source == NONE_LEFT:
+		return Tried.NONE_LEFT
+	var going_to := placed if source == Person.NO_OBJECT \
+			else building.levels[source.x].objects[source.y] as BuildingMap.PlacedObject
+	var seat: BuildingMap.PlacedObject = null
+	if placed.def.seated:
+		seat = free_seat(n, placed, person.flat())
+		if seat == null:
+			return Tried.FAILED
+	var spots := _spots_beside(source.x if going_to != placed else n, going_to, person.flat())
+	if seat != null and going_to == placed:
+		spots = _seat_spots(n, seat, person.flat())
+	if going_to != placed and not spots.is_empty():
+		spots = [_queue_spot(person, source, spots[0])]
+	for spot in spots:
+		if _walk_to(person, source.x if going_to != placed else n, spot):
+			if seat != null:
+				_take_seat(person, Vector2i(n, seat.id))
+			person.target = Vector2i(n, placed.id)
+			person.target_tag = tag
+			person.target_need = need
+			person.fetch_from = source
+			_claimed[person.target] = person
+			var def := need_def(need)
+			if going_to != placed:
+				person.activity = "Fetching a %s" % String(placed.def.needs_item).replace("_", " ")
+			else:
+				person.activity = "Going to a %s" % placed.def.display_name.to_lower() \
+						+ (" for %s" % def.display_name.to_lower() if def != null else "")
+			return Tried.GOING
+	return Tried.FAILED
 
 
 ## Where to fetch the item an object needs in hand first, as (level,
@@ -1711,6 +1741,37 @@ func _need_for_tag(tag: StringName) -> StringName:
 ## Sends someone for a stroll somewhere nearby they may go.
 func wander(person: Person) -> void:
 	_wander(person)
+
+
+## Sends someone to use one object on a level (seated, queuing or fetching
+## what it needs as usual), for the need its first tag meets. False when
+## they may not or cannot get to it.
+func use_object(person: Person, level: int, placed: BuildingMap.PlacedObject) -> bool:
+	if placed == null or placed.def.tags.is_empty() or not _may_use(person, level, placed):
+		return false
+	var key := Vector2i(level, placed.id)
+	if _claimed.has(key) and _claimed[key] != person:
+		return false
+	_stop(person)
+	var tag: StringName = placed.def.tags[0]
+	for t in placed.def.tags:
+		if _need_for_tag(t) != &"":
+			tag = t
+			break
+	return _try_object(person, level, placed, tag, _need_for_tag(tag)) == Tried.GOING
+
+
+## Sends someone to a free spot in a room they may go into.
+func go_to_room(person: Person, level: int, room: Room) -> bool:
+	if room == null or not may_enter(person, room):
+		return false
+	_stop(person)
+	for attempt in 6:
+		var spot: Variant = _spot_in_room(level, room)
+		if spot != null and _walk_to(person, level, spot):
+			person.activity = "Heading to %s" % _place_name(person, room)
+			return true
+	return false
 
 
 func _wander(person: Person) -> void:

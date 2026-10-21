@@ -105,6 +105,9 @@ var going_home := false
 ## Being walked somewhere by someone else, such as a guard: they decide
 ## nothing for themselves meanwhile.
 var led := false
+## Decides for them before their group's brain does (see People.brains),
+## such as a PlayerBrain; null for none.
+var brain: Brain = null
 ## When set, doors treat them as this group instead of their own (someone
 ## slipping out behind a vehicle through a staff-only gate).
 var passes_as: StringName = &""

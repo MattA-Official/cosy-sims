@@ -118,6 +118,7 @@ func _process(_delta: float) -> bool:
 	_test_moving_cells()
 	_test_regime_extras()
 	_test_desk_tint()
+	_test_brains()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1821,6 +1822,47 @@ func _test_desk_tint() -> void:
 	_check(of_warden.call()[0][2] == DeskTint.BUSY, "a busy one amber")
 	desk_work.overloaded[id] = true
 	_check(of_warden.call()[0][2] == DeskTint.OVERLOADED, "an overloaded one red")
+	main.queue_free()
+
+
+func _test_brains() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	root.add_child(main)
+	var people: People = main.people
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	var brain := PlayerBrain.new()
+	prisoner.brain = brain
+	people.stop(prisoner)
+	people._decide(prisoner, true)
+	_check(prisoner.activity == "Waiting for orders" and prisoner.state == Person.State.IDLE,
+			"someone with a player brain and no orders waits")
+	brain.needs_when_idle = true
+	people._decide(prisoner, true)
+	_check(prisoner.activity != "Waiting for orders", "or decides by needs when allowed to")
+	brain.needs_when_idle = false
+	var level: BuildingMap = main.building.levels[prisoner.level]
+	var toilet: BuildingMap.PlacedObject = null
+	for placed: BuildingMap.PlacedObject in level.objects.values():
+		if placed.def.tags.has(&"toilet") and people.user_of(prisoner.level, placed.id) == null \
+				and people._may_use(prisoner, prisoner.level, placed):
+			toilet = placed
+			break
+	_check(toilet != null and brain.order(people, prisoner, UseObject.new(prisoner.level, toilet))
+			and prisoner.target == Vector2i(prisoner.level, toilet.id), "an order to use a toilet sends them to it")
+	var room := level.room_at_point(prisoner.flat())
+	_check(room == null or brain.order(people, prisoner, GoToRoom.new(prisoner.level, room)), "an order to go to a room")
+	_check(brain.order(people, prisoner, Wander.new()) and brain.doing is Wander, "and to wander")
+	brain.orders.append(Action.new())
+	people.stop(prisoner)
+	people._decide(prisoner, false)
+	_check(brain.doing == null and prisoner.activity == "Waiting for orders", "an order that can't start is dropped")
+	prisoner.brain = null
+	var other: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[1]
+	people.brains[&"prisoner"] = brain
+	people.stop(other)
+	people._decide(other, true)
+	_check(other.activity == "Waiting for orders", "a group can have a brain of its own")
+	people.brains.erase(&"prisoner")
 	main.queue_free()
 
 
