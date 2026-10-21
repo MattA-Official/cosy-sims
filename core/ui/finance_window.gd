@@ -2,7 +2,8 @@ class_name FinanceWindow
 extends PanelContainer
 ## The prison's money: the balance, a chart of the last week's closing
 ## balances, and what came in and went out today and yesterday, line by
-## line. A sandbox switch gives unlimited money. Toggle with M.
+## line. A sandbox switch gives unlimited money. A game can add its own
+## sections in a column to the right, such as a budget. Toggle with M.
 
 ## Seconds between showing the lines again while open.
 const REFRESH_SECONDS := 0.5
@@ -17,6 +18,7 @@ var _chart := BalanceChart.new()
 var _today := GridContainer.new()
 var _yesterday := GridContainer.new()
 var _wait := 0.0
+var _sections := VBoxContainer.new()
 
 
 ## Bars for the closing balances, today's last; below zero in red.
@@ -57,9 +59,13 @@ func _ready() -> void:
 	grow_horizontal = GROW_DIRECTION_BOTH
 	offset_top = 76.0
 	custom_minimum_size = Vector2(440, 0)
+	var outer := HBoxContainer.new()
+	outer.add_theme_constant_override(&"separation", 16)
+	add_child(outer)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override(&"separation", 8)
-	add_child(box)
+	box.custom_minimum_size = Vector2(420, 0)
+	outer.add_child(box)
 
 	var heading := HBoxContainer.new()
 	var title := Label.new()
@@ -97,6 +103,11 @@ func _ready() -> void:
 	columns.add_child(_column("Today", _today))
 	columns.add_child(_column("Yesterday", _yesterday))
 	box.add_child(columns)
+	# Sections sit in a column of their own to the right.
+	_sections.add_theme_constant_override(&"separation", 8)
+	_sections.custom_minimum_size = Vector2(400, 0)
+	_sections.visible = _sections.get_child_count() > 0
+	outer.add_child(_sections)
 
 	_sandbox.text = "Sandbox: unlimited money"
 	_sandbox.tooltip_text = "Build and hire whatever the balance. Money is still counted."
@@ -107,6 +118,15 @@ func _ready() -> void:
 	box.add_child(_sandbox)
 	visible = false
 	refresh()
+
+
+## Adds a section below the day's lines. Anything with a refresh() is
+## refreshed along with the window.
+func add_section(control: Control) -> void:
+	if _sections.get_child_count() > 0:
+		_sections.add_child(HSeparator.new())
+	_sections.add_child(control)
+	_sections.visible = true
 
 
 func _process(delta: float) -> void:
@@ -145,6 +165,9 @@ func refresh() -> void:
 	_chart.queue_redraw()
 	_fill(_today, ledger.today)
 	_fill(_yesterday, ledger.yesterday)
+	for section in _sections.get_children():
+		if section.has_method(&"refresh"):
+			section.call(&"refresh")
 
 
 func _column(text: String, grid: GridContainer) -> VBoxContainer:

@@ -16,6 +16,11 @@ var _limit := Label.new()
 var _limit_row := HBoxContainer.new()
 var _beds := Label.new()
 var _checks: Dictionary[StringName, CheckBox] = {}
+var _caps: Dictionary[StringName, Label] = {}
+var _cap_rows: Array[Control] = []
+var _forecast := Label.new()
+var _offer_row := HBoxContainer.new()
+var _offer := Label.new()
 var _buttons: Array[Button] = []
 var _wait := 0.0
 var _grade := Label.new()
@@ -71,24 +76,46 @@ func _ready() -> void:
 	name_label.text = "Arrivals a day"
 	name_label.size_flags_horizontal = SIZE_EXPAND_FILL
 	_limit_row.add_child(name_label)
-	_limit_row.add_child(_button("−", func() -> void: intake.limit = maxi(intake.limit - 1, 0)))
-	_limit.custom_minimum_size = Vector2(32, 0)
+	_limit_row.add_child(_stepper(func() -> void: intake.limit = maxi(intake.limit - 1, 0)))
+	_limit.custom_minimum_size = Vector2(56, 0)
 	_limit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_limit_row.add_child(_limit)
-	_limit_row.add_child(_button("+", func() -> void: intake.limit = mini(intake.limit + 1, intake.max_limit)))
+	_limit_row.add_child(_stepper(func() -> void:
+		intake.limit = mini(intake.limit + 1, Intake.MOST_WITHOUT_WARDEN)))
 	box.add_child(_limit_row)
-	var categories := HBoxContainer.new()
-	categories.add_theme_constant_override(&"separation", 12)
 	for def in intake.categories:
+		var row := HBoxContainer.new()
 		var check := CheckBox.new()
 		check.text = def.display_name
 		check.tooltip_text = "%s\nGrant: %s a day each." % [def.description, Ledger.text(def.daily_grant)]
 		check.focus_mode = FOCUS_NONE
+		check.size_flags_horizontal = SIZE_EXPAND_FILL
 		var id := def.id
 		check.toggled.connect(func(on: bool) -> void: intake.accepted[id] = on)
-		categories.add_child(check)
+		row.add_child(check)
 		_checks[def.id] = check
-	box.add_child(categories)
+		row.add_child(_button("−", func() -> void: intake.caps[id] = maxi(intake.caps.get(id, 0) - 1, 0)))
+		var cap := Label.new()
+		cap.custom_minimum_size = Vector2(56, 0)
+		cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cap.tooltip_text = "The most a day. Mondays bring this many; other days a few fewer."
+		cap.mouse_filter = MOUSE_FILTER_PASS
+		row.add_child(cap)
+		_caps[def.id] = cap
+		row.add_child(_button("+", func() -> void:
+			intake.caps[id] = mini(intake.caps.get(id, 0) + 1, Intake.MOST_CAP)))
+		_cap_rows.append(row)
+		box.add_child(row)
+	_forecast.theme_type_variation = &"SubtleLabel"
+	_forecast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_forecast)
+	_offer_row.add_theme_constant_override(&"separation", 8)
+	_offer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_offer.size_flags_horizontal = SIZE_EXPAND_FILL
+	_offer_row.add_child(_offer)
+	_offer_row.add_child(_button("Accept", func() -> void: intake.accept_offer()))
+	_offer_row.add_child(_button("Decline", func() -> void: intake.decline_offer()))
+	box.add_child(_offer_row)
 	_beds.theme_type_variation = &"SubtleLabel"
 	box.add_child(_beds)
 	if consequences != null and searching != null:
@@ -96,7 +123,7 @@ func _ready() -> void:
 	if standing != null:
 		box.add_child(HSeparator.new())
 		_grade.theme_type_variation = &"HeaderLabel"
-		_grade.tooltip_text = "Graded each midnight on safety, wellbeing, reform and money. A better grade brings a bigger grant and a bigger intake."
+		_grade.tooltip_text = "Graded each midnight on safety, wellbeing, reform and money. A better grade brings a bigger grant."
 		_grade.mouse_filter = MOUSE_FILTER_PASS
 		box.add_child(_grade)
 		_measures.theme_type_variation = &"SubtleLabel"
@@ -136,14 +163,24 @@ func refresh() -> void:
 	var missing := office.missing()
 	_missing.text = "The warden is in charge." if missing.is_empty() else missing
 	if not warden:
-		_missing.text += " Until then %d low or medium security prisoners come each day." % Intake.WITHOUT_WARDEN
-	_limit.text = str(intake.todays_count())
-	for button in _buttons:
-		button.disabled = not warden
+		_missing.text += " Until then you set a simple number a day of low or medium security prisoners."
+	_limit_row.visible = not warden
+	_limit.text = str(intake.limit) if intake.limit > 0 else "Closed"
+	for row in _cap_rows:
+		row.visible = warden
 	for id: StringName in _checks:
-		_checks[id].disabled = not warden
-		_checks[id].set_pressed_no_signal(intake.accepted.get(id, false) if warden
-				else Intake.WITHOUT_WARDEN_CATEGORIES.has(id))
+		_checks[id].set_pressed_no_signal(intake.accepted.get(id, false))
+		_caps[id].text = str(intake.caps.get(id, 0))
+	var days := PackedStringArray()
+	for entry: Array in intake.forecast():
+		days.append("%s %d" % [(entry[1] as String).left(3), entry[2]])
+	_forecast.text = "Next 7 days: " + " · ".join(days)
+	_offer_row.visible = warden and not intake.offer.is_empty()
+	if not intake.offer.is_empty():
+		var category := PrisonCatalogue.categories().get(intake.offer.category) as CategoryDef
+		_offer.text = "Transfer offer: %d %s prisoners on tomorrow's bus, %s each." % [intake.offer.count,
+				category.display_name.to_lower() if category != null else String(intake.offer.category),
+				Ledger.text(intake.offer.fee)]
 	for control in _policies:
 		if control is BaseButton:
 			(control as BaseButton).disabled = not warden
@@ -220,7 +257,7 @@ func measures_text() -> String:
 
 func _show_standing(warden: bool) -> void:
 	_grade.text = "Grade  %s%s" % ["★".repeat(standing.grade), "☆".repeat(5 - standing.grade)]
-	_measures.text = measures_text() + "\nUp to %d arrivals a day at this grade." % intake.max_limit
+	_measures.text = measures_text()
 	for child in _goals.get_children():
 		_goals.remove_child(child)
 		child.queue_free()
@@ -242,6 +279,18 @@ func _show_standing(warden: bool) -> void:
 			row.add_child(grant)
 			_goals.add_child(row)
 	_report.text = ("Today's report:\n" + standing.report) if warden and not standing.report.is_empty() else ""
+
+
+## A − or + for the arrivals without a warden.
+func _stepper(pressed: Callable) -> Button:
+	var button := Button.new()
+	button.text = "−" if _limit_row.get_child_count() == 1 else "+"
+	button.focus_mode = FOCUS_NONE
+	button.custom_minimum_size = Vector2(32, 0)
+	button.pressed.connect(func() -> void:
+		pressed.call()
+		refresh())
+	return button
 
 
 func _button(text: String, pressed: Callable) -> Button:

@@ -90,6 +90,8 @@ func _process(_delta: float) -> bool:
 	_test_balanced_grade()
 	_test_goals_and_difficulty()
 	_test_escape_plans()
+	_test_budget()
+	_test_staff_roster()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1170,7 +1172,7 @@ func _test_intake() -> void:
 	clock.speed_index = 0
 	_check(main.office.has_warden() and intake.warden_here(), "the paying prison has a warden in an office")
 	_check(intake.warnings().is_empty() and intake.free_beds() == 4, "a reception and four free beds")
-	intake.limit = 3
+	intake.caps[&"high"] = 3
 	intake.accepted = {&"low": false, &"medium": false, &"high": true}
 	var fees: int = ledger.today.get("Intake fees", 0)
 	# The bus drives in along the road; they step off when it stops.
@@ -1195,7 +1197,7 @@ func _test_intake() -> void:
 		if people.people.size() > before:
 			came.assign(people.people.slice(before))
 			break
-	_check(came.size() == 3, "the bus brings the warden's limit")
+	_check(came.size() == 3, "Monday's bus brings the warden's cap")
 	_check(came.all(func(p: Person) -> bool: return p.category == &"high" and p.moodlets.has(Intake.FIRST_NIGHT)),
 			"of the categories accepted, each feeling their first night")
 	_check(ledger.today.get("Intake fees", 0) - fees == 3 * Intake.FEE, "and the prison is paid for each")
@@ -1215,6 +1217,22 @@ func _test_intake() -> void:
 	_check(ride.call().is_empty() and intake.warnings()[0].begins_with("No free beds"), "and none when the cells are full")
 	main.shifts.set_wanted(&"warden", &"day", 0)
 	_check(not intake.warden_here() and intake.todays_count() == Intake.WITHOUT_WARDEN, "without a warden a couple come")
+	intake.limit = 0
+	_check(intake.todays_count() == 0 and intake.forecast().all(func(e: Array) -> bool: return e[2] == 0),
+			"or none, closed")
+	main.shifts.set_wanted(&"warden", &"day", 1)
+	intake.caps = {&"low": 4, &"medium": 0, &"high": 0}
+	intake.accepted = {&"low": true, &"medium": true, &"high": false}
+	var week: Array = intake.forecast()
+	_check(week.size() == 7 and week.all(func(e: Array) -> bool: return e[2] >= 1 and e[2] <= 4)
+			and week.any(func(e: Array) -> bool: return e[1] == "Monday" and e[2] == 4), "a week ahead, Mondays full")
+	var offer: Dictionary = intake._maybe_offer(true)
+	_check(not offer.is_empty(), "the Ministry offers a transfer")
+	var tomorrow: int = main.clock.day() + 1
+	var before_plan: int = intake.plan_for(tomorrow).get(offer.category, 0)
+	intake.accept_offer()
+	_check(intake.offer.is_empty() and intake.plan_for(tomorrow).get(offer.category, 0) == before_plan + offer.count,
+			"accepted, they come on tomorrow's bus")
 	main.queue_free()
 
 
@@ -1235,7 +1253,6 @@ func _test_standing() -> void:
 	_check(standing.current_goals().size() == Standing.GOALS_SHOWN, "and the next goal comes up")
 	standing.grade_day()
 	_check(standing.measures.size() == 4 and standing.grade >= 1 and standing.grade <= 5, "each midnight it is graded")
-	_check(main.intake.max_limit == 2 + standing.grade * 2, "the grade sets the biggest intake")
 	var report := standing.write_report()
 	_check(report.contains("★") and report.contains("Money:"), "and the morning report sums up yesterday")
 	main.queue_free()
@@ -3863,6 +3880,7 @@ func _test_release() -> void:
 	var clock: GameClock = main.clock
 	(main.misconduct as Misconduct).enabled = false
 	(main.intake as Intake).limit = 0
+	(main.intake as Intake).accepted.clear()
 	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
 	for p: Person in prisoners:
 		PrisonerFile.of(p).release_day = clock.day() + 50
@@ -3949,8 +3967,16 @@ func _test_balanced_grade() -> void:
 	_check(standing.write_report().contains("Held to 3★ by Reform"), "the report says what held it")
 	standing.measure_value["Reform"] = func() -> Array: return [0.5, "fine"]
 	standing.grade_day()
-	_check(standing.grade == 5 and standing.held_by.is_empty() and standing.history.size() == 2,
-			"with Reform at 4 nothing holds it back, and both nights are kept")
+	_check(standing.measures["Reform"] == 3 and standing.grade == 4 and standing.held_by.is_empty()
+			and standing.history.size() == 2, "Reform averages 1 and 4 over two nights, and nothing holds it back")
+	standing.measure_value["Reform"] = weak
+	standing.grade_day()
+	_check(standing.measures["Reform"] == 2 and standing.grade == 4, "one bad night dents the grade rather than sinking it")
+	var ledger: Ledger = main.ledger
+	ledger.balance = 7000
+	ledger.spent.assign([1000, 1000, 1000])
+	_check(is_equal_approx(standing._money()[0], 7.0), "money counts days of costs in the bank")
+	ledger.balance = 7000
 	# The real Reform measure: half average reform, half this week's leavers.
 	standing.measure_value.erase("Reform")
 	standing.start()
@@ -4089,4 +4115,91 @@ func _test_escape_plans() -> void:
 	_check(not plans.quiet_at(cut.spot), "a guard nearby stops the cutting")
 	clock.advance(5.0)
 	_check(not plans.plans.has(cutter), "and finds the cut")
+	main.free()
+
+
+func _test_staff_roster() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var roster: StaffRoster = main.roster
+	var shifts: Shifts = main.shifts
+	var ledger: Ledger = main.ledger
+	var people: People = main.people
+	var staff: Array = people.people.filter(func(p: Person) -> bool: return p.role != &"" and not p.going_home)
+	_check(not staff.is_empty() and staff.all(func(p: Person) -> bool:
+			var r := roster.record_of(p)
+			return r != null and r.name == p.name and r.person == p), "everyone at work is on the roster by name")
+	_check(roster.records.size() == staff.size() + roster.count(&"guard", &"night") + roster.count(&"cook", &"night")
+			+ roster.count(&"cleaner", &"night") + roster.count(&"nurse", &"night") + roster.count(&"handyman", &"night"),
+			"and so is the night shift, at home")
+	var now := shifts.on_now().id
+	var guard: StaffRoster.Record = roster.cheapest(&"guard", now)
+	_check(guard != null and roster.applicants_for(&"warden", &"night").is_empty(), "applicants for each shift a role works")
+	var before := shifts.wanted_for(&"guard", now)
+	_check(roster.hire(guard) == guard and shifts.wanted_for(&"guard", now) == before + 1
+			and not roster.applicants.has(guard), "hiring an applicant puts them on the shift")
+	shifts.balance(true)
+	_check(guard.person != null and guard.person.name == guard.name and guard.person.look_seed == guard.look_seed
+			and guard.person.traits == guard.traits, "they come in as themselves")
+	var wages: int = ledger.today.get("Wages", 0)
+	var person := guard.person
+	roster.dismiss(guard)
+	shifts.balance()
+	_check(ledger.today.get("Wages", 0) == wages - roster.day_pay(guard) and person.going_home
+			and shifts.wanted_for(&"guard", now) == before, "letting someone go pays a day's notice and sends them home")
+	var cook: StaffRoster.Record = roster.on(&"cook", now)[0]
+	var wage := cook.wage
+	roster.raise(cook)
+	_check(cook.wage > wage and roster.pay_feeling(cook) > (float(wage) / 60.0 - 1.0) * 100.0, "a raise, and they feel it")
+	cook.wage = 15
+	var quit: Array = []
+	roster.quit.connect(func(r: StaffRoster.Record) -> void: quit.append(r))
+	for i in 25:
+		roster.nightly()
+	shifts.balance()
+	_check(quit.has(cook) and not roster.records.has(cook) and cook.person.going_home, "badly paid and miserable, they quit")
+	_check(roster.applicants.all(func(a: StaffRoster.Record) -> bool: return a.until >= (main.clock as GameClock).day()),
+			"applicants wait a few days")
+	var names: Array = roster.records.map(func(r: StaffRoster.Record) -> String: return r.name)
+	var saved := PrisonSave.capture(main)
+	main.queue_free()
+	main = load("res://games/prison/main.tscn").instantiate()
+	PrisonSave.pending = saved
+	root.add_child(main)
+	roster = main.roster
+	_check(roster.records.map(func(r: StaffRoster.Record) -> String: return r.name) == names
+			and (main.people as People).people.all(func(p: Person) -> bool:
+				return p.role == &"" or p.going_home or roster.record_of(p) != null and roster.record_of(p).person == p),
+			"the roster saves, and staff at work rejoin it")
+	main.queue_free()
+
+
+func _test_budget() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 11
+	root.add_child(main)
+	var budget: Budget = main.budget
+	var ledger: Ledger = main.ledger
+	var clock: GameClock = main.clock
+	var week: Array = budget.forecast()
+	_check(week.size() == 7 and week.all(func(row: Array) -> bool: return row[1] > 0 and row[2] > 0),
+			"a week ahead of money in and out")
+	_check(budget.has_workshop() and budget.make_offers().size() == Budget.OFFERS, "contracts on offer for the workshop")
+	var offer: Dictionary = budget.offers[0]
+	_check(budget.accept(0) and budget.contract.goods == offer.goods and not budget.accept(0), "one contract at a time")
+	var before: int = ledger.today.get("Contracts", 0)
+	(main.workshop as Workshop).collected.emit(offer.goods)
+	_check(budget.contract.is_empty() and ledger.today.get("Contracts", 0) - before == offer.pay,
+			"made in time, it pays on top")
+	var balance := ledger.balance
+	_check(budget.borrow(5000) and ledger.balance == balance + 5000 and not budget.borrow(2000), "one loan at a time")
+	clock.jump_to_hour(0)
+	_check(budget.loan.left == 5500 - 550, "paid back a share each midnight, with interest")
+	budget.make_offers()
+	budget.accept(1)
+	var due: int = budget.contract.due
+	while clock.day() <= due:
+		clock.jump_to_hour(0)
+	_check(budget.contract.is_empty(), "late, a contract lapses")
 	main.free()

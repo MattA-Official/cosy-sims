@@ -6,6 +6,8 @@ extends Resource
 @export var id: StringName
 @export var display_name: String
 @export_multiline var description: String
+## Money a new game starts with.
+@export var starting_money := 20000
 @export var grant_scale := 1.0
 @export var wage_scale := 1.0
 ## Scales how quickly tempers rise.

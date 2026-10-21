@@ -18,6 +18,8 @@ var today: Dictionary[String, int] = {}
 var yesterday: Dictionary[String, int] = {}
 ## Closing balances of the last HISTORY_DAYS days, oldest first.
 var closing: Array[int] = []
+## Money spent each of the last HISTORY_DAYS days, oldest first.
+var spent: Array[int] = []
 
 
 ## Adds money in (positive) or out (negative) under a line such as
@@ -40,10 +42,27 @@ func can_spend() -> bool:
 func close_day() -> void:
 	yesterday = today
 	today = {}
+	var out := 0
+	for line: String in yesterday:
+		out += mini(yesterday[line], 0)
+	spent.append(-out)
+	if spent.size() > HISTORY_DAYS:
+		spent = spent.slice(spent.size() - HISTORY_DAYS)
 	closing.append(balance)
 	if closing.size() > HISTORY_DAYS:
 		closing = closing.slice(closing.size() - HISTORY_DAYS)
 	changed.emit()
+
+
+## Average spent a day over the last few days, or 0 before any.
+func daily_costs(days := 3) -> float:
+	var recent := spent.slice(maxi(spent.size() - days, 0))
+	if recent.is_empty():
+		return 0.0
+	var sum := 0
+	for amount in recent:
+		sum += amount
+	return float(sum) / recent.size()
 
 
 ## The total of some lines' amounts.

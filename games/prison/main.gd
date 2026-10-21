@@ -103,6 +103,8 @@ var sit_ins := SitIns.new()
 var coverage_tint := CoverageTint.new()
 ## Staff coming and going on day and night shifts.
 var shifts := Shifts.new()
+## Staff by name: who's hired, from which applicants.
+var roster := StaffRoster.new()
 ## The prison's money, and what comes in and goes out.
 var ledger := Ledger.new()
 var build_costs := BuildCosts.new()
@@ -124,6 +126,8 @@ var parole := Parole.new()
 var release := Release.new()
 ## Tunnels and fence cuts.
 var escape_plans := EscapePlans.new()
+## The week's forecast, contracts and loans.
+var budget := Budget.new()
 var programmes_window := ProgrammesWindow.new()
 ## Difficulty and sentence length, on F4.
 var settings_window := SettingsWindow.new()
@@ -369,6 +373,17 @@ func _ready() -> void:
 	shifts.start_spot = _staff_spot
 	shifts.clock = clock
 	add_child(shifts)
+	roster.name = "StaffRoster"
+	roster.people = people
+	roster.roles = PrisonCatalogue.ROLES
+	roster.shifts = PrisonCatalogue.SHIFTS
+	roster.trait_pool.assign(PrisonCatalogue.TRAITS.filter(func(t: TraitDef) -> bool: return t.id != &"light_fingered"))
+	roster.clock = clock
+	add_child(roster)
+	if saved.has("staff"):
+		roster.restore(saved["staff"])
+	shifts.roster = roster
+	roster.start()
 	_set_entrance()
 	if saved.is_empty():
 		_lay_road()
@@ -783,11 +798,32 @@ func _ready() -> void:
 			longest = maxf(longest, sit_in.minutes / 60.0)
 		return longest
 	standing.difficulty_changed.connect(func(_def: DifficultyDef) -> void: _apply_difficulty())
+	if saved.is_empty() and not ledger.sandbox:
+		ledger.balance = standing.difficulty.starting_money
+	budget.name = "Budget"
+	budget.ledger = ledger
+	budget.finances = finances
+	budget.intake = intake
+	budget.workshop = workshop
+	budget.building = building
+	budget.clock = clock
+	add_child(budget)
+	budget.start()
+	budget.contract_done.connect(func(c: Dictionary) -> void:
+		Toasts.post("Contract done", "The %d goods for %s are delivered: %s on top." % [c.goods, c.client,
+				Ledger.text(c.pay)]))
+	budget.contract_missed.connect(func(c: Dictionary) -> void:
+		Toasts.post("Contract missed", "%s gave up waiting for their goods." % (c.client as String).capitalize()))
 	standing.failed.connect(func(rule: FailRule) -> void:
 		if not clock.paused():
 			clock.toggle_pause()
 		fail_card.show_for(rule.reason, standing.history))
 	_apply_difficulty()
+	roster.pay = func(amount: int) -> void: ledger.add(-amount, "Wages")
+	roster.quit.connect(func(record: StaffRoster.Record) -> void:
+		Toasts.post("%s quit" % record.name, "%s, a %s on the %s shift, has handed in their notice." % [
+				record.first_name(), shifts.role_def(record.role).display_name.to_lower(), record.shift]))
+	inspector.person_lines.append(roster.summary)
 	inspector.person_lines.append(func(person: Person) -> String:
 		if person.group != &"prisoner":
 			return ""
@@ -803,6 +839,9 @@ func _ready() -> void:
 		var pallets := building.objects_tagged([&"delivery_pallet"])
 		var to := building.object_at(pallets[0]).centre if not pallets.is_empty() else intake.stop_point()
 		vehicles.drive_in(LORRY, to, Callable(), LORRY_STAY))
+	intake.offer_made.connect(func(offer: Dictionary) -> void:
+		Toasts.post("Transfer offer", "The Ministry asks you to take %d more prisoners tomorrow, at %s each. Accept or decline in the office (O)."
+				% [offer.count, Ledger.text(offer.fee)]))
 	intake.arrived.connect(func(came: Array[Person]) -> void:
 		var words := "%d new %s on the way to reception." % [came.size(),
 				"prisoner is" if came.size() == 1 else "prisoners are"]
@@ -903,10 +942,14 @@ func _add_hud() -> void:
 	staff_window.routes = routes
 	staff_window.route_icon = load("res://core/ui/icons/tool_route.svg")
 	staff_window.ledger = ledger
+	staff_window.roster = roster
 	staff_window.hire_refused.connect(func() -> void:
 		Toasts.post("Out of money", "Nobody new can be taken on until the balance is back above zero."))
 	book.add_page(&"staff", "Staff", "Who works here, and work programmes. P", "staff", staff_window)
 	finance_window.ledger = ledger
+	var budget_panel := BudgetPanel.new()
+	budget_panel.budget = budget
+	finance_window.add_section(budget_panel)
 	book.add_page(&"money", "Money", "What comes in and goes out. M", "money", finance_window)
 	office_window.office = office
 	office_window.intake = intake
