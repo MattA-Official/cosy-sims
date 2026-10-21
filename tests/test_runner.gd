@@ -4492,6 +4492,8 @@ func _test_heads() -> void:
 	var head := heads.hire(applicants[0])
 	_check(head != null and heads.head(security) == head and heads.applicants(security).is_empty(),
 			"taking one on sends the other home")
+	head.work_traits.clear()
+	heads.refresh_bonuses()
 	_check(is_equal_approx(modifiers.value(&"search_speed"), 0.1), "the Chief of Security's bonus counts")
 	desk_work.add_paperwork(head.id, DeskWork.OVERLOAD + 60.0)
 	desk_work.morning(0, 0, [])
@@ -4670,6 +4672,18 @@ func _test_perks() -> void:
 	var level := Heads.level_scale(warden)
 	roster.add_xp(warden, 20.0)
 	_check(Heads.level_scale(warden) > level, "a higher level head gives a bigger bonus")
+	var rounds: Rounds = main.rounds
+	var warden_person: Person = people.people.filter(func(p: Person) -> bool: return p.role == &"warden")[0] \
+			if people.people.any(func(p: Person) -> bool: return p.role == &"warden") else null
+	if warden_person != null:
+		var walk := rounds.start_rounds()
+		_check(walk != null and walk.stages.size() > 0 and walk.only_for == warden_person, "the warden goes on their rounds")
+		var cheerful: Person = prisoners[0]
+		cheerful.mood = 80.0
+		cheerful.level = warden_person.level
+		cheerful.position = warden_person.position
+		_check(rounds.meet(warden_person.level, warden_person) >= 1 and cheerful.moodlets.has(Rounds.MOODLET),
+				"prisoners in a good mood are pleased to meet the warden")
 	var box: Suggestions = main.suggestions
 	var tray: InTray = main.in_tray
 	tray.cards.clear()

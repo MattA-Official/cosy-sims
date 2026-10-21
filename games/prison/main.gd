@@ -121,6 +121,7 @@ var desk_work := DeskWork.new()
 var modifiers := Modifiers.new()
 var training := Training.new()
 var suggestions := Suggestions.new()
+var rounds := Rounds.new()
 ## Department heads, hired from the warden's desk.
 var heads := Heads.new()
 ## Request cards for the warden, and what their answers do.
@@ -785,6 +786,13 @@ func _ready() -> void:
 	suggestions.clock = clock
 	add_child(suggestions)
 	suggestions.start()
+	people.moodlet_defs[Rounds.MOODLET] = Rounds.moodlet()
+	rounds.name = "Rounds"
+	rounds.people = people
+	rounds.jobs = jobs
+	rounds.building = building
+	rounds.clock = clock
+	add_child(rounds)
 	for idea in suggestions.ideas:
 		in_tray.defs.append(PrisonTray.suggestion(idea))
 	suggestions.suggested.connect(func(idea: Dictionary, record: StaffRoster.Record) -> void:
@@ -977,6 +985,7 @@ func _ready() -> void:
 		Toasts.post("Break-out!", "%s came out through %s." % [person.name,
 				"a tunnel" if kind == EscapePlans.TUNNEL else "a cut in the fence"]))
 	standing.report_lines.append(release.report_lines)
+	standing.report_lines.append(rounds.report_lines)
 	standing.reform = reform
 	standing.release = release
 	courses.passed.connect(func(_person: Person, _def: CourseDef) -> void: standing.count(&"courses_passed"))
