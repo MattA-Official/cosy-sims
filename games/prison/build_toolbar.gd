@@ -9,7 +9,7 @@ extends VBoxContainer
 @export var controller: BuildController
 
 ## In the order they're used: put up rooms, then fit them out, then the
-## grounds, with demolish set apart at the end. Keys 1 to 9 then 0 follow
+## grounds, with moving and demolishing set apart at the end. Keys 1 to 9 then 0 follow
 ## this order. Each is [tool, name, what it does, icon].
 const TOOLS := [
 	[BuildController.Tool.ROOM, "Room", "Drag out a floor with walls all round.", "tool_room"],
@@ -21,15 +21,16 @@ const TOOLS := [
 	[BuildController.Tool.PATH, "Paths", "Lay paths and roads, with stairs and bridges.", "tool_path"],
 	[BuildController.Tool.PLANTS, "Plants", "Plant trees, bushes and flowers.", "tool_plants"],
 	[BuildController.Tool.TERRAIN, "Terrain", "Shape the ground, or add and drain water.", "tool_terrain"],
+	[BuildController.Tool.MOVE, "Move", "Pick up an object, a room or a box of things and put it somewhere else. Ctrl+C and Ctrl+V copy.", "tool_move"],
 	[BuildController.Tool.DEMOLISH, "Demolish", "Remove objects and walls, or clear an area.", "tool_demolish"],
 	[BuildController.Tool.ZONE, "Zones", "Say who may go where, and lock doors by hand.", "tool_zones"],
 	[BuildController.Tool.ROUTE, "Patrol routes", "Draw loops for guards to walk; put guards on them in the Staff window (P).", "tool_route"],
 ]
 ## A divider goes before each of these tools, grouping building, grounds,
 ## demolish and running the prison.
-const GROUP_STARTS: Array[int] = [6, 9, 10]
+const GROUP_STARTS: Array[int] = [6, 9, 11]
 ## Keys for tools past the tenth, which have no number.
-const EXTRA_KEYS: Array[String] = ["Z", "X"]
+const EXTRA_KEYS: Array[String] = ["Z", "X", "B"]
 
 const ICONS := "res://core/ui/icons/%s.svg"
 

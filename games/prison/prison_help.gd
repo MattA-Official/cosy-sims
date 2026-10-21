@@ -26,6 +26,7 @@ const SECTIONS := [
 		["F", "Hold to turn to face the mouse"],
 		["I or middle-click", "Eyedropper: pick up what's under the mouse"],
 		["Ctrl+Z / Ctrl+Y", "Undo or redo; undo gives back land bought this hour"],
+		["Ctrl+C / Ctrl+V", "Copy the room or object under the mouse, and put down copies"],
 	]],
 	["Time and the book", [
 		["Space", "Pause, or carry on"],

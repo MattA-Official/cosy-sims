@@ -122,6 +122,9 @@ var _room_zones: Dictionary[Vector2i, StringName] = {}
 ## Plain doors have none.
 var door_kinds: Dictionary[Vector3i, StringName] = {}
 var _next_object_id := 1
+## What stood on objects lifted by lift_objects(): [thing, turn from the
+## surface] pairs by the surface's id.
+var _lifted: Dictionary[int, Array] = {}
 var _next_stairs_id := 1
 var _rooms: Array[Room] = []
 var _room_lookup: Dictionary[Vector2i, Room] = {}
@@ -995,6 +998,49 @@ func _add_object(def: ObjectDef, centre: Vector2, angle: float, look: int, on: i
 	return placed.id
 
 
+## Lifts objects off the floor to put down again with put_object(),
+## keeping their ids, so whoever has claimed one keeps it. Whatever stands
+## on them comes along. Returns them in the order given.
+func lift_objects(ids: Array[int]) -> Array[PlacedObject]:
+	var out: Array[PlacedObject] = []
+	for id in ids:
+		var placed: PlacedObject = objects.get(id)
+		if placed == null or placed.on_surface():
+			continue
+		var carried: Array = []
+		for thing in things_on(id):
+			carried.append([thing, thing.angle - placed.angle])
+			objects.erase(thing.id)
+		_lifted[id] = carried
+		objects.erase(id)
+		out.append(placed)
+	if not out.is_empty():
+		_changed()
+	return out
+
+
+## Puts a lifted object down at a new middle and turn, with what it
+## carried. Returns false, leaving it lifted, if it doesn't fit there.
+func put_object(placed: PlacedObject, centre: Vector2, angle: float) -> bool:
+	if not can_place_at(placed.def, centre, angle):
+		return false
+	placed.centre = centre
+	placed.angle = wrapf(angle, 0.0, TAU)
+	placed.rotation = posmod(roundi(placed.angle / (PI * 0.5)), 4)
+	placed.rect = polygon_bounds(object_polygon(placed.def, centre, placed.angle))
+	objects[placed.id] = placed
+	for entry: Array in _lifted.get(placed.id, []):
+		var thing: PlacedObject = entry[0]
+		thing.angle = wrapf(placed.angle + entry[1], 0.0, TAU)
+		thing.rotation = posmod(roundi(thing.angle / (PI * 0.5)), 4)
+		thing.centre = spot_point(placed, thing.spot)
+		thing.rect = polygon_bounds(object_polygon(thing.def, thing.centre, thing.angle))
+		objects[thing.id] = thing
+	_lifted.erase(placed.id)
+	_changed()
+	return true
+
+
 ## Takes away things left standing on surfaces that are gone.
 func _drop_orphans() -> int:
 	var count := 0
@@ -1197,6 +1243,26 @@ func set_room_zone(room: Room, zone: StringName) -> void:
 	_mark_cells(_room_zones, room, zone)
 
 
+## The room type and zone marked on each of some cells, as two
+## dictionaries by cell, for carrying a room somewhere else.
+func cell_marks(cells: Array[Vector2i]) -> Array[Dictionary]:
+	var types: Dictionary[Vector2i, StringName] = {}
+	var zones: Dictionary[Vector2i, StringName] = {}
+	for cell in cells:
+		if _room_types.has(cell):
+			types[cell] = _room_types[cell]
+		if _room_zones.has(cell):
+			zones[cell] = _room_zones[cell]
+	return [types, zones]
+
+
+## Marks cells with room types and zones, as cell_marks() gives them.
+func mark_cells(types: Dictionary[Vector2i, StringName], zones: Dictionary[Vector2i, StringName]) -> void:
+	_room_types.merge(types, true)
+	_room_zones.merge(zones, true)
+	_changed()
+
+
 func _mark_cells(marks: Dictionary[Vector2i, StringName], room: Room, value: StringName) -> void:
 	for cell in room.cells:
 		if value.is_empty():
@@ -1320,8 +1386,26 @@ func build_room(rect: Rect2i, floor_type: StringName = DEFAULT_FLOOR,
 ## edge go too, unless they still have floor on their far side, so knocking
 ## down one room leaves its neighbours closed in.
 func demolish(rect: Rect2i) -> void:
-	var count := _clear_floor(rect)
-	for edge in rect_edges(rect):
+	_demolish(cells_in(rect), rect_edges(rect))
+
+
+## Clears some cells the way demolish() clears a rectangle.
+func demolish_cells(cells: Array[Vector2i]) -> void:
+	var edges: Dictionary[Vector3i, bool] = {}
+	for cell in cells:
+		for side in DIRECTIONS:
+			edges[edge_between(cell, cell + side)] = true
+	_demolish(cells, edges.keys())
+
+
+func _demolish(cells: Array[Vector2i], edges: Array) -> void:
+	var count := 0
+	for cell in cells:
+		count += _clear_floor(Rect2i(cell, Vector2i.ONE))
+	var inside: Dictionary[Vector2i, bool] = {}
+	for cell in cells:
+		inside[cell] = true
+	for edge: Vector3i in edges:
 		if wall_at(edge) == Wall.NONE:
 			continue
 		var sides := edge_cells(edge)
@@ -1334,7 +1418,7 @@ func demolish(rect: Rect2i) -> void:
 	# Angled walls go once no floor is left on either side of them.
 	for key: Vector4i in slants.keys():
 		var crossed := slant_crossings(key)
-		if not crossed.any(func(cell: Vector2i) -> bool: return rect.has_point(cell)):
+		if not crossed.any(func(cell: Vector2i) -> bool: return inside.has(cell)):
 			continue
 		if not crossed.any(has_floor):
 			slants.erase(key)

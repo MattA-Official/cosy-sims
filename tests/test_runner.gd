@@ -93,6 +93,7 @@ func _process(_delta: float) -> bool:
 	_test_budget()
 	_test_staff_roster()
 	_test_readout_and_eyedropper()
+	_test_move_and_copy()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4170,6 +4171,89 @@ func _test_readout_and_eyedropper() -> void:
 	if map.object_at(controller._hover_point) == null:
 		_check(controller.eyedrop() and controller.tool == BuildController.Tool.FLOOR
 				and controller.floor_style == map.floors[floored], "and a floor")
+	main.free()
+
+
+func _test_move_and_copy() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 0
+	root.add_child(main)
+	var controller: BuildController = main.controller
+	var map: BuildingMap = main.map
+	var ledger: Ledger = main.ledger
+	ledger.sandbox = false
+	ledger.balance = 100000
+	var land: Rect2i = map.land_bounds()
+	var spot := land.end - Vector2i(12, 12)
+	var rect := Rect2i(spot, Vector2i(3, 2))
+	map.build_room(rect)
+	var door := BuildingMap.edge_between(spot + Vector2i(1, 1), spot + Vector2i(1, 2))
+	map.set_door(door, true)
+	map.paint_side(BuildingMap.edge_between(spot, spot + Vector2i(-1, 0)),
+			BuildingMap.wall_side(BuildingMap.edge_between(spot, spot + Vector2i(-1, 0)), Vector2(spot) + Vector2(0.5, 0.5)), &"plaster")
+	var bed := PrisonCatalogue.object(&"bed")
+	var bed_id := map.place_object(bed, Vector2(spot), 0)
+	map.set_room_type(map.room_at(spot), &"cell")
+	controller.tool = BuildController.Tool.MOVE
+	controller._has_hover = true
+	controller._hover_point = Vector2(spot) + Vector2(2.5, 0.5)
+	_check(controller.pick_up(Rect2i(spot + Vector2i(2, 0), Vector2i.ONE)) and controller.carrying().floors.size() == 6
+			and controller.carrying().ids == [bed_id], "the move tool picks up a whole room with its furniture")
+	controller._turn_carried(1)
+	_check(controller.carrying().size == Vector2i(2, 3), "and turns it")
+	var target := spot + Vector2i(-6, -6)
+	controller._hover_point = Vector2(target) + controller._grab
+	var floor_price := map.floor_def(BuildingMap.DEFAULT_FLOOR).price
+	var before := ledger.balance
+	_check(controller.drop(), "putting it down somewhere empty works")
+	_check(not map.has_floor(spot) and map.has_floor(target) and map.has_floor(target + Vector2i(1, 2))
+			and not map.has_floor(target + Vector2i(2, 0)), "the room moves, turned")
+	_check(map.objects.has(bed_id) and Rect2i(target, Vector2i(2, 3)).has_point(Vector2i(map.objects[bed_id].centre))
+			and is_equal_approx(map.objects[bed_id].angle, PI * 0.5), "the bed keeps its id and turns with the room")
+	var moved := map.room_at(target)
+	_check(moved != null and moved.type == &"cell", "the room stays a cell")
+	var doors := 0
+	for e: Vector3i in map.walls:
+		if map.walls[e] == BuildingMap.Wall.DOOR and Rect2i(target - Vector2i.ONE, Vector2i(4, 5)).has_point(Vector2i(e.x, e.y)):
+			doors += 1
+	_check(doors == 1, "and keeps its door")
+	var paid := before - ledger.balance
+	_check(paid >= 6 * floor_price and paid < 6 * floor_price + 20 * 200, "moving the structure costs its full price again (%d)" % paid)
+	_check(controller.carrying() == null, "and nothing is carried afterwards")
+	# A room won't go down over another.
+	controller._hover_point = Vector2(target) + Vector2(0.5, 0.5)
+	controller.pick_up(Rect2i(target, Vector2i.ONE))
+	var grab := controller._grab
+	controller._hover_point = Vector2(target + Vector2i(1, 0)) + grab
+	before = ledger.balance
+	_check(not controller.drop() and map.has_floor(target) and ledger.balance == before
+			and map.objects.has(bed_id), "a move that overlaps itself fine, but over other floor is refused")
+	controller._carried = null
+	# Copy and paste make a new room, charged in full.
+	controller._hover_point = Vector2(target) + Vector2(0.5, 2.5)
+	_check(controller.copy_hovered() and BuildController.clipboard != null and controller.carrying() == null,
+			"Ctrl+C copies the room under the mouse")
+	_check(controller.paste() and controller.carrying() != null, "Ctrl+V takes up a copy")
+	var copy_at := target + Vector2i(5, 0)
+	controller._hover_point = Vector2(copy_at) + controller._grab
+	before = ledger.balance
+	var count := map.objects.size()
+	_check(controller.drop() and map.has_floor(copy_at) and map.objects.size() == count + 1
+			and controller.carrying() != null, "a paste puts down a new room and keeps another copy in hand")
+	_check(before - ledger.balance >= 6 * floor_price + bed.price, "and costs everything in it")
+	_check(map.room_at(copy_at).type == &"cell", "with its room type")
+	controller._hover_point = Vector2(land.end + Vector2i(5, 5))
+	_check(not controller.drop(), "but not off your land")
+	# One object on its own moves for free.
+	controller._carried = null
+	controller._hover_point = map.objects[bed_id].centre
+	controller.pick_up(Rect2i(Vector2i(map.objects[bed_id].centre), Vector2i.ONE))
+	_check(controller.carrying() != null and not controller.carrying().is_structure(), "clicking an object picks up just it")
+	before = ledger.balance
+	var was: Vector2 = map.objects[bed_id].centre
+	controller._hover_point = was + Vector2(0, 2)
+	_check(controller.drop() and map.objects.has(bed_id) and map.objects[bed_id].centre.is_equal_approx(was + Vector2(0, 2))
+			and ledger.balance == before, "and moving it is free")
 	main.free()
 
 

@@ -24,6 +24,7 @@ var line := "Building"
 var refund_all := false
 
 var _worth := 0
+var _suspended := false
 
 
 ## Starts charging from the building as it is now, which is free.
@@ -81,7 +82,43 @@ func _opening_price(kind: int, door_kind: StringName, window: StringName) -> int
 	return 0
 
 
+## Stops charging for changes until resume(), for moving things: a move
+## charges what it builds anew, not the difference.
+func suspend() -> void:
+	_suspended = true
+
+
+## Charges from the building as it is now again, taking `charge` for what
+## happened while suspended.
+func resume(charge := 0) -> void:
+	_suspended = false
+	_worth = worth()
+	if charge > 0:
+		ledger.add(-charge, line)
+
+
+## What building a clip new would cost: its floor, walls, doors and
+## windows, and its objects if asked.
+func clip_price(clip: BuildClip, with_objects := true) -> int:
+	var map := building.ground()
+	var sum := 0
+	for cell: Vector2i in clip.floors:
+		var def := map.floor_def(clip.floors[cell][0])
+		if def != null:
+			sum += def.price
+	for wall: Array in clip.walls:
+		sum += _wall_price(map.wall_def(wall[3]), 1.0) + _opening_price(wall[2], wall[5], wall[4])
+	if with_objects:
+		for entry: Array in clip.objects:
+			sum += (entry[0] as ObjectDef).price
+			for thing: Array in entry[4]:
+				sum += (thing[0] as ObjectDef).price
+	return sum
+
+
 func _on_changed() -> void:
+	if _suspended:
+		return
 	var now := worth()
 	var change := now - _worth
 	_worth = now

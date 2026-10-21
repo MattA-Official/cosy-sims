@@ -628,6 +628,12 @@ func _ready() -> void:
 	add_child(build_costs)
 	build_costs.start()
 	controller.spending_allowed = ledger.can_spend
+	controller.build_costs = build_costs
+	controller.find_object = PrisonCatalogue.object
+	controller.drop_refused.connect(func(reason: String) -> void:
+		Toasts.post("Can't put it there", reason))
+	controller.copied.connect(func(what: String) -> void:
+		Toasts.post("Copied", "Ctrl+V to put down a copy of the %s. Each copy costs the full price." % what))
 	controller.balance = func() -> int: return 1 << 30 if ledger.sandbox else ledger.balance
 	land_plots.building = building
 	land_plots.terrain = terrain

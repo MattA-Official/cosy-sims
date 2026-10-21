@@ -24,6 +24,10 @@ signal door_lock_clicked(level: int, edge: Vector3i, pin: bool)
 signal route_clicked(level: int, point: Vector2, erase: bool)
 ## A click would have built something, but spending_allowed said no.
 signal spending_refused
+## A move or paste couldn't go down, and why.
+signal drop_refused(reason: String)
+## Something was copied, with a word on what.
+signal copied(what: String)
 
 ## What Tab loops through, like The Sims: walls up; cutaway (walls in front
 ## of rooms drop, as the camera looks); every wall down; and roofs on, for
@@ -41,7 +45,7 @@ var wall_view := WallView.UP:
 		wall_view = value
 		wall_view_changed.emit(value)
 
-enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE, ROUTE }
+enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE, ROUTE, MOVE }
 enum WaterMode { NONE, ADD, REMOVE }
 ## What the floor tool does: lay floor, or nudge existing floor up or down.
 enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS }
@@ -65,6 +69,7 @@ const HINTS := {
 	Tool.OBJECT: "Click to place. R turns it by %s°; [ and ] change the step. Hold F to turn it freely, Alt to place freely. V changes the look.",
 	Tool.ROOM_TYPE: "Click a room to mark it.",
 	Tool.DEMOLISH: "Click an object or wall to remove it, or drag to clear an area.",
+	Tool.MOVE: "Click an object or room to pick it up, or drag a box round what to move. Click again to put it down.",
 	Tool.TERRAIN: "Hold the mouse to shape your land. [ and ] change the brush size.",
 	Tool.PLANTS: "Hold the mouse to plant, or click to place one at the smallest size. Hold Ctrl to clear. [ and ] change the size.",
 	Tool.PATH: "",
@@ -155,6 +160,7 @@ var tool := Tool.NONE:
 	set(value):
 		tool = value
 		_dragging = false
+		_carried = null
 		path_tool.cancel()
 		stair_tool.cancel()
 		tool_changed.emit(tool)
@@ -225,6 +231,20 @@ var plant_density := 1.0:
 ## () -> int: money to hand, so readouts can say when you can't afford
 ## something. Optional.
 var balance: Callable
+## Charges for what's built. Optional: a move charges its walls and floor
+## in full through it, and a paste checks the price first.
+var build_costs: BuildCosts
+## (StringName) -> ObjectDef, for putting the map back when a move doesn't
+## fit.
+var find_object: Callable
+## What Ctrl+C copied last, shared by every game in the session.
+static var clipboard: BuildClip
+## What the move tool is carrying, and whether it's a paste (which goes
+## down again and again) rather than a move.
+var _carried: BuildClip
+var _pasting := false
+## Where the mouse holds what's carried, from its top-left.
+var _grab := Vector2.ZERO
 
 ## Makes the floor and wall tools remove instead of build, as if Ctrl were
 ## held. Mainly for tests.
@@ -330,6 +350,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if _dragging:
 			_dragging = false
+		elif _carried != null:
+			_carried = null
+			hint_changed.emit()
 		elif tool == Tool.PATH and path_tool.cancel():
 			pass
 		elif tool == Tool.FLOOR and stair_tool.cancel():
@@ -346,6 +369,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			path_tool.lower()
 		get_viewport().set_input_as_handled()
+	elif _carried != null and (event.is_action_pressed("build_rotate")
+			or event.is_action_pressed("build_brush_smaller") or event.is_action_pressed("build_brush_bigger")):
+		_turn_carried(-1 if event.is_action_pressed("build_brush_smaller") else 1)
+		get_viewport().set_input_as_handled()
+	elif _is_shortcut(event, KEY_C):
+		if copy_hovered():
+			get_viewport().set_input_as_handled()
+	elif _is_shortcut(event, KEY_V):
+		if paste():
+			get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_look") and tool == Tool.OBJECT and object_def != null:
 		object_look = (mini(object_look, object_def.look_count()) + 1) % (object_def.look_count() + 1)
 		if object_def.look_count() == 1:
@@ -390,7 +423,9 @@ func _on_press() -> void:
 	match tool:
 		Tool.FLOOR when floor_mode == FloorMode.STAIRS:
 			_press_stairs()
-		Tool.ROOM, Tool.FLOOR, Tool.DEMOLISH:
+		Tool.MOVE when _carried != null:
+			drop()
+		Tool.ROOM, Tool.FLOOR, Tool.DEMOLISH, Tool.MOVE:
 			_dragging = true
 			_drag_start_cell = _hover_cell()
 			_drag_start_point = _hover_point
@@ -509,6 +544,8 @@ func _on_release() -> void:
 			_land_cache = []
 			if not done:
 				land_refused.emit()
+		Tool.MOVE:
+			pick_up(rect)
 		Tool.DEMOLISH:
 			if rect.size != Vector2i.ONE:
 				map.demolish(rect)
@@ -538,6 +575,8 @@ func _spends() -> bool:
 	match tool:
 		Tool.ROOM, Tool.OPENING, Tool.OBJECT:
 			return true
+		Tool.MOVE:
+			return _carried != null and (_pasting or _carried.is_structure())
 		Tool.FLOOR:
 			return floor_mode in [FloorMode.LAY, FloorMode.RAMP, FloorMode.STAIRS]
 		Tool.WALL:
@@ -609,7 +648,175 @@ func hint() -> String:
 		return text
 	if tool == Tool.OPENING:
 		return (HINTS[tool] + "\n" + _door_status_shown).strip_edges()
+	if tool == Tool.MOVE and _carried != null:
+		return ("Click to put down another copy. " if _pasting else "Click to put it down. ") \
+				+ "R or [ and ] turn it, Ctrl+C copies it, Esc puts it back."
 	return HINTS[tool]
+
+
+#region Moving and copying
+
+## Picks up what's under the mouse for the move tool: on a click, the
+## object or else the room there; on a drag, everything in the box.
+func pick_up(rect: Rect2i) -> bool:
+	var clip := _clip_at(rect)
+	if clip == null:
+		return false
+	_carried = clip
+	_pasting = false
+	_grab = _hover_point - Vector2(clip.from)
+	hint_changed.emit()
+	return true
+
+
+func _clip_at(rect: Rect2i) -> BuildClip:
+	if rect.size != Vector2i.ONE:
+		return BuildClip.capture_rect(map, rect)
+	var placed := map.object_at(_hover_point)
+	if placed != null:
+		return BuildClip.capture_object(map, placed)
+	var room := map.room_at_point(_hover_point)
+	return BuildClip.capture_room(map, room) if room != null else null
+
+
+## Copies what the move tool carries, or else the object or room under the
+## mouse. A copy being carried stays in hand; a move is put back.
+func copy_hovered() -> bool:
+	var clip := _carried
+	if clip == null:
+		if not _has_hover or map == null or tool == Tool.NONE:
+			return false
+		clip = _clip_at(Rect2i(_hover_cell(), Vector2i.ONE))
+	if clip == null:
+		return false
+	clipboard = clip.copy()
+	if not _pasting:
+		_carried = null
+	copied.emit("room" if clip.is_structure() else "object")
+	hint_changed.emit()
+	return true
+
+
+## Takes up a copy of what was copied last, to put down as many times as
+## you like.
+func paste() -> bool:
+	if clipboard == null or map == null:
+		return false
+	carry_copy(clipboard)
+	return true
+
+
+## Takes up a copy of a clip, such as a template, to put down.
+func carry_copy(clip: BuildClip) -> void:
+	tool = Tool.MOVE
+	_carried = clip.copy()
+	_pasting = true
+	_grab = Vector2(_carried.size) * 0.5
+	hint_changed.emit()
+
+
+func carrying() -> BuildClip:
+	return _carried
+
+
+func _turn_carried(quarters: int) -> void:
+	for i in posmod(quarters, 4):
+		_grab = Vector2(_carried.size.y - _grab.y, _grab.x)
+		_carried.rotate(1)
+
+
+## Where what's carried would go down: its top-left tile.
+func _carry_at() -> Vector2i:
+	return Vector2i((_hover_point - _grab).round())
+
+
+## Why what's carried can't go down at a tile, or empty if it can.
+func _drop_problem(at: Vector2i) -> String:
+	var problem := _carried.floor_problem(map, at, [] as Array[Vector2i] if _pasting else _carried.taken)
+	if not problem.is_empty():
+		return problem
+	var price := _drop_price()
+	if price > 0 and balance.is_valid() and balance.call() < price:
+		return "Not enough money"
+	return ""
+
+
+## What putting down what's carried costs: a paste, everything in it; a
+## move, its walls and floor in full again. Moving objects is free.
+func _drop_price() -> int:
+	if build_costs == null or _carried == null:
+		return 0
+	if _pasting:
+		return build_costs.clip_price(_carried, true)
+	return build_costs.clip_price(_carried, false) if _carried.is_structure() else 0
+
+
+## Puts down what's carried where the mouse is. Returns whether it went.
+func drop() -> bool:
+	if _carried == null:
+		return false
+	var at := _carry_at()
+	var problem := _drop_problem(at)
+	if problem.is_empty():
+		problem = _put_carried(at)
+	if not problem.is_empty():
+		drop_refused.emit(problem)
+		return false
+	if not _pasting:
+		_carried = null
+		hint_changed.emit()
+	return true
+
+
+## Does the move or paste, putting everything back if any object won't
+## fit. Returns why it failed, or empty.
+func _put_carried(at: Vector2i) -> String:
+	var clip := _carried if not _pasting else _carried.copy()
+	var price := _drop_price()
+	var before := map.to_data()
+	var worth_before := build_costs.worth() if build_costs != null else 0
+	if build_costs != null:
+		build_costs.suspend()
+	var lifted: Array[BuildingMap.PlacedObject] = []
+	if not _pasting:
+		lifted = map.lift_objects(clip.ids)
+		if not clip.taken.is_empty():
+			map.demolish_cells(clip.taken)
+	var area := Rect2i(at, clip.size)
+	var misfits := clip.put(map, at, build_height(area) if clip.is_structure() else 0.0, lifted)
+	if misfits > 0:
+		map.load_data(before, find_object)
+		if build_costs != null:
+			build_costs.resume()
+		return "It doesn't fit there." if misfits == clip.objects.size() else \
+				"Some of the furniture doesn't fit there."
+	if clip.is_structure():
+		settle_ground(area)
+	if build_costs != null:
+		# A paste pays for what it added; a move for its structure anew.
+		build_costs.resume(maxi(build_costs.worth() - worth_before, 0) if _pasting else price)
+	return ""
+
+
+func _preview_carried() -> void:
+	var at := _carry_at()
+	var ok := _drop_problem(at).is_empty()
+	var colour := ok_colour if ok else bad_colour
+	var area := Rect2i(at, _carried.size)
+	var height := _preview_height(area) if _carried.is_structure() else NAN
+	_shapes.cells(_carried.cells_at(at), colour, height)
+	for wall: Array in _carried.walls:
+		_shapes.edge(BuildingMap.edge_between(wall[0] + at, wall[1] + at), colour, height)
+	for entry: Array in _carried.objects:
+		_shapes.object(entry[0], entry[2], entry[1] + Vector2(at), colour)
+
+
+func _is_shortcut(event: InputEvent, keycode: Key) -> bool:
+	var key := event as InputEventKey
+	return key != null and key.pressed and not key.echo and (key.ctrl_pressed or key.meta_pressed) \
+			and not key.shift_pressed and key.physical_keycode == keycode
+
+#endregion
 
 
 ## What a door in the wall under the mouse would mean, when the floors
@@ -1288,6 +1495,17 @@ func _draw_preview() -> void:
 					var angle := _placing_angle(centre)
 					var ok := _can_place(centre, angle)
 					_shapes.object(object_def, angle, centre, ok_colour if ok else bad_colour)
+		Tool.MOVE when _carried != null:
+			_preview_carried()
+		Tool.MOVE:
+			var placed := map.object_at(_hover_point)
+			var room := map.room_at_point(_hover_point)
+			if _dragging:
+				_shapes.cells(BuildingMap.cells_in(_drag_rect()), ok_colour)
+			elif placed != null:
+				_shapes.rect(placed.rect, ok_colour, placed.def.height + 0.05)
+			elif room != null:
+				_shapes.cells(room.cells, ok_colour)
 		Tool.ROOM_TYPE:
 			var room := map.room_at_point(_hover_point)
 			if room != null:
@@ -1362,6 +1580,15 @@ func readout() -> Array:
 			return ["%d × %d" % [rect.size.x, rect.size.y], true]
 		Tool.OBJECT when object_def != null and object_def.price > 0:
 			return _priced(object_def.display_name, object_def.price)
+		Tool.MOVE when _carried != null:
+			var words := "%d × %d" % [_carried.size.x, _carried.size.y]
+			var problem := _drop_problem(_carry_at())
+			if not problem.is_empty():
+				return [problem, false]
+			return _priced(words, _drop_price())
+		Tool.MOVE when _dragging:
+			var rect := _drag_rect()
+			return ["%d × %d" % [rect.size.x, rect.size.y], true]
 		Tool.ROOM_TYPE when room_type != null:
 			var room := map.room_at_point(_hover_point)
 			if room == null:
