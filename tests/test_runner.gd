@@ -124,6 +124,7 @@ func _process(_delta: float) -> bool:
 	_test_research_effects()
 	_test_research_slots()
 	_test_research_trials()
+	_test_relationships()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -2240,6 +2241,78 @@ func _test_research_slots() -> void:
 	var saved := research.capture()
 	research.restore(saved)
 	_check(research.states[b.id].slot == &"security+" and research.pet_projects.has(head.id), "slots and pet projects save")
+	main.queue_free()
+
+
+func _test_relationships() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var people: People = main.people
+	var relationships: Relationships = main.relationships
+	(main.misconduct as Misconduct).enabled = false
+	var prisoners: Array = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")
+	var a: Person = prisoners[0]
+	var b: Person = prisoners[1]
+	var c: Person = prisoners[2]
+	for p: Person in [a, b, c]:
+		people.stop(p)
+	# Put a and b side by side, awake, and let time pass.
+	b.level = a.level
+	b.position = a.position + Vector3(0.5, 0.0, 0.0)
+	people._buckets_fresh = false
+	relationships.bonds.clear()
+	relationships.tick(60.0)
+	_check(relationships.bonds.has(Relationships.key(a, b)), "time together starts a bond")
+	relationships.bonds[Relationships.key(a, b)] = 39.9
+	var friended := []
+	relationships.became_friends.connect(func(x: Person, y: Person) -> void: friended.append([x, y]))
+	relationships.change(a, b, 1.0)
+	_check(relationships.is_friend(a, b) and friended.size() == 1, "at 40 they become friends")
+	_check(PrisonerFile.of(a) == null or String(PrisonerFile.of(a).log[-1][1]).begins_with("Became friends with"),
+			"which goes in their file")
+	var parts := relationships.mood_parts(a, [])
+	_check(parts.size() == 1 and String(parts[0][0]).begins_with("Near ") and parts[0][1] == Relationships.FRIEND_MOOD,
+			"a friend close by lifts their mood")
+	relationships.change(a, c, -50.0)
+	c.level = a.level
+	c.position = a.position + Vector3(0.0, 0.0, 0.5)
+	people._buckets_fresh = false
+	_check(relationships.rival_near(a) and (main.misconduct as Misconduct).odds.call(a) > 1.0,
+			"a rival close by makes trouble likelier")
+	_check((main.fights as Fights).target_for(a) == c, "and is who they pick a fight with")
+	var fight := (main.fights as Fights).begin(a, b)
+	_check(fight != null and relationships.bond(a, b) < Relationships.FRIEND_AT, "a fight sours a friendship")
+	(main.fights as Fights).end(fight)
+	_check(relationships.words(a).contains("Rivals: ☁ %s" % c.name), "the inspector names rivals")
+	_check(relationships.predict(a, c) == "Rivals", "a cell's pair says how they get on")
+	var lines: BondLines = (main.inspector as Inspector).get_node("BondLines")
+	_check(lines.lines_for(a).any(func(l: Array) -> bool: return l[0] == c and l[1] == BondLines.RIVAL),
+			"a red line runs to a rival")
+	# Fading, saving and leaving.
+	relationships.bonds[Relationships.key(b, c)] = 10.0
+	relationships._met_today.clear()
+	relationships.fade()
+	_check(relationships.bond(b, c) == 10.0 - Relationships.DAILY_FADE, "bonds fade a little each day apart")
+	var saved := relationships.capture()
+	relationships.bonds.clear()
+	relationships.restore(saved)
+	_check(relationships.bond(b, c) == 10.0 - Relationships.DAILY_FADE, "bonds save")
+	# Guard rapport.
+	var guard: Person = people.people.filter(func(p: Person) -> bool: return p.role == &"guard")[0]
+	var guard_record := (main.roster as StaffRoster).record_of(guard)
+	var calm_before := (main.misconduct as Misconduct)._temper_scale(b)
+	for i in 50:
+		relationships.add_rapport(guard_record.id, b)
+	people.stop(guard)
+	guard.level = b.level
+	guard.position = b.position + Vector3(0.3, 0.0, 0.3)
+	people._buckets_fresh = false
+	_check(is_equal_approx((main.misconduct as Misconduct)._temper_scale(b), calm_before * 0.8),
+			"a guard who knows them well slows their temper by a fifth")
+	relationships.bonds[Relationships.key(b, c)] = 60.0
+	people.remove_person(c)
+	_check(b.moodlets.has(&"missing_friend"), "a friend leaving is missed")
 	main.queue_free()
 
 

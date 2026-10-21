@@ -60,6 +60,9 @@ var warden_role: StringName = &"warden"
 var gentle: StringName = &"gentle"
 var enabled := true
 var sit_ins: Array[SitIn] = []
+## (talker, sit-in) -> float: how much faster someone talks them round,
+## such as a guard they know well. Optional.
+var talk_speed: Callable
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -161,7 +164,8 @@ func tick(minutes := 1.0) -> void:
 		# Talking them round.
 		var talker: Person = sit_in.job.worker if sit_in.job != null else null
 		if talker != null and talker.state == Person.State.USING:
-			sit_in.talked += minutes / TALK_MINUTES * (2.0 if talker.role == warden_role else 1.0)
+			sit_in.talked += minutes / TALK_MINUTES * (2.0 if talker.role == warden_role else 1.0) \
+					* (talk_speed.call(talker, sit_in) if talk_speed.is_valid() else 1.0)
 			if sit_in.talked >= 1.0:
 				end(sit_in, "talked")
 				continue

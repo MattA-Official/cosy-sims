@@ -87,6 +87,11 @@ func _process(_delta: float) -> void:
 		_draw_person(_selected)
 
 
+## Whether the inspector's panel is showing.
+func is_open() -> bool:
+	return _panel.visible
+
+
 ## Selects something to inspect, or nothing with null.
 func select(thing: Variant, level := 0) -> void:
 	_selected = thing

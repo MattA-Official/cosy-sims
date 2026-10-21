@@ -113,6 +113,7 @@ static func capture(main: Node) -> Dictionary:
 		"counters": (main.counters as Counters).capture(),
 		"knowhow": (main.knowhow as Knowhow).capture(),
 		"research": (main.research as Research).capture(),
+		"relationships": (main.relationships as Relationships).capture(),
 		"suggestions": (main.suggestions as Suggestions).capture(),
 		"visits": (main.visits as Visits).capture(),
 		"garden": (main.garden as Garden).capture(),
@@ -337,6 +338,7 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 		ResearchWiring.new_game(main)
 	if data.has("research"):
 		(main.research as Research).restore(data.research)
+	(main.relationships as Relationships).restore(data.get("relationships", {}))
 	var parole_data: Dictionary = data.get("parole", {})
 	var parole: Parole = main.parole
 	parole.today = parole_data.get("today", [])

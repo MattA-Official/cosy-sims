@@ -257,6 +257,7 @@ const MISCONDUCT: Array[MisconductDef] = [
 ]
 
 const MOODLETS: Array[MoodletDef] = [
+	preload("res://games/prison/catalogue/moodlet_missing_friend.tres"),
 	preload("res://games/prison/catalogue/moodlet_proud.tres"),
 	preload("res://games/prison/catalogue/moodlet_parole_granted.tres"),
 	preload("res://games/prison/catalogue/moodlet_parole_refused.tres"),

@@ -229,6 +229,13 @@ var _rooms_for: Dictionary[ActivityDef, Dictionary] = {}
 ## (person) -> float: anything else that speeds up or slows down someone's
 ## work, such as a prisoner's skill at it. Multiplied together.
 var pace_scales: Array[Callable] = []
+## (person, here) -> Array of [words, points]: more parts of someone's mood,
+## such as friends close by.
+var mood_extras: Array[Callable] = []
+## Cellmates who share a trait get on, and clashing ones don't. Off once
+## something keeps proper bonds (Relationships), which start from the same
+## rule.
+var cellmate_moods := true
 var _qualities: Dictionary[Room, RoomQuality] = {}
 ## People by (level, x, z) in squares NEARBY tiles across, for finding
 ## who is close, refilled when first wanted each step.
@@ -1075,7 +1082,7 @@ func _mood_extras(person: Person, here: Array) -> Array:
 		_room_part(out, quality(home[0], home[1]), home_type)
 		var clashes: Array[String] = []
 		var friends: Array[String] = []
-		for mate in owners_in(home[0], home[1]):
+		for mate in owners_in(home[0], home[1]) if cellmate_moods else ([] as Array[Person]):
 			if mate == person:
 				continue
 			if _clash(person, mate):
@@ -1105,6 +1112,8 @@ func _mood_extras(person: Person, here: Array) -> Array:
 	var bonus := Modifiers.amount_for(modifiers, StringName("%s_mood" % person.group), person)
 	if not is_zero_approx(bonus):
 		out.append(["How the prison is run", bonus])
+	for extra in mood_extras:
+		out.append_array(extra.call(person, here))
 	return out
 
 

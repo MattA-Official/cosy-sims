@@ -64,6 +64,8 @@ var clock: GameClock:
 		clock.minute_passed.connect(func(_minute: int) -> void: tick())
 
 var fights: Array[Fight] = []
+## (a, b) -> bool: whether b is a's rival, picked first. Optional.
+var rivalry: Callable
 var _rng := RandomNumberGenerator.new()
 
 
@@ -72,16 +74,20 @@ func start() -> void:
 	jobs.rebuilders[&"break_up"] = func(_work: Dictionary) -> Job: return null
 
 
-## Who someone would pick a fight with: the unhappiest prisoner close by.
+## Who someone would pick a fight with: a rival close by first, otherwise
+## the unhappiest prisoner close by.
 func target_for(person: Person) -> Person:
 	var best: Person = null
+	var best_rival := false
 	for other in people.nearby(person, REACH):
 		if other.group != prisoner_group or fighting(other) or other.led or other.going_home \
 				or Health.injury(other.health) == Health.Injury.KNOCKED_OUT \
 				or other.flat().distance_to(person.flat()) > REACH:
 			continue
-		if best == null or other.mood < best.mood:
+		var rival: bool = rivalry.is_valid() and rivalry.call(person, other)
+		if best == null or (rival and not best_rival) or (rival == best_rival and other.mood < best.mood):
 			best = other
+			best_rival = rival
 	return best
 
 

@@ -136,6 +136,7 @@ var heads := Heads.new()
 var in_tray := InTray.new()
 ## What has happened, for know-how and research reveals.
 var counters := Counters.new()
+var relationships := Relationships.new()
 var knowhow := Knowhow.new()
 ## The research board in play.
 var research := Research.new()
@@ -1049,7 +1050,7 @@ func _ready() -> void:
 	misconduct.temper_scales.append(func(person: Person) -> float:
 		return Contraband.ROWDY_TEMPER if person.moodlets.has(&"rowdy") else 1.0)
 	inspector.person_pickers.append(["Cell", "Move them to another cell or dorm. In a full one, they swap beds with someone.",
-		func(_person: Person) -> Array:
+		func(person: Person) -> Array:
 			var out: Array = []
 			var counts: Dictionary[StringName, int] = {}
 			for entry: Array in people.home_rooms():
@@ -1057,8 +1058,13 @@ func _ready() -> void:
 				var type := people.room_type(room.type)
 				var name := type.display_name if type != null else "Room"
 				counts[name] = counts.get(name, 0) + 1
+				# In a double, who they'd share with and how it might go.
+				var mates := people.owners_in(entry[0], room).filter(func(p: Person) -> bool: return p != person)
+				var with := ""
+				if mates.size() == 1:
+					with = ", with %s: %s" % [(mates[0] as Person).name, relationships.predict(person, mates[0]).to_lower()]
 				out.append([StringName("%d:%d:%d" % [entry[0], room.cells[0].x, room.cells[0].y]),
-						"%s %d (%d of %d beds free)" % [name, counts[name], entry[3], entry[2]]])
+						"%s %d (%d of %d beds free%s)" % [name, counts[name], entry[3], entry[2], with]])
 			return out,
 		func(person: Person) -> StringName:
 			var home := people.home_room(person)
@@ -1255,6 +1261,7 @@ func _ready() -> void:
 			words += " There's no perimeter yet, so anyone who wanders off can walk away."
 		Toasts.post("The bus is here", words))
 	ResearchWiring.setup(self)
+	PrisonLife.setup(self)
 	if saved.is_empty():
 		ResearchWiring.new_game(self)
 	if not saved.is_empty():
@@ -1906,7 +1913,13 @@ func _on_cell_hovered(cell: Vector2i) -> void:
 		status.set_item(&"room", "No room here" if cell != GridCursor.NO_CELL else "Off the map", &"SubtleLabel")
 		return
 	var def := PrisonCatalogue.room_type(room.type)
-	status.set_item(&"room", "%s  ·  %d tiles  ·  %s" % [
+	# A shared cell says how its two get on.
+	var mates := people.owners_in(building.active, room)
+	var pair := ""
+	if mates.size() == 2:
+		pair = "  ·  %s and %s: %s" % [mates[0].name.get_slice(" ", 0), mates[1].name.get_slice(" ", 0),
+				relationships.predict(mates[0], mates[1]).to_lower()]
+	status.set_item(&"room", "%s  ·  %d tiles  ·  %s%s" % [
 		def.display_name if def != null else "Unmarked room",
 		room.cells.size(),
-		"indoors" if room.indoor else "outdoors"])
+		"indoors" if room.indoor else "outdoors", pair])

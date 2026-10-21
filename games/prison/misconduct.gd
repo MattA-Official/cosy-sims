@@ -21,6 +21,9 @@ const VANDAL_REACH := 8.0
 
 signal acted(person: Person, rung: MisconductDef, words: String)
 
+## (person) -> float: scales the hour's odds of acting up, such as a
+## rival close by. Optional.
+var odds: Callable
 var people: People
 var model: MisconductModel
 ## Rungs in order, mildest first.
@@ -79,7 +82,8 @@ func tick(minutes: float) -> void:
 ## The hour's roll: maybe they act up, warning first for worse rungs.
 ## Returns the rung picked, or null.
 func roll(person: Person, force := false) -> MisconductDef:
-	if not force and _rng.randf() >= model.chance(person.temper, watched(person)):
+	var scale: float = odds.call(person) if odds.is_valid() else 1.0
+	if not force and _rng.randf() >= model.chance(person.temper, watched(person)) * scale:
 		return null
 	var trait_ids: Array[StringName] = []
 	for t in person.traits:
