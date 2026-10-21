@@ -24,6 +24,8 @@ var categories: Dictionary[StringName, CategoryDef] = {}
 var prisoner_group: StringName = &"prisoner"
 ## Multiplies the daily grant: the grade's bonus, 1 for none.
 var grant_scale := 1.0
+## Multiplies what goods sell for, such as the town's demand. 1 for none.
+var goods_scale := 1.0
 ## Multiplies wages (difficulty).
 var wage_scale := 1.0
 var clock: GameClock:
@@ -38,7 +40,7 @@ var kitchen: Kitchen:
 var workshop: Workshop:
 	set(value):
 		workshop = value
-		workshop.collected.connect(func(count: int) -> void: ledger.add(count * GOODS_PRICE, "Goods sold"))
+		workshop.collected.connect(func(count: int) -> void: ledger.add(roundi(count * GOODS_PRICE * goods_scale), "Goods sold"))
 
 
 ## What a crate of food costs, at the kitchen's meal quality.

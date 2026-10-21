@@ -74,6 +74,16 @@ var nightly: Array[Callable] = []
 ## () -> Array[String]: more lines for the morning report, such as who
 ## went home.
 var report_lines: Array[Callable] = []
+## (tonight's stars by measure) -> void: changes a night's stars before
+## they're averaged, such as the town's opinion denting Safety.
+var star_adjusts: Array[Callable] = []
+## () -> float: more scales on the daily grant.
+var grant_scales: Array[Callable] = []
+## The paper's news, if set: () -> Array of {words, change}, weightiest
+## first. The first leads the paper; the rest go under "Town talk".
+var news: Callable
+## () -> String: the paper's name. Optional.
+var paper_name: Callable
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -382,6 +392,8 @@ func grade_day() -> void:
 		values[def.display_name] = got[0]
 		why[def.display_name] = got[1]
 		tonight[def.display_name] = def.stars(got[0])
+	for adjust in star_adjusts:
+		adjust.call(tonight)
 	if security != null:
 		security.end_day()
 	# Each measure is its stars averaged over the last few nights, so one
@@ -503,8 +515,18 @@ func write_paper() -> Dictionary:
 	if not desk.is_empty():
 		sections.append(["The warden's desk", desk])
 	var story := _story()
-	return {"day": clock.day() if clock != null else 0, "stars": grade, "headline": _headline(worst, money, story),
-			"sections": sections, "story": story}
+	var headline := _headline(worst, money, story)
+	if news.is_valid():
+		var stories: Array = news.call()
+		if not stories.is_empty() and float(stories[0].change) != 0.0:
+			headline = stories[0].words
+		var talk := PackedStringArray()
+		for entry: Dictionary in stories.slice(1, 3):
+			talk.append(entry.words)
+		if not talk.is_empty():
+			sections.insert(0, ["Town talk", talk])
+	return {"day": clock.day() if clock != null else 0, "stars": grade, "headline": headline,
+			"sections": sections, "story": story, "name": paper_name.call() if paper_name.is_valid() else ""}
 
 
 ## The biggest news of yesterday, in a few words.
@@ -602,6 +624,8 @@ func _money() -> Array:
 
 func _apply() -> void:
 	finances.grant_scale = (0.8 + 0.1 * (grade - 1)) * difficulty.grant_scale
+	for scale in grant_scales:
+		finances.grant_scale *= scale.call()
 
 
 func _prisoners() -> int:

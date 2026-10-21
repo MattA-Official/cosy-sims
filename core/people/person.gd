@@ -102,6 +102,8 @@ var category: StringName = &""
 var shift: StringName = &""
 ## On their way home at the end of a shift: they do nothing else.
 var going_home := false
+## Out of sight, such as away on an outing: not drawn.
+var away := false
 ## Being walked somewhere by someone else, such as a guard: they decide
 ## nothing for themselves meanwhile.
 var led := false

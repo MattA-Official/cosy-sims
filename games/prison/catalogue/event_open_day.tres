@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/event_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"open_day"
+display_name = "Open day"
+description = "The town tours the prison from 10:00 to 16:00. Nice, tidy rooms win them over; grim ones put them off. Once a season."
+cost = 50

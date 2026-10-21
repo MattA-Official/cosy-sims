@@ -27,6 +27,8 @@ var group: StringName = &"animal"
 var resident_group: StringName = &"prisoner"
 ## Words for a room, such as "the yard": (Room) -> String. Optional.
 var room_words: Callable
+## Animals kept on a lead -> who walks them, such as a dog's handler.
+var leaders: Dictionary[Person, Person] = {}
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -123,6 +125,14 @@ func random_name(def: AnimalDef) -> String:
 ## lap now and then.
 func next(animal: Person) -> void:
 	var def := def_of(animal)
+	var leader: Person = leaders.get(animal)
+	if leader != null and people.people.has(leader):
+		animal.timer = 1.0
+		animal.activity = "With %s" % leader.name.get_slice(" ", 0)
+		var beside := leader.flat() + Vector2(0.6, 0.0)
+		if leader.level == animal.level and animal.flat().distance_to(beside) > 0.8:
+			people.walk_to(animal, leader.level, beside, animal.activity)
+		return
 	if def == null or not def.roams or animal.has_meta(&"stay"):
 		animal.timer = WANDER_MINUTES
 		animal.activity = "In its cage" if def != null and not def.roams else "Sitting tight"

@@ -42,7 +42,7 @@ func show_paper(paper: Dictionary) -> void:
 		child.queue_free()
 	var ink := Color(0.15, 0.14, 0.12)
 	var faded := Color(0.4, 0.38, 0.34)
-	var masthead := _label(MASTHEAD, 30, ink)
+	var masthead := _label(paper.get("name", "") if not String(paper.get("name", "")).is_empty() else MASTHEAD, 30, ink)
 	masthead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_column.add_child(masthead)
 	var dateline := _label("Day %d   ·   %s" % [paper.day, "★".repeat(paper.stars) + "☆".repeat(5 - paper.stars)], 13, faded)

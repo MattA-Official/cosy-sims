@@ -14,6 +14,7 @@ var desk_work: DeskWork
 var sentences: Sentences
 var research: Research
 var illnesses: Illnesses
+var protest: Protest
 
 var _difficulty := OptionButton.new()
 var _about := Label.new()
@@ -23,6 +24,7 @@ var _instant := CheckButton.new()
 var _red_tape := OptionButton.new()
 var _research := OptionButton.new()
 var _illness := CheckButton.new()
+var _protestors := CheckButton.new()
 
 
 func _ready() -> void:
@@ -98,6 +100,12 @@ func _ready() -> void:
 		if illnesses != null:
 			illnesses.enabled = on)
 	box.add_child(_row("Illness", _illness))
+	_protestors.focus_mode = FOCUS_NONE
+	_protestors.tooltip_text = "On, bad headlines bring campaigners with placards to the gate, and good ones may bring well-wishers with cake. They heckle staff and hold up traffic, never worse."
+	_protestors.toggled.connect(func(on: bool) -> void:
+		if protest != null:
+			protest.enabled = on)
+	box.add_child(_row("Protestors", _protestors))
 	box.add_child(HSeparator.new())
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()
@@ -147,3 +155,5 @@ func refresh() -> void:
 		_research.select(research.mode)
 	if illnesses != null:
 		_illness.set_pressed_no_signal(illnesses.enabled)
+	if protest != null:
+		_protestors.set_pressed_no_signal(protest.enabled)

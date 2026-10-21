@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ReputationEventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/world/reputation_event_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"abscond"
+change = -4.0
+tone = 1
+topic = &"soft"
+headlines = Array[String](["{name} slips away from community service"])
+weight = 5
+once_a_day = false

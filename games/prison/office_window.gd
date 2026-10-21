@@ -20,6 +20,14 @@ var open_research: Callable
 var events: Events
 ## For the Shop section. Optional.
 var shop: Shop
+## What the town thinks, shown beside the grade. Optional.
+var reputation: Reputation
+## Protestors at the gate, and () -> bool to have a word with them (and
+## whether the warden may). Optional.
+var protest: Protest
+var have_a_word: Callable
+var may_have_a_word: Callable
+var _word := Button.new()
 
 var _missing := Label.new()
 var _limit := Label.new()
@@ -169,6 +177,14 @@ func _ready() -> void:
 		box.add_child(_grade)
 		_measures.theme_type_variation = &"SubtleLabel"
 		box.add_child(_measures)
+		_word.text = "Have a word with the protestors"
+		_word.tooltip_text = "The warden goes out to the gate to talk things over, which calms the crowd. Once a week, with the Public relations card."
+		_word.focus_mode = FOCUS_NONE
+		_word.pressed.connect(func() -> void:
+			if have_a_word.is_valid():
+				have_a_word.call()
+			refresh())
+		box.add_child(_word)
 		box.add_child(HSeparator.new())
 		var goals_heading := Label.new()
 		goals_heading.text = "Grant goals"
@@ -493,7 +509,16 @@ func _show_scenario() -> void:
 
 func _show_standing(warden: bool) -> void:
 	_grade.text = "Grade  %s%s" % ["★".repeat(standing.grade), "☆".repeat(5 - standing.grade)]
+	if reputation != null:
+		_grade.text += "    Town: %s (%d)" % [reputation.words(), roundi(reputation.score)]
+		var recent := reputation.recent_words()
+		_grade.tooltip_text = "Graded each midnight on safety, wellbeing, reform and money. A better grade brings a bigger grant.\n\n" \
+				+ ("What the town has heard lately:\n" + "\n".join(recent) if not recent.is_empty() \
+				else "The town hasn't heard much about the prison yet.")
+		_grade.mouse_filter = MOUSE_FILTER_STOP
 	_measures.text = measures_text()
+	_word.visible = protest != null and protest.state == Protest.State.PROTESTING
+	_word.disabled = not warden or not may_have_a_word.is_valid() or not may_have_a_word.call()
 	for child in _goals.get_children():
 		_goals.remove_child(child)
 		child.queue_free()

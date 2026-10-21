@@ -62,6 +62,8 @@ var letter_from: Callable
 ## () -> bool: a family day, when visits don't wait their turn and twice as
 ## many come. Optional.
 var family_day: Callable
+## () -> float: more or fewer visits, such as by the prison's name. Optional.
+var visit_scale: Callable
 ## The visitors' bus: it drives in to bus_stop () -> Vector2 when there's a
 ## road. Optional.
 var vehicles: Vehicles
@@ -166,6 +168,8 @@ func start_visits() -> int:
 	if spot.is_empty() or pairs.is_empty():
 		return 0
 	var most := MOST_VISITS * (2 if _family_day() else 1)
+	if visit_scale.is_valid():
+		most = maxi(1, roundi(most * visit_scale.call()))
 	var count := 0
 	for prisoner: Person in waiting():
 		if count >= mini(pairs.size(), most):
@@ -250,7 +254,8 @@ func send_home(visitor: Person) -> void:
 ## load, say) heads out.
 func tick() -> void:
 	for person in people.people.duplicate():
-		if person.group == VISITOR and not _visitors.has(person) and not _leaving.has(person):
+		if person.group == VISITOR and not _visitors.has(person) and not _leaving.has(person) \
+				and not person.profile.has("guest"):
 			send_home(person)
 	var spot: Array = entrance.call() if entrance.is_valid() else []
 	for visitor: Person in _leaving.keys():
@@ -298,7 +303,7 @@ func _head_out(visitor: Person) -> void:
 
 ## Visitors only visit: waiting for their seat, or on their way out.
 func _visitor_decides(person: Person, _may_wander: bool) -> bool:
-	if person.group != VISITOR:
+	if person.group != VISITOR or person.profile.has("guest"):
 		return false
 	if _leaving.has(person):
 		if person.state == Person.State.IDLE:

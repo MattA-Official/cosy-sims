@@ -130,6 +130,7 @@ const GROUPS: Array[GroupDef] = [
 	preload("res://games/prison/catalogue/group_staff.tres"),
 	preload("res://games/prison/catalogue/group_visitor.tres"),
 	preload("res://games/prison/catalogue/group_animal.tres"),
+	preload("res://games/prison/catalogue/group_protestor.tres"),
 ]
 
 const ZONES: Array[ZoneDef] = [
@@ -189,6 +190,7 @@ const PROGRAMMES: Array[WorkProgrammeDef] = [
 	preload("res://games/prison/catalogue/programme_workshop.tres"),
 	preload("res://games/prison/catalogue/programme_shop.tres"),
 	preload("res://games/prison/catalogue/programme_pet_care.tres"),
+	preload("res://games/prison/catalogue/programme_community.tres"),
 ]
 
 const DOOR_KINDS: Array[DoorKindDef] = [
@@ -299,12 +301,37 @@ const ILLNESSES: Array[IllnessDef] = [
 	preload("res://games/prison/catalogue/illness_cold.tres"),
 ]
 
+## What crowds at the gate protest about (see Protest).
+const PROTEST_TOPICS: Array[ProtestTopicDef] = [
+	preload("res://games/prison/catalogue/protest/topic_overcrowding.tres"),
+	preload("res://games/prison/catalogue/protest/topic_food.tres"),
+	preload("res://games/prison/catalogue/protest/topic_soft.tres"),
+	preload("res://games/prison/catalogue/protest/topic_safety.tres"),
+]
+
+## News the town hears (see Reputation).
+const REPUTATION: Array[ReputationEventDef] = [
+	preload("res://games/prison/catalogue/reputation/rep_abscond.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_community.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_death.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_escape.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_escape_plan.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_fight.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_open_day_bad.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_open_day_good.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_protest.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_quiet_day.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_release_did_well.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_sit_in.tres"),
+]
+
 const EVENTS: Array[EventDef] = [
 	preload("res://games/prison/catalogue/event_talent_show.tres"),
 	preload("res://games/prison/catalogue/event_chess_tournament.tres"),
 	preload("res://games/prison/catalogue/event_art_show.tres"),
 	preload("res://games/prison/catalogue/event_veg_show.tres"),
 	preload("res://games/prison/catalogue/event_family_day.tres"),
+	preload("res://games/prison/catalogue/event_open_day.tres"),
 ]
 
 const MOODLETS: Array[MoodletDef] = [
@@ -314,6 +341,9 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_lost_my_pet.tres"),
 	preload("res://games/prison/catalogue/moodlet_rabbit_chaos.tres"),
 	preload("res://games/prison/catalogue/moodlet_good_dog.tres"),
+	preload("res://games/prison/catalogue/moodlet_heckled.tres"),
+	preload("res://games/prison/catalogue/moodlet_nervous.tres"),
+	preload("res://games/prison/catalogue/moodlet_cheered_on.tres"),
 	preload("res://games/prison/catalogue/moodlet_chocolate.tres"),
 	preload("res://games/prison/catalogue/moodlet_got_a_gift.tres"),
 	preload("res://games/prison/catalogue/moodlet_wrote_home.tres"),

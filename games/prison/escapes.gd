@@ -78,7 +78,8 @@ func tick() -> void:
 		return
 	var minute := clock.minute_of_day() if clock != null else 0
 	for person in people.people:
-		if person.group != prisoner_group or runners.has(person) or person.led or person.going_home \
+		if person.group != prisoner_group or runners.has(person) or person.led or person.going_home or person.away \
+				or person.profile.has("outing") \
 				or person.quiet_room_hours > 0.0 or Health.injury(person.health) >= Health.Injury.HURT:
 			continue
 		if secure_area.has_perimeter and person.level == 0 and not secure_area.is_secure(Vector2i(person.flat().floor())):

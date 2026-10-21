@@ -2341,7 +2341,7 @@ func _sit_down(person: Person, body: Node3D) -> void:
 func _update_visibility() -> void:
 	var active := building.active if building != null else 0
 	for person: Person in _bodies:
-		_bodies[person].visible = person.level <= active
+		_bodies[person].visible = person.level <= active and not person.away
 
 
 ## A little person about 0.9 m tall: the body model with this person's

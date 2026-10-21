@@ -257,7 +257,25 @@ static func _pets(main: Node) -> void:
 			dog_visit(main)
 		elif hour == DOG_HOURS.y:
 			for dog in animals.of_kind(&"therapy_dog"):
-				people.remove_person(dog))
+				dog_leaves(main, dog)
+			# Any handler left without their dog, such as after a load.
+			for person: Person in people.people.duplicate():
+				if person.profile.has("handler_room"):
+					people.remove_person(person))
+	# The handler walks the dog round the room it came to.
+	people.deciders.append(func(person: Person, _may_wander: bool) -> bool:
+		if not person.profile.has("handler_room"):
+			return false
+		if person.state != Person.State.IDLE:
+			return true
+		var place: Array = person.profile["handler_room"]
+		var room := (building.levels.get(place[0]) as BuildingMap).room_at(place[1]) if building.levels.has(place[0]) else null
+		person.timer = 5.0
+		person.activity = "Walking the therapy dog"
+		if room != null and not room.cells.is_empty():
+			var cell: Vector2i = room.cells[rng.randi() % room.cells.size()]
+			people.walk_to(person, place[0], Vector2(cell) + Vector2(0.5, 0.5), person.activity)
+		return true)
 	clock.minute_passed.connect(func(_minute: int) -> void:
 		for dog in animals.of_kind(&"therapy_dog"):
 			for other in people.nearby(dog, DOG_REACH):
@@ -402,7 +420,28 @@ static func dog_visit(main: Node) -> Person:
 				best = here
 	if best.is_empty():
 		return null
-	return animals.add_in(animals.def_by_id(&"therapy_dog"), best[0], best[1])
+	var dog := animals.add_in(animals.def_by_id(&"therapy_dog"), best[0], best[1])
+	if dog == null:
+		return null
+	var handler := people.add_person(dog.level, dog.flat(), "", &"visitor")
+	if handler != null:
+		handler.traits.clear()
+		handler.profile["guest"] = true
+		handler.profile["handler_room"] = [best[0], (best[1] as Room).cells[0]]
+		handler.activity = "Walking the therapy dog"
+		animals.leaders[dog] = handler
+	return dog
+
+
+## The therapy dog goes home with its handler.
+static func dog_leaves(main: Node, dog: Person) -> void:
+	var people: People = main.people
+	var animals: Animals = main.animals
+	var handler: Person = animals.leaders.get(dog)
+	animals.leaders.erase(dog)
+	if handler != null and people.people.has(handler):
+		people.remove_person(handler)
+	people.remove_person(dog)
 
 
 ## Colds going round, seen to by a nurse in the infirmary; fitness from

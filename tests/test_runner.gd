@@ -131,6 +131,8 @@ func _process(_delta: float) -> bool:
 	_test_health()
 	_test_pets()
 	_test_families()
+	_test_reputation()
+	_test_protest()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -6637,6 +6639,10 @@ func _test_pets() -> void:
 	a.profile["course"] = &"calm_minds"
 	var dog := PrisonLife.dog_visit(main)
 	_check(dog != null and animals.of_kind(&"therapy_dog").size() == 1, "the therapy dog visits")
+	var handler: Person = animals.leaders.get(dog)
+	_check(handler != null and people.people.has(handler) and handler.profile.has("guest"), "with its handler")
+	animals.next(dog)
+	_check(dog.activity.begins_with("With "), "who it stays with")
 	var b: Person = prisoners[1]
 	people.stop(b)
 	b.level = dog.level
@@ -6645,7 +6651,7 @@ func _test_pets() -> void:
 	clock.minute_passed.emit(0)
 	_check(b.moodlets.has(&"good_dog"), "and those near it are cheered")
 	clock.hour_changed.emit(PrisonLife.DOG_HOURS.y)
-	_check(animals.of_kind(&"therapy_dog").is_empty(), "then goes home")
+	_check(animals.of_kind(&"therapy_dog").is_empty() and not people.people.has(handler), "then they both go home")
 	main.queue_free()
 
 
@@ -6729,4 +6735,152 @@ func _test_families() -> void:
 	var hall := release.hall_of_fame()
 	_check(hall.size() == 1 and hall[0][0].name == "Dot Crumb" and hall[0][1].text == "Thank you!",
 			"the hall of fame lists the best reformed, with their postcards")
+	main.queue_free()
+
+
+func _test_reputation() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var reputation: Reputation = main.reputation
+	var standing: Standing = main.standing
+	var security: Security = main.security
+	var clock: GameClock = main.clock
+	_check(is_equal_approx(reputation.score, 50.0) and not reputation.paper_name.is_empty(), "the town starts in two minds, with a local paper")
+	security.counted.emit(&"escape")
+	_check(is_equal_approx(reputation.score, 42.0) and reputation.entries[-1].id == &"escape", "an escape makes the news")
+	security.counted.emit(&"sit_in")
+	security.counted.emit(&"sit_in")
+	_check(is_equal_approx(reputation.score, 37.0), "a sit-in counts once a day however long it lasts")
+	security.counted.emit(&"vandalism")
+	_check(is_equal_approx(reputation.score, 37.0), "not everything is news")
+	(main.release as Release).left.emit({"name": "Dot Crumb", "reform": 90.0})
+	_check(reputation.entries[-1].words.contains("Dot Crumb"), "good releases are news too")
+	var news := reputation.news(clock.day())
+	_check(news[0].id == &"escape", "the weightiest story leads")
+	var day := clock.day()
+	clock.day_changed.emit(day + 1)
+	_check(reputation.score > 39.0 - 0.01 and reputation.score < 40.0, "old news fades back towards 50")
+	# The paper.
+	clock.day_changed.emit(day + 1)
+	reputation.entries.clear()
+	reputation.report(&"escape", "Gus Fitch")
+	reputation.entries[-1].day = clock.day() - 1
+	reputation.report(&"escape_plan")
+	reputation.entries[-1].day = clock.day() - 1
+	var paper := standing.write_paper()
+	_check(String(paper.headline).contains("Gus Fitch") or paper.headline == "Prisoner on the run!" \
+			or paper.headline == "Lock your doors: escape at the prison", "the paper leads with the town's news")
+	_check(paper.name == reputation.paper_name, "under the local paper's name")
+	_check((paper.sections as Array).any(func(s: Array) -> bool: return s[0] == "Town talk"), "with the rest as town talk")
+	# The grade.
+	reputation.score = 20.0
+	var tonight := {"Safety": 3}
+	for adjust in standing.star_adjusts:
+		adjust.call(tonight)
+	_check(tonight["Safety"] == 2, "a bad name costs a Safety star")
+	reputation.score = 80.0
+	var scale := 1.0
+	for extra in standing.grant_scales:
+		scale *= extra.call()
+	_check(is_equal_approx(scale, PrisonWorld.HIGH_GRANT), "a good name raises the grant")
+	var copy := Reputation.new()
+	copy.restore(reputation.capture())
+	_check(is_equal_approx(copy.score, 80.0) and copy.paper_name == reputation.paper_name, "and it's saved")
+	copy.free()
+	# An open day.
+	var events: Events = main.events
+	var research: Research = main.research
+	var people: People = main.people
+	var open: EventDef = events.def_of(PrisonWorld.OPEN_DAY)
+	if research.mode != Research.Mode.OFF:
+		research.states[&"open-day"].state = Research.State.HIDDEN
+		_check(not events.may_put_on(open), "open days need their card")
+		research.states[&"open-day"].state = Research.State.DONE
+	_check(events.may_put_on(open), "an open day can be booked")
+	var tourists := PrisonWorld.open_doors(main)
+	_check(tourists.size() == PrisonWorld.TOURISTS and not events.may_put_on(open), "the town comes, once a season")
+	reputation.score = 50.0
+	var score := PrisonWorld.close_doors(main)
+	_check(score >= 0.0 and score <= 100.0 and tourists.all(func(t: Person) -> bool: return not t.profile.has("tour")),
+			"they rate the rooms and head home (%d)" % roundi(score))
+	_check((score > PrisonWorld.OPEN_GOOD) == (reputation.score > 50.0) or score <= PrisonWorld.OPEN_GOOD,
+			"and tell the paper")
+	# Community service.
+	var p: Person = people.people.filter(func(x: Person) -> bool: return x.group == &"prisoner")[0]
+	p.programme = PrisonWorld.COMMUNITY
+	p.category = &"medium"
+	_check(PrisonWorld.send_out(main) == 0, "community service is only for low category")
+	p.category = &"low"
+	_check(PrisonWorld.send_out(main) == 1, "low-category prisoners go out")
+	var jobs: JobBoard = main.jobs
+	var mine: Job = jobs.of_kind(PrisonWorld.COMMUNITY).filter(func(j: Job) -> bool: return j.only_for == p)[0]
+	mine.stages[0].finish.call(mine.stages[0], p)
+	p.state = Person.State.USING
+	clock.minute_passed.emit(0)
+	_check(p.away and p.profile.has("outing"), "and are out of sight in town")
+	var was := reputation.score
+	p.mood = 100.0
+	var back := PrisonWorld.bring_back(main)
+	_check(back.has(p) or not people.people.has(p), "they come back at 15:00")
+	if back.has(p):
+		_check(not p.away and reputation.score > was, "good for the prison's name")
+	_check(jobs.of_kind(PrisonWorld.COMMUNITY).is_empty(), "and the outing is over")
+	main.queue_free()
+
+
+func _test_protest() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var protest: Protest = main.protest
+	var reputation: Reputation = main.reputation
+	var people: People = main.people
+	var clock: GameClock = main.clock
+	var vehicles: Vehicles = main.vehicles
+	_check(protest.pressure == 0.0 and protest.state == Protest.State.NONE, "no protestors to start with")
+	for i in 3:
+		protest.read_paper(ReputationEventDef.Tone.BAD, &"food")
+	_check(is_equal_approx(protest.pressure, 45.0) and protest.topic == &"food", "bad headlines build pressure")
+	var crowd := protest.gather()
+	_check(crowd.size() == Protest.FEWEST and protest.state == Protest.State.PROTESTING, "a crowd gathers at the gate")
+	_check(String(crowd[0].profile.get("placard", "")) in ["Better dinners!", "Gruel is cruel", "Feed them properly"],
+			"with placards about the topic")
+	_check(protest.words(crowd[0]).contains("What would help"), "and says what would help")
+	var was := reputation.score
+	clock.hour_changed.emit(12)
+	_check(reputation.score < was, "a protest costs reputation by the hour")
+	var staff: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"staff")[0]
+	people.stop(staff)
+	staff.level = crowd[0].level
+	staff.position = crowd[0].position
+	protest.tick()
+	_check(staff.moodlets.has(&"heckled"), "staff walking past are heckled")
+	_check(protest.hold_at(crowd[0].flat()) > 0.0 and protest.hold_at(crowd[0].flat() + Vector2(30, 30)) == 0.0,
+			"vehicles passing the crowd are held up")
+	_check(vehicles.holds.has(protest.hold_at), "on the road")
+	protest.ease(PrisonWorld.OPEN_DAY_EASE)
+	_check(protest.state == Protest.State.LEAVING, "easing the pressure sends them home")
+	for i in Protest.LEAVE_MINUTES + 1:
+		protest.tick()
+	_check(protest.crowd().is_empty() and protest.state == Protest.State.NONE, "and they go")
+	# A fix holding eases it.
+	protest.pressure = 30.0
+	protest.fixes[&"food"] = func() -> bool: return true
+	protest.read_paper(ReputationEventDef.Tone.NEUTRAL, &"")
+	_check(is_equal_approx(protest.pressure, 10.0), "a fix for the topic takes pressure off")
+	# Well-wishers.
+	protest.good_days = Protest.GOOD_DAYS
+	reputation.score = 90.0
+	protest.send_bus = Callable()
+	clock.hour_changed.emit(Protest.ARRIVE_HOUR)
+	_check(protest.state == Protest.State.WELL_WISHERS and protest.crowd().size() == Protest.FEWEST, "a good run brings well-wishers")
+	protest.tick()
+	clock.day_changed.emit(clock.day() + 1)
+	_check(protest.state == Protest.State.LEAVING, "who stay a day")
+	# Off.
+	var copy := Protest.new()
+	copy.restore(protest.capture())
+	_check(copy.good_days == protest.good_days, "it's saved")
+	copy.free()
 	main.queue_free()

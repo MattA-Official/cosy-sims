@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="WorkProgrammeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/jobs/work_programme_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"community"
+display_name = "Community service"
+description = "Low-category prisoners go out with a guard from 10:00 to 15:00 to help in the town. Good for the prison's name, and for reform; now and then someone slips away."
+job_kinds = Array[StringName]([&"community"])

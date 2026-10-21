@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ReputationEventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/world/reputation_event_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"open_day_bad"
+change = -3.0
+tone = 1
+topic = &"overcrowding"
+headlines = Array[String](["Open day leaves visitors cold", "Grim tour of the prison"])
+weight = 4
+once_a_day = false

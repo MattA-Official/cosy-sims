@@ -29,6 +29,12 @@ var _trips: Dictionary[Node3D, Array] = {}
 var _parked: Dictionary[Node3D, PackedVector2Array] = {}
 ## Game minutes left before parked vehicles leave on their own.
 var _stays: Dictionary[Node3D, float] = {}
+## (point: Vector2) -> float: game minutes a vehicle passing a point is
+## held up, such as by a crowd at the gate; 0 for none. Each vehicle is
+## held once at most.
+var holds: Array[Callable] = []
+## Vehicles held up -> game minutes left.
+var _held: Dictionary[Node3D, float] = {}
 
 
 ## Sends a vehicle in by road to the road point nearest `to`, or with
@@ -84,6 +90,7 @@ func drive_through(model: PackedScene, points: PackedVector2Array) -> Node3D:
 	add_child(vehicle)
 	_trips[vehicle] = [points, 0.0, func(gone: Node3D) -> void:
 		_parked.erase(gone)
+		_held.erase(gone)
 		gone.queue_free()]
 	_place(vehicle, points, 0.0)
 	return vehicle
@@ -106,6 +113,7 @@ func drive_out(vehicle: Node3D) -> void:
 	points.reverse()
 	_trips[vehicle] = [points, 0.0, func(gone: Node3D) -> void:
 		_parked.erase(gone)
+		_held.erase(gone)
 		gone.queue_free()]
 
 
@@ -132,6 +140,15 @@ func _drive(minutes: float) -> void:
 		if not is_instance_valid(vehicle):
 			_trips.erase(vehicle)
 			continue
+		if _held.get(vehicle, 0.0) > 0.0:
+			_held[vehicle] -= minutes
+			continue
+		if not _held.has(vehicle) and vehicle.has_meta(&"at"):
+			for hold in holds:
+				var wait: float = hold.call(vehicle.get_meta(&"at"))
+				if wait > 0.0:
+					_held[vehicle] = wait
+					break
 		var trip: Array = _trips[vehicle]
 		var points: PackedVector2Array = trip[0]
 		trip[1] = minf(trip[1] + SPEED * minutes, Roads._length(points))
@@ -156,6 +173,7 @@ func _place(vehicle: Node3D, points: PackedVector2Array, along: float) -> void:
 	var at := a.lerp(b, clampf((along - before) / gap, 0.0, 1.0))
 	var height: float = ground_at.call(at) if ground_at.is_valid() else 0.0
 	vehicle.position = Vector3(at.x * cell_size, height, at.y * cell_size)
+	vehicle.set_meta(&"at", at)
 	vehicle.visible = not shown_at.is_valid() or shown_at.call(at)
 	if b != a:
 		vehicle.rotation.y = atan2(b.x - a.x, b.y - a.y) + float(vehicle.get_meta(&"turn", 0.0))

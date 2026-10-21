@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ReputationEventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/world/reputation_event_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"community"
+change = 0.3
+tone = 0
+topic = &"kindness"
+headlines = Array[String](["Prisoners lend a hand in town", "{name} helps tidy the park"])
+weight = 1
+once_a_day = false

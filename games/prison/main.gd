@@ -143,6 +143,8 @@ var cliques := Cliques.new()
 var shop := Shop.new()
 var illnesses := Illnesses.new()
 var animals := Animals.new()
+var reputation := Reputation.new()
+var protest := Protest.new()
 var health_tint := HealthTint.new()
 var knowhow := Knowhow.new()
 ## The research board in play.
@@ -1274,6 +1276,7 @@ func _ready() -> void:
 		Toasts.post("The bus is here", words))
 	ResearchWiring.setup(self)
 	PrisonLife.setup(self)
+	PrisonWorld.setup(self)
 	if saved.is_empty():
 		ResearchWiring.new_game(self)
 	if not saved.is_empty():
@@ -1430,6 +1433,7 @@ func _add_hud() -> void:
 	office_window.open_research = book.open.bind(&"research")
 	office_window.events = events
 	office_window.shop = shop
+	office_window.reputation = reputation
 	book.add_page(&"office", "Office", "The warden's office: intake, goals and the grade. O", "office",
 			office_window)
 	heads_window.heads = heads
@@ -1516,6 +1520,7 @@ func _add_hud() -> void:
 	settings_window.desk_work = desk_work
 	settings_window.research = research
 	settings_window.illnesses = illnesses
+	settings_window.protest = protest
 	pause_menu.clock = clock
 	pause_menu.subtitle = title
 	pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")
