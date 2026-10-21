@@ -19,6 +19,7 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/tv.tres"),
 	preload("res://games/prison/catalogue/bookshelf.tres"),
 	preload("res://games/prison/catalogue/games_table.tres"),
+	preload("res://games/prison/catalogue/meeting_table.tres"),
 	preload("res://games/prison/catalogue/chess_board.tres"),
 	preload("res://games/prison/catalogue/weights_bench.tres"),
 	preload("res://games/prison/catalogue/basketball_hoop.tres"),

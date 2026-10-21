@@ -6,6 +6,10 @@
   {
    "unlock": "room",
    "id": "meeting"
+  },
+  {
+   "unlock": "object",
+   "id": "meeting_table"
   }
  ],
  "department-budgets": [
