@@ -7,6 +7,7 @@
 script = ExtResource("1_def")
 id = &"poster"
 display_name = "Poster"
+category = "Decoration"
 size = Vector2(0.75, 0.1)
 snap = 2
 height = 0.9

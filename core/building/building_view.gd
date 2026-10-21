@@ -833,9 +833,8 @@ func _build_objects() -> void:
 		var surface: BuildingMap.PlacedObject = map.objects.get(placed.on)
 		if surface != null:
 			ground = map.floor_height(Vector2i(surface.centre.floor())) + surface.def.height
-		var scene := placed.def.model_for(placed.look)
-		if scene != null:
-			var model := scene.instantiate() as Node3D
+		var model := placed.def.make_model(placed.look)
+		if model != null:
 			model.position = Vector3(centre.x, ground + 0.03, centre.y)
 			model.rotation.y = -placed.angle
 			_objects.add_child(model)
@@ -873,7 +872,7 @@ func _add_dressing(placed: BuildingMap.PlacedObject, ground: float) -> void:
 		var at := map.spot_point(placed, free[i]) * cs
 		var node: Node3D
 		if def.model != null:
-			node = def.model.instantiate() as Node3D
+			node = def.make_model()
 		else:
 			var box := BoxMesh.new()
 			box.size = Vector3(def.size.x * cs, def.height, def.size.y * cs)
@@ -1080,6 +1079,15 @@ func _wall_base(edge: Vector3i) -> float:
 			best = maxf(best, map.floor_height(cell))
 	if best > -INF:
 		return best
+	# Beside a stairwell with no floor on the other side either (stairs
+	# against an outside wall): stand on the floor round the stairwell, not
+	# down on the ground.
+	for cell in BuildingMap.edge_cells(edge):
+		if map.holes.has(cell):
+			for reach in 3:
+				var near := map.floor_height_near(Rect2i(cell, Vector2i.ONE).grow(reach))
+				if not is_nan(near):
+					return near
 	var start := Vector2(edge.x, edge.y)
 	var end := start + (Vector2.RIGHT if edge.z == BuildingMap.EDGE_X else Vector2.DOWN)
 	return minf(_height_at(start), _height_at(end))

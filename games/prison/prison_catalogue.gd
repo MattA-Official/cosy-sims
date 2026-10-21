@@ -2,6 +2,9 @@ class_name PrisonCatalogue
 ## Everything the prison game can build. Edit the .tres files in catalogue/
 ## in the inspector to tweak sizes and colours.
 
+## Tabs of the objects menu, in order (see ObjectDef.category).
+const OBJECT_CATEGORIES: Array[String] = ["Cells", "Kitchen", "Work", "Leisure",
+		"Staff", "Decoration"]
 const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/bed.tres"),
 	preload("res://games/prison/catalogue/toilet.tres"),

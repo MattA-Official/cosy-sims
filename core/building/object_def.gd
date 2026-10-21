@@ -5,6 +5,8 @@ extends Resource
 
 @export var id: StringName
 @export var display_name: String
+## Which tab of the objects menu it sits under, such as "Cells".
+@export var category := "Other"
 enum Snap {
 	TILE, ## Lines up with whole tiles, like beds and tables.
 	QUARTER, ## Quarter-tile steps, for smaller things.
@@ -25,6 +27,9 @@ enum Connects {
 ## Its model, origin at the middle of its footprint on the floor. Without
 ## one it shows as a box of `height` and `colour`.
 @export var model: PackedScene
+## Scales the model to suit the people, such as a shorter shelf. Keep
+## `height` to match.
+@export var model_scale := Vector3.ONE
 ## Height in metres, for the placeholder box and anything that needs to
 ## know how tall it is.
 @export var height := 0.6
@@ -105,6 +110,16 @@ func model_for(look: int) -> PackedScene:
 	if look > 0 and look <= looks.size() and looks[look - 1].model != null:
 		return looks[look - 1].model
 	return model
+
+
+## A fresh copy of the model for a look, scaled, or null without one.
+func make_model(look := 0) -> Node3D:
+	var scene := model_for(look)
+	if scene == null:
+		return null
+	var node := scene.instantiate() as Node3D
+	node.scale = model_scale
+	return node
 
 
 func look_name(look: int) -> String:

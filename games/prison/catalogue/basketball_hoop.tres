@@ -7,9 +7,11 @@
 script = ExtResource("1_def")
 id = &"basketball_hoop"
 display_name = "Basketball hoop"
+category = "Leisure"
 size = Vector2(1, 1)
 snap = 0
-height = 2.4
+height = 1.6
+model_scale = Vector3(0.7, 0.65, 0.7)
 colour = Color(0.9, 0.55, 0.3, 1)
 tags = Array[StringName]([&"exercise"])
 model = ExtResource("2_ext")

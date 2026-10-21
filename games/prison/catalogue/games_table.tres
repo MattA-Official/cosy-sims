@@ -26,6 +26,7 @@ model = ExtResource("look_2")
 script = ExtResource("1_def")
 id = &"games_table"
 display_name = "Games table"
+category = "Leisure"
 size = Vector2(1, 1)
 snap = 0
 height = 0.725

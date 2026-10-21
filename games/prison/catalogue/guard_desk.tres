@@ -7,6 +7,7 @@
 script = ExtResource("1_def")
 id = &"guard_desk"
 display_name = "Guard post desk"
+category = "Staff"
 size = Vector2(1.5, 1)
 snap = 1
 height = 0.53

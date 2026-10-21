@@ -88,11 +88,24 @@ func _ready() -> void:
 		var tip := def.description
 		if ledger != null:
 			tip += "\nWage: %s a day shift, more at night." % Ledger.text(def.wage)
+		if def.most > 0:
+			tip += "\nAt most %d." % def.most
 		var row := _row(def.icon, def.display_name, tip)
 		_counts[def.id] = {}
 		for shift in shifts.shifts if shifts != null else []:
 			var shift_id: StringName = shift.id
 			var role_id := def.id
+			if not def.works(shift_id):
+				var none := Label.new()
+				none.text = "–"
+				none.tooltip_text = "%s only work %s." % [def.display_name.to_lower() + "s",
+						" and ".join(def.only_shifts.map(func(id: StringName) -> String: return String(id) + "s"))]
+				none.mouse_filter = MOUSE_FILTER_PASS
+				none.theme_type_variation = &"SubtleLabel"
+				none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				none.custom_minimum_size = Vector2(CONTROLS_WIDTH, 0)
+				row.add_child(none)
+				continue
 			_counts[def.id][shift_id] = _stepper(row,
 					func() -> void:
 						if _may_hire():

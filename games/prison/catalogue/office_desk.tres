@@ -26,6 +26,7 @@ model = ExtResource("look_2")
 script = ExtResource("1_def")
 id = &"office_desk"
 display_name = "Office desk"
+category = "Staff"
 size = Vector2(1.5, 0.75)
 snap = 1
 height = 0.53

@@ -7,6 +7,7 @@
 script = ExtResource("1_def")
 id = &"serving_counter"
 display_name = "Serving counter"
+category = "Kitchen"
 size = Vector2(2, 1)
 height = 0.53
 colour = Color(0.74, 0.76, 0.77, 1)

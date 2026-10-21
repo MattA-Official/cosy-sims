@@ -32,6 +32,8 @@ func _process(_delta: float) -> bool:
 	_test_water()
 	_test_path_network()
 	_test_building_levels()
+	_test_walls_beside_stairs()
+	_test_object_categories()
 	_test_ramps()
 	_test_stair_builder()
 	_test_nav_graph()
@@ -1544,6 +1546,12 @@ func _test_staff_window() -> void:
 	window.refresh()
 	_check(window._counts[&"cook"][&"day"].text == "2" and window._counts[&"cook"][&"night"].text == "0",
 			"and counts them for each shift")
+	var wardens := shifts.wanted_for(&"warden", &"day")
+	shifts.set_wanted(&"warden", &"day", 3, false)
+	shifts.set_wanted(&"warden", &"night", 1, false)
+	_check(shifts.wanted_for(&"warden", &"day") == 1 and shifts.wanted_for(&"warden", &"night") == 0
+			and not window._counts[&"warden"].has(&"night"), "there's one warden at most, on days only")
+	shifts.set_wanted(&"warden", &"day", wardens, false)
 	shifts.set_wanted(&"cook", &"day", 1)
 	_check(cooks.call().size() == 1 and cook.going_home, "and sends one home")
 	for i in 60:
@@ -2096,6 +2104,18 @@ func _test_tools(controller: BuildController, map: BuildingMap) -> void:
 	controller._apply_brush(0.5)
 	controller._brushing = false
 	_check(terrain.corner_height(cell.call(44, 44)) == before_sculpt, "terrain tools only work on the ground floor")
+	if upstairs.wall_def(&"perimeter_fence") != null:
+		controller.tool = BuildController.Tool.WALL
+		controller.wall_style = &"perimeter_fence"
+		var walls_before := upstairs.walls.size() + map.walls.size()
+		hover.call(44.0, 44.0)
+		controller._on_press()
+		hover.call(46.0, 44.0)
+		controller._on_release()
+		_check(upstairs.walls.size() + map.walls.size() == walls_before, "perimeter fences only go on the ground floor")
+		controller.wall_style = BuildingMap.DEFAULT_WALL
+	else:
+		_check(false, "the perimeter fence style is known to the build tools")
 	building.active = -1
 	controller.tool = BuildController.Tool.ROOM
 	hover.call(41.5, 40.5)
@@ -2445,6 +2465,38 @@ func _test_water() -> void:
 	_check(water.bodies.is_empty(), "flattening the ground drains the pond")
 	water.free()
 	terrain.free()
+
+
+## Every object sits under one of the objects menu's tabs, and none is so
+## crowded it runs off the screen.
+func _test_object_categories() -> void:
+	var counts := {}
+	var lost := PackedStringArray()
+	for def in PrisonCatalogue.OBJECTS:
+		if not PrisonCatalogue.OBJECT_CATEGORIES.has(def.category):
+			lost.append(def.display_name)
+		counts[def.category] = counts.get(def.category, 0) + 1
+	_check(lost.is_empty(), "every object is under a tab of the objects menu (%s)" % ", ".join(lost))
+	_check(counts.values().all(func(n: int) -> bool: return n <= 12), "no tab has more than 12 objects")
+
+
+## Upstairs walls beside a stairwell stand on the upstairs floor, not down
+## on the ground hidden in the wall below.
+func _test_walls_beside_stairs() -> void:
+	var building := Building.new(Rect2i(0, 0, 20, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var ground := building.ground()
+	ground.build_room(Rect2i(2, 2, 4, 5), &"concrete", &"brick", 0.0)
+	var up := building.level(1)
+	up.build_room(Rect2i(2, 2, 4, 5), &"wood", &"brick", Building.STOREY)
+	var route: Array[Vector2i] = [Vector2i(2, 3), Vector2i(2, 4), Vector2i(2, 5)]
+	ground.add_stairs(Staircase.create(route, [false, false, false] as Array[bool]))
+	var view := BuildingView.new()
+	view.grid = BuildGrid.new()
+	root.add_child(view)
+	view.map = up
+	_check(is_equal_approx(view._wall_base(Vector3i(2, 4, BuildingMap.EDGE_Z)), Building.STOREY),
+			"an upstairs wall beside the stairs stands on the upstairs floor")
+	view.queue_free()
 
 
 func _test_building_levels() -> void:

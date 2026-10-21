@@ -7,9 +7,11 @@
 script = ExtResource("1_def")
 id = &"cctv_camera"
 display_name = "CCTV camera"
+category = "Staff"
 size = Vector2(0.5, 0.5)
 snap = 1
-height = 2.2
+height = 1.7
+model_scale = Vector3(1, 0.75, 1)
 colour = Color(0.82, 0.84, 0.86, 1)
 tags = Array[StringName]([&"camera"])
 model = ExtResource("2_ext")

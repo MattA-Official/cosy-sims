@@ -7,6 +7,7 @@
 script = ExtResource("1_def")
 id = &"wall_shelf"
 display_name = "Wall shelf"
+category = "Cells"
 size = Vector2(1, 0.25)
 snap = 1
 height = 1.2

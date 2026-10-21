@@ -89,10 +89,34 @@ func wanted_for(role: StringName, shift: StringName) -> int:
 func set_wanted(role: StringName, shift: StringName, count: int, now := true) -> void:
 	if not wanted.has(role):
 		wanted[role] = {}
-	wanted[role][shift] = maxi(count, 0)
+	wanted[role][shift] = clampi(count, 0, most_wanted(role, shift))
 	if now:
 		balance()
 	changed.emit()
+
+
+## The most of a role a shift may want: none on a shift they don't work,
+## and no more than the role's limit less those wanted on other shifts.
+func most_wanted(role: StringName, shift: StringName) -> int:
+	var def := role_def(role)
+	if def == null:
+		return 1 << 30
+	if not def.works(shift):
+		return 0
+	if def.most <= 0:
+		return 1 << 30
+	var others := 0
+	for other: StringName in wanted.get(role, {}):
+		if other != shift:
+			others += wanted[role][other]
+	return maxi(def.most - others, 0)
+
+
+func role_def(role: StringName) -> StaffRoleDef:
+	for def in roles:
+		if def.id == role:
+			return def
+	return null
 
 
 ## Staff of a role on a shift on site now, not counting anyone going home.

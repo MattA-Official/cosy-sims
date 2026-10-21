@@ -561,6 +561,8 @@ func hint() -> String:
 	if tool == Tool.WALL and wall_mode == WallMode.PAINT:
 		return WALL_PAINT_HINT
 	if _ground_only(tool) and _level() != 0:
+		if tool == Tool.WALL:
+			return "Perimeter fences go round the ground floor. Page Down to go back to it."
 		return "This tool works on the ground floor. Page Down to go back to it."
 	if _buying():
 		return (LAND_HINT + "\n" + _land_status_shown).strip_edges()
@@ -823,7 +825,15 @@ func _level() -> int:
 
 ## Tools that only make sense on the ground level.
 func _ground_only(t: Tool) -> bool:
-	return t == Tool.TERRAIN or t == Tool.PLANTS or t == Tool.PATH
+	return t == Tool.TERRAIN or t == Tool.PLANTS or t == Tool.PATH or (t == Tool.WALL
+			and wall_mode == WallMode.BUILD and _perimeter_style())
+
+
+## Whether the wall style is a perimeter fence, which only goes round the
+## ground.
+func _perimeter_style() -> bool:
+	var def := map.wall_def(wall_style) if map != null else null
+	return def != null and def.secure
 
 
 ## Does this edge already have the opening the tool would put in?
@@ -906,6 +916,38 @@ func _update_hover() -> void:
 	if _has_hover:
 		var local := grid.to_local(hit) / grid.cell_size
 		_hover_point = Vector2(local.x, local.z)
+	if tool == Tool.OBJECT and object_def != null and object_def.goes_on_surfaces():
+		var top: Variant = _surface_top_under_mouse()
+		if top != null:
+			_has_hover = true
+			_hover_point = top
+
+
+## Where the mouse meets the top of a table, desk or counter, in tiles, or
+## null: things that go on surfaces are placed by pointing at the top, not
+## at the floor under it.
+func _surface_top_under_mouse() -> Variant:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null or map == null:
+		return null
+	var mouse := get_viewport().get_mouse_position()
+	var origin := grid.to_local(camera.project_ray_origin(mouse))
+	var direction := grid.global_basis.inverse() * camera.project_ray_normal(mouse)
+	var best: Variant = null
+	var nearest := INF
+	for placed: BuildingMap.PlacedObject in map.objects.values():
+		if not placed.def.is_surface() or placed.on_surface():
+			continue
+		var top := map.floor_height(Vector2i(placed.centre.floor())) + placed.def.height
+		var hit: Variant = Plane(Vector3.UP, top).intersects_ray(origin, direction)
+		if hit == null:
+			continue
+		var point := Vector2(hit.x, hit.z) / grid.cell_size
+		if placed.rect.has_point(point) and Geometry2D.is_point_in_polygon(point, placed.polygon()) \
+				and origin.distance_to(hit) < nearest:
+			nearest = origin.distance_to(hit)
+			best = point
+	return best
 
 
 func _hover_cell() -> Vector2i:

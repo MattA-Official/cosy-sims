@@ -63,6 +63,8 @@ func _process(_delta: float) -> bool:
 			_main.controller.buying_land = true
 			_main.controller.flatten_land = true
 			_main.controller.tool = BuildController.Tool.TERRAIN
+		if args.has("objects"):
+			_main.controller.tool = BuildController.Tool.OBJECT
 		if args.has("route"):
 			_main.controller.tool = BuildController.Tool.ROUTE
 		if args.has("perimeter"):

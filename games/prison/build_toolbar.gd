@@ -95,6 +95,8 @@ var _options_bar := PanelContainer.new()
 var _tool_buttons := {} # Tool -> Button
 var _tool_group := ButtonGroup.new()
 var _thumbnails := Thumbnails.new()
+## The objects menu tab showing; empty for the one the chosen object is in.
+var _object_category := ""
 var _size_slider: HSlider
 var _density_slider: HSlider
 var _strength_slider: HSlider
@@ -188,8 +190,7 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 				_add_wall_angle_choices()
 				_add_style_choices(PrisonCatalogue.WALLS, false)
 		BuildController.Tool.OBJECT:
-			_add_choices("Objects", PrisonCatalogue.OBJECTS, controller.object_def,
-					func(def: Resource) -> void: controller.object_def = def)
+			_add_object_choices()
 		BuildController.Tool.ROOM_TYPE:
 			_add_choices("Room types", PrisonCatalogue.ROOM_TYPES, controller.room_type,
 					func(def: Resource) -> void: controller.room_type = def, "Clear")
@@ -496,6 +497,33 @@ func _columns(title: String, buttons: Array[Button]) -> void:
 			column.add_theme_constant_override(&"separation", 4)
 			row.add_child(column)
 		column.add_child(buttons[i])
+
+
+## Tabs for each kind of object, then tiles for the objects of the chosen
+## kind, so the row fits on screen.
+func _add_object_choices() -> void:
+	if _object_category.is_empty():
+		_object_category = controller.object_def.category if controller.object_def != null \
+				else PrisonCatalogue.OBJECT_CATEGORIES[0]
+	var group := ButtonGroup.new()
+	var tabs: Array[Button] = []
+	for category in PrisonCatalogue.OBJECT_CATEGORIES:
+		var tab := Button.new()
+		tab.text = category
+		tab.toggle_mode = true
+		tab.button_group = group
+		tab.focus_mode = Control.FOCUS_NONE
+		tab.button_pressed = category == _object_category
+		tab.toggled.connect(func(on: bool) -> void:
+			if on and _object_category != category:
+				_object_category = category
+				_on_tool_changed.call_deferred(controller.tool))
+		tabs.append(tab)
+	_columns("Kind", tabs)
+	var defs := PrisonCatalogue.OBJECTS.filter(func(def: ObjectDef) -> bool:
+		return def.category == _object_category)
+	var current: Resource = controller.object_def if defs.has(controller.object_def) else null
+	_add_choices("Objects", defs, current, func(def: Resource) -> void: controller.object_def = def)
 
 
 ## One picture tile per definition. The first is picked if nothing is yet.

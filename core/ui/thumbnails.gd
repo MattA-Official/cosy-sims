@@ -48,7 +48,7 @@ func _ready() -> void:
 func object(def: ObjectDef) -> Texture2D:
 	return _request(def, func() -> void:
 		if def.model != null:
-			_stage.add_child(def.model.instantiate())
+			_stage.add_child(def.make_model())
 			return
 		var margin := minf(0.1, minf(def.size.x, def.size.y) * 0.1)
 		_box(Vector3.UP * def.height * 0.5,
