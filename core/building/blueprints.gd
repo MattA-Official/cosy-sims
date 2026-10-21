@@ -391,10 +391,9 @@ func _update_bars() -> void:
 			_bars[key] = bar
 		var job := _jobs[key]
 		var done := progress(key.x, key.y)
-		var filled := roundi(done * 10.0)
 		var words := "Building" if job.worker != null else ("Waiting for money" if job.reason == "Waiting for money"
 				else "Waiting for a handyman")
-		bar.text = "%s\n%s%s" % [words, "▰".repeat(filled), "▱".repeat(10 - filled)]
+		bar.text = "%s · %d%%" % [words, roundi(done * 100.0)] if done > 0.0 else words
 
 
 func _make_bar(map: BuildingMap, key: Vector2i) -> Label3D:
@@ -410,7 +409,7 @@ func _make_bar(map: BuildingMap, key: Vector2i) -> Label3D:
 	bar.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	bar.no_depth_test = true
 	bar.render_priority = 3
-	bar.pixel_size = 0.006
+	bar.pixel_size = 0.01
 	bar.font_size = 40
 	bar.outline_size = 10
 	bar.modulate = Color(0.85, 0.93, 1.0)

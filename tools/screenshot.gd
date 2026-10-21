@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders the main scene for a moment and saves a screenshot. Needs a real
 ## renderer (not --headless). Usage:
-##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [settings] [graded] [inspect=N] [zones] [at=X,Z] [zoom=F] [empty] [map=small|medium|large]
+##   godot --path . -s res://tools/screenshot.gd -- out.png [hour] [timetable] [staff] [money] [office] [bus] [debug] [route] [land] [loop=X,Z,...] [break=TAG] [trouble] [fight] [perimeter] [security] [sitin] [split] [sample=N] [programmes] [settings] [graded] [inspect=N] [zones] [at=X,Z] [zoom=F] [empty] [map=small|medium|large] [blueprint] [move]
 ## With an hour, the day plays out at speed until then first (12.25 is
 ## 12:15); "timetable" opens the timetable window; sample=N starts in
 ## another sample prison; inspect=N opens the F3 inspector on the Nth
@@ -15,6 +15,8 @@ extends SceneTree
 ## prisoners down in the canteen over a missed meal; "split" gives high
 ## security its own timetable and shows it in the timetable window;
 ## at=X,Z points the camera at a tile, and zoom=F scales its distance.
+## "blueprint" plans two rooms and lets a handyman start on them; "move"
+## opens the move tool and its templates.
 
 const FRAMES_TO_WAIT := 90
 
@@ -82,6 +84,29 @@ func _process(_delta: float) -> bool:
 			_main.controller.buying_land = true
 			_main.controller.flatten_land = true
 			_main.controller.tool = BuildController.Tool.TERRAIN
+		if args.has("blueprint"):
+			# Two rooms planned by an open space, one a handyman has started.
+			var map: BuildingMap = _main.building.ground()
+			var blueprints: Blueprints = _main.blueprints
+			blueprints.instant = false
+			var land := map.land_bounds()
+			var spot := Vector2i()
+			for z in range(land.end.y - 12, land.position.y, -1):
+				for x in range(land.end.x - 14, land.position.x, -1):
+					if spot == Vector2i() and not map.in_use(Rect2i(x - 2, z - 2, 15, 10)) \
+							and map.owns(Vector2i(x - 2, z - 2)):
+						spot = Vector2i(x, z)
+			_main.controller.tool = BuildController.Tool.ROOM
+			map.build_room(Rect2i(spot, Vector2i(4, 4)))
+			map.set_door(BuildingMap.edge_between(spot + Vector2i(1, 3), spot + Vector2i(1, 4)), true)
+			map.build_room(Rect2i(spot + Vector2i(6, 0), Vector2i(4, 4)))
+			_main.controller.tool = BuildController.Tool.NONE
+			for i in 160:
+				clock.advance(0.5)
+				blueprints._process(0.0)
+			_main.camera_rig.focus_on(Vector3(spot.x + 5, 0.0, spot.y + 2) * _main.grid.cell_size)
+		if args.has("move"):
+			_main.controller.tool = BuildController.Tool.MOVE
 		if args.has("objects"):
 			_main.controller.tool = BuildController.Tool.OBJECT
 		if args.has("route"):
