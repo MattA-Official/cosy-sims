@@ -237,6 +237,8 @@ var build_costs: BuildCosts
 ## (StringName) -> ObjectDef, for putting the map back when a move doesn't
 ## fit.
 var find_object: Callable
+## Templates to take up with the move tool. Optional.
+var templates: TemplateStore
 ## What Ctrl+C copied last, shared by every game in the session.
 static var clipboard: BuildClip
 ## What the move tool is carrying, and whether it's a paste (which goes

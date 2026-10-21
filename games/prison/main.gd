@@ -630,6 +630,9 @@ func _ready() -> void:
 	controller.spending_allowed = ledger.can_spend
 	controller.build_costs = build_costs
 	controller.find_object = PrisonCatalogue.object
+	controller.templates = TemplateStore.new()
+	controller.templates.find_object = PrisonCatalogue.object
+	controller.templates.starters = StarterTemplates.build()
 	controller.drop_refused.connect(func(reason: String) -> void:
 		Toasts.post("Can't put it there", reason))
 	controller.copied.connect(func(what: String) -> void:

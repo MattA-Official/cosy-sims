@@ -4,12 +4,12 @@ extends VBoxContainer
 ## catalogue (objects, floors, walls, rooms, plants, paths) are picture tiles
 ## with their name on hover, so new entries slot in without new code.
 ## Number keys 1 to 9, then 0, pick tools, Z the zones tool and X the
-## patrol route tool.
+## patrol route tool and B the move tool.
 
 @export var controller: BuildController
 
 ## In the order they're used: put up rooms, then fit them out, then the
-## grounds, with moving and demolishing set apart at the end. Keys 1 to 9 then 0 follow
+## grounds, with demolish set apart, then running the prison, then moving. Keys 1 to 9 then 0 follow
 ## this order. Each is [tool, name, what it does, icon].
 const TOOLS := [
 	[BuildController.Tool.ROOM, "Room", "Drag out a floor with walls all round.", "tool_room"],
@@ -21,14 +21,14 @@ const TOOLS := [
 	[BuildController.Tool.PATH, "Paths", "Lay paths and roads, with stairs and bridges.", "tool_path"],
 	[BuildController.Tool.PLANTS, "Plants", "Plant trees, bushes and flowers.", "tool_plants"],
 	[BuildController.Tool.TERRAIN, "Terrain", "Shape the ground, or add and drain water.", "tool_terrain"],
-	[BuildController.Tool.MOVE, "Move", "Pick up an object, a room or a box of things and put it somewhere else. Ctrl+C and Ctrl+V copy.", "tool_move"],
 	[BuildController.Tool.DEMOLISH, "Demolish", "Remove objects and walls, or clear an area.", "tool_demolish"],
 	[BuildController.Tool.ZONE, "Zones", "Say who may go where, and lock doors by hand.", "tool_zones"],
 	[BuildController.Tool.ROUTE, "Patrol routes", "Draw loops for guards to walk; put guards on them in the Staff window (P).", "tool_route"],
+	[BuildController.Tool.MOVE, "Move and templates", "Pick up an object, a room or a box of things and put it somewhere else. Ctrl+C and Ctrl+V copy; keep rooms as templates.", "tool_move"],
 ]
 ## A divider goes before each of these tools, grouping building, grounds,
 ## demolish and running the prison.
-const GROUP_STARTS: Array[int] = [6, 9, 11]
+const GROUP_STARTS: Array[int] = [6, 9, 10, 12]
 ## Keys for tools past the tenth, which have no number.
 const EXTRA_KEYS: Array[String] = ["Z", "X", "B"]
 
@@ -198,6 +198,8 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 					func(def: Resource) -> void: controller.room_type = def, "Clear")
 		BuildController.Tool.OPENING:
 			_add_opening_choices()
+		BuildController.Tool.MOVE:
+			_add_template_choices()
 		BuildController.Tool.ZONE:
 			_add_choices("Who may be here", PrisonCatalogue.ZONES, controller.zone,
 					func(def: Resource) -> void: controller.zone = def, "Room type's")
@@ -212,6 +214,70 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 
 	_options_bar.visible = _options.get_children().any(func(c: Node) -> bool:
 		return not c.is_queued_for_deletion())
+
+
+## Keeping what's carried as a template, and every template to take up.
+func _add_template_choices() -> void:
+	var store := controller.templates
+	if store == null:
+		return
+	var keep := _section("Keep as a template")
+	var column := VBoxContainer.new()
+	var name_box := LineEdit.new()
+	name_box.placeholder_text = "Name"
+	name_box.custom_minimum_size = Vector2(150, 0)
+	name_box.max_length = 30
+	column.add_child(name_box)
+	var save := Button.new()
+	save.text = "Keep"
+	save.focus_mode = Control.FOCUS_NONE
+	save.tooltip_text = "Keeps what you're carrying as a template, in every game."
+	save.pressed.connect(func() -> void:
+		var what := controller.carrying()
+		if what == null:
+			Toasts.post("Nothing picked up", "Pick up a room or a box of things with the move tool first.")
+			return
+		var called := name_box.text.strip_edges()
+		if called.is_empty():
+			called = store.free_name(_template_base(what))
+		if store.is_starter(called):
+			called = store.free_name(called)
+		if store.keep(called, what):
+			Toasts.post("Template kept", "%s is in the templates now, in every game." % called)
+			_on_tool_changed.call_deferred(controller.tool))
+	column.add_child(save)
+	keep.add_child(column)
+	var row := _section("Templates")
+	for called in store.names():
+		var clip := store.clip(called)
+		if clip == null:
+			continue
+		var picture := ClipPlan.texture(clip, controller.map.floor_def)
+		var details := "%d × %d. Click to put one down; each costs the full price." % [clip.size.x, clip.size.y]
+		if not store.is_starter(called):
+			details += " Ctrl-click to forget it."
+		var button := CosyButton.tile(called, details, picture, false)
+		button.toggle_mode = false
+		button.pressed.connect(func() -> void:
+			if Input.is_key_pressed(KEY_CTRL) and not store.is_starter(called):
+				store.forget(called)
+				_on_tool_changed.call_deferred(controller.tool)
+				return
+			controller.carry_copy(store.clip(called)))
+		row.add_child(button)
+
+
+## A name for a new template from its rooms' type, such as "Cell".
+func _template_base(clip: BuildClip) -> String:
+	var votes := {}
+	for cell: Vector2i in clip.types:
+		votes[clip.types[cell]] = votes.get(clip.types[cell], 0) + 1
+	var best: StringName = &""
+	for type: StringName in votes:
+		if best.is_empty() or votes[type] > votes[best]:
+			best = type
+	var def := PrisonCatalogue.room_type(best) if not best.is_empty() else null
+	return def.display_name if def != null else "Layout"
 
 
 ## Floor or wall style buttons, with outdoor styles marked.

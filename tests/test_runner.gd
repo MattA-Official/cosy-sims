@@ -94,6 +94,7 @@ func _process(_delta: float) -> bool:
 	_test_staff_roster()
 	_test_readout_and_eyedropper()
 	_test_move_and_copy()
+	_test_templates()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4254,6 +4255,48 @@ func _test_move_and_copy() -> void:
 	controller._hover_point = was + Vector2(0, 2)
 	_check(controller.drop() and map.objects.has(bed_id) and map.objects[bed_id].centre.is_equal_approx(was + Vector2(0, 2))
 			and ledger.balance == before, "and moving it is free")
+	main.free()
+
+
+func _test_templates() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 0
+	root.add_child(main)
+	var controller: BuildController = main.controller
+	var map: BuildingMap = main.map
+	var store: TemplateStore = controller.templates
+	store.path = "user://test_templates.cfg"
+	if FileAccess.file_exists(store.path):
+		DirAccess.remove_absolute(store.path)
+	_check(store.names() == ["Single cell", "Double cell", "Shower block", "Small canteen"],
+			"four starter templates come with the game")
+	var single := store.clip("Single cell")
+	_check(single.size == Vector2i(2, 3) and single.objects.size() == 3 and single.types.values().has(&"cell"),
+			"the single cell has its bed, toilet and radio, and is a cell")
+	var land: Rect2i = map.land_bounds()
+	var at := land.end - Vector2i(12, 12)
+	controller._has_hover = true
+	controller.carry_copy(single)
+	controller._hover_point = Vector2(at) + controller._grab
+	_check(controller.drop() and map.room_at(at) != null and map.room_at(at).type == &"cell"
+			and map.room_at(at).type == &"cell", "a starter goes down as a ready cell")
+	var problems := PrisonCatalogue.room_type(&"cell").problems(map.room_at(at), map)
+	_check(problems.is_empty(), "with nothing missing (%s)" % ", ".join(problems))
+	controller._carried = null
+	controller._hover_point = Vector2(at) + Vector2(0.5, 2.5)
+	controller.pick_up(Rect2i(at + Vector2i(0, 2), Vector2i.ONE))
+	_check(store.keep("My cell", controller.carrying()) and not store.keep("Single cell", controller.carrying()),
+			"your own templates can be kept, but not over a starter")
+	var again := TemplateStore.new()
+	again.path = store.path
+	again.find_object = PrisonCatalogue.object
+	var kept := again.clip("My cell")
+	_check(kept != null and kept.floors.size() == 6 and kept.objects.size() == 3 and kept.walls.size() >= 10,
+			"and they last, read back from the user folder")
+	_check(store.free_name("My cell") == "My cell 2", "a fresh name is offered for another")
+	_check(store.forget("My cell") and not store.names().has("My cell"), "and they can be forgotten")
+	_check(ClipPlan.texture(kept, map.floor_def).get_width() > 0, "each has a little plan to show")
+	DirAccess.remove_absolute(store.path)
 	main.free()
 
 
