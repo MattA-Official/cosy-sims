@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="AnimalDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/people/animal_def.gd" id="1_def"]
-[ext_resource type="PackedScene" path="res://games/prison/art/models/hen.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://games/prison/art/models/hen.glb" id="2_model"]
 
 [resource]
 script = ExtResource("1_def")
