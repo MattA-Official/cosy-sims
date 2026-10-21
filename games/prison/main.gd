@@ -1092,7 +1092,7 @@ func _add_hud() -> void:
 	heads_window.heads = heads
 	heads_window.desk_work = desk_work
 	heads_window.clock = clock
-	book.add_page(&"heads", "Heads", "Department heads: hire cards, applicants and bonuses. H", "role_warden",
+	book.add_page(&"heads", "Heads", "Department heads: hire cards, applicants and bonuses. H", "heads",
 			heads_window)
 	security_window.security = security
 	security_window.secure_area = secure_area
