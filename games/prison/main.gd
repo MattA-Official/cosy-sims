@@ -75,6 +75,7 @@ var items := ItemStore.new()
 var jobs := JobBoard.new()
 var item_view := ItemView.new()
 var kitchen := Kitchen.new()
+var snacks := Snacks.new()
 var cleaning := Cleaning.new()
 var laundry := Laundry.new()
 var workshop := Workshop.new()
@@ -381,6 +382,11 @@ func _ready() -> void:
 	kitchen.clock = clock
 	add_child(kitchen)
 	kitchen.start()
+	snacks.name = "Snacks"
+	snacks.people = people
+	snacks.ledger = ledger
+	snacks.clock = clock
+	add_child(snacks)
 	cleaning.name = "Cleaning"
 	cleaning.jobs = jobs
 	cleaning.items = items
@@ -1328,6 +1334,8 @@ func _add_hud() -> void:
 	office_window.standing = standing
 	office_window.consequences = consequences
 	office_window.searching = searching
+	office_window.kitchen = kitchen
+	office_window.finances = finances
 	book.add_page(&"office", "Office", "The warden's office: intake, goals and the grade. O", "office",
 			office_window)
 	heads_window.heads = heads

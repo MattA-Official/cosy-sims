@@ -10,6 +10,9 @@ var intake: Intake
 var standing: Standing
 var consequences: Consequences
 var searching: Searching
+## For the Kitchen and stores section. Optional.
+var kitchen: Kitchen
+var finances: Finances
 
 var _missing := Label.new()
 var _limit := Label.new()
@@ -33,6 +36,8 @@ var _policies: Array[Control] = []
 var _searches := OptionButton.new()
 var _days := OptionButton.new()
 var _quiet := CheckBox.new()
+var _meals := OptionButton.new()
+var _stock := Label.new()
 
 
 func _ready() -> void:
@@ -124,6 +129,8 @@ func _ready() -> void:
 	box.add_child(_beds)
 	if consequences != null and searching != null:
 		_add_policies(box)
+	if kitchen != null:
+		_add_stores(box)
 	if standing != null:
 		box.add_child(HSeparator.new())
 		_grade.theme_type_variation = &"HeaderLabel"
@@ -188,6 +195,10 @@ func refresh() -> void:
 	for control in _policies:
 		if control is BaseButton:
 			(control as BaseButton).disabled = not warden
+	if kitchen != null:
+		_meals.disabled = not warden
+		_meals.selected = maxi(PrisonCatalogue.MEALS.find(kitchen.meal), 0)
+		_stock.text = stock_text()
 	if searching != null:
 		_searches.selected = maxi(Searching.POLICIES.find(searching.random_per_day), 0)
 		_days.selected = maxi(DAYS.find(roundi(consequences.privilege_days)), 0)
@@ -224,6 +235,41 @@ func _add_policies(box: VBoxContainer) -> void:
 	_quiet.toggled.connect(func(on: bool) -> void: consequences.quiet_room_on = on)
 	box.add_child(_quiet)
 	_policies.assign([_searches, _days, _quiet])
+
+
+func _add_stores(box: VBoxContainer) -> void:
+	box.add_child(HSeparator.new())
+	var heading := Label.new()
+	heading.text = "Kitchen and stores"
+	heading.theme_type_variation = &"HeaderLabel"
+	box.add_child(heading)
+	var tips := PackedStringArray()
+	for def in PrisonCatalogue.MEALS:
+		_meals.add_item(def.display_name)
+		tips.append("%s: %s" % [def.display_name, def.description])
+	_meals.tooltip_text = "\n".join(tips) + "\nThe warden sets it."
+	_meals.item_selected.connect(func(index: int) -> void: kitchen.meal = PrisonCatalogue.MEALS[index])
+	box.add_child(_row("Meals", _meals))
+	_stock.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_stock.theme_type_variation = &"SubtleLabel"
+	box.add_child(_stock)
+
+
+## What's in the stores, and whether there's enough food for tomorrow.
+func stock_text() -> String:
+	var items := kitchen.items
+	var lines := PackedStringArray()
+	var crates := items.total(&"ingredient")
+	lines.append("Food: %d crate%s, %d meals (tomorrow needs %d)%s." % [crates, "" if crates == 1 else "s",
+			kitchen.meals_in_stock(), kitchen.meals_needed(),
+			", %s a crate" % Ledger.text(roundi(finances.crate_price())) if finances != null else ""])
+	lines.append("Uniforms: %d clean, %d waiting to be washed." % [items.total(&"clean_laundry"), items.total(&"dirty_laundry")])
+	var goods := items.total(&"goods")
+	if goods > 0:
+		lines.append("Goods waiting for the lorry: %d." % goods)
+	for warning in kitchen.warnings():
+		lines.append(warning + ".")
+	return "\n".join(lines)
 
 
 func _row(text: String, control: Control) -> HBoxContainer:

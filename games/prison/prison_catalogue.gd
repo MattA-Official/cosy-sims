@@ -56,6 +56,7 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/filing_cabinet.tres"),
 	preload("res://games/prison/catalogue/payphone.tres"),
 	preload("res://games/prison/catalogue/planter.tres"),
+	preload("res://games/prison/catalogue/snack_machine.tres"),
 	preload("res://games/prison/catalogue/veg_bed.tres"),
 	preload("res://games/prison/catalogue/class_desk.tres"),
 	preload("res://games/prison/catalogue/whiteboard.tres"),
@@ -271,6 +272,9 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_searched_tidy.tres"),
 	preload("res://games/prison/catalogue/moodlet_had_a_biscuit.tres"),
 	preload("res://games/prison/catalogue/moodlet_had_sweets.tres"),
+	preload("res://games/prison/catalogue/moodlet_plain_meal.tres"),
+	preload("res://games/prison/catalogue/moodlet_hearty_meal.tres"),
+	preload("res://games/prison/catalogue/moodlet_had_a_snack.tres"),
 	preload("res://games/prison/catalogue/moodlet_rowdy.tres"),
 	preload("res://games/prison/catalogue/moodlet_phoned_home.tres"),
 	preload("res://games/prison/catalogue/moodlet_saw_a_fight.tres"),
@@ -427,6 +431,21 @@ static func item(id: StringName) -> ItemDef:
 
 static func room_type(id: StringName) -> RoomTypeDef:
 	for def in ROOM_TYPES:
+		if def.id == id:
+			return def
+	return null
+
+
+## The office's Meals setting, cheapest first.
+const MEALS: Array[MealDef] = [
+	preload("res://games/prison/catalogue/meal_basic.tres"),
+	preload("res://games/prison/catalogue/meal_good.tres"),
+	preload("res://games/prison/catalogue/meal_hearty.tres"),
+]
+
+
+static func meal(id: StringName) -> MealDef:
+	for def in MEALS:
 		if def.id == id:
 			return def
 	return null

@@ -180,6 +180,9 @@ var litter_tag: StringName = &"litter"
 ## their needs and the timetable can take over, such as misconduct or a
 ## player in control.
 var deciders: Array[Callable] = []
+## (person, PlacedObject) -> bool: false keeps someone off an object for
+## now, such as a second snack in a day.
+var use_filters: Array[Callable] = []
 
 var _dirty := true
 ## Whether the ground under the building has changed too (terrain, water or
@@ -1584,6 +1587,9 @@ func _may_use(person: Person, level: int, placed: BuildingMap.PlacedObject) -> b
 		return false
 	if not person.restrictions.is_empty() and restricted_from(person, placed):
 		return false
+	for filter in use_filters:
+		if not filter.call(person, placed):
+			return false
 	if not _is_owned_tag_object(placed):
 		return true
 	return person.bed == key if person.has_bed() else not _bed_owners.has(key)

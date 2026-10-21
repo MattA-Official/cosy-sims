@@ -42,6 +42,8 @@ var items: ItemStore
 var building: Building
 ## The prisoners' timetable, for when meals are.
 var schedule: Schedule
+## How well people are fed (the office's Meals setting).
+var meal: MealDef = PrisonCatalogue.meal(&"good")
 var crate := PrisonCatalogue.item(&"food_crate")
 var tray := PrisonCatalogue.item(&"meal_tray")
 ## For skilled cooks' "tasty_meals". Optional.
@@ -77,6 +79,7 @@ func _on_half_hour(slot: int) -> void:
 	if _meal_ends(slot):
 		clear_leftovers()
 		tasty_meals()
+		serve_quality()
 
 
 ## Scrapes away whatever trays are left on the counters and cookers.
@@ -110,6 +113,34 @@ func tasty_meals() -> int:
 		people.add_moodlet(person, &"lovely_meal")
 		count += 1
 	return count
+
+
+## Cooked meals leave the moodlet the Meals setting gives, in place of a
+## good meal from this sitting. Returns how many changed.
+func serve_quality() -> int:
+	if meal == null or meal.moodlet == &"good_meal" or building.objects_tagged(COUNTERS).is_empty() \
+			or building.objects_tagged(COOKERS).is_empty():
+		return 0
+	var good: MoodletDef = PrisonCatalogue.moodlets()[&"good_meal"]
+	var count := 0
+	for person in people.people:
+		var left: float = person.moodlets.get(&"good_meal", 0.0)
+		if left <= 0.0 or left < good.hours * 60.0 - FRESH_MEAL_MINUTES:
+			continue
+		person.moodlets.erase(&"good_meal")
+		people.add_moodlet(person, meal.moodlet)
+		count += 1
+	return count
+
+
+## Crates of food in stock, and how many meals they make.
+func meals_in_stock() -> int:
+	return items.total(&"ingredient") * MEALS_PER_BATCH
+
+
+## Meals tomorrow needs: a tray for each prisoner at each mealtime.
+func meals_needed() -> int:
+	return _prisoners() * meals_per_day()
 
 
 ## The lorry leaves enough crates on the delivery pallets to keep two
@@ -164,7 +195,7 @@ func cook() -> int:
 		var fetch := Job.at_any(Job.Do.FETCH, COOK_FROM, &"ingredient")
 		fetch.doing = "Fetching food"
 		var work := Job.at_any(Job.Do.WORK, COOKERS, &"meal")
-		work.minutes = COOK_MINUTES
+		work.minutes = meal.cook_minutes if meal != null else COOK_MINUTES
 		work.doing = "Cooking"
 		work.finish = func(stage: Job.Stage, worker: Person) -> void:
 			items.put_down(worker) # The crate, cooked.

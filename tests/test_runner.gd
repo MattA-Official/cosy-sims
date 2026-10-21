@@ -111,6 +111,7 @@ func _process(_delta: float) -> bool:
 	_test_contraband_extras()
 	_test_planning_permission()
 	_test_morning_paper()
+	_test_meals_and_snacks()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1552,6 +1553,50 @@ func _test_morning_paper() -> void:
 	var card: MorningPaper = main.morning_paper
 	card.show_paper(paper)
 	_check(card.visible, "the paper opens")
+	main.queue_free()
+
+
+func _test_meals_and_snacks() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 9
+	root.add_child(main)
+	var people: People = main.people
+	var kitchen: Kitchen = main.kitchen
+	var finances: Finances = main.finances
+	var clock: GameClock = main.clock
+	_check(kitchen.meal.id == &"good", "meals start Good")
+	var good_price := finances.crate_price()
+	kitchen.meal = PrisonCatalogue.meal(&"hearty")
+	_check(finances.crate_price() > good_price, "hearty food costs more")
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	prisoner.traits.clear()
+	people.add_moodlet(prisoner, &"good_meal")
+	_check(kitchen.serve_quality() >= 1 and prisoner.moodlets.has(&"hearty_meal") and not prisoner.moodlets.has(&"good_meal"),
+			"a hearty meal leaves a hearty moodlet")
+	kitchen.meal = PrisonCatalogue.meal(&"basic")
+	var jobs: JobBoard = main.jobs
+	for job in jobs.of_kind(&"cook"):
+		jobs.cancel(job)
+	var posted := kitchen.cook()
+	var cooking := jobs.of_kind(&"cook")
+	_check(posted == 0 or (cooking[0] as Job).stages[1].minutes == 15.0, "basic meals cook quicker")
+	var office: OfficeWindow = main.office_window
+	_check(office.stock_text().begins_with("Food:"), "the office lists what's in the stores")
+	# A snack machine, once a day.
+	var snacks: Snacks = main.snacks
+	var ledger: Ledger = main.ledger
+	var machine := BuildingMap.PlacedObject.new()
+	machine.def = PrisonCatalogue.object(&"snack_machine")
+	_check(machine.def != null and machine.def.tags.has(&"snack_machine"), "there's a snack machine to buy")
+	_check(people._may_use(prisoner, 0, machine), "anyone may use it")
+	var before := ledger.balance
+	prisoner.needs[&"hunger"] = 100.0
+	people.used.emit(prisoner, machine)
+	_check(prisoner.needs[&"hunger"] == Snacks.SNACK_HUNGER and prisoner.moodlets.has(&"had_a_snack")
+			and ledger.balance == before + Snacks.PRICE, "a snack takes the edge off and the prison takes the money")
+	_check(not people._may_use(prisoner, 0, machine), "but only one a day")
+	prisoner.profile["snack_day"] = clock.day() - 1
+	_check(people._may_use(prisoner, 0, machine), "tomorrow they can have another")
 	main.queue_free()
 
 

@@ -34,11 +34,17 @@ var clock: GameClock:
 var kitchen: Kitchen:
 	set(value):
 		kitchen = value
-		kitchen.delivered.connect(func(count: int) -> void: ledger.add(-roundi(count * CRATE_PRICE * Modifiers.scale(modifiers, &"running_costs")), "Food"))
+		kitchen.delivered.connect(func(count: int) -> void: ledger.add(-roundi(count * crate_price()), "Food"))
 var workshop: Workshop:
 	set(value):
 		workshop = value
 		workshop.collected.connect(func(count: int) -> void: ledger.add(count * GOODS_PRICE, "Goods sold"))
+
+
+## What a crate of food costs, at the kitchen's meal quality.
+func crate_price() -> float:
+	var scale := kitchen.meal.cost_scale if kitchen != null and kitchen.meal != null else 1.0
+	return CRATE_PRICE * scale * Modifiers.scale(modifiers, &"running_costs")
 
 
 ## Wages for a shift's staff, as it starts.

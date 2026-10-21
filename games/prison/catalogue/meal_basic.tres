@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="MealDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://games/prison/meal_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"basic"
+display_name = "Basic"
+description = "Cheap and quick: something warm on a tray. Nobody complains, nobody thanks you."
+cost_scale = 0.7
+cook_minutes = 15.0
+moodlet = &"plain_meal"
