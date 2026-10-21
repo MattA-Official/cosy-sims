@@ -12,6 +12,9 @@ signal changed
 
 ## Source id -> {modifier: amount}.
 var sources: Dictionary[StringName, Dictionary] = {}
+## Source id -> [{modifier: amount}, (person) -> bool]: amounts that count
+## only for some people, such as a policy tried in one wing.
+var scoped: Dictionary[StringName, Array] = {}
 
 
 func set_source(id: StringName, amounts: Dictionary) -> void:
@@ -32,6 +35,32 @@ func value(modifier: StringName) -> float:
 	for id: StringName in sources:
 		sum += float(sources[id].get(modifier, 0.0))
 	return sum
+
+
+func set_scoped(id: StringName, amounts: Dictionary, applies: Callable) -> void:
+	scoped[id] = [amounts.duplicate(), applies]
+	changed.emit()
+
+
+func clear_scoped(id: StringName) -> void:
+	if scoped.erase(id):
+		changed.emit()
+
+
+## The sum for one person: every source, and the scoped ones that apply
+## to them.
+func value_for(modifier: StringName, person: Object) -> float:
+	var sum := value(modifier)
+	for id: StringName in scoped:
+		var entry: Array = scoped[id]
+		if (entry[0] as Dictionary).has(modifier) and (entry[1] as Callable).call(person):
+			sum += float(entry[0][modifier])
+	return sum
+
+
+## value_for from a Modifiers node that may be missing.
+static func amount_for(of: Modifiers, modifier: StringName, person: Object) -> float:
+	return of.value_for(modifier, person) if of != null else 0.0
 
 
 ## The modifier's sum, or 0 from a missing Modifiers node.

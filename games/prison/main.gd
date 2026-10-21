@@ -43,7 +43,7 @@ const TITLE_SCENE := "res://games/prison/title.tscn"
 ## The key for each page of the management book.
 const BOOK_KEYS: Dictionary[StringName, StringName] = {&"timetable": &"timetable_toggle",
 		&"staff": &"staff_toggle", &"money": &"money_toggle", &"office": &"office_toggle", &"heads": &"heads_toggle", &"in_tray": &"in_tray_toggle",
-		&"security": &"security_toggle", &"programmes": &"programmes_toggle"}
+		&"security": &"security_toggle", &"programmes": &"programmes_toggle", &"research": &"research_toggle"}
 
 @onready var grid: BuildGrid = $BuildGrid
 @onready var view: BuildingView = $BuildGrid/BuildingView
@@ -194,6 +194,7 @@ var office_window := OfficeWindow.new()
 var security_window := SecurityWindow.new()
 ## Department heads, on H.
 var heads_window := HeadsWindow.new()
+var research_window := ResearchWindow.new()
 ## The in-tray, on J.
 var in_tray_window := InTrayWindow.new()
 ## Save slots and the autosave, on F2.
@@ -1417,6 +1418,11 @@ func _add_hud() -> void:
 	book.add_page(&"in_tray", "In-tray", "Requests and letters waiting for an answer. J", "in_tray", in_tray_window)
 	book.add_page(&"heads", "Heads", "Department heads: hire cards, applicants and bonuses. H", "heads",
 			heads_window)
+	research_window.research = research
+	research_window.knowhow = knowhow
+	research_window.heads = heads
+	book.add_page(&"research", "Research", "Know-how, the research board and wing trials. N", "research",
+			research_window)
 	security_window.security = security
 	security_window.secure_area = secure_area
 	security_window.searching = searching

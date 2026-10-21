@@ -1102,7 +1102,7 @@ func _mood_extras(person: Person, here: Array) -> Array:
 		if not is_zero_approx(t.steady_mood):
 			out.append([t.steady_text, t.steady_mood])
 	# Such as &"prisoner_mood" from research cards.
-	var bonus := Modifiers.amount(modifiers, StringName("%s_mood" % person.group))
+	var bonus := Modifiers.amount_for(modifiers, StringName("%s_mood" % person.group), person)
 	if not is_zero_approx(bonus):
 		out.append(["How the prison is run", bonus])
 	return out

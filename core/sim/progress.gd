@@ -11,8 +11,8 @@ signal changed(person: Person)
 
 var def: ProgressDef
 var sources: Dictionary[StringName, ProgressSourceDef] = {}
-## () -> float: multipliers on gains (not losses), such as research cards
-## that speed reform.
+## (person) -> float: multipliers on gains (not losses), such as research
+## cards that speed reform.
 var gain_scales: Array[Callable] = []
 
 
@@ -40,7 +40,7 @@ func add(person: Person, source_id: StringName, times := 1.0) -> float:
 	var amount := source.amount * times
 	if amount > 0.0:
 		for scale in gain_scales:
-			amount *= scale.call()
+			amount *= scale.call(person)
 	var today := _today(person)
 	if amount > 0.0:
 		var given: float = today.get(source_id, 0.0)

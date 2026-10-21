@@ -12,6 +12,7 @@ extends Node
 ##   {"paperwork": 60}                    on the warden's desk
 ##   {"resign": &"raise"}                 answers a resignation (StaffRoster.resign_answer)
 ##   {"hire": [&"security", 0]}           takes on a department's first applicant
+##   {"trial": [&"roll_out", &"card-id"]}  answers a wing trial (Research)
 
 const PRISONER := &"prisoner"
 
@@ -20,6 +21,7 @@ var ledger: Ledger
 var roster: StaffRoster
 var desk_work: DeskWork
 var heads: Heads
+var research: Research
 var clock: GameClock
 var _rng := RandomNumberGenerator.new()
 
@@ -166,6 +168,21 @@ static func applicants(department: DepartmentDef) -> TrayCardDef:
 	return def
 
 
+## The report on a policy card tried in one wing: roll it out, try another
+## wing, or shelve it. Unanswered, it rolls out. Its words are the findings.
+static func trial(card: ResearchCardDef) -> TrayCardDef:
+	var id := card.id
+	var def := TrayCardDef.make(StringName("trial_%s" % id), &"trial", &"", "Trial: %s" % card.display_name,
+			"%s has been tried in one wing for %d days. {who}" % [card.display_name, Research.TRIAL_DAYS],
+			[TrayCardDef.choice("Roll it out", [{"trial": [&"roll_out", id]}], [], "%s rolled out everywhere." % card.display_name),
+			TrayCardDef.choice("Try another wing", [{"trial": [&"adjust", id]}], [], "%s tried in another wing." % card.display_name),
+			TrayCardDef.choice("Shelve it (half the know-how back)", [{"trial": [&"shelve", id]}], [],
+				"%s shelved." % card.display_name)], 0)
+	def.weight = 0.0
+	def.deadline_days = Research.TRIAL_GRACE - 1
+	return def
+
+
 ## What a choice costs: the money it pays out.
 static func cost(choice: TrayChoiceDef) -> int:
 	var out := 0
@@ -231,6 +248,16 @@ func apply(card: InTray.Card, choice: TrayChoiceDef) -> void:
 				heads.hire(waiting[effect.hire[1]])
 		if effect.has("paperwork") and heads != null and heads.warden() != null:
 			desk_work.add_paperwork(heads.warden().id, effect.paperwork)
+		if effect.has("trial") and research != null:
+			var def := research.card(StringName(effect.trial[1]))
+			if def != null:
+				match StringName(effect.trial[0]):
+					&"roll_out":
+						research.roll_out(def)
+					&"adjust":
+						research.adjust(def)
+					&"shelve":
+						research.shelve(def)
 
 
 ## A card's words for afterwards, such as "Gus got a guitar."

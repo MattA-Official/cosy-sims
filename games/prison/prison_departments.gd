@@ -5,6 +5,7 @@ class_name PrisonDepartments
 const NAMES := ["security", "wellbeing", "admin", "industry", "medical", "education"]
 
 static var _all: Array[DepartmentDef] = []
+static var _deputies: Array[StaffRoleDef] = []
 
 
 static func all() -> Array[DepartmentDef]:
@@ -36,7 +37,35 @@ static func roles() -> Array[StaffRoleDef]:
 	var out: Array[StaffRoleDef] = []
 	for def in all():
 		out.append(def.head_role)
+	out.append_array(deputies())
 	return out
+
+
+## Deputies, taken on from the research board: one for the warden and one
+## for each head, each with a desk of their own and a research slot.
+static func deputies() -> Array[StaffRoleDef]:
+	if _deputies.is_empty():
+		_deputies.append(_deputy(&"warden", "Deputy Warden", Color(0.45, 0.45, 0.5)))
+		for def in all():
+			_deputies.append(_deputy(def.id, "Deputy %s" % def.head_role.display_name, def.colour))
+	return _deputies
+
+
+static func _deputy(id: StringName, words: String, colour: Color) -> StaffRoleDef:
+	var role := StaffRoleDef.new()
+	role.id = StringName("deputy_%s" % id)
+	role.display_name = words
+	role.description = "Works a second research card beside their boss. Taken on from the research board."
+	role.job_kinds = [&"office"]
+	role.wage = 80
+	role.most = 1
+	role.only_shifts = [&"day"]
+	role.by_card = true
+	role.outfit_colour = colour.darkened(0.2)
+	role.icon = preload("res://core/ui/icons/role_warden.svg")
+	role.claims = &"office_desk"
+	role.dressing = [preload("res://games/prison/catalogue/nameplate.tres"), preload("res://games/prison/catalogue/mug.tres")]
+	return role
 
 
 static func find(id: StringName) -> DepartmentDef:

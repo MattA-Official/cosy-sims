@@ -122,6 +122,8 @@ func _process(_delta: float) -> bool:
 	_test_research_board()
 	_test_research()
 	_test_research_effects()
+	_test_research_slots()
+	_test_research_trials()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1923,7 +1925,9 @@ func _test_research() -> void:
 	var done := []
 	research.finished.connect(func(def: ResearchCardDef, _owner: int) -> void: done.append(def.id))
 	desk_work.work(warden.id, 240.0)
-	_check(research.is_done(walk.id) and done == [walk.id], "and a whole day finishes it")
+	_check(research.state_of(walk.id) == Research.State.TRIAL and done.is_empty(), "a whole day's work takes a policy to a wing trial")
+	research.roll_out(walk)
+	_check(research.is_done(walk.id) and done == [walk.id], "and rolled out, it's done")
 	var review := research.card(&"escape-review")
 	_check(research.state_of(review.id) == Research.State.HIDDEN, "Escape review starts face down")
 	counters.add(&"escape")
@@ -1944,7 +1948,9 @@ func _test_research() -> void:
 	var chief := heads.head(heads.find(&"security"))
 	desk_work.piles[chief.id] = desk_work.piles[chief.id].filter(func(i: DeskWork.Item) -> bool: return i.kind == &"research")
 	desk_work.work(chief.id, 480.0)
-	_check(research.is_done(cell.id) and research.state_of(guard.id) == Research.State.RESEARCHING, "when one's done the next starts")
+	_check(research.state_of(cell.id) == Research.State.TRIAL and research.state_of(guard.id) == Research.State.RESEARCHING,
+			"when one's done the next starts")
+	research.roll_out(cell)
 	heads.let_go(chief)
 	_check(research.state_of(guard.id) == Research.State.PAUSED, "a head gone leaves their card paused")
 	# A tier 4 card waits on the grade.
@@ -2031,6 +2037,173 @@ func _test_research_effects() -> void:
 	research.states[&"land-agent"].state = Research.State.FACE_UP
 	research.changed.emit()
 	_check(is_zero_approx(modifiers.value(&"land_price")), "a card no longer done takes its bonus with it")
+	main.queue_free()
+
+
+func _test_research_slots() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var research: Research = main.research
+	var knowhow: Knowhow = main.knowhow
+	var heads: Heads = main.heads
+	var roster: StaffRoster = main.roster
+	var desk_work: DeskWork = main.desk_work
+	var warden := heads.warden()
+	desk_work.piles.erase(warden.id)
+	# A joint card: Security and Admin, with a Chief of Security and the
+	# warden standing in for the Business Manager.
+	var joint: ResearchCardDef = research.board.cards.filter(func(d: ResearchCardDef) -> bool:
+		return d.department == &"security" and d.kinds().slice(0, 2) == [&"security", &"admin"] and not d.trial)[0]
+	research.states[joint.id].state = Research.State.FACE_UP
+	for id in joint.requires:
+		research.states[id].state = Research.State.DONE
+	research.states[&"hire-chief-of-security"].state = Research.State.DONE
+	knowhow.add(&"security", 200.0)
+	knowhow.add(&"admin", 200.0)
+	_check(not research.is_joint(joint) and research.why_not(joint).is_empty(), "with no heads, the warden works a joint card alone")
+	var chief := roster.take_on(&"head_security", &"day")
+	_check(research.is_joint(joint) and research.why_not(joint).contains("Management meeting"),
+			"with a Chief of Security, a joint card needs the Management meeting card")
+	research._finish(research.card(&"management-meeting"), 0, false)
+	_check(research.why_not(joint).contains("meeting room"), "and a meeting room")
+	var map: BuildingMap = (main.building as Building).ground()
+	var land := map.land_bounds()
+	var spot := Vector2i(-1, -1)
+	for z in range(land.position.y + 1, land.end.y - 6):
+		for x in range(land.position.x + 1, land.end.x - 6):
+			if spot.x < 0 and not map.in_use(Rect2i(x - 1, z - 1, 7, 7)) and map.owns(Vector2i(x, z)):
+				spot = Vector2i(x, z)
+	map.build_room(Rect2i(spot, Vector2i(5, 5)))
+	var room := map.room_at_point(Vector2(spot) + Vector2(2.5, 2.5))
+	map.set_room_type(room, &"meeting")
+	map.place_object(PrisonCatalogue.object(&"chair"), Vector2(spot) + Vector2(1, 1), 0)
+	map.place_object(PrisonCatalogue.object(&"chair"), Vector2(spot) + Vector2(3, 1), 0)
+	(main.building as Building).changed.emit()
+	_check(research.why_not(joint).is_empty() and research.begin(joint), "then it can start")
+	var s: Research.CardState = research.states[joint.id]
+	_check(s.slot == &"security" and s.partner == Research.OFFICE and desk_work.items(chief.id, &"research").is_empty(),
+			"it sits in both slots, not on a desk")
+	_check(research.is_busy(Research.OFFICE) and research.owner_line(warden.id).contains("meetings at"),
+			"the warden's slot is busy with it too")
+	var jobs: JobBoard = main.jobs
+	var start := jobs.jobs.size()
+	if chief.person == null:
+		chief.person = warden.person
+	research.hold_meetings()
+	var meetings := jobs.jobs.slice(start).filter(func(j: Job) -> bool: return j.kind == Research.MEETING_JOB)
+	_check(meetings.size() == 2, "at ten o'clock both are called to a meeting")
+	research.attend(joint.id, chief.id)
+	_check(is_zero_approx(research.progress(joint)), "one turning up isn't enough")
+	research.attend(joint.id, warden.id)
+	_check(research.progress(joint) > 0.0, "with both there, it moves on")
+	for i in 40:
+		research._attended.clear()
+		research.attend(joint.id, chief.id)
+		research.attend(joint.id, warden.id)
+	_check(research.is_done(joint.id), "and meetings finish it")
+	# Budgets.
+	var guard := research.card(&"guard-training")
+	var plain := research.speed(guard, chief.id)
+	research._finish(research.card(&"department-budgets"), 0, false)
+	research.set_budget(&"security", 300)
+	_check(is_equal_approx(research.speed(guard, chief.id), plain * 1.3), "£300 a day makes a wedge 30% faster")
+	research.set_budget(&"security", 1000)
+	_check(is_equal_approx(research.speed(guard, chief.id), plain * Research.BUDGET_MOST), "up to half as fast again")
+	var money := (main.ledger as Ledger).balance
+	research.nightly()
+	_check((main.ledger as Ledger).balance <= money - 1000, "budgets are paid each night")
+	research.set_budget(&"security", 0)
+	# Deputies.
+	_check(research.why_no_deputy(Research.OFFICE).contains("Deputy warden"), "a deputy warden needs its card")
+	research._finish(research.card(&"deputy-warden"), 0, true)
+	var deputy := research.slot_owner(&"office+")
+	_check(deputy != 0 and research.slots().has(&"office+"), "the Deputy warden card takes one on, with a second slot")
+	research._finish(research.card(&"deputy-heads"), 0, false)
+	_check(research.why_no_deputy(&"security").contains("level"), "a head's deputy needs a seasoned head")
+	chief.level = Research.DEPUTY_LEVEL
+	_check(research.take_on_deputy(&"security") != null and research.slots().has(&"security+"), "then they get one")
+	var a := research.card(&"guard-training")
+	var b: ResearchCardDef = research.board.cards.filter(func(d: ResearchCardDef) -> bool:
+		return (d.department == &"security" and d != a and d.knowhow.size() == 1 and not research.is_done(d.id)
+				and not research.is_hire(d)))[0]
+	for def: ResearchCardDef in [a, b]:
+		research.states[def.id].state = Research.State.FACE_UP
+		for id in def.requires:
+			research.states[id].state = Research.State.DONE
+	(main.standing as Standing).grade = 5
+	_check(research.begin(a) and research.begin(b) and research.states[b.id].slot == &"security+",
+			"a head and their deputy work two cards at once")
+	# Conferences.
+	research._finish(research.card(&"conferences"), 0, false)
+	var hidden := func() -> int: return research.board.cards.filter(func(d: ResearchCardDef) -> bool:
+		return d.department == &"security" and research.state_of(d.id) == Research.State.HIDDEN and d.addon == &"").size()
+	var before: int = hidden.call()
+	_check(research.send_to_conference(chief) and chief.away == "at a conference", "a head goes off to a conference")
+	(main.clock as GameClock).advance(GameClock.MINUTES_PER_DAY * Research.CONFERENCE_DAYS)
+	_check(not research.conferences.has(chief.id) and hidden.call() <= before - mini(2, before), "and comes back with two new cards")
+	# Pet projects.
+	var hire := research.card(&"hire-head-of-wellbeing")
+	research.states[hire.id].state = Research.State.DONE
+	var welfare: int = research.board.cards.filter(func(d: ResearchCardDef) -> bool:
+		return d.department == &"wellbeing" and research.state_of(d.id) == Research.State.HIDDEN).size()
+	var department := heads.find(&"wellbeing")
+	var head := roster.add_applicant(department.head_role.id, &"day")
+	head = heads.hire(head)
+	_check(research.pet_projects.has(head.id) and research.states[research.pet_projects[head.id]].revealed_by.begins_with("Pet project of"),
+			"a new head turns up a pet project")
+	var saved := research.capture()
+	research.restore(saved)
+	_check(research.states[b.id].slot == &"security+" and research.pet_projects.has(head.id), "slots and pet projects save")
+	main.queue_free()
+
+
+func _test_research_trials() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var research: Research = main.research
+	var people: People = main.people
+	var modifiers: Modifiers = main.modifiers
+	var in_tray: InTray = main.in_tray
+	var policy: ResearchCardDef = research.board.cards.filter(func(d: ResearchCardDef) -> bool:
+		return d.trial and d.pair == &"" and d.effects.any(func(e: Dictionary) -> bool: return e.has("modifier")))[0]
+	var key := StringName(policy.effects.filter(func(e: Dictionary) -> bool: return e.has("modifier"))[0].modifier)
+	research.start_trial(policy)
+	var wing := research.trials[policy.id].rooms as Array
+	var prisoners := people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner" and not people.home_room(p).is_empty())
+	var inside := prisoners.filter(func(p: Person) -> bool: return research.in_wing(policy.id, p))
+	_check(not wing.is_empty() and not inside.is_empty() and inside.size() < prisoners.size(),
+			"a trial picks a wing of about half the beds (%d of %d)" % [inside.size(), prisoners.size()])
+	var outside: Person = prisoners.filter(func(p: Person) -> bool: return not research.in_wing(policy.id, p))[0]
+	_check(modifiers.value_for(key, inside[0]) != 0.0 and modifiers.value_for(key, outside) == 0.0
+			and modifiers.value(key) == 0.0, "its effects count only in the wing")
+	research.note_trial(inside[0], &"fight")
+	var reports := []
+	research.trial_report.connect(func(def: ResearchCardDef, words: String) -> void: reports.append(words))
+	for i in Research.TRIAL_DAYS:
+		research.trials[policy.id].start_day -= 1
+		research.nightly()
+	_check(reports.size() == 1 and String(reports[0]).contains("1 fight"), "after three days a report compares the wing and the rest")
+	var card: InTray.Card = in_tray.cards.filter(func(c: InTray.Card) -> bool: return c.def.kind == &"trial")[0]
+	in_tray.answer(card, 2)
+	_check(research.state_of(policy.id) == Research.State.FACE_UP and modifiers.value_for(key, inside[0]) == 0.0,
+			"shelving it from the in-tray drops it")
+	research.start_trial(policy)
+	research.roll_out(policy)
+	_check(research.is_done(policy.id) and modifiers.value(key) != 0.0, "rolled out, it counts everywhere")
+	# Refinements once a wedge is done.
+	var refine := research.card(&"refine-medical")
+	_check(refine != null and research.state_of(refine.id) == Research.State.HIDDEN, "a refinement waits for its wedge")
+	for def in research.board.cards:
+		if def.department == &"medical" and not research.is_hire(def):
+			research.states[def.id].state = Research.State.DONE
+	research.check_reveals()
+	_check(research.state_of(refine.id) == Research.State.FACE_UP, "a finished wedge offers a refinement")
+	var first: Dictionary = research.cost(refine)
+	research._finish(refine, 0, true)
+	_check(research.refinements[&"medical"] == 1 and research.state_of(refine.id) == Research.State.FACE_UP
+			and research.cost(refine)[first.keys()[0]] > first.values()[0], "it can be done again, dearer each time")
 	main.queue_free()
 
 

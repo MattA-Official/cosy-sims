@@ -107,8 +107,6 @@ const SOURCES := [
 ## read. Every other flag, and every modifier key, must be read by a
 ## system now (a test checks).
 const FUTURE_FLAGS := {
-	&"joint_cards": "M10 joint cards", &"department_budgets": "M10 budgets", &"conferences": "M10 conferences",
-	&"deputy_warden": "M10 deputies", &"deputy_heads": "M10 deputies",
 	&"petitions": "M11 prisoner life", &"hobby_clubs": "M11 hobbies", &"prison_cat": "M11 pets",
 	&"prison_shop": "M11 shop", &"phone_credit": "M11 privileges", &"earned_privileges": "M11 privileges",
 	&"hygiene_drive": "M11 colds", &"vaccinations": "M11 colds", &"isolation_ward": "M11 colds",
@@ -130,6 +128,20 @@ const FUTURE_FLAGS := {
 ## the reading code uses.
 const GROUP_KEYS := {&"guard_walk_speed": "%s_walk_speed", &"staff_need_rate": "%s_need_rate",
 		&"prisoner_mood": "%s_mood"}
+
+## Know-how kind -> the department whose head brings it to a joint card.
+const KIND_DEPARTMENTS := {&"security": &"security", &"care": &"wellbeing", &"health": &"medical",
+		&"learning": &"education", &"craft": &"industry", &"admin": &"admin"}
+
+## Refinements: [department, main kind, name, gives, modifier, amount each].
+const REFINEMENTS := [
+	[&"security", &"security", "Sharper guards", "Guards 2% faster", &"guard_walk_speed", 0.02],
+	[&"wellbeing", &"care", "Thriftier menus", "Meals 2% cheaper", &"supply_price", -0.02],
+	[&"medical", &"health", "Quicker treatment", "Treatment 2% faster", &"treat_speed", 0.02],
+	[&"education", &"learning", "Better teaching", "Course passes 2% higher", &"course_pass", 0.02],
+	[&"industry", &"craft", "Tighter workshops", "Output 2% higher", &"job_output", 0.02],
+	[&"admin", &"admin", "Tidier books", "Running costs 1% lower", &"running_costs", -0.01],
+]
 
 static var _board: ResearchBoardDef
 
@@ -164,6 +176,19 @@ static func make_board() -> ResearchBoardDef:
 		out.cards.append(card)
 		if String(card.id).begins_with("hire-"):
 			out.hire_cards[_department_of_hire(card)] = card.id
+	out.kind_departments.assign(KIND_DEPARTMENTS)
+	for row: Array in REFINEMENTS:
+		var card := ResearchCardDef.new()
+		card.id = StringName("refine-%s" % row[0])
+		card.department = row[0]
+		card.knowhow[row[1]] = TIER_KNOWHOW[3]
+		card.desk_minutes = TIER_MINUTES[3]
+		card.tier = 3
+		card.display_name = row[2]
+		card.gives_text = row[3]
+		card.effects.append({"modifier": String(row[4]), "amount": row[5]})
+		card.repeatable = true
+		out.refinements.append(card)
 	return out
 
 

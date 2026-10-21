@@ -40,6 +40,7 @@ const KEY_ACTIONS := {
 	"in_tray_toggle": [KEY_J],
 	"security_toggle": [KEY_K],
 	"programmes_toggle": [KEY_L],
+	"research_toggle": [KEY_N],
 	"saves_toggle": [KEY_F2],
 	"settings_toggle": [KEY_F4],
 }

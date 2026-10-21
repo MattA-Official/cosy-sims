@@ -39,6 +39,9 @@ static func setup(main: Node) -> void:
 	research.desk_work = main.desk_work
 	research.modifiers = main.modifiers
 	research.building = main.building
+	research.jobs = main.jobs
+	research.people = main.people
+	research.pay = func(amount: int, line: String) -> void: (main.ledger as Ledger).add(-amount, line)
 	research.grade = func() -> int: return (main.standing as Standing).grade
 	research.setting = func(id: StringName) -> Variant: return _setting(main, id)
 	research.clock = clock
@@ -46,6 +49,7 @@ static func setup(main: Node) -> void:
 	research.start()
 	_count(main)
 	_effects(main)
+	_trials(main)
 	clock.hour_changed.connect(func(_hour: int) -> void: research.check_reveals())
 
 
@@ -75,8 +79,11 @@ static func _count(main: Node) -> void:
 		elif id == &"lovely_meal" or id == &"hearty_meal":
 			counters.add(&"meal_lovely"))
 	var fights: Fights = main.fights
+	var research: Research = main.research
 	fights.started.connect(func(fight: Fights.Fight) -> void:
 		counters.add(&"fight")
+		for person: Person in fight.fighters:
+			research.note_trial(person, &"fight")
 		if fight.fighters.size() >= BIG_FIGHT:
 			counters.add(&"big_fight"))
 	(main.sit_ins as SitIns).started.connect(func(_sit_in: SitIns.SitIn) -> void: counters.add(&"riot"))
@@ -89,9 +96,13 @@ static func _count(main: Node) -> void:
 			counters.add(&"drug_found")
 		if def.tags.has(&"weapon"):
 			counters.add(&"weapon_found")
-	(main.searching as Searching).found.connect(func(_owner: Person, def: ItemDef, _where: String) -> void:
-		found.call(def))
-	(main.contraband as Contraband).detected.connect(func(_person: Person, def: ItemDef) -> void: found.call(def))
+	(main.searching as Searching).found.connect(func(owner: Person, def: ItemDef, _where: String) -> void:
+		found.call(def)
+		if owner != null:
+			research.note_trial(owner, &"find"))
+	(main.contraband as Contraband).detected.connect(func(person: Person, def: ItemDef) -> void:
+		found.call(def)
+		research.note_trial(person, &"find"))
 	(main.vehicle_gates as VehicleGates).found.connect(func(def: ItemDef) -> void:
 		found.call(def)
 		counters.add(&"delivery_smuggling_found"))
@@ -137,6 +148,21 @@ static func _count(main: Node) -> void:
 			counters.add(&"calm_day"))
 
 
+## Wing trials report through the in-tray.
+static func _trials(main: Node) -> void:
+	var research: Research = main.research
+	var in_tray: InTray = main.in_tray
+	(main.prison_tray as PrisonTray).research = research
+	for def in research.board.cards:
+		if def.trial:
+			in_tray.defs.append(PrisonTray.trial(def))
+	research.trial_report.connect(func(def: ResearchCardDef, words: String) -> void:
+		in_tray.post_about(in_tray.find(StringName("trial_%s" % def.id)), 0, words)
+		var toasts := main.get_node_or_null("/root/Toasts")
+		if not main.attract and toasts != null:
+			toasts.post("Trial report: %s" % def.display_name, "See the in-tray (J) to roll it out, try another wing or shelve it."))
+
+
 ## Hours when night_trouble counts.
 const NIGHT_FROM := 22
 const NIGHT_TO := 6
@@ -157,14 +183,14 @@ static func _effects(main: Node) -> void:
 	modifiers.set_source(&"research", research.modifier_sums())
 	var misconduct: Misconduct = main.misconduct
 	var clock: GameClock = main.clock
-	misconduct.temper_scales.append(func(_person: Person) -> float:
-		var scale := maxf(0.1, Modifiers.scale(modifiers, &"temper_rate"))
+	misconduct.temper_scales.append(func(person: Person) -> float:
+		var scale := maxf(0.1, 1.0 + modifiers.value_for(&"temper_rate", person))
 		var hour := clock.hour()
 		if hour >= NIGHT_FROM or hour < NIGHT_TO:
-			scale *= maxf(0.1, Modifiers.scale(modifiers, &"night_trouble"))
+			scale *= maxf(0.1, 1.0 + modifiers.value_for(&"night_trouble", person))
 		return scale)
-	(main.reform as Reform).progress.gain_scales.append(func() -> float:
-		return Modifiers.scale(modifiers, &"reform_gain"))
+	(main.reform as Reform).progress.gain_scales.append(func(person: Person) -> float:
+		return 1.0 + modifiers.value_for(&"reform_gain", person))
 	(main.standing as Standing).nightly.append(func() -> void:
 		for entry: Array in research.daily_money():
 			(main.ledger as Ledger).add(entry[0], entry[1]))
