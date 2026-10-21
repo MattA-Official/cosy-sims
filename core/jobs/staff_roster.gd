@@ -308,7 +308,11 @@ func job_done(job: Job, worker: Person) -> void:
 
 ## How fast someone works for their level; 1 for anyone not on staff.
 func pace(person: Person) -> float:
-	var record := record_of(person)
+	return work_scale(record_of(person))
+
+
+## How fast someone works for their level and work traits; 1 for nobody.
+func work_scale(record: Record) -> float:
 	if record == null:
 		return 1.0
 	var out := LEVEL_PACE[record.level - 1]

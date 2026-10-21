@@ -726,6 +726,7 @@ func _ready() -> void:
 	office.roster = roster
 	office.desk_work = desk_work
 	add_child(office)
+	claims.extra_dressing = office.pile_dressing
 	training.name = "Training"
 	training.people = people
 	training.jobs = jobs
@@ -1028,6 +1029,7 @@ func _ready() -> void:
 		Toasts.post("%s quit" % record.name, "%s, a %s on the %s shift, has handed in their notice." % [
 				record.first_name(), shifts.role_def(record.role).display_name.to_lower(), record.shift]))
 	inspector.person_lines.append(roster.summary)
+	inspector.person_lines.append(office.pile_words)
 	inspector.person_lines.append(func(person: Person) -> String:
 		return "File: awaiting paperwork, so no parole yet" if MissingFiles.is_missing(person) else "")
 	inspector.person_lines.append(func(person: Person) -> String:

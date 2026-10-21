@@ -14,6 +14,9 @@ var people: People
 var building: Building
 ## For each role id, its def.
 var roles: Dictionary[StringName, StaffRoleDef] = {}
+## (person) -> Array[ObjectDef]: more to set out for someone first, such as
+## the paper stack of their desk work. Optional.
+var extra_dressing: Callable
 
 ## Who has claimed what, as (level, object id).
 var _claims: Dictionary[Person, Vector2i] = {}
@@ -78,7 +81,8 @@ func _dress() -> void:
 	for person: Person in _claims:
 		var key := _claims[person]
 		var things: Array = []
-		for def in (roles[person.role] as StaffRoleDef).dressing:
+		var extra: Array = extra_dressing.call(person) if extra_dressing.is_valid() else []
+		for def: ObjectDef in extra + (roles[person.role] as StaffRoleDef).dressing:
 			things.append([def, PI if def.faces_out else 0.0])
 		building.levels[key.x].set_dressing(key.y, things)
 		now[key] = true

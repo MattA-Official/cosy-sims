@@ -4684,6 +4684,13 @@ func _test_perks() -> void:
 		cheerful.position = warden_person.position
 		_check(rounds.meet(warden_person.level, warden_person) >= 1 and cheerful.moodlets.has(Rounds.MOODLET),
 				"prisoners in a good mood are pleased to meet the warden")
+		var desks: DeskWork = main.desk_work
+		desks.piles.erase(warden.id)
+		_check(office.pile_dressing(warden_person).is_empty(), "an empty pile shows no paper on the desk")
+		desks.add_paperwork(warden.id, DeskWork.OVERLOAD + 10.0)
+		desks.morning(0, 0, [])
+		_check(office.pile_dressing(warden_person) == [office.stacks[2]] and office.pile_words(warden_person).contains("overloaded"),
+				"an overloaded desk has a teetering stack")
 	var box: Suggestions = main.suggestions
 	var tray: InTray = main.in_tray
 	tray.cards.clear()

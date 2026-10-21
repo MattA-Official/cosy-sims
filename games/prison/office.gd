@@ -20,6 +20,8 @@ const LEAST_MINUTES := 15.0
 const CLERKS: Array[StringName] = [&"clerk"]
 ## How much faster a clerk with their perk works.
 const SKILLED_CLERK := 1.25
+## Desk work speed for each point of office quality.
+const OFFICE_QUALITY := 0.03
 
 var people: People
 var claims: Claims
@@ -29,6 +31,10 @@ var shifts: Shifts
 ## Optional: whose pile is whose, and the piles.
 var roster: StaffRoster
 var desk_work: DeskWork
+## Paper stacks for the size of someone's pile (see pile_dressing).
+var stacks: Array[ObjectDef] = [preload("res://games/prison/catalogue/paper_stack_small.tres"),
+		preload("res://games/prison/catalogue/paper_stack_tall.tres"),
+		preload("res://games/prison/catalogue/paper_stack_teetering.tres")]
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -85,15 +91,63 @@ func desk_for(person: Person) -> Array[Vector2i]:
 	return office_desk() if person.role == WARDEN else []
 
 
-## How fast someone gets through desk work: morale helps or hinders, and
-## a clerk's perk helps.
-func desk_speed(record: StaffRoster.Record) -> float:
+## How much desk work someone gets through a minute at their desk: morale,
+## a clerk's perk, and how nice their office is (OFFICE_QUALITY a point of
+## room quality). Their level and work traits already make the minutes go
+## quicker (StaffRoster.pace).
+func desk_speed(record: StaffRoster.Record, desk: Array[Vector2i] = []) -> float:
 	if record == null:
 		return 1.0
 	var speed := 0.8 if record.morale < 30.0 else 1.1 if record.morale > 70.0 else 1.0
+	if not desk.is_empty():
+		speed *= office_factor(desk[0])
 	if CLERKS.has(record.role) and roster != null and roster.has_perk(record):
 		speed *= SKILLED_CLERK
 	return speed
+
+
+## How much an office's quality speeds desk work at a desk in it.
+func office_factor(desk: Vector2i) -> float:
+	var placed := building.object_at(desk)
+	if placed == null or not building.levels.has(desk.x):
+		return 1.0
+	var room := building.levels[desk.x].room_at(Vector2i(placed.centre.floor()))
+	if room == null:
+		return 1.0
+	return clampf(1.0 + OFFICE_QUALITY * people.quality(desk.x, room).score, 0.7, 1.3)
+
+
+## The paper stack on someone's desk: none for an empty pile, small under
+## DeskWork.CLEAR minutes, tall up to DeskWork.OVERLOAD, teetering when
+## overloaded. Clerks show the shared pile.
+func pile_dressing(person: Person) -> Array:
+	var record := roster.record_of(person) if roster != null else null
+	if desk_work == null or (record == null and not CLERKS.has(person.role)):
+		return []
+	var owner := DeskWork.SHARED if CLERKS.has(person.role) else record.id
+	var minutes := desk_work.all_paperwork() if CLERKS.has(person.role) else desk_work.pile_minutes(owner)
+	if minutes <= 0.0:
+		return []
+	if desk_work.is_overloaded(owner):
+		return [stacks[2]]
+	return [stacks[0] if minutes < DeskWork.CLEAR else stacks[1]]
+
+
+## Words about someone's desk work, for the inspector, or "".
+func pile_words(person: Person) -> String:
+	var record := roster.record_of(person) if roster != null else null
+	if desk_work == null or record == null or not desk_workers().has(person) or CLERKS.has(person.role):
+		return ""
+	var parts := PackedStringArray()
+	for kind in DeskWork.ORDER:
+		var minutes := desk_work.pile_minutes(record.id, kind)
+		if minutes > 0.0:
+			parts.append("%s %d" % [String(kind), ceili(minutes)])
+	var total := desk_work.pile_minutes(record.id)
+	if total <= 0.0:
+		return "Desk work: all done"
+	return "Desk work: %d minutes (%s), %s%s" % [ceili(total), ", ".join(parts), DeskWork.time_text(total),
+			"; overloaded, so their bonus is halved" if desk_work.is_overloaded(record.id) else ""]
 
 
 ## Staff on site whose role works at a desk.
@@ -130,7 +184,7 @@ func _post_desk_job(person: Person) -> void:
 	if desk.is_empty():
 		return
 	var record := roster.record_of(person) if roster != null else null
-	var speed := desk_speed(record)
+	var speed := desk_speed(record, desk)
 	var clerk := CLERKS.has(person.role)
 	var pile := 0.0
 	if desk_work != null:
