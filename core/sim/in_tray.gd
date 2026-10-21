@@ -123,6 +123,23 @@ func post(def: TrayCardDef = null) -> Card:
 	return card
 
 
+## Posts an event card about someone in particular, such as a
+## resignation, whatever the tray holds; the roll never picks these.
+func post_about(def: TrayCardDef, subject: int, words: String) -> Card:
+	var card := Card.new()
+	card.id = next_id
+	next_id += 1
+	card.def = def
+	card.subject = subject
+	card.words = words
+	card.posted_day = _day()
+	card.due_day = card.posted_day + def.deadline_days
+	cards.append(card)
+	posted.emit(card)
+	changed.emit()
+	return card
+
+
 ## Answers a card. `by` is &"player", &"clerk" or &"lapsed".
 func answer(card: Card, index: int, by: StringName = &"player") -> void:
 	if not cards.has(card) or index < 0 or index >= card.def.choices.size():
@@ -193,7 +210,7 @@ func _pick() -> TrayCardDef:
 	var pool: Array[TrayCardDef] = []
 	var total := 0.0
 	for def in defs:
-		if def.red_tape > red_tape() or count < def.min_prisoners:
+		if def.weight <= 0.0 or def.red_tape > red_tape() or count < def.min_prisoners:
 			continue
 		if recent.has(def.id) and today - recent[def.id] < REPEAT_DAYS:
 			continue

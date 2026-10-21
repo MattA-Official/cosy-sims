@@ -30,6 +30,21 @@ static func all() -> Array[DepartmentDef]:
 	return _all
 
 
+## The ways a warden may work, each with a small bonus while they're in
+## charge. Applicants for warden each have one.
+static func warden_styles() -> Array:
+	return [
+		{"id": &"green_fingers", "name": "Green fingers", "words": "Good moments last 10% longer",
+				"bonus": {&"good_moodlet_time": 0.1}},
+		{"id": &"stickler", "name": "Stickler", "words": "Guards search 10% faster", "bonus": {&"search_speed": 0.1}},
+		{"id": &"soft_touch", "name": "Soft touch", "words": "Course exams 5% likelier to pass",
+				"bonus": {&"course_pass": 0.05}},
+		{"id": &"penny_pincher", "name": "Penny pincher", "words": "Wages and food cost 3% less",
+				"bonus": {&"running_costs": -0.03}},
+		{"id": &"old_hand", "name": "Old hand", "words": "Hire cards 25% quicker", "bonus": {&"hire_speed": 0.25}},
+	]
+
+
 static func roles() -> Array[StaffRoleDef]:
 	var out: Array[StaffRoleDef] = []
 	for def in all():

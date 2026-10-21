@@ -275,13 +275,23 @@ func _list_staff() -> void:
 		var role := shifts.role_def(record.role)
 		var words := "%s, %s shift, level %d. %s a day. Morale %d.%s" % [role.display_name if role != null else String(record.role),
 				record.shift, record.level, Ledger.text(roster.day_pay(record)), roundi(record.morale),
-				" Off sick today." if roster.is_off(record) else ""]
+				" Away (%s) until day %d." % [record.away if not record.away.is_empty() else "off", record.off_until]
+				if record.off_until >= (roster.clock.day() if roster.clock != null else 1) else ""]
 		var raise := Button.new()
 		raise.text = "Raise"
 		raise.focus_mode = FOCUS_NONE
 		raise.tooltip_text = "Pay them %d%% more, which lifts their morale." % roundi(StaffRoster.RAISE * 100.0)
 		raise.pressed.connect(func() -> void:
 			roster.raise(record)
+			refresh())
+		var course := Button.new()
+		course.text = "Course"
+		course.focus_mode = FOCUS_NONE
+		course.tooltip_text = "Send them on a course: %s, away tomorrow, and they come back with experience." \
+				% Ledger.text(StaffRoster.COURSE_FEE)
+		course.disabled = record.off_until >= (roster.clock.day() if roster.clock != null else 1)
+		course.pressed.connect(func() -> void:
+			roster.send_on_course(record)
 			refresh())
 		var dismiss := Button.new()
 		dismiss.text = "Let go"
@@ -290,7 +300,7 @@ func _list_staff() -> void:
 		dismiss.pressed.connect(func() -> void:
 			roster.dismiss(record)
 			refresh())
-		var row := _person_row(record, words, [raise, dismiss])
+		var row := _person_row(record, words, [course, raise, dismiss])
 		if record.morale < StaffRoster.QUIT_MORALE + 10.0:
 			row.get_child(0).get_child(1).add_theme_color_override(&"font_color", Color(0.75, 0.35, 0.32))
 		_payroll_box.add_child(row)
@@ -309,6 +319,9 @@ func _person_row(record: StaffRoster.Record, words: String, buttons: Array) -> H
 	text.add_child(about)
 	if not record.traits.is_empty():
 		text.add_child(_note(", ".join(record.traits.map(func(t: TraitDef) -> String: return t.display_name))))
+	var style := roster.style_of(record)
+	if not style.is_empty():
+		text.add_child(_note("%s: %s" % [style["name"], String(style["words"]).to_lower()]))
 	row.add_child(text)
 	for button: Button in buttons:
 		button.size_flags_vertical = SIZE_SHRINK_CENTER

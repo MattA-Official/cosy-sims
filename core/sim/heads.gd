@@ -134,7 +134,7 @@ func start_hire(department: DepartmentDef) -> bool:
 	if not why_not(department).is_empty():
 		return false
 	desk_work.add(warden().id, &"research", "Hire card: %s" % department.head_role.display_name,
-			department.hire_minutes, String(department.id))
+			department.hire_minutes / Modifiers.scale(modifiers, &"hire_speed"), String(department.id))
 	return true
 
 
@@ -174,10 +174,18 @@ func morning() -> void:
 	desk_work.morning(prisoners.call() if prisoners.is_valid() else 0, record.id if record != null else 0, head_ids())
 
 
-## Each department's bonus, by whether it has a head and how their desk is.
+## Each department's bonus, by whether it has a head and how their desk is,
+## and the bonus of each member of staff's style, such as the warden's.
 func refresh_bonuses() -> void:
 	if modifiers == null:
 		return
+	for id: StringName in modifiers.sources.keys():
+		if String(id).begins_with("style_"):
+			modifiers.clear_source(id)
+	for record in roster.records:
+		var style := roster.style_of(record)
+		if not style.is_empty():
+			modifiers.set_source(StringName("style_%d" % record.id), style["bonus"])
 	for department in departments:
 		var record := head(department)
 		if record == null:

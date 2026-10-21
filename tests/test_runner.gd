@@ -4512,6 +4512,16 @@ func _test_heads() -> void:
 				"the warden has a desk job of their own")
 	heads.let_go(head)
 	_check(heads.head(security) == null and modifiers.value(&"search_speed") == 0.0, "letting a head go ends the bonus")
+	warden.style = &"stickler"
+	heads.refresh_bonuses()
+	_check(is_equal_approx(modifiers.value(&"search_speed"), 0.1), "a stickler warden has guards search faster")
+	warden.style = &"old_hand"
+	heads.refresh_bonuses()
+	_check(modifiers.value(&"search_speed") == 0.0 and heads.start_hire(medical) == heads.available(medical)
+			and (heads.hire_card() == null or heads.hire_card().total < medical.hire_minutes), "an old hand works hire cards quicker")
+	warden.style = &""
+	heads.cancel_hire()
+	heads.refresh_bonuses()
 	# Clerks take the biggest paperwork pile first.
 	desk_work.add_paperwork(warden.id, 100.0)
 	desk_work.add_paperwork(77, 30.0)
@@ -4583,6 +4593,19 @@ func _test_in_tray() -> void:
 	_check(book.queued == 0 and desk_work.pile_minutes(DeskWork.SHARED) > 0.0, "with a rule, the clerk takes the card")
 	desk_work.work_paperwork(desk_work.all_paperwork())
 	_check(not tray.cards.has(book) and tray.history.back().ends_with("(clerk)"), "and answers it after some desk work")
+	var unhappy: StaffRoster.Record = roster.take_on(&"cook", &"day")
+	unhappy.morale = 0.0
+	unhappy.low_days = StaffRoster.QUIT_DAYS
+	roster.nightly()
+	var letters := tray.cards.filter(func(c: InTray.Card) -> bool: return c.def.id == &"resignation")
+	_check(letters.size() == 1 and roster.records.has(unhappy), "someone unhappy writes a letter rather than just going")
+	var wage := unhappy.wage
+	tray.answer(letters[0], 1)
+	_check(roster.records.has(unhappy) and unhappy.wage > wage and not unhappy.resigning, "a raise keeps them on")
+	balance = ledger.balance
+	var xp := unhappy.xp
+	_check(roster.send_on_course(unhappy) and ledger.balance == balance - StaffRoster.COURSE_FEE
+			and unhappy.xp > xp and roster.next_in(&"cook", &"day") != unhappy, "a course costs a fee, adds experience and takes them away")
 	var spicy := tray.post(tray.find(&"spicy"))
 	var saved := tray.capture()
 	tray.cards.clear()
@@ -4631,8 +4654,13 @@ func _test_staff_roster() -> void:
 	roster.quit.connect(func(r: StaffRoster.Record) -> void: quit.append(r))
 	for i in 25:
 		roster.nightly()
+	var tray: InTray = main.in_tray
+	var letter: Array = tray.cards.filter(func(c: InTray.Card) -> bool: return c.def.id == &"resignation" and c.subject == cook.id)
+	_check(letter.size() == 1, "badly paid and miserable, they write a resignation letter")
+	if not letter.is_empty():
+		tray.answer(letter[0], 0)
 	shifts.balance()
-	_check(quit.has(cook) and not roster.records.has(cook) and cook.person.going_home, "badly paid and miserable, they quit")
+	_check(quit.has(cook) and not roster.records.has(cook) and cook.person.going_home, "accepting it, they go")
 	_check(roster.applicants.all(func(a: StaffRoster.Record) -> bool: return a.until >= (main.clock as GameClock).day()),
 			"applicants wait a few days")
 	var names: Array = roster.records.map(func(r: StaffRoster.Record) -> String: return r.name)

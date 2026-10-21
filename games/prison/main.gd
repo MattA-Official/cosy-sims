@@ -403,6 +403,7 @@ func _ready() -> void:
 	roster.name = "StaffRoster"
 	roster.people = people
 	roster.roles = PrisonCatalogue.all_roles()
+	roster.styles[&"warden"] = PrisonDepartments.warden_styles()
 	roster.shifts = PrisonCatalogue.SHIFTS
 	roster.trait_pool.assign(PrisonCatalogue.TRAITS.filter(func(t: TraitDef) -> bool: return t.id != &"light_fingered"))
 	roster.clock = clock
@@ -753,6 +754,7 @@ func _ready() -> void:
 	add_child(prison_tray)
 	in_tray.name = "InTray"
 	in_tray.defs = PrisonTray.cards()
+	in_tray.defs.append(PrisonTray.resignation())
 	in_tray.desk_work = desk_work
 	in_tray.prisoners = heads.prisoners
 	in_tray.has_clerk = func() -> bool: return roster.records.any(func(r: StaffRoster.Record) -> bool:
@@ -762,6 +764,11 @@ func _ready() -> void:
 	in_tray.clock = clock
 	add_child(in_tray)
 	in_tray.start()
+	roster.resign = func(record: StaffRoster.Record) -> void:
+		in_tray.post_about(in_tray.find(&"resignation"), record.id, prison_tray.staff_words(record))
+		if not attract:
+			Toasts.post("A resignation letter", "%s wants to leave. Answer in the in-tray (J)." % record.name)
+	roster.charge = func(amount: int, line: String) -> void: ledger.add(-amount, line)
 	in_tray.answered.connect(func(card: InTray.Card, choice: TrayChoiceDef, by: StringName) -> void:
 		var words := PrisonTray.why(card, choice)
 		in_tray.note(words + (" (lapsed)" if by == &"lapsed" else " (clerk)" if by == &"clerk" else ""))

@@ -14,6 +14,9 @@ extends Node
 ## of experience, and LEVEL_XP points make each level, which works faster
 ## (LEVEL_PACE) and is paid WAGE_STEP more a level. Low morale brings sick
 ## days: each night, under SICK_LINE, a chance of a day off tomorrow.
+## With a `resign` handler, someone unhappy for QUIT_DAYS writes a letter
+## instead of just going (see resign_answer). Staff can be sent on a course
+## for COURSE_FEE: away tomorrow, back with COURSE_XP.
 
 signal changed
 ## Someone handed in their notice and won't be back.
@@ -45,6 +48,11 @@ const WAGE_STEP := 0.05
 ## of a sick day tomorrow.
 const SICK_LINE := 40.0
 const SICK_CHANCE := 0.005
+const COURSE_FEE := 200
+const COURSE_XP := 1.5
+## A resignation answered with a raise: this much more pay.
+const KEEP_RAISE := 0.2
+const LEAVE_DAYS := 3
 
 ## One member of staff, or an applicant hoping to be.
 class Record:
@@ -60,8 +68,14 @@ class Record:
 	var look_seed := 0
 	var level := 1
 	var xp := 0.0
-	## Off sick through this day.
+	## Away (sick, on a course or on leave) through this day.
 	var off_until := 0
+	## Why they're away, such as "off sick".
+	var away := ""
+	## Has written a resignation letter that's waiting for an answer.
+	var resigning := false
+	## Their way of working, for roles with styles (see `styles`), or &"".
+	var style: StringName = &""
 	## An applicant's last day of waiting.
 	var until := 0
 	## On site now, or null; and on their way in by car or bus.
@@ -81,6 +95,15 @@ var shifts: Array[ShiftDef] = []
 var trait_pool: Array[TraitDef] = []
 ## (amount) -> void: pays notice to someone let go. Optional.
 var pay: Callable
+## (amount: int, line: String) -> void: pays a course fee. Optional.
+var charge: Callable
+## (record) -> void: someone unhappy writes a resignation letter. Without
+## it, they just quit.
+var resign: Callable
+## Ways of working applicants for a role may have, each with a bonus while
+## they're on the payroll: role -> [{id, name, words, bonus}], such as the
+## warden's "Stickler: guards search 10% faster".
+var styles: Dictionary[StringName, Array] = {}
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -133,6 +156,57 @@ func next_in(role: StringName, shift: StringName) -> Record:
 ## Whether someone is off sick today.
 func is_off(record: Record) -> bool:
 	return record.off_until >= _day()
+
+
+## Sends someone on a course: they're away tomorrow and come back with
+## COURSE_XP. Returns whether they went.
+func send_on_course(record: Record) -> bool:
+	if not records.has(record) or is_off(record) or record.off_until > _day():
+		return false
+	if charge.is_valid():
+		charge.call(COURSE_FEE, "Training")
+	record.off_until = _day() + 1
+	record.away = "on a course"
+	add_xp(record, COURSE_XP)
+	return true
+
+
+## Answers a resignation letter: &"accept" lets them go (no notice),
+## &"raise" keeps them with KEEP_RAISE more pay, &"leave" gives them
+## LEAVE_DAYS off.
+func resign_answer(record: Record, answer: StringName) -> void:
+	record.resigning = false
+	match answer:
+		&"accept":
+			if records.has(record):
+				records.erase(record)
+				quit.emit(record)
+		&"raise":
+			record.wage = roundi(record.wage * (1.0 + KEEP_RAISE) / 5.0) * 5
+			record.morale = minf(record.morale + 20.0, 100.0)
+			record.low_days = 0
+		&"leave":
+			record.off_until = _day() + LEAVE_DAYS
+			record.away = "on leave"
+			record.morale = minf(record.morale + 15.0, 100.0)
+			record.low_days = 0
+	changed.emit()
+
+
+## Gives an applicant one of their role's styles, if it has any. Staff
+## taken on without applying (samples, old saves) have none.
+func _pick_style(record: Record) -> void:
+	var pool: Array = styles.get(record.role, [])
+	if not pool.is_empty():
+		record.style = pool[_rng.randi() % pool.size()]["id"]
+
+
+## A record's style entry ({id, name, words, bonus}), or an empty one.
+func style_of(record: Record) -> Dictionary:
+	for entry: Dictionary in styles.get(record.role, []):
+		if entry["id"] == record.style:
+			return entry
+	return {}
 
 
 ## Experience for someone, levelling them up as they pass each line.
@@ -258,11 +332,16 @@ func nightly() -> void:
 		record.mood_sum = 0.0
 		record.mood_hours = 0
 		record.low_days = record.low_days + 1 if record.morale < QUIT_MORALE else 0
-		if record.low_days >= QUIT_DAYS:
+		if record.low_days >= QUIT_DAYS and resign.is_valid():
+			if not record.resigning:
+				record.resigning = true
+				resign.call(record)
+		elif record.low_days >= QUIT_DAYS:
 			records.erase(record)
 			quit.emit(record)
-		elif _rng.randf() < maxf(0.0, (SICK_LINE - record.morale) * SICK_CHANCE):
+		elif not is_off(record) and _rng.randf() < maxf(0.0, (SICK_LINE - record.morale) * SICK_CHANCE):
 			record.off_until = _day()
+			record.away = "off sick"
 			off_sick.emit(record)
 	refresh_applicants()
 	changed.emit()
@@ -282,6 +361,7 @@ func refresh_applicants() -> void:
 			var want := _rng.randi_range(APPLICANTS.x, APPLICANTS.y)
 			for i in want - waiting:
 				var applicant := _make(def.id, shift.id)
+				_pick_style(applicant)
 				applicant.until = today + APPLICANT_DAYS - 1
 				applicants.append(applicant)
 	changed.emit()
@@ -290,6 +370,7 @@ func refresh_applicants() -> void:
 ## A new applicant for a role and shift, waiting `days` days.
 func add_applicant(role: StringName, shift: StringName, days := APPLICANT_DAYS) -> Record:
 	var applicant := _make(role, shift)
+	_pick_style(applicant)
 	applicant.until = _day() + days - 1
 	applicants.append(applicant)
 	changed.emit()
@@ -366,7 +447,8 @@ func _data(record: Record) -> Dictionary:
 			"morale": record.morale, "low_days": record.low_days, "hired_day": record.hired_day,
 			"look_seed": record.look_seed, "until": record.until, "mood_sum": record.mood_sum,
 			"mood_hours": record.mood_hours, "level": record.level, "xp": record.xp,
-			"off_until": record.off_until}
+			"off_until": record.off_until, "away": record.away, "resigning": record.resigning,
+			"style": record.style}
 
 
 func _from(entry: Dictionary) -> Record:
@@ -390,6 +472,9 @@ func _from(entry: Dictionary) -> Record:
 	record.level = entry.get("level", 1)
 	record.xp = entry.get("xp", 0.0)
 	record.off_until = entry.get("off_until", 0)
+	record.away = entry.get("away", "")
+	record.resigning = entry.get("resigning", false)
+	record.style = StringName(entry.get("style", ""))
 	next_id = maxi(next_id, record.id + 1)
 	return record
 

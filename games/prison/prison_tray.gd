@@ -10,6 +10,7 @@ extends Node
 ##   {"raise": true}                      the card's member of staff gets a raise
 ##   {"day_off": true}                    they stay home tomorrow
 ##   {"paperwork": 60}                    on the warden's desk
+##   {"resign": &"raise"}                 answers a resignation (StaffRoster.resign_answer)
 
 const PRISONER := &"prisoner"
 
@@ -112,6 +113,24 @@ static func cards() -> Array[TrayCardDef]:
 	return out
 
 
+## The letter someone unhappy writes; posted by the roster, not the roll.
+static func resignation() -> TrayCardDef:
+	var def := TrayCardDef.make(&"resignation", &"resignation", &"staff", "A resignation letter",
+			"{who} has written to say they're not happy here and would like to leave.",
+			[TrayCardDef.choice("Accept it", [{"resign": &"accept"}], [&"decline"], "{who} left."),
+			TrayCardDef.choice("Offer a raise (20%)", [{"resign": &"raise"}], [&"approve"], "{who} stayed for a raise."),
+			TrayCardDef.choice("Offer %d days' leave" % StaffRoster.LEAVE_DAYS, [{"resign": &"leave"}], [], "{who} took some leave.")], 0)
+	def.weight = 0.0
+	def.deadline_days = 3
+	return def
+
+
+## Words for a member of staff, such as "Dot the cook".
+func staff_words(record: StaffRoster.Record) -> String:
+	var role := roster._role(record.role)
+	return "%s the %s" % [record.first_name(), role.display_name.to_lower() if role != null else "staff member"]
+
+
 ## Picks who a card is about. False when nobody fits.
 func pick_subject(card: InTray.Card) -> bool:
 	match card.def.subject:
@@ -127,8 +146,7 @@ func pick_subject(card: InTray.Card) -> bool:
 				return false
 			var record: StaffRoster.Record = roster.records[_rng.randi() % roster.records.size()]
 			card.subject = record.id
-			var role := roster._role(record.role)
-			card.words = "%s the %s" % [record.first_name(), role.display_name.to_lower() if role != null else "staff member"]
+			card.words = staff_words(record)
 	return true
 
 
@@ -154,6 +172,8 @@ func apply(card: InTray.Card, choice: TrayChoiceDef) -> void:
 			roster.raise(_record(card.subject))
 		if effect.has("day_off") and _record(card.subject) != null:
 			_record(card.subject).off_until = clock.day() + 1 if clock != null else 2
+		if effect.has("resign") and _record(card.subject) != null:
+			roster.resign_answer(_record(card.subject), effect.resign)
 		if effect.has("paperwork") and heads != null and heads.warden() != null:
 			desk_work.add_paperwork(heads.warden().id, effect.paperwork)
 
