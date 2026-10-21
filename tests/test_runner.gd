@@ -98,6 +98,7 @@ func _process(_delta: float) -> bool:
 	_test_build_feel()
 	_test_blueprints()
 	_test_regime()
+	_test_heads()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4462,6 +4463,55 @@ func _test_regime() -> void:
 	again.free()
 	regime.free()
 	clock.free()
+
+
+func _test_heads() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var heads: Heads = main.heads
+	var desk_work: DeskWork = main.desk_work
+	var modifiers: Modifiers = main.modifiers
+	var warden := heads.warden()
+	_check(warden != null, "the classroom prison has a warden on the roster")
+	var security := heads.find(&"security")
+	var medical := heads.find(&"medical")
+	_check(heads.available(heads.find(&"education")), "a classroom brings the Head of Learning's hire card")
+	heads.morning()
+	var prisoners: int = heads.prisoners.call()
+	_check(is_equal_approx(desk_work.pile_minutes(warden.id, &"paperwork"), prisoners * 2.0),
+			"light red tape: two minutes of paperwork a prisoner for the warden")
+	_check(heads.start_hire(security) and heads.hiring() == security, "the warden takes on the security hire card")
+	_check(not heads.start_hire(medical), "one hire card at a time")
+	_check(desk_work.items(warden.id, &"research")[0] == desk_work.piles[warden.id].back(), "paperwork comes before the card")
+	desk_work.work(warden.id, desk_work.pile_minutes(warden.id))
+	var applicants := heads.applicants(security)
+	_check(applicants.size() == Heads.APPLICANTS and heads.hiring() == null, "a finished hire card brings two applicants")
+	var head := heads.hire(applicants[0])
+	_check(head != null and heads.head(security) == head and heads.applicants(security).is_empty(),
+			"taking one on sends the other home")
+	_check(is_equal_approx(modifiers.value(&"search_speed"), 0.1), "the Chief of Security's bonus counts")
+	desk_work.add_paperwork(head.id, DeskWork.OVERLOAD + 60.0)
+	desk_work.morning(0, 0, [])
+	_check(desk_work.is_overloaded(head.id) and is_equal_approx(modifiers.value(&"search_speed"), 0.05),
+			"an overloaded head gives half their bonus")
+	desk_work.work(head.id, 400.0)
+	_check(not desk_work.is_overloaded(head.id) and is_equal_approx(modifiers.value(&"search_speed"), 0.1),
+			"and all of it once the pile is down")
+	var saved := desk_work.capture()
+	desk_work.add(head.id, &"research", "Something", 30.0, "x")
+	desk_work.restore(saved)
+	_check(desk_work.items(head.id, &"research").is_empty(), "desk piles save and load")
+	var clock: GameClock = main.clock
+	clock.advance(5.0)
+	var jobs: JobBoard = main.jobs
+	var on_site: Array = (main.people as People).people.filter(func(p: Person) -> bool: return p.role == &"warden")
+	if not on_site.is_empty():
+		_check(jobs.of_kind(Office.DESK_JOB).any(func(j: Job) -> bool: return j.only_for == on_site[0]),
+				"the warden has a desk job of their own")
+	heads.let_go(head)
+	_check(heads.head(security) == null and modifiers.value(&"search_speed") == 0.0, "letting a head go ends the bonus")
+	main.queue_free()
 
 
 func _test_staff_roster() -> void:

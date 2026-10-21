@@ -100,6 +100,8 @@ const SURNAMES: Array[String] = ["Abbott", "Blythe", "Crumb", "Dimble", "Ellery"
 	preload("res://core/ui/faces/fed_up.svg"), preload("res://core/ui/faces/angry.svg"),
 ]
 
+## Bonuses, such as good moodlets lasting longer. Optional.
+var modifiers: Modifiers
 var building: Building:
 	set(value):
 		building = value
@@ -572,7 +574,10 @@ func add_moodlet(person: Person, id: StringName) -> void:
 		id = t.moodlet_swaps.get(id, id)
 	var def: MoodletDef = moodlet_defs.get(id)
 	if def != null:
-		person.moodlets[id] = def.hours * 60.0
+		var hours := def.hours
+		if def.mood > 0.0:
+			hours *= Modifiers.scale(modifiers, &"good_moodlet_time")
+		person.moodlets[id] = hours * 60.0
 		moodlet_added.emit(person, id)
 
 

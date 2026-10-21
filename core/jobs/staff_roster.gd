@@ -219,7 +219,7 @@ func refresh_applicants() -> void:
 	applicants = applicants.filter(func(a: Record) -> bool: return a.until >= today)
 	for def in roles:
 		for shift in shifts:
-			if not def.works(shift.id):
+			if def.by_card or not def.works(shift.id):
 				continue
 			var waiting := applicants.filter(func(a: Record) -> bool:
 					return a.role == def.id and a.shift == shift.id).size()
@@ -229,6 +229,15 @@ func refresh_applicants() -> void:
 				applicant.until = today + APPLICANT_DAYS - 1
 				applicants.append(applicant)
 	changed.emit()
+
+
+## A new applicant for a role and shift, waiting `days` days.
+func add_applicant(role: StringName, shift: StringName, days := APPLICANT_DAYS) -> Record:
+	var applicant := _make(role, shift)
+	applicant.until = _day() + days - 1
+	applicants.append(applicant)
+	changed.emit()
+	return applicant
 
 
 func applicants_for(role: StringName, shift: StringName) -> Array[Record]:

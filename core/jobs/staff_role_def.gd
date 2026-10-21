@@ -14,6 +14,9 @@ extends Resource
 ## The shifts they work, by id, such as only days for office roles; empty
 ## for any shift.
 @export var only_shifts: Array[StringName] = []
+## Hired only through a card (such as a department head's), so no
+## applicants turn up for it by themselves.
+@export var by_card := false
 ## Pay for a day shift; other shifts scale it (see ShiftDef.pay_scale).
 @export var wage := 0
 @export var outfit_colour := Color(0.27, 0.36, 0.52)

@@ -14,6 +14,8 @@ const GOODS_PRICE := 30
 ## One crate makes a batch of meals (Kitchen.MEALS_PER_BATCH).
 const CRATE_PRICE := 40
 
+## Bonuses such as a department head's. Optional.
+var modifiers: Modifiers
 var ledger: Ledger
 var people: People
 var shifts: Shifts
@@ -32,7 +34,7 @@ var clock: GameClock:
 var kitchen: Kitchen:
 	set(value):
 		kitchen = value
-		kitchen.delivered.connect(func(count: int) -> void: ledger.add(-count * CRATE_PRICE, "Food"))
+		kitchen.delivered.connect(func(count: int) -> void: ledger.add(-roundi(count * CRATE_PRICE * Modifiers.scale(modifiers, &"running_costs")), "Food"))
 var workshop: Workshop:
 	set(value):
 		workshop = value
@@ -41,7 +43,7 @@ var workshop: Workshop:
 
 ## Wages for a shift's staff, as it starts.
 func shift_wages(shift: ShiftDef) -> int:
-	return roundi(shifts.wage_bill(shift.id) * shift.pay_scale * wage_scale)
+	return roundi(shifts.wage_bill(shift.id) * shift.pay_scale * wage_scale * Modifiers.scale(modifiers, &"running_costs"))
 
 
 ## The grant for today's prisoners, by their category.

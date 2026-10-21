@@ -1,8 +1,8 @@
 class_name SettingsWindow
 extends PanelContainer
 ## How the game plays and sounds: difficulty, sentence length, instant
-## building and volumes. Changing difficulty starts the Ministry's counts
-## again. Toggle with F4.
+## building, red tape and volumes. Changing difficulty starts the
+## Ministry's counts again. Toggle with F4.
 
 ## A volume slider per sound bus: [bus, words].
 const VOLUMES := [[&"Master", "All sound"], [&"Effects", "Building and the prison"],
@@ -10,6 +10,7 @@ const VOLUMES := [[&"Master", "All sound"], [&"Effects", "Building and the priso
 
 var standing: Standing
 var blueprints: Blueprints
+var desk_work: DeskWork
 var sentences: Sentences
 
 var _difficulty := OptionButton.new()
@@ -17,6 +18,7 @@ var _about := Label.new()
 var _length := OptionButton.new()
 var _worries := Label.new()
 var _instant := CheckButton.new()
+var _red_tape := OptionButton.new()
 
 
 func _ready() -> void:
@@ -70,6 +72,14 @@ func _ready() -> void:
 		if blueprints != null:
 			blueprints.instant = on)
 	box.add_child(_row("Instant building", _instant))
+	for words in ["Off", "Light", "Full"]:
+		_red_tape.add_item(words)
+	_red_tape.focus_mode = FOCUS_NONE
+	_red_tape.tooltip_text = "How much paperwork lands on the warden's and heads' desks each morning, per prisoner. Off: none. Light: 2 minutes for the warden, 1 for each head. Full: twice that."
+	_red_tape.item_selected.connect(func(index: int) -> void:
+		if desk_work != null:
+			desk_work.red_tape = index as DeskWork.RedTape)
+	box.add_child(_row("Red tape", _red_tape))
 	box.add_child(HSeparator.new())
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()
@@ -113,3 +123,5 @@ func refresh() -> void:
 		_length.select(sentences.length)
 	if blueprints != null:
 		_instant.set_pressed_no_signal(blueprints.instant)
+	if desk_work != null:
+		_red_tape.select(desk_work.red_tape)

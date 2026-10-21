@@ -45,6 +45,8 @@ var room_checks: Array[Callable] = []
 ## When set, its operation times are used instead of the hour above (main
 ## passes on Regime.operation_due).
 var regime: Regime
+## Bonuses such as a department head's. Optional.
+var modifiers: Modifiers
 var clock: GameClock:
 	set(value):
 		clock = value
@@ -102,7 +104,7 @@ func _cell_job(level: int, room: Room) -> Job:
 	var map: BuildingMap = people.building.levels.get(level)
 	var tile := map.clear_cell(room) if map != null else room.cells[room.cells.size() / 2]
 	var look := Job.on_tile(Job.Do.WORK, level, tile)
-	look.minutes = CELL_MINUTES
+	look.minutes = CELL_MINUTES / Modifiers.scale(modifiers, &"search_speed")
 	look.doing = "Searching"
 	look.finish = func(_stage: Job.Stage, _guard: Person) -> void: _search_room(level, room)
 	job.stages = [look]

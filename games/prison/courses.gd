@@ -40,6 +40,8 @@ var runner: ScheduleRunner
 ## Places sessions in the week. Optional: without it, classes run in every
 ## block that holds them.
 var regime: Regime
+## Bonuses such as a department head's. Optional.
+var modifiers: Modifiers
 var reform: Progress
 var prisoner_group: StringName = &"prisoner"
 var defs: Array[CourseDef] = []
@@ -298,6 +300,8 @@ func pass_chance(person: Person, course: CourseDef) -> float:
 		chance += course.trait_bonus.get(t.id, 0.0)
 	if person.mood < LOW_MOOD:
 		chance -= LOW_MOOD_PENALTY
+	if modifiers != null:
+		chance += modifiers.value(&"course_pass")
 	return clampf(chance, PASS_MIN, PASS_MAX)
 
 

@@ -2,24 +2,33 @@ class_name Office
 extends Node
 ## The warden's office. A warden on the staff and an office with a desk to
 ## work at unlock the intake settings, grant goals and the daily report.
-## While on shift the warden sits at the office desk.
+## Everyone who works at a desk (the warden and the department heads) has
+## a job to sit at it, working through their pile of desk work (DeskWork)
+## while on shift.
 
 const OFFICE := &"office"
 const DESKS: Array[StringName] = [&"office_desk"]
 const WARDEN := &"warden"
-## Game minutes the warden works at the desk before the job comes round
-## again, when they may take a break.
+## The job kind of desk work.
+const DESK_JOB := &"office"
+## Game minutes at the desk before the job comes round again, when they
+## may take a break.
 const DESK_MINUTES := 120.0
+## Shortest sit for a small pile.
+const LEAST_MINUTES := 15.0
 
 var people: People
 var claims: Claims
 var jobs: JobBoard
 var building: Building
 var shifts: Shifts
+## Optional: whose pile is whose, and the piles.
+var roster: StaffRoster
+var desk_work: DeskWork
 var clock: GameClock:
 	set(value):
 		clock = value
-		clock.minute_passed.connect(func(_minute: int) -> void: _man_desk())
+		clock.minute_passed.connect(func(_minute: int) -> void: _man_desks())
 
 
 ## Whether a warden is employed and has an office to work from.
@@ -59,26 +68,82 @@ func missing() -> String:
 ## office desk.
 func warden_desk() -> Array[Vector2i]:
 	for person in people.people:
-		if person.role == WARDEN and claims != null and claims.claim_of(person) != Person.NO_OBJECT:
-			return [claims.claim_of(person)]
+		if person.role == WARDEN:
+			return desk_for(person)
 	return office_desk()
 
 
-## Keeps a job on the board for the warden to work at their desk.
-func _man_desk() -> void:
-	var desk := warden_desk()
-	for job in jobs.of_kind(&"office"):
+## Someone's desk: the one they've claimed, or for the warden any office
+## desk. Empty for none.
+func desk_for(person: Person) -> Array[Vector2i]:
+	if claims != null and claims.claim_of(person) != Person.NO_OBJECT:
+		return [claims.claim_of(person)]
+	return office_desk() if person.role == WARDEN else []
+
+
+## How fast someone gets through desk work: morale helps or hinders.
+func desk_speed(record: StaffRoster.Record) -> float:
+	if record == null:
+		return 1.0
+	return 0.8 if record.morale < 30.0 else 1.1 if record.morale > 70.0 else 1.0
+
+
+## Staff on site whose role works at a desk.
+func desk_workers() -> Array[Person]:
+	var out: Array[Person] = []
+	for person in people.people:
+		if person.role.is_empty() or person.going_home:
+			continue
+		var role: StaffRoleDef = claims.roles.get(person.role) if claims != null else null
+		if (role != null and role.job_kinds.has(DESK_JOB)) or person.role == WARDEN:
+			out.append(person)
+	return out
+
+
+## Keeps a job on the board for each desk worker to sit at their desk.
+func _man_desks() -> void:
+	var workers := desk_workers()
+	var covered: Array[Person] = []
+	for job in jobs.of_kind(DESK_JOB):
+		var who := job.only_for
 		var stage := job.stages[0]
-		if desk.is_empty() or Vector2i(stage.level, stage.object) != desk[0]:
+		var desk := desk_for(who) if who != null else ([] as Array[Vector2i])
+		if who == null or not workers.has(who) or desk.is_empty() or Vector2i(stage.level, stage.object) != desk[0]:
 			jobs.cancel(job)
-	if desk.is_empty() or not jobs.of_kind(&"office").is_empty():
+		else:
+			covered.append(who)
+	for person in workers:
+		if not covered.has(person):
+			_post_desk_job(person)
+
+
+func _post_desk_job(person: Person) -> void:
+	var desk := desk_for(person)
+	if desk.is_empty():
 		return
+	var record := roster.record_of(person) if roster != null else null
+	var speed := desk_speed(record)
+	var pile := desk_work.pile_minutes(record.id) if record != null and desk_work != null else 0.0
 	var job := Job.new()
-	job.kind = &"office"
-	job.title = "Run the prison"
+	job.kind = DESK_JOB
+	job.only_for = person
+	job.title = "Desk work" if person.role != WARDEN else "Run the prison"
 	job.priority = 2
 	var sit := Job.at(Job.Do.WORK, desk[0].x, desk[0].y)
-	sit.minutes = DESK_MINUTES
-	sit.doing = "Running the prison"
+	sit.minutes = clampf(pile / speed, LEAST_MINUTES, DESK_MINUTES) if pile > 0.0 else DESK_MINUTES
+	sit.doing = _doing(record, person)
+	if record != null and desk_work != null:
+		var owner := record.id
+		sit.finish = func(stage: Job.Stage, _worker: Person) -> void:
+			desk_work.work(owner, stage.minutes * speed)
 	job.stages = [sit]
 	jobs.post(job)
+
+
+func _doing(record: StaffRoster.Record, person: Person) -> String:
+	if record != null and desk_work != null:
+		var pile: Array = desk_work.piles.get(record.id, [])
+		if not pile.is_empty():
+			var top: DeskWork.Item = pile[0]
+			return top.title if top.kind != &"paperwork" else "Doing the paperwork"
+	return "Running the prison" if person.role == WARDEN else "Planning"

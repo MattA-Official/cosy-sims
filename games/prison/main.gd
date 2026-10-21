@@ -40,7 +40,7 @@ const AUTOSAVE_HOUR := 6
 const TITLE_SCENE := "res://games/prison/title.tscn"
 ## The key for each page of the management book.
 const BOOK_KEYS: Dictionary[StringName, StringName] = {&"timetable": &"timetable_toggle",
-		&"staff": &"staff_toggle", &"money": &"money_toggle", &"office": &"office_toggle",
+		&"staff": &"staff_toggle", &"money": &"money_toggle", &"office": &"office_toggle", &"heads": &"heads_toggle",
 		&"security": &"security_toggle", &"programmes": &"programmes_toggle"}
 
 @onready var grid: BuildGrid = $BuildGrid
@@ -115,6 +115,12 @@ var finances := Finances.new()
 var intake := Intake.new()
 ## The warden's office.
 var office := Office.new()
+## Each desk worker's pile of paper.
+var desk_work := DeskWork.new()
+## Bonuses, such as department heads'.
+var modifiers := Modifiers.new()
+## Department heads, hired from the warden's desk.
+var heads := Heads.new()
 ## Desks people have claimed.
 var claims := Claims.new()
 ## The grade, grant goals and the daily report.
@@ -162,6 +168,8 @@ var finance_window := FinanceWindow.new()
 ## Intake, goals and the grade, on O.
 var office_window := OfficeWindow.new()
 var security_window := SecurityWindow.new()
+## Department heads, on H.
+var heads_window := HeadsWindow.new()
 ## Save slots and the autosave, on F2.
 var saves_window := SavesWindow.new()
 ## The bookmarks down the left and the book they open: every management
@@ -382,14 +390,14 @@ func _ready() -> void:
 	workshop.look()
 	shifts.name = "Shifts"
 	shifts.people = people
-	shifts.roles = PrisonCatalogue.ROLES
+	shifts.roles = PrisonCatalogue.all_roles()
 	shifts.shifts = PrisonCatalogue.SHIFTS
 	shifts.start_spot = _staff_spot
 	shifts.clock = clock
 	add_child(shifts)
 	roster.name = "StaffRoster"
 	roster.people = people
-	roster.roles = PrisonCatalogue.ROLES
+	roster.roles = PrisonCatalogue.all_roles()
 	roster.shifts = PrisonCatalogue.SHIFTS
 	roster.trait_pool.assign(PrisonCatalogue.TRAITS.filter(func(t: TraitDef) -> bool: return t.id != &"light_fingered"))
 	roster.clock = clock
@@ -683,7 +691,7 @@ func _ready() -> void:
 	finances.ledger = ledger
 	finances.people = people
 	finances.shifts = shifts
-	for role in PrisonCatalogue.ROLES:
+	for role in PrisonCatalogue.all_roles():
 		finances.roles[role.id] = role
 	finances.categories = PrisonCatalogue.categories()
 	finances.kitchen = kitchen
@@ -702,7 +710,31 @@ func _ready() -> void:
 	office.building = building
 	office.shifts = shifts
 	office.clock = clock
+	office.roster = roster
+	office.desk_work = desk_work
 	add_child(office)
+	desk_work.name = "DeskWork"
+	add_child(desk_work)
+	modifiers.name = "Modifiers"
+	add_child(modifiers)
+	heads.name = "Heads"
+	heads.departments = PrisonDepartments.all()
+	heads.roster = roster
+	heads.desk_work = desk_work
+	heads.modifiers = modifiers
+	heads.building = building
+	heads.prisoners = func() -> int:
+		return people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner").size()
+	heads.pay = func(amount: int) -> void: ledger.add(-amount, "Wages")
+	heads.clock = clock
+	add_child(heads)
+	heads.start()
+	heads.applicants_ready.connect(func(department: DepartmentDef) -> void:
+		if not attract:
+			Toasts.post("Applicants for %s" % department.head_role.display_name,
+					"The hire card is done: pick one on the Heads page (H)."))
+	for system: Object in [people, searching, infirmary, courses, workshop, finances]:
+		system.set(&"modifiers", modifiers)
 	intake.name = "Intake"
 	intake.people = people
 	intake.building = building
@@ -1057,6 +1089,11 @@ func _add_hud() -> void:
 	office_window.searching = searching
 	book.add_page(&"office", "Office", "The warden's office: intake, goals and the grade. O", "office",
 			office_window)
+	heads_window.heads = heads
+	heads_window.desk_work = desk_work
+	heads_window.clock = clock
+	book.add_page(&"heads", "Heads", "Department heads: hire cards, applicants and bonuses. H", "role_warden",
+			heads_window)
 	security_window.security = security
 	security_window.secure_area = secure_area
 	security_window.searching = searching
@@ -1106,6 +1143,7 @@ func _add_hud() -> void:
 	settings_window.standing = standing
 	settings_window.sentences = sentences
 	settings_window.blueprints = blueprints
+	settings_window.desk_work = desk_work
 	pause_menu.clock = clock
 	pause_menu.subtitle = title
 	pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")
@@ -1205,7 +1243,7 @@ func _rota_rows() -> Array:
 	for shift in shifts.shifts:
 		var parts := PackedStringArray()
 		var total := 0
-		for role in PrisonCatalogue.ROLES:
+		for role in PrisonCatalogue.all_roles():
 			var count := shifts.wanted_for(role.id, shift.id)
 			if count > 0:
 				parts.append("%s %d" % [role.display_name, count])

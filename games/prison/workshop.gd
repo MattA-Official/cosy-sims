@@ -26,6 +26,8 @@ var clock: GameClock:
 			look()
 			if hour == Kitchen.DELIVERY_HOUR and regime == null:
 				collect())
+## Bonuses such as a department head's. Optional.
+var modifiers: Modifiers
 var items: ItemStore
 var building: Building
 ## What the workshop makes, one picked at random each time.
@@ -77,7 +79,9 @@ func _make_job(item: ItemDef = null) -> Job:
 	make.minutes = MAKE_MINUTES
 	make.doing = "Making a %s" % item.display_name.to_lower()
 	make.finish = func(_stage: Job.Stage, worker: Person) -> void:
-		items.pick_up(worker, [item, 1])
+		# Extra output (a Works Manager) is a chance of a second one.
+		var extra := modifiers.value(&"job_output") if modifiers != null else 0.0
+		items.pick_up(worker, [item, 2 if _rng.randf() < extra else 1])
 	var stack := Job.at_any(Job.Do.DELIVER, SHELVES, &"goods")
 	stack.doing = "Putting it on the shelf"
 	job.stages = [make, stack]

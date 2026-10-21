@@ -367,9 +367,16 @@ static func door_models() -> Dictionary[StringName, PackedScene]:
 	return out
 
 
+## Every role, department heads included.
+static func all_roles() -> Array[StaffRoleDef]:
+	var out: Array[StaffRoleDef] = ROLES.duplicate()
+	out.append_array(PrisonDepartments.roles())
+	return out
+
+
 static func roles() -> Dictionary[StringName, StaffRoleDef]:
 	var out: Dictionary[StringName, StaffRoleDef] = {}
-	for def in ROLES:
+	for def in all_roles():
 		out[def.id] = def
 	return out
 

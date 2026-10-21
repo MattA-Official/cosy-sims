@@ -30,6 +30,8 @@ var deaths := false
 
 signal died(person: Person, level: int, point: Vector2)
 
+## Bonuses such as a department head's. Optional.
+var modifiers: Modifiers
 var people: People
 var jobs: JobBoard
 var bed_tag: StringName = &"infirmary_bed"
@@ -255,7 +257,7 @@ func _treat_job(person: Person) -> Job:
 	job.priority = 5
 	job.set_meta(&"patient", person)
 	var stage := Job.on_tile(Job.Do.WORK, spot[0], Vector2i(spot[1].floor()))
-	stage.minutes = TREAT_MINUTES
+	stage.minutes = TREAT_MINUTES / Modifiers.scale(modifiers, &"treat_speed")
 	stage.doing = "Patching up %s" % person.name.get_slice(" ", 0)
 	stage.finish = func(_stage: Job.Stage, _nurse: Person) -> void:
 		if people.people.has(person):
