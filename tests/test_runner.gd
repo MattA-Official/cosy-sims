@@ -119,6 +119,8 @@ func _process(_delta: float) -> bool:
 	_test_regime_extras()
 	_test_desk_tint()
 	_test_brains()
+	_test_research_board()
+	_test_research()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -1863,6 +1865,121 @@ func _test_brains() -> void:
 	people._decide(other, true)
 	_check(other.activity == "Waiting for orders", "a group can have a brain of its own")
 	people.brains.erase(&"prisoner")
+	main.queue_free()
+
+
+func _test_research_board() -> void:
+	var board := PrisonResearch.make_board()
+	_check(board.cards.size() == 122 and board.hire_cards.size() == 6, "the board has its 122 cards and six hire cards")
+	var guard := board.card(&"guard-training")
+	_check(guard.knowhow == {&"security": 15} and guard.desk_minutes == 480.0 and guard.department == &"security"
+			and guard.reveal == null, "a tier 1 card costs 15 know-how and a day at a desk")
+	_check(board.card(&"walkabouts").knowhow == {&"admin": 9, &"care": 6}, "a joint card splits it 60/40")
+	_check(board.card(&"hire-senior-doctor").knowhow == {&"admin": 20} and board.card(&"hire-senior-doctor").rule == 1,
+			"hire cards cost 20 Admin, and the doctor needs any one other head")
+	var escape := board.card(&"escape-review").reveal
+	_check(escape != null and escape.kind == RevealDef.Kind.FIRST and escape.id == &"escape", "Escape review turns up on the first escape")
+	_check(board.card(&"gang-intelligence").addon == &"maximum_security" and board.card(&"day-release").addon == &"",
+			"add-on cards belong to their add-on, hooks to the base game")
+	_check(board.card(&"strict-rules").pair == &"prison-council" and board.card(&"strict-rules").lean == 1,
+			"Strict rules leans strict and pairs with the council")
+	var knowhow := Knowhow.new()
+	knowhow.kinds = board.knowhow
+	knowhow.sources = board.sources
+	var counters := Counters.new()
+	knowhow.counters = counters
+	counters.add(&"visit", 3)
+	_check(knowhow.amount(&"care") == 6.0 and knowhow.breakdown(&"care") == "Visits 6", "visits earn Care know-how")
+	knowhow.earning = false
+	counters.add(&"visit")
+	_check(knowhow.amount(&"care") == 6.0, "nothing is earned with research off")
+	knowhow.free()
+	counters.free()
+
+
+func _test_research() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var research: Research = main.research
+	var knowhow: Knowhow = main.knowhow
+	var heads: Heads = main.heads
+	var desk_work: DeskWork = main.desk_work
+	var counters: Counters = main.counters
+	var warden := heads.warden()
+	desk_work.piles.erase(warden.id)
+	_check(knowhow.amount(&"admin") >= 30.0, "a new game starts with some Admin know-how")
+	var cell := research.card(&"cell-searches")
+	_check(research.state_of(cell.id) == Research.State.FACE_UP and research.why_not(cell).begins_with("Needs Hire Chief"),
+			"Cell searches waits on the Chief of Security")
+	var walk := research.card(&"walkabouts")
+	_check(research.why_not(walk) == "Not enough know-how.", "Walkabouts needs Care know-how first")
+	knowhow.add(&"care", 10.0)
+	_check(research.begin(walk) and desk_work.items(warden.id, &"research").size() == 1, "starting it puts it on the warden's desk")
+	_check(knowhow.amount(&"care") == 4.0, "and pays its know-how")
+	desk_work.work(warden.id, 240.0)
+	_check(is_equal_approx(research.progress(walk), 0.5), "half a day's desk work is halfway")
+	var done := []
+	research.finished.connect(func(def: ResearchCardDef, _owner: int) -> void: done.append(def.id))
+	desk_work.work(warden.id, 240.0)
+	_check(research.is_done(walk.id) and done == [walk.id], "and a whole day finishes it")
+	var review := research.card(&"escape-review")
+	_check(research.state_of(review.id) == Research.State.HIDDEN, "Escape review starts face down")
+	counters.add(&"escape")
+	_check(research.state_of(review.id) == Research.State.FACE_UP and research.states[review.id].revealed_by == "First escape",
+			"and turns up after the first escape")
+	var hire := research.card(&"hire-chief-of-security")
+	_check(research.begin(hire) and heads.hiring() == heads.find(&"security"), "a hire card puts the hire on the warden's desk")
+	desk_work.work(warden.id, 600.0)
+	_check(research.is_done(hire.id) and not heads.applicants(heads.find(&"security")).is_empty(), "done, the applicants come")
+	heads.hire(heads.applicants(heads.find(&"security"))[0])
+	knowhow.add(&"security", 40.0)
+	_check(research.slot_of(cell) == &"security" and research.begin(cell)
+			and desk_work.items(heads.head(heads.find(&"security")).id, &"research").size() == 1,
+			"with a Chief of Security, Cell searches goes on their desk")
+	_check(research.speed(research.card(&"guard-training"), warden.id) == 0.5, "the warden works other wedges at half speed")
+	var guard := research.card(&"guard-training")
+	_check(research.queue(guard) and research.queues[&"security"] == [guard.id], "a second card waits in the queue")
+	var chief := heads.head(heads.find(&"security"))
+	desk_work.piles[chief.id] = desk_work.piles[chief.id].filter(func(i: DeskWork.Item) -> bool: return i.kind == &"research")
+	desk_work.work(chief.id, 480.0)
+	_check(research.is_done(cell.id) and research.state_of(guard.id) == Research.State.RESEARCHING, "when one's done the next starts")
+	heads.let_go(chief)
+	_check(research.state_of(guard.id) == Research.State.PAUSED, "a head gone leaves their card paused")
+	# A tier 4 card waits on the grade.
+	var towers := research.card(&"watchtowers")
+	research.states[towers.id].state = Research.State.FACE_UP
+	research.states[&"cctv-room"].state = Research.State.DONE
+	(main.standing as Standing).grade = 2
+	_check(research.why_not(towers) == "Needs a 3-star grade (now 2).", "high tiers need a good grade")
+	# Pick-one pairs turn up as the prison leans, and lock each other out.
+	research.states[&"earned-privileges"].state = Research.State.DONE
+	research.lean_shifts = [[40.0, (main.clock as GameClock).day()]]
+	research.refresh_lean()
+	research.check_reveals()
+	var strict := research.card(&"strict-rules")
+	_check(research.state_of(strict.id) == Research.State.FACE_UP and research.state_of(&"prison-council") == Research.State.HIDDEN,
+			"leaning strict turns up Strict rules")
+	research.reveal(research.card(&"prison-council"), "test")
+	knowhow.add(&"security", 50.0)
+	knowhow.add(&"admin", 50.0)
+	research.states[&"hire-chief-of-security"].state = Research.State.DONE
+	_check(research.begin(strict) and research.why_not(research.card(&"prison-council")).begins_with("Locked out"),
+			"starting one locks out its partner")
+	research.cancel(strict)
+	_check(research.state_of(&"prison-council") == Research.State.FACE_UP, "cancelling frees it again")
+	# Word of mouth.
+	var dogs := research.card(&"sniffer-dogs")
+	_check(research.state_of(dogs.id) == Research.State.HIDDEN, "Sniffer dogs is face down")
+	research.nightly()
+	research.states[dogs.id].ready_day -= Research.WORD_OF_MOUTH_DAYS
+	research.nightly()
+	_check(research.state_of(dogs.id) == Research.State.FACE_UP and research.states[dogs.id].revealed_by == "Word of mouth",
+			"a week after everything it needs is done, word of mouth turns it up")
+	var saved := research.capture()
+	research.states[walk.id].state = Research.State.FACE_UP
+	research.restore(saved)
+	_check(research.is_done(walk.id) and research.state_of(dogs.id) == Research.State.FACE_UP, "card states save and load")
 	main.queue_free()
 
 

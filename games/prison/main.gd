@@ -134,6 +134,11 @@ var vehicle_gates := VehicleGates.new()
 var heads := Heads.new()
 ## Request cards for the warden, and what their answers do.
 var in_tray := InTray.new()
+## What has happened, for know-how and research reveals.
+var counters := Counters.new()
+var knowhow := Knowhow.new()
+## The research board in play.
+var research := Research.new()
 var prison_tray := PrisonTray.new()
 ## Arrivals who come without their paperwork.
 var missing_files := MissingFiles.new()
@@ -1246,6 +1251,9 @@ func _ready() -> void:
 		if escapes.without_perimeter and not secure_area.has_perimeter:
 			words += " There's no perimeter yet, so anyone who wanders off can walk away."
 		Toasts.post("The bus is here", words))
+	ResearchWiring.setup(self)
+	if saved.is_empty():
+		ResearchWiring.new_game(self)
 	if not saved.is_empty():
 		PrisonSave.apply_rest(self, saved)
 		build_costs.start_from_now()

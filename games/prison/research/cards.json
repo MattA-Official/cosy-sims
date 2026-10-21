@@ -1,0 +1,2297 @@
+[
+ {
+  "name": "Warden's office",
+  "branch": "office",
+  "tier": 0,
+  "kh": [],
+  "rule": "all",
+  "pre": [],
+  "up": "Start",
+  "gives": "The research board itself. The warden researches one card at a time, at half speed outside Administration",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "warden-s-office"
+ },
+ {
+  "name": "Hire Chief of Security",
+  "branch": "office",
+  "tier": 1,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "warden-s-office"
+  ],
+  "up": "Start",
+  "gives": "Security branch and its head. Bonus: guards search 10% faster",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "hire-chief-of-security"
+ },
+ {
+  "name": "Hire Head of Wellbeing",
+  "branch": "office",
+  "tier": 1,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "warden-s-office"
+  ],
+  "up": "Start",
+  "gives": "Wellbeing branch and its head. Bonus: meal and visit moodlets last 25% longer",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "hire-head-of-wellbeing"
+ },
+ {
+  "name": "Hire Business Manager",
+  "branch": "office",
+  "tier": 1,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "warden-s-office"
+  ],
+  "up": "Start",
+  "gives": "Administration branch and its head. Bonus: running costs 5% lower",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "hire-business-manager"
+ },
+ {
+  "name": "Hire Works Manager",
+  "branch": "office",
+  "tier": 1,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "warden-s-office"
+  ],
+  "up": "A kitchen, laundry or workshop is built",
+  "gives": "Industry branch and its head. Bonus: job output 10% higher",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "hire-works-manager"
+ },
+ {
+  "name": "Hire Senior Doctor",
+  "branch": "office",
+  "tier": 2,
+  "kh": [
+   "A"
+  ],
+  "rule": 1,
+  "pre": [
+   "hire-chief-of-security",
+   "hire-head-of-wellbeing",
+   "hire-business-manager",
+   "hire-works-manager"
+  ],
+  "up": "An infirmary is built (M7)",
+  "gives": "Medical branch and its head. Bonus: treatment 20% faster",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "hire-senior-doctor"
+ },
+ {
+  "name": "Hire Head of Learning",
+  "branch": "office",
+  "tier": 2,
+  "kh": [
+   "A"
+  ],
+  "rule": 1,
+  "pre": [
+   "hire-chief-of-security",
+   "hire-head-of-wellbeing",
+   "hire-business-manager",
+   "hire-works-manager"
+  ],
+  "up": "A classroom is built (M8)",
+  "gives": "Education branch and its head. Bonus: course passes 10% higher",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "hire-head-of-learning"
+ },
+ {
+  "name": "Management meeting",
+  "branch": "office",
+  "tier": 3,
+  "kh": [
+   "A"
+  ],
+  "rule": 2,
+  "pre": [
+   "hire-chief-of-security",
+   "hire-head-of-wellbeing",
+   "hire-business-manager",
+   "hire-works-manager",
+   "hire-senior-doctor",
+   "hire-head-of-learning"
+  ],
+  "up": "Start",
+  "gives": "Joint cards; heads meet in a meeting room",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "management-meeting"
+ },
+ {
+  "name": "Department budgets",
+  "branch": "office",
+  "tier": 2,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-business-manager"
+  ],
+  "up": "Start",
+  "gives": "Share a research budget between branches; money speeds research",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "department-budgets"
+ },
+ {
+  "name": "Conferences",
+  "branch": "office",
+  "tier": 4,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "management-meeting"
+  ],
+  "up": "Start",
+  "gives": "Send a head away for two days; they return with two cards turned face up",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "conferences"
+ },
+ {
+  "name": "Deputy warden",
+  "branch": "office",
+  "tier": 3,
+  "kh": [
+   "A"
+  ],
+  "rule": 3,
+  "pre": [
+   "hire-chief-of-security",
+   "hire-head-of-wellbeing",
+   "hire-business-manager",
+   "hire-works-manager",
+   "hire-senior-doctor",
+   "hire-head-of-learning"
+  ],
+  "up": "Start",
+  "gives": "Second warden slot; the deputy covers the in-tray and inspection days",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "deputy-warden"
+ },
+ {
+  "name": "Deputy heads",
+  "branch": "office",
+  "tier": 4,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "deputy-warden"
+  ],
+  "up": "A head reaches level 3",
+  "gives": "That head gets a deputy and a second slot",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "deputy-heads"
+ },
+ {
+  "name": "Annual review",
+  "branch": "office",
+  "tier": 4,
+  "kh": [
+   "A",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "management-meeting"
+  ],
+  "up": "First year ends",
+  "gives": "Heads level up yearly; warning before an unhappy head resigns",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "annual-review"
+ },
+ {
+  "name": "Headhunting",
+  "branch": "office",
+  "tier": 4,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "deputy-warden"
+  ],
+  "up": "Ministry memo",
+  "gives": "Three applicants instead of two, with rarer traits",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "headhunting"
+ },
+ {
+  "name": "Walkabouts",
+  "branch": "office",
+  "tier": 1,
+  "kh": [
+   "A",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "warden-s-office"
+  ],
+  "up": "Start",
+  "gives": "The warden tours one wing a day: a small mood lift there, and early warning of trouble brewing",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "walkabouts"
+ },
+ {
+  "name": "Open-door hour",
+  "branch": "office",
+  "tier": 2,
+  "kh": [
+   "A",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "walkabouts"
+  ],
+  "up": "Start",
+  "gives": "Prisoners can petition the warden; their requests arrive as in-tray cards",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "open-door-hour"
+ },
+ {
+  "name": "Emergency fund",
+  "branch": "office",
+  "tier": 2,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "warden-s-office"
+  ],
+  "up": "First riot or big repair bill",
+  "gives": "A weekly cash reserve that pays for repairs after incidents",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "emergency-fund"
+ },
+ {
+  "name": "Town meetings",
+  "branch": "office",
+  "tier": 3,
+  "kh": [
+   "A",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "open-door-hour"
+  ],
+  "up": "Protestors at the gate",
+  "gives": "The warden speaks in town: reputation rises and protestors go home sooner",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "town-meetings"
+ },
+ {
+  "name": "Long-term plan",
+  "branch": "office",
+  "tier": 5,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "annual-review"
+  ],
+  "up": "First year ends",
+  "gives": "Pick a focus for the year (safety, wellbeing, reform or money); that score counts double for grants",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "long-term-plan"
+ },
+ {
+  "name": "Warden's legacy",
+  "branch": "office",
+  "tier": 6,
+  "kh": [
+   "A",
+   "C"
+  ],
+  "rule": 2,
+  "pre": [
+   "long-term-plan",
+   "town-meetings",
+   "deputy-warden"
+  ],
+  "up": "4-star grade",
+  "gives": "A named wing or statue, a permanent mood lift, and a bigger final grade",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "warden-s-legacy"
+ },
+ {
+  "name": "Guard training",
+  "branch": "sec",
+  "tier": 1,
+  "kh": [
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-chief-of-security"
+  ],
+  "up": "Start",
+  "gives": "Guards walk 10% faster and break up fights sooner",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "guard-training"
+ },
+ {
+  "name": "Cell searches",
+  "branch": "sec",
+  "tier": 1,
+  "kh": [
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-chief-of-security"
+  ],
+  "up": "Start",
+  "gives": "Scheduled shakedowns of a wing (M7 contraband)",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "cell-searches"
+ },
+ {
+  "name": "Escape review",
+  "branch": "sec",
+  "tier": 1,
+  "kh": [
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-chief-of-security"
+  ],
+  "up": "First escape",
+  "gives": "Weak spots shown on the map",
+  "lean": "",
+  "pair": "",
+  "addon": "Escape Mode hook",
+  "id": "escape-review"
+ },
+ {
+  "name": "Patrol planner",
+  "branch": "sec",
+  "tier": 2,
+  "kh": [
+   "S",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "guard-training"
+  ],
+  "up": "Start",
+  "gives": "Suggested patrol routes and a patrolled-area tint (deferred from M5)",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "patrol-planner"
+ },
+ {
+  "name": "Night watch",
+  "branch": "sec",
+  "tier": 2,
+  "kh": [
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "guard-training"
+  ],
+  "up": "10 night shifts worked",
+  "gives": "Night guards stay alert; fewer night incidents",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "night-watch"
+ },
+ {
+  "name": "Metal detectors",
+  "branch": "sec",
+  "tier": 2,
+  "kh": [
+   "S",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "cell-searches"
+  ],
+  "up": "Start",
+  "gives": "Detector arches at gates find weapons",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "metal-detectors"
+ },
+ {
+  "name": "Vehicle checks",
+  "branch": "sec",
+  "tier": 2,
+  "kh": [
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "cell-searches"
+  ],
+  "up": "First delivery smuggling found",
+  "gives": "Lorries searched in the vehicle gate airlock",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "vehicle-checks"
+ },
+ {
+  "name": "Visit screening",
+  "branch": "sec",
+  "tier": 2,
+  "kh": [
+   "S",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "cell-searches",
+   "family-visits"
+  ],
+  "up": "First item passed at a visit",
+  "gives": "Visitors searched; less smuggling",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "visit-screening"
+ },
+ {
+  "name": "Sniffer dogs",
+  "branch": "sec",
+  "tier": 2,
+  "kh": [
+   "S",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "cell-searches"
+  ],
+  "up": "5 drug finds",
+  "gives": "Dog handler job; dogs find drugs",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "sniffer-dogs"
+ },
+ {
+  "name": "CCTV room",
+  "branch": "sec",
+  "tier": 3,
+  "kh": [
+   "S",
+   "A"
+  ],
+  "rule": "any",
+  "pre": [
+   "patrol-planner",
+   "metal-detectors"
+  ],
+  "up": "Start",
+  "gives": "Cameras and a monitor desk; watched areas need fewer guards",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "cctv-room"
+ },
+ {
+  "name": "Lockdown",
+  "branch": "sec",
+  "tier": 3,
+  "kh": [
+   "S"
+  ],
+  "rule": "any",
+  "pre": [
+   "night-watch",
+   "guard-training"
+  ],
+  "up": "First fight with 5 or more people",
+  "gives": "Lockdown button: doors lock, prisoners return to cells",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "lockdown"
+ },
+ {
+  "name": "Remote doors",
+  "branch": "sec",
+  "tier": 4,
+  "kh": [
+   "S",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "cctv-room",
+   "better-tools"
+  ],
+  "up": "Start",
+  "gives": "Door control desk opens doors from afar",
+  "lean": "strict",
+  "pair": "",
+  "addon": "",
+  "id": "remote-doors"
+ },
+ {
+  "name": "Watchtowers",
+  "branch": "sec",
+  "tier": 4,
+  "kh": [
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "cctv-room"
+  ],
+  "up": "Perimeter fence closed",
+  "gives": "Towers on the fence spot escapes early",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "watchtowers"
+ },
+ {
+  "name": "Informants",
+  "branch": "sec",
+  "tier": 3,
+  "kh": [
+   "S",
+   "C"
+  ],
+  "rule": "any",
+  "pre": [
+   "sniffer-dogs",
+   "cell-searches"
+  ],
+  "up": "10 contraband finds",
+  "gives": "Prisoners tip off stashes for favours",
+  "lean": "strict",
+  "pair": "",
+  "addon": "",
+  "id": "informants"
+ },
+ {
+  "name": "Riot kit",
+  "branch": "sec",
+  "tier": 4,
+  "kh": [
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "lockdown"
+  ],
+  "up": "First riot",
+  "gives": "Padded shields and foam batons; fewer injuries",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "riot-kit"
+ },
+ {
+  "name": "Strict rules",
+  "branch": "sec",
+  "tier": 3,
+  "kh": [
+   "S",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "earned-privileges"
+  ],
+  "up": "Character scale leans strict",
+  "gives": "Fixed routine; fewer incidents, lower mood",
+  "lean": "strict",
+  "pair": "prison-council",
+  "addon": "",
+  "id": "strict-rules"
+ },
+ {
+  "name": "Tactical team",
+  "branch": "sec",
+  "tier": 5,
+  "kh": [
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "riot-kit"
+  ],
+  "up": "Character scale leans strict",
+  "gives": "A response squad that ends riots fast",
+  "lean": "strict",
+  "pair": "de-escalation-team",
+  "addon": "",
+  "id": "tactical-team"
+ },
+ {
+  "name": "De-escalation team",
+  "branch": "sec",
+  "tier": 5,
+  "kh": [
+   "S",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "riot-kit",
+   "talking-therapy"
+  ],
+  "up": "Character scale leans caring",
+  "gives": "Trained staff talk most fights down",
+  "lean": "caring",
+  "pair": "tactical-team",
+  "addon": "",
+  "id": "de-escalation-team"
+ },
+ {
+  "name": "Max security wing",
+  "branch": "sec",
+  "tier": 5,
+  "kh": [
+   "S",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "remote-doors",
+   "watchtowers"
+  ],
+  "up": "4-star grade",
+  "gives": "Take maximum category prisoners for bigger grants",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "max-security-wing"
+ },
+ {
+  "name": "Gang intelligence",
+  "branch": "sec",
+  "tier": 4,
+  "kh": [
+   "S",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "informants"
+  ],
+  "up": "Maximum Security expansion",
+  "gives": "Crew map, leaders and rackets",
+  "lean": "",
+  "pair": "",
+  "addon": "Maximum Security",
+  "id": "gang-intelligence"
+ },
+ {
+  "name": "Armoury",
+  "branch": "sec",
+  "tier": 5,
+  "kh": [
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "riot-kit"
+  ],
+  "up": "Maximum Security expansion",
+  "gives": "Cartoon guns signed out by armed guards",
+  "lean": "strict",
+  "pair": "",
+  "addon": "Maximum Security",
+  "id": "armoury"
+ },
+ {
+  "name": "Marksmen",
+  "branch": "sec",
+  "tier": 6,
+  "kh": [
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "armoury"
+  ],
+  "up": "Maximum Security expansion",
+  "gives": "Tower guards with tranquilliser rifles",
+  "lean": "",
+  "pair": "",
+  "addon": "Maximum Security",
+  "id": "marksmen"
+ },
+ {
+  "name": "Better mattresses",
+  "branch": "well",
+  "tier": 1,
+  "kh": [
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-head-of-wellbeing"
+  ],
+  "up": "Start",
+  "gives": "Sleep restores faster",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "better-mattresses"
+ },
+ {
+  "name": "Menu planning",
+  "branch": "well",
+  "tier": 1,
+  "kh": [
+   "C",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-head-of-wellbeing"
+  ],
+  "up": "Start",
+  "gives": "A meal variety moodlet",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "menu-planning"
+ },
+ {
+  "name": "Family visits",
+  "branch": "well",
+  "tier": 1,
+  "kh": [
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-head-of-wellbeing"
+  ],
+  "up": "A visits room is built",
+  "gives": "Longer visits and a children's corner",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "family-visits"
+ },
+ {
+  "name": "Phone credit",
+  "branch": "well",
+  "tier": 1,
+  "kh": [
+   "C",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-head-of-wellbeing"
+  ],
+  "up": "Start",
+  "gives": "Phone calls become an earned privilege",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "phone-credit"
+ },
+ {
+  "name": "Yard sports",
+  "branch": "well",
+  "tier": 1,
+  "kh": [
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-head-of-wellbeing"
+  ],
+  "up": "Start",
+  "gives": "Football and basketball for fitness and fresh air",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "yard-sports"
+ },
+ {
+  "name": "Staff room comforts",
+  "branch": "well",
+  "tier": 1,
+  "kh": [
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-head-of-wellbeing"
+  ],
+  "up": "Staff needs setting on",
+  "gives": "Staff needs recover faster",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "staff-room-comforts"
+ },
+ {
+  "name": "Hobby clubs",
+  "branch": "well",
+  "tier": 2,
+  "kh": [
+   "C"
+  ],
+  "rule": "any",
+  "pre": [
+   "yard-sports",
+   "phone-credit"
+  ],
+  "up": "Start",
+  "gives": "Chess, art and music clubs (M11 hobbies)",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "hobby-clubs"
+ },
+ {
+  "name": "Earned privileges",
+  "branch": "well",
+  "tier": 2,
+  "kh": [
+   "C",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "phone-credit"
+  ],
+  "up": "Start",
+  "gives": "Good behaviour unlocks a better timetable",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "earned-privileges"
+ },
+ {
+  "name": "Prison cat",
+  "branch": "well",
+  "tier": 3,
+  "kh": [
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "hobby-clubs"
+  ],
+  "up": "A stray turns up",
+  "gives": "A cat that wanders the wings (M11 pets)",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "prison-cat"
+ },
+ {
+  "name": "Therapy dogs",
+  "branch": "well",
+  "tier": 3,
+  "kh": [
+   "C",
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "sniffer-dogs"
+  ],
+  "up": "Start",
+  "gives": "Visiting dogs with a big mood lift",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "therapy-dogs"
+ },
+ {
+  "name": "Talking therapy",
+  "branch": "well",
+  "tier": 2,
+  "kh": [
+   "C",
+   "H"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-senior-doctor"
+  ],
+  "up": "10 fights",
+  "gives": "Counsellor job; anger falls",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "talking-therapy"
+ },
+ {
+  "name": "Quiet rooms",
+  "branch": "well",
+  "tier": 3,
+  "kh": [
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "talking-therapy"
+  ],
+  "up": "Start",
+  "gives": "A calm room for stressed prisoners",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "quiet-rooms"
+ },
+ {
+  "name": "Garden",
+  "branch": "well",
+  "tier": 2,
+  "kh": [
+   "C",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "yard-sports"
+  ],
+  "up": "Start",
+  "gives": "Vegetable beds that feed the kitchen",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "garden"
+ },
+ {
+  "name": "Seasonal days",
+  "branch": "well",
+  "tier": 2,
+  "kh": [
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "menu-planning"
+  ],
+  "up": "First winter (M12 seasons)",
+  "gives": "Christmas dinner and a summer fair",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "seasonal-days"
+ },
+ {
+  "name": "Open day",
+  "branch": "well",
+  "tier": 2,
+  "kh": [
+   "C",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "family-visits"
+  ],
+  "up": "Protestors at the gate",
+  "gives": "The town tours the prison; sends protestors home",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "open-day"
+ },
+ {
+  "name": "Gourmet kitchen",
+  "branch": "well",
+  "tier": 3,
+  "kh": [
+   "C",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "menu-planning"
+  ],
+  "up": "Celebrity chef event",
+  "gives": "Fine meals and a big moodlet",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "gourmet-kitchen"
+ },
+ {
+  "name": "Family day",
+  "branch": "well",
+  "tier": 3,
+  "kh": [
+   "C",
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "family-visits",
+   "visit-screening"
+  ],
+  "up": "20 visits",
+  "gives": "Family day events for mood and reform",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "family-day"
+ },
+ {
+  "name": "Prison council",
+  "branch": "well",
+  "tier": 3,
+  "kh": [
+   "C",
+   "A",
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "earned-privileges"
+  ],
+  "up": "Character scale leans caring",
+  "gives": "Elected reps raise group requests",
+  "lean": "caring",
+  "pair": "strict-rules",
+  "addon": "",
+  "id": "prison-council"
+ },
+ {
+  "name": "Mediation",
+  "branch": "well",
+  "tier": 3,
+  "kh": [
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "talking-therapy"
+  ],
+  "up": "Maximum Security expansion",
+  "gives": "Crew truces",
+  "lean": "",
+  "pair": "",
+  "addon": "Maximum Security",
+  "id": "mediation"
+ },
+ {
+  "name": "Nurse rounds",
+  "branch": "med",
+  "tier": 1,
+  "kh": [
+   "H"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-senior-doctor"
+  ],
+  "up": "Start",
+  "gives": "Nurses visit cells and treat small injuries there",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "nurse-rounds"
+ },
+ {
+  "name": "Staff health",
+  "branch": "med",
+  "tier": 1,
+  "kh": [
+   "H"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-senior-doctor"
+  ],
+  "up": "Staff needs setting on",
+  "gives": "Fewer staff sick days",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "staff-health"
+ },
+ {
+  "name": "Hygiene drive",
+  "branch": "med",
+  "tier": 1,
+  "kh": [
+   "H"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-senior-doctor"
+  ],
+  "up": "First cold outbreak (M11)",
+  "gives": "Clean laundry and showers cut colds",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "hygiene-drive"
+ },
+ {
+  "name": "Vaccinations",
+  "branch": "med",
+  "tier": 2,
+  "kh": [
+   "H",
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "hygiene-drive"
+  ],
+  "up": "Start",
+  "gives": "Colds spread far less",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "vaccinations"
+ },
+ {
+  "name": "Isolation ward",
+  "branch": "med",
+  "tier": 2,
+  "kh": [
+   "H"
+  ],
+  "rule": "all",
+  "pre": [
+   "hygiene-drive"
+  ],
+  "up": "Flu week event",
+  "gives": "Sick prisoners kept apart",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "isolation-ward"
+ },
+ {
+  "name": "Pharmacy",
+  "branch": "med",
+  "tier": 2,
+  "kh": [
+   "H",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "nurse-rounds"
+  ],
+  "up": "Start",
+  "gives": "A medicine room, with theft risk (contraband)",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "pharmacy"
+ },
+ {
+  "name": "Dentist",
+  "branch": "med",
+  "tier": 2,
+  "kh": [
+   "H"
+  ],
+  "rule": "all",
+  "pre": [
+   "nurse-rounds"
+  ],
+  "up": "Start",
+  "gives": "A dental chair and a comfort lift",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "dentist"
+ },
+ {
+  "name": "First aid course",
+  "branch": "med",
+  "tier": 2,
+  "kh": [
+   "H",
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "nurse-rounds",
+   "hire-head-of-learning"
+  ],
+  "up": "Start",
+  "gives": "Prisoners learn first aid; reform and fewer bad injuries",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "first-aid-course"
+ },
+ {
+  "name": "Ambulance bay",
+  "branch": "med",
+  "tier": 2,
+  "kh": [
+   "H",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "nurse-rounds"
+  ],
+  "up": "First serious injury",
+  "gives": "Bad injuries leave by road, or by air ambulance where there is no road",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "ambulance-bay"
+ },
+ {
+  "name": "Health inspection ready",
+  "branch": "med",
+  "tier": 3,
+  "kh": [
+   "H",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "pharmacy"
+  ],
+  "up": "Red tape setting on",
+  "gives": "The medical part of inspections passes",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "health-inspection-ready"
+ },
+ {
+  "name": "Addiction clinic",
+  "branch": "med",
+  "tier": 3,
+  "kh": [
+   "H",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "pharmacy",
+   "talking-therapy"
+  ],
+  "up": "10 drug finds",
+  "gives": "Drug users recover; reform",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "addiction-clinic"
+ },
+ {
+  "name": "Mental health ward",
+  "branch": "med",
+  "tier": 3,
+  "kh": [
+   "H",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "talking-therapy"
+  ],
+  "up": "Start",
+  "gives": "Long stays for troubled prisoners",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "mental-health-ward"
+ },
+ {
+  "name": "Teaching infirmary",
+  "branch": "med",
+  "tier": 4,
+  "kh": [
+   "H",
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "mental-health-ward",
+   "vaccinations"
+  ],
+  "up": "4-star grade",
+  "gives": "Prisoners train as orderlies (a nod to the hospital game)",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "teaching-infirmary"
+ },
+ {
+  "name": "Exams",
+  "branch": "edu",
+  "tier": 1,
+  "kh": [
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-head-of-learning"
+  ],
+  "up": "Start",
+  "gives": "Qualifications on prisoner files; better parole chances",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "exams"
+ },
+ {
+  "name": "Library",
+  "branch": "edu",
+  "tier": 1,
+  "kh": [
+   "L",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-head-of-learning"
+  ],
+  "up": "Start",
+  "gives": "A library room; reading becomes a choice",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "library"
+ },
+ {
+  "name": "Guest speakers",
+  "branch": "edu",
+  "tier": 1,
+  "kh": [
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-head-of-learning"
+  ],
+  "up": "Start",
+  "gives": "Each talk turns a card face up",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "guest-speakers"
+ },
+ {
+  "name": "Language classes",
+  "branch": "edu",
+  "tier": 1,
+  "kh": [
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-head-of-learning"
+  ],
+  "up": "5 prisoners share a language",
+  "gives": "Fewer misunderstandings; reform",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "language-classes"
+ },
+ {
+  "name": "Parole prep",
+  "branch": "edu",
+  "tier": 2,
+  "kh": [
+   "L",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "exams"
+  ],
+  "up": "Start",
+  "gives": "Reports for parole hearings; more passes (M8 parole)",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "parole-prep"
+ },
+ {
+  "name": "Computer room",
+  "branch": "edu",
+  "tier": 2,
+  "kh": [
+   "L",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "exams"
+  ],
+  "up": "Start",
+  "gives": "Computers on desks (flexible objects)",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "computer-room"
+ },
+ {
+  "name": "Cooking course",
+  "branch": "edu",
+  "tier": 2,
+  "kh": [
+   "L",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "exams"
+  ],
+  "up": "A kitchen is built",
+  "gives": "Prisoners qualify for kitchen jobs",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "cooking-course"
+ },
+ {
+  "name": "Woodwork course",
+  "branch": "edu",
+  "tier": 2,
+  "kh": [
+   "L",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "exams",
+   "better-tools"
+  ],
+  "up": "Start",
+  "gives": "Qualified prisoners in the workshop; reform",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "woodwork-course"
+ },
+ {
+  "name": "Arts programme",
+  "branch": "edu",
+  "tier": 2,
+  "kh": [
+   "L",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "library"
+  ],
+  "up": "Start",
+  "gives": "Painting and drama",
+  "lean": "",
+  "pair": "",
+  "addon": "Arts and Culture hook",
+  "id": "arts-programme"
+ },
+ {
+  "name": "Graduation day",
+  "branch": "edu",
+  "tier": 2,
+  "kh": [
+   "L",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "exams"
+  ],
+  "up": "5 course passes",
+  "gives": "A ceremony event for mood and reputation",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "graduation-day"
+ },
+ {
+  "name": "Distance learning",
+  "branch": "edu",
+  "tier": 3,
+  "kh": [
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "computer-room"
+  ],
+  "up": "Start",
+  "gives": "Courses without a teacher",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "distance-learning"
+ },
+ {
+  "name": "Prisoner tutors",
+  "branch": "edu",
+  "tier": 4,
+  "kh": [
+   "L",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "exams",
+   "prison-council"
+  ],
+  "up": "5 course passes",
+  "gives": "Top students teach others",
+  "lean": "caring",
+  "pair": "",
+  "addon": "",
+  "id": "prisoner-tutors"
+ },
+ {
+  "name": "Research assistants",
+  "branch": "edu",
+  "tier": 3,
+  "kh": [
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "exams"
+  ],
+  "up": "A prisoner with a high skill",
+  "gives": "Skilled prisoners speed up a head's research; reform",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "research-assistants"
+ },
+ {
+  "name": "Restorative justice",
+  "branch": "edu",
+  "tier": 3,
+  "kh": [
+   "L",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "parole-prep",
+   "talking-therapy"
+  ],
+  "up": "10 reformed releases",
+  "gives": "Meetings with victims; big reform",
+  "lean": "caring",
+  "pair": "",
+  "addon": "",
+  "id": "restorative-justice"
+ },
+ {
+  "name": "Day release",
+  "branch": "edu",
+  "tier": 3,
+  "kh": [
+   "L",
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "parole-prep"
+  ],
+  "up": "5 parole passes",
+  "gives": "Prisoners work outside by day",
+  "lean": "",
+  "pair": "",
+  "addon": "Open Prison hook",
+  "id": "day-release"
+ },
+ {
+  "name": "University link",
+  "branch": "edu",
+  "tier": 4,
+  "kh": [
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "distance-learning",
+   "research-assistants"
+  ],
+  "up": "4-star grade",
+  "gives": "Degrees; every branch researches 10% faster",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "university-link"
+ },
+ {
+  "name": "Better tools",
+  "branch": "ind",
+  "tier": 1,
+  "kh": [
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-works-manager"
+  ],
+  "up": "Start",
+  "gives": "Workshop output 15% higher",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "better-tools"
+ },
+ {
+  "name": "Repair crew",
+  "branch": "ind",
+  "tier": 1,
+  "kh": [
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-works-manager"
+  ],
+  "up": "Start",
+  "gives": "Handymen fix faster and objects wear slower",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "repair-crew"
+ },
+ {
+  "name": "Recycling",
+  "branch": "ind",
+  "tier": 1,
+  "kh": [
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-works-manager"
+  ],
+  "up": "Start",
+  "gives": "Sorted bins and a small income",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "recycling"
+ },
+ {
+  "name": "Tool control",
+  "branch": "ind",
+  "tier": 2,
+  "kh": [
+   "R",
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "better-tools"
+  ],
+  "up": "First improvised weapon found",
+  "gives": "Shadow boards; fewer tools go missing",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "tool-control"
+ },
+ {
+  "name": "Furniture workshop",
+  "branch": "ind",
+  "tier": 2,
+  "kh": [
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "better-tools"
+  ],
+  "up": "Start",
+  "gives": "Makes props and furniture for your own rooms (flexible objects)",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "furniture-workshop"
+ },
+ {
+  "name": "Bakery",
+  "branch": "ind",
+  "tier": 2,
+  "kh": [
+   "R",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "better-tools",
+   "menu-planning"
+  ],
+  "up": "Start",
+  "gives": "Bread for the kitchen and to sell",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "bakery"
+ },
+ {
+  "name": "Laundry service",
+  "branch": "ind",
+  "tier": 2,
+  "kh": [
+   "R",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-works-manager"
+  ],
+  "up": "Start",
+  "gives": "Washing for outside firms brings income",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "laundry-service"
+ },
+ {
+  "name": "Prisoner maintenance",
+  "branch": "ind",
+  "tier": 3,
+  "kh": [
+   "R",
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "repair-crew",
+   "woodwork-course"
+  ],
+  "up": "Start",
+  "gives": "Qualified prisoners do repairs",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "prisoner-maintenance"
+ },
+ {
+  "name": "Groundworks",
+  "branch": "ind",
+  "tier": 2,
+  "kh": [
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "repair-crew"
+  ],
+  "up": "First land plot bought",
+  "gives": "Flattening land 30% cheaper",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "groundworks"
+ },
+ {
+  "name": "Road works",
+  "branch": "ind",
+  "tier": 3,
+  "kh": [
+   "R",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "groundworks"
+  ],
+  "up": "Start",
+  "gives": "A second road entrance, wider roads and a bigger car park",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "road-works"
+ },
+ {
+  "name": "Generators",
+  "branch": "ind",
+  "tier": 2,
+  "kh": [
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "repair-crew"
+  ],
+  "up": "Utilities set to Self-sufficient",
+  "gives": "A generator room",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "generators"
+ },
+ {
+  "name": "Solar and water",
+  "branch": "ind",
+  "tier": 3,
+  "kh": [
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "generators"
+  ],
+  "up": "Utilities set to Self-sufficient",
+  "gives": "Solar panels and water treatment",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "solar-and-water"
+ },
+ {
+  "name": "Jetty and helipad",
+  "branch": "ind",
+  "tier": 4,
+  "kh": [
+   "R",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "road-works"
+  ],
+  "up": "A location without a road",
+  "gives": "New arrival points for location packs",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "jetty-and-helipad"
+ },
+ {
+  "name": "Prison farm",
+  "branch": "ind",
+  "tier": 3,
+  "kh": [
+   "R",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "garden"
+  ],
+  "up": "Prison Farm add-on",
+  "gives": "Fields and animals",
+  "lean": "",
+  "pair": "",
+  "addon": "Prison Farm",
+  "id": "prison-farm"
+ },
+ {
+  "name": "Mass production",
+  "branch": "ind",
+  "tier": 4,
+  "kh": [
+   "R",
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "furniture-workshop",
+   "contract-labour"
+  ],
+  "up": "4-star grade",
+  "gives": "Big workshop contracts",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "mass-production"
+ },
+ {
+  "name": "Bookkeeping",
+  "branch": "adm",
+  "tier": 1,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-business-manager"
+  ],
+  "up": "Start",
+  "gives": "Daily report split by department",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "bookkeeping"
+ },
+ {
+  "name": "Land agent",
+  "branch": "adm",
+  "tier": 1,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-business-manager"
+  ],
+  "up": "Start",
+  "gives": "Land 15% cheaper, and you see a plot's ground before buying",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "land-agent"
+ },
+ {
+  "name": "Bulk buying",
+  "branch": "adm",
+  "tier": 2,
+  "kh": [
+   "A",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "bookkeeping",
+   "hire-works-manager"
+  ],
+  "up": "Start",
+  "gives": "Supplies 10% cheaper",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "bulk-buying"
+ },
+ {
+  "name": "Grant writing",
+  "branch": "adm",
+  "tier": 2,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "bookkeeping"
+  ],
+  "up": "Start",
+  "gives": "Grant goals pay 20% more",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "grant-writing"
+ },
+ {
+  "name": "Intake desk",
+  "branch": "adm",
+  "tier": 2,
+  "kh": [
+   "A",
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "hire-business-manager"
+  ],
+  "up": "Start",
+  "gives": "Choose categories per bus; files filled in on arrival",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "intake-desk"
+ },
+ {
+  "name": "Inspection prep",
+  "branch": "adm",
+  "tier": 2,
+  "kh": [
+   "A",
+   "S"
+  ],
+  "rule": "all",
+  "pre": [
+   "bookkeeping",
+   "hire-chief-of-security"
+  ],
+  "up": "First inspection",
+  "gives": "Inspections announced two days ahead",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "inspection-prep"
+ },
+ {
+  "name": "Filing system",
+  "branch": "adm",
+  "tier": 3,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "intake-desk"
+  ],
+  "up": "Red tape setting on",
+  "gives": "In-tray cards wait twice as long",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "filing-system"
+ },
+ {
+  "name": "Prison shop",
+  "branch": "adm",
+  "tier": 2,
+  "kh": [
+   "A",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "bookkeeping"
+  ],
+  "up": "Start",
+  "gives": "Tokens and a shop (M11)",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "prison-shop"
+ },
+ {
+  "name": "Utility contracts",
+  "branch": "adm",
+  "tier": 2,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "bookkeeping"
+  ],
+  "up": "Utilities set to Bought in",
+  "gives": "Cheaper bills",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "utility-contracts"
+ },
+ {
+  "name": "Logistics",
+  "branch": "adm",
+  "tier": 3,
+  "kh": [
+   "A",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "intake-desk"
+  ],
+  "up": "A late delivery",
+  "gives": "Choose each delivery's arrival point and time",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "logistics"
+ },
+ {
+  "name": "Typing pool",
+  "branch": "adm",
+  "tier": 4,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "filing-system"
+  ],
+  "up": "Start",
+  "gives": "A clerk job; clerks clear paperwork",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "typing-pool"
+ },
+ {
+  "name": "Contract labour",
+  "branch": "adm",
+  "tier": 3,
+  "kh": [
+   "A",
+   "R"
+  ],
+  "rule": "all",
+  "pre": [
+   "grant-writing",
+   "furniture-workshop"
+  ],
+  "up": "Start",
+  "gives": "Outside firms pay for goods",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "contract-labour"
+ },
+ {
+  "name": "Ministry liaison",
+  "branch": "adm",
+  "tier": 3,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "grant-writing"
+  ],
+  "up": "Ministry memo",
+  "gives": "Memos come with a choice and better terms",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "ministry-liaison"
+ },
+ {
+  "name": "Public relations",
+  "branch": "adm",
+  "tier": 4,
+  "kh": [
+   "A",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "ministry-liaison"
+  ],
+  "up": "First bad news story (M12)",
+  "gives": "Reputation recovers faster; protestors leave sooner",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "public-relations"
+ },
+ {
+  "name": "Paperless office",
+  "branch": "adm",
+  "tier": 5,
+  "kh": [
+   "A",
+   "L"
+  ],
+  "rule": "all",
+  "pre": [
+   "typing-pool",
+   "computer-room"
+  ],
+  "up": "4-star grade",
+  "gives": "Paperwork halved",
+  "lean": "",
+  "pair": "",
+  "addon": "",
+  "id": "paperless-office"
+ },
+ {
+  "name": "Lobbying",
+  "branch": "adm",
+  "tier": 4,
+  "kh": [
+   "A"
+  ],
+  "rule": "all",
+  "pre": [
+   "ministry-liaison"
+  ],
+  "up": "Character scale leans strict",
+  "gives": "Easier Ministry targets",
+  "lean": "strict",
+  "pair": "open-books",
+  "addon": "",
+  "id": "lobbying"
+ },
+ {
+  "name": "Open books",
+  "branch": "adm",
+  "tier": 4,
+  "kh": [
+   "A",
+   "C"
+  ],
+  "rule": "all",
+  "pre": [
+   "ministry-liaison"
+  ],
+  "up": "Character scale leans caring",
+  "gives": "Better reputation and friendlier inspections",
+  "lean": "caring",
+  "pair": "lobbying",
+  "addon": "",
+  "id": "open-books"
+ }
+]

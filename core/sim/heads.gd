@@ -95,8 +95,10 @@ func hire_card() -> DeskWork.Item:
 	var record := warden()
 	if record == null:
 		return null
-	var cards := desk_work.items(record.id, &"research")
-	return cards[0] if not cards.is_empty() else null
+	for card in desk_work.items(record.id, &"research"):
+		if card.ref is String and find(StringName(card.ref)) != null:
+			return card
+	return null
 
 
 func hiring() -> DepartmentDef:
@@ -222,7 +224,7 @@ func _on_finished(owner: int, item: DeskWork.Item) -> void:
 				roster.add_xp(record, CARD_XP)
 	if item.kind != &"research":
 		return
-	var department := find(StringName(item.ref))
+	var department := find(StringName(item.ref)) if item.ref is String else null
 	if department == null:
 		return
 	for i in APPLICANTS:

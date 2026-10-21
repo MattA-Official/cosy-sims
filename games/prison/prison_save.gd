@@ -108,6 +108,9 @@ static func capture(main: Node) -> Dictionary:
 		"regime": (main.regime as Regime).to_data(),
 		"desk_work": (main.desk_work as DeskWork).capture(),
 		"in_tray": (main.in_tray as InTray).capture(),
+		"counters": (main.counters as Counters).capture(),
+		"knowhow": (main.knowhow as Knowhow).capture(),
+		"research": (main.research as Research).capture(),
 		"suggestions": (main.suggestions as Suggestions).capture(),
 		"visits": (main.visits as Visits).capture(),
 		"garden": (main.garden as Garden).capture(),
@@ -321,6 +324,14 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 		(main.suggestions as Suggestions).restore(data.suggestions)
 	if data.has("in_tray"):
 		(main.in_tray as InTray).restore(data.in_tray)
+	if data.has("counters"):
+		(main.counters as Counters).restore(data.counters)
+	if data.has("knowhow"):
+		(main.knowhow as Knowhow).restore(data.knowhow)
+	else:
+		ResearchWiring.new_game(main)
+	if data.has("research"):
+		(main.research as Research).restore(data.research)
 	var parole_data: Dictionary = data.get("parole", {})
 	var parole: Parole = main.parole
 	parole.today = parole_data.get("today", [])
