@@ -95,6 +95,7 @@ func _process(_delta: float) -> bool:
 	_test_readout_and_eyedropper()
 	_test_move_and_copy()
 	_test_templates()
+	_test_build_feel()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -4297,6 +4298,35 @@ func _test_templates() -> void:
 	_check(store.forget("My cell") and not store.names().has("My cell"), "and they can be forgotten")
 	_check(ClipPlan.texture(kept, map.floor_def).get_width() > 0, "each has a little plan to show")
 	DirAccess.remove_absolute(store.path)
+	main.free()
+
+
+func _test_build_feel() -> void:
+	var board: Node = root.get_node_or_null(^"Sounds")
+	_check(board != null and board.defs.size() == 8 and board.defs[&"build_place"].streams.size() == 3,
+			"the build sounds are loaded, three takes each")
+	_check(AudioServer.get_bus_index(&"Effects") >= 0 and AudioServer.get_bus_index(&"Music") >= 0,
+			"with buses for effects, interface, ambience and music")
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 0
+	root.add_child(main)
+	var controller: BuildController = main.controller
+	var map: BuildingMap = main.map
+	var feel: BuildFeel = main.build_feel
+	var land: Rect2i = map.land_bounds()
+	var spot := land.end - Vector2i(12, 12)
+	var effects := feel.get_child_count()
+	map.build_room(Rect2i(spot, Vector2i(3, 3)))
+	_check(feel.get_child_count() == effects, "nothing shows while not building")
+	controller.tool = BuildController.Tool.ROOM
+	map.build_room(Rect2i(spot + Vector2i(4, 0), Vector2i(3, 3)))
+	_check(feel.get_child_count() >= effects + 13, "building a room raises its walls and sweeps its floor")
+	var view: BuildingView = main.views[0]
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(spot + Vector2i(4, 0)), 0)
+	_check(not view._popping.is_empty(), "a placed object pops in")
+	effects = feel.get_child_count()
+	map.demolish(Rect2i(spot, Vector2i(3, 3)))
+	_check(feel.get_child_count() > effects, "and demolishing puffs up dust")
 	main.free()
 
 

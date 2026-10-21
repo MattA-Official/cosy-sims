@@ -374,6 +374,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _carried != null and (event.is_action_pressed("build_rotate")
 			or event.is_action_pressed("build_brush_smaller") or event.is_action_pressed("build_brush_bigger")):
 		_turn_carried(-1 if event.is_action_pressed("build_brush_smaller") else 1)
+		Sound.play(&"build_rotate")
 		get_viewport().set_input_as_handled()
 	elif _is_shortcut(event, KEY_C):
 		if copy_hovered():
@@ -390,6 +391,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("build_rotate") and tool == Tool.OBJECT:
 		object_angle = wrapf(snappedf(object_angle + deg_to_rad(rotation_step), deg_to_rad(rotation_step)),
 				0.0, TAU)
+		Sound.play(&"build_rotate")
 		get_viewport().set_input_as_handled()
 	elif tool == Tool.OBJECT and (event.is_action_pressed("build_brush_smaller")
 			or event.is_action_pressed("build_brush_bigger")):

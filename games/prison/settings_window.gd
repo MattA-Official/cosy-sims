@@ -1,7 +1,11 @@
 class_name SettingsWindow
 extends PanelContainer
-## How the game plays: difficulty and sentence length. Changing difficulty
+## How the game plays and sounds: difficulty, sentence length and volumes. Changing difficulty
 ## starts the Ministry's counts again. Toggle with F4.
+
+## A volume slider per sound bus: [bus, words].
+const VOLUMES := [[&"Master", "All sound"], [&"Effects", "Building and the prison"],
+		[&"Interface", "Menus and clicks"], [&"Ambience", "Surroundings"], [&"Music", "Music"]]
 
 var standing: Standing
 var sentences: Sentences
@@ -57,6 +61,18 @@ func _ready() -> void:
 	_length.tooltip_text = "How long new arrivals are sent here for. Prisoners already here keep theirs."
 	_length.item_selected.connect(func(index: int) -> void: sentences.length = index as Sentences.Length)
 	box.add_child(_row("Sentence length", _length))
+	box.add_child(HSeparator.new())
+	for entry: Array in VOLUMES:
+		var slider := HSlider.new()
+		slider.min_value = 0.0
+		slider.max_value = 1.0
+		slider.step = 0.05
+		slider.focus_mode = FOCUS_NONE
+		slider.value = Sound.volume(entry[0])
+		slider.value_changed.connect(func(amount: float) -> void:
+			Sound.set_volume(entry[0], amount)
+			Sound.play(&"build_place" if entry[0] != &"Interface" else &"build_rotate"))
+		box.add_child(_row(entry[1], slider))
 	visible = false
 
 

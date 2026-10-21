@@ -19,6 +19,7 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 
 DefaultActions="*res://core/input/default_actions.gd"
 Toasts="*res://core/ui/toasts.gd"
+Sounds="*res://core/audio/sounds.gd"
 
 [display]
 

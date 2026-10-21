@@ -115,6 +115,8 @@ var _wall_mesh := MeshInstance3D.new()
 var _glass_mesh := MeshInstance3D.new()
 var _objects := Node3D.new()
 var _objects_queued := false
+## Objects to pop into place the next time objects are drawn, by id.
+var _popping: Dictionary[int, bool] = {}
 var _stairs_material := MeshShapes.vertex_colour_material()
 var _labels := Node3D.new()
 ## What the labels were last decluttered for (camera, screen size and the
@@ -219,6 +221,23 @@ func _on_terrain_changed() -> void:
 ## Redraws just the objects, such as after dress_model would change.
 func redraw_objects() -> void:
 	_queue_objects()
+
+
+## Pops objects into place (a quick bounce in size) as they're next drawn.
+func pop(ids: Array[int]) -> void:
+	for id in ids:
+		_popping[id] = true
+	_queue_objects()
+
+
+func _pop(placed: BuildingMap.PlacedObject, node: Node3D, popping: Dictionary[int, bool]) -> void:
+	if not popping.has(placed.id) and not popping.has(placed.on):
+		return
+	var full := node.scale
+	node.scale = full * 0.55
+	var tween := node.create_tween()
+	tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(node, "scale", full, 0.28)
 
 
 func queue_rebuild() -> void:
@@ -829,6 +848,8 @@ func _add_fence(run: WallRun) -> void:
 func _build_objects() -> void:
 	for child in _objects.get_children():
 		child.queue_free()
+	var popping := _popping
+	_popping = {}
 	var cs := grid.cell_size
 	for flight: Staircase in map.stairs.values():
 		_add_stairs(flight)
@@ -848,6 +869,7 @@ func _build_objects() -> void:
 			if dress_model.is_valid():
 				dress_model.call(placed, model)
 			_objects.add_child(model)
+			_pop(placed, model, popping)
 			_add_dressing(placed, ground + 0.03)
 			continue
 		# Shrink a touch so neighbours and walls do not look fused together.
@@ -862,6 +884,7 @@ func _build_objects() -> void:
 		# Turning about Y goes the other way to turning a Vector2 on the ground.
 		instance.rotation.y = -placed.angle
 		_objects.add_child(instance)
+		_pop(placed, instance, popping)
 		_add_dressing(placed, ground + 0.03)
 
 

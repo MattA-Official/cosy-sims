@@ -108,6 +108,7 @@ var roster := StaffRoster.new()
 ## The prison's money, and what comes in and goes out.
 var ledger := Ledger.new()
 var build_costs := BuildCosts.new()
+var build_feel := BuildFeel.new()
 var finances := Finances.new()
 ## New prisoners arriving on the morning bus.
 var intake := Intake.new()
@@ -652,6 +653,8 @@ func _ready() -> void:
 	for key: Vector2i in saved.get("land_paid", {}):
 		land_plots.paid[key] = saved["land_paid"][key]
 	controller.land_plots = land_plots
+	for refused: Signal in [controller.land_refused, controller.spending_refused, controller.drop_refused]:
+		refused.connect(func(_why := "") -> void: Sound.play(&"build_error"))
 	controller.land_refused.connect(func() -> void:
 		Toasts.post("Not enough money", "That plot costs more than you have."))
 	controller.spending_refused.connect(func() -> void:
@@ -893,6 +896,15 @@ func _ready() -> void:
 		build_costs.refund_all = false
 	add_child(undo)
 	undo.start([building.changed, terrain.changed, water.changed, foliage.changed, paths.changed] as Array[Signal])
+	build_feel.name = "BuildFeel"
+	build_feel.building = building
+	build_feel.terrain = terrain
+	build_feel.cell_size = grid.cell_size
+	build_feel.view_for = func(level: int) -> BuildingView: return views.get(level)
+	build_feel.active = func() -> bool:
+		return controller.tool != BuildController.Tool.NONE and not undo.restoring()
+	add_child(build_feel)
+	build_feel.start()
 	# Land bought stays bought: undo starts again from the new boundary.
 	var tunnel_ends: Array = []
 	land_plots.buying.connect(func(_plot: Rect2i) -> void:
