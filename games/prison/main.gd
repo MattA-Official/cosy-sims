@@ -735,6 +735,8 @@ func _ready() -> void:
 					"The hire card is done: pick one on the Heads page (H)."))
 	for system: Object in [people, searching, infirmary, courses, workshop, finances]:
 		system.set(&"modifiers", modifiers)
+	jobs.job_finished.connect(roster.job_done)
+	people.pace_scales.append(roster.pace)
 	intake.name = "Intake"
 	intake.people = people
 	intake.building = building

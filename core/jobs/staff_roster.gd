@@ -9,10 +9,18 @@ extends Node
 ## and how their pay compares with the going rate, MORALE_STEP a day at
 ## most. Under QUIT_MORALE for QUIT_DAYS days running, they hand in their
 ## notice. A raise lifts it; letting someone go costs a day's pay.
+##
+## Staff get better with practice: XP_MINUTES of finished work is a point
+## of experience, and LEVEL_XP points make each level, which works faster
+## (LEVEL_PACE) and is paid WAGE_STEP more a level. Low morale brings sick
+## days: each night, under SICK_LINE, a chance of a day off tomorrow.
 
 signal changed
 ## Someone handed in their notice and won't be back.
 signal quit(record: Record)
+signal levelled_up(record: Record)
+## Someone won't be in tomorrow.
+signal off_sick(record: Record)
 
 const MORALE_START := 70.0
 const MORALE_STEP := 5.0
@@ -27,6 +35,16 @@ const APPLICANT_DAYS := 3
 ## What applicants ask, against the role's going rate.
 const ASKING := Vector2(0.85, 1.2)
 const RAISE := 0.1
+## Experience for levels 2 to 5, and how fast each level works.
+const LEVEL_XP: Array[float] = [2.0, 5.0, 9.0, 14.0]
+const LEVEL_PACE: Array[float] = [1.0, 1.1, 1.1, 1.15, 1.15]
+const MOST_LEVEL := 5
+const XP_MINUTES := 480.0
+const WAGE_STEP := 0.05
+## Under this morale, each point under is SICK_CHANCE more chance a night
+## of a sick day tomorrow.
+const SICK_LINE := 40.0
+const SICK_CHANCE := 0.005
 
 ## One member of staff, or an applicant hoping to be.
 class Record:
@@ -40,6 +58,10 @@ class Record:
 	var low_days := 0
 	var hired_day := 0
 	var look_seed := 0
+	var level := 1
+	var xp := 0.0
+	## Off sick through this day.
+	var off_until := 0
 	## An applicant's last day of waiting.
 	var until := 0
 	## On site now, or null; and on their way in by car or bus.
@@ -103,9 +125,40 @@ func record_of(person: Person) -> Record:
 ## The next of a role and shift to come in: not here and not on their way.
 func next_in(role: StringName, shift: StringName) -> Record:
 	for record in on(role, shift):
-		if record.person == null and not record.coming:
+		if record.person == null and not record.coming and not is_off(record):
 			return record
 	return null
+
+
+## Whether someone is off sick today.
+func is_off(record: Record) -> bool:
+	return record.off_until >= _day()
+
+
+## Experience for someone, levelling them up as they pass each line.
+func add_xp(record: Record, amount: float) -> void:
+	record.xp += amount
+	while record.level < MOST_LEVEL and record.xp >= LEVEL_XP[record.level - 1]:
+		record.level += 1
+		levelled_up.emit(record)
+	changed.emit()
+
+
+## Experience for a finished job: its time at work.
+func job_done(job: Job, worker: Person) -> void:
+	var record := record_of(worker)
+	if record == null:
+		return
+	var minutes := 0.0
+	for stage in job.stages:
+		minutes += stage.minutes if stage.do == Job.Do.WORK else 2.0
+	add_xp(record, minutes / XP_MINUTES)
+
+
+## How fast someone works for their level; 1 for anyone not on staff.
+func pace(person: Person) -> float:
+	var record := record_of(person)
+	return LEVEL_PACE[record.level - 1] if record != null else 1.0
 
 
 ## Takes on an applicant. Returns their record, or null.
@@ -171,7 +224,7 @@ func link(person: Person, record: Record) -> void:
 ## A day of someone's pay, at their shift's rate.
 func day_pay(record: Record) -> int:
 	var shift := _shift(record.shift)
-	return roundi(record.wage * (shift.pay_scale if shift != null else 1.0))
+	return roundi(record.wage * (1.0 + WAGE_STEP * (record.level - 1)) * (shift.pay_scale if shift != null else 1.0))
 
 
 ## What a shift's staff cost before the shift's own rate.
@@ -208,6 +261,9 @@ func nightly() -> void:
 		if record.low_days >= QUIT_DAYS:
 			records.erase(record)
 			quit.emit(record)
+		elif _rng.randf() < maxf(0.0, (SICK_LINE - record.morale) * SICK_CHANCE):
+			record.off_until = _day()
+			off_sick.emit(record)
 	refresh_applicants()
 	changed.emit()
 
@@ -276,8 +332,9 @@ func summary(person: Person) -> String:
 		return ""
 	var feeling := "happy at work" if record.morale >= 70.0 else "content" if record.morale >= 40.0 \
 			else "unhappy at work" if record.morale >= QUIT_MORALE else "thinking of quitting"
-	return "Morale %d (%s), %s a day, hired day %d" % [roundi(record.morale), feeling,
-			Ledger.text(day_pay(record)), record.hired_day]
+	return "Level %d%s, morale %d (%s), %s a day, hired day %d" % [record.level,
+			" (%d%% faster)" % roundi((pace(person) - 1.0) * 100.0) if record.level > 1 else "",
+			roundi(record.morale), feeling, Ledger.text(day_pay(record)), record.hired_day]
 
 
 func _make(role: StringName, shift: StringName) -> Record:
@@ -308,7 +365,8 @@ func _data(record: Record) -> Dictionary:
 			"traits": record.traits.map(func(t: TraitDef) -> StringName: return t.id), "wage": record.wage,
 			"morale": record.morale, "low_days": record.low_days, "hired_day": record.hired_day,
 			"look_seed": record.look_seed, "until": record.until, "mood_sum": record.mood_sum,
-			"mood_hours": record.mood_hours}
+			"mood_hours": record.mood_hours, "level": record.level, "xp": record.xp,
+			"off_until": record.off_until}
 
 
 func _from(entry: Dictionary) -> Record:
@@ -329,6 +387,9 @@ func _from(entry: Dictionary) -> Record:
 	record.until = entry.get("until", 0)
 	record.mood_sum = entry.get("mood_sum", 0.0)
 	record.mood_hours = entry.get("mood_hours", 0)
+	record.level = entry.get("level", 1)
+	record.xp = entry.get("xp", 0.0)
+	record.off_until = entry.get("off_until", 0)
 	next_id = maxi(next_id, record.id + 1)
 	return record
 

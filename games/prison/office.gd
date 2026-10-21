@@ -16,6 +16,8 @@ const DESK_JOB := &"office"
 const DESK_MINUTES := 120.0
 ## Shortest sit for a small pile.
 const LEAST_MINUTES := 15.0
+## Roles who work everyone's paperwork rather than a pile of their own.
+const CLERKS: Array[StringName] = [&"clerk"]
 
 var people: People
 var claims: Claims
@@ -123,7 +125,10 @@ func _post_desk_job(person: Person) -> void:
 		return
 	var record := roster.record_of(person) if roster != null else null
 	var speed := desk_speed(record)
-	var pile := desk_work.pile_minutes(record.id) if record != null and desk_work != null else 0.0
+	var clerk := CLERKS.has(person.role)
+	var pile := 0.0
+	if desk_work != null:
+		pile = desk_work.all_paperwork() if clerk else desk_work.pile_minutes(record.id) if record != null else 0.0
 	var job := Job.new()
 	job.kind = DESK_JOB
 	job.only_for = person
@@ -132,7 +137,10 @@ func _post_desk_job(person: Person) -> void:
 	var sit := Job.at(Job.Do.WORK, desk[0].x, desk[0].y)
 	sit.minutes = clampf(pile / speed, LEAST_MINUTES, DESK_MINUTES) if pile > 0.0 else DESK_MINUTES
 	sit.doing = _doing(record, person)
-	if record != null and desk_work != null:
+	if clerk and desk_work != null:
+		sit.finish = func(stage: Job.Stage, _worker: Person) -> void:
+			desk_work.work_paperwork(stage.minutes * speed)
+	elif record != null and desk_work != null:
 		var owner := record.id
 		sit.finish = func(stage: Job.Stage, _worker: Person) -> void:
 			desk_work.work(owner, stage.minutes * speed)
@@ -141,6 +149,8 @@ func _post_desk_job(person: Person) -> void:
 
 
 func _doing(record: StaffRoster.Record, person: Person) -> String:
+	if CLERKS.has(person.role):
+		return "Doing the paperwork" if desk_work != null and desk_work.all_paperwork() > 0.0 else "Filing"
 	if record != null and desk_work != null:
 		var pile: Array = desk_work.piles.get(record.id, [])
 		if not pile.is_empty():

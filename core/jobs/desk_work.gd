@@ -88,6 +88,43 @@ func work(owner: int, minutes: float) -> void:
 	changed.emit()
 
 
+## Clerks' work: desk minutes off the biggest paperwork pile, then the
+## next. Returns the minutes used.
+func work_paperwork(minutes: float) -> float:
+	var used := 0.0
+	while minutes - used > 0.001:
+		var biggest := 0
+		var most := 0.0
+		for owner: int in piles:
+			var paper := pile_minutes(owner, &"paperwork")
+			if paper > most:
+				most = paper
+				biggest = owner
+		if most <= 0.0:
+			break
+		for item: Item in piles[biggest]:
+			if item.kind == &"paperwork":
+				var take := minf(minutes - used, item.minutes)
+				item.minutes -= take
+				used += take
+				if item.minutes <= 0.001:
+					(piles[biggest] as Array).erase(item)
+					finished.emit(biggest, item)
+				break
+		if overloaded.has(biggest) and pile_minutes(biggest) < CLEAR:
+			overloaded.erase(biggest)
+	changed.emit()
+	return used
+
+
+## Paperwork waiting on every desk.
+func all_paperwork() -> float:
+	var sum := 0.0
+	for owner: int in piles:
+		sum += pile_minutes(owner, &"paperwork")
+	return sum
+
+
 ## Minutes left on a pile, of one kind or of everything.
 func pile_minutes(owner: int, kind: StringName = &"") -> float:
 	var sum := 0.0

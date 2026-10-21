@@ -273,8 +273,9 @@ func _list_staff() -> void:
 		_payroll_box.add_child(_note("Nobody yet."))
 	for record in roster.records:
 		var role := shifts.role_def(record.role)
-		var words := "%s, %s shift. %s a day. Morale %d." % [role.display_name if role != null else String(record.role),
-				record.shift, Ledger.text(roster.day_pay(record)), roundi(record.morale)]
+		var words := "%s, %s shift, level %d. %s a day. Morale %d.%s" % [role.display_name if role != null else String(record.role),
+				record.shift, record.level, Ledger.text(roster.day_pay(record)), roundi(record.morale),
+				" Off sick today." if roster.is_off(record) else ""]
 		var raise := Button.new()
 		raise.text = "Raise"
 		raise.focus_mode = FOCUS_NONE

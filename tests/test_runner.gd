@@ -4511,6 +4511,37 @@ func _test_heads() -> void:
 				"the warden has a desk job of their own")
 	heads.let_go(head)
 	_check(heads.head(security) == null and modifiers.value(&"search_speed") == 0.0, "letting a head go ends the bonus")
+	# Clerks take the biggest paperwork pile first.
+	desk_work.add_paperwork(warden.id, 100.0)
+	desk_work.add_paperwork(77, 30.0)
+	desk_work.work_paperwork(110.0)
+	_check(is_equal_approx(desk_work.pile_minutes(warden.id, &"paperwork") + desk_work.pile_minutes(77, &"paperwork"), 20.0)
+			and desk_work.pile_minutes(77, &"paperwork") <= 30.0, "a clerk works down the paperwork, biggest pile first")
+	var roster: StaffRoster = main.roster
+	var cook: StaffRoster.Record = roster.take_on(&"cook", &"day")
+	var pay := roster.day_pay(cook)
+	var job := Job.new()
+	var stage := Job.at(Job.Do.WORK, 0, 0)
+	stage.minutes = StaffRoster.XP_MINUTES * 2.0
+	job.stages = [stage]
+	var levelled := [0]
+	roster.levelled_up.connect(func(_r: StaffRoster.Record) -> void: levelled[0] += 1)
+	var person := Person.new()
+	person.profile["staff_id"] = cook.id
+	roster.job_done(job, person)
+	_check(cook.level == 2 and levelled[0] == 1, "two days' worth of work makes a level")
+	_check(roster.day_pay(cook) > pay and is_equal_approx(roster.pace(person), StaffRoster.LEVEL_PACE[1]),
+			"a level works faster and is paid more")
+	cook.morale = 0.0
+	var sick := false
+	for i in 200:
+		cook.low_days = 0
+		cook.morale = 0.0
+		roster.nightly()
+		if roster.is_off(cook):
+			sick = true
+			break
+	_check(sick and roster.next_in(&"cook", &"day") != cook, "low morale brings a sick day, and they stay home")
 	main.queue_free()
 
 

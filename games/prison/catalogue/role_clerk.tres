@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="StaffRoleDef" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://core/jobs/staff_role_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/heads.svg" id="2_icon"]
+[ext_resource type="Resource" path="res://games/prison/catalogue/nameplate.tres" id="3_name"]
+[ext_resource type="Resource" path="res://games/prison/catalogue/mug.tres" id="4_mug"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"clerk"
+display_name = "Clerk"
+description = "Works through the paperwork piling up on the warden's and heads' desks, the biggest pile first. Needs a free office desk."
+job_kinds = Array[StringName]([&"office"])
+wage = 50
+outfit_colour = Color(0.45, 0.42, 0.38, 1)
+icon = ExtResource("2_icon")
+claims = &"office_desk"
+only_shifts = Array[StringName]([&"day"])
+dressing = Array[Resource]([ExtResource("3_name"), ExtResource("4_mug")])

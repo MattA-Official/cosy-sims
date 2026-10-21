@@ -148,6 +148,7 @@ const ROLES: Array[StaffRoleDef] = [
 	preload("res://games/prison/catalogue/role_warden.tres"),
 	preload("res://games/prison/catalogue/role_teacher.tres"),
 	preload("res://games/prison/catalogue/role_counsellor.tres"),
+	preload("res://games/prison/catalogue/role_clerk.tres"),
 ]
 
 ## Staff shifts. Days start at 06:00 so the cook is in for breakfast;
