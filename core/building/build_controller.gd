@@ -127,6 +127,8 @@ const MIN_PLANT_DENSITY := 0.25
 @export var bad_colour := Color(1.0, 0.4, 0.4, 0.45)
 ## Outlines plots of land for sale.
 @export var land_colour := Color(1.0, 0.85, 0.4, 0.5)
+## Land paid for but waiting on planning permission.
+@export var pending_colour := Color(0.55, 0.7, 1.0, 0.3)
 @export var demolish_colour := Color(1.0, 0.3, 0.25, 0.4)
 @export var preview_wall_height := 1.0
 
@@ -1708,6 +1710,10 @@ func _preview_land() -> void:
 	if not _has_hover:
 		return
 	var chosen := _land_choice()
+	# Bought and waiting on planning permission: a soft blue wash.
+	for plots: Array in land_plots.pending.values():
+		for plot: Rect2i in plots:
+			_shapes.cells(BuildingMap.cells_in(plot), pending_colour, NAN, 0.03)
 	for plot: Rect2i in _land_cache[1]:
 		if chosen.has(plot):
 			continue
