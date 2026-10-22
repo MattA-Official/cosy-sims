@@ -7497,6 +7497,9 @@ func _test_self_sufficient() -> void:
 		if net.kind == &"sewage" and not net.plant.is_empty():
 			drains = net
 	_check(drains != null and drains.short_minutes >= Utilities.BACKED_UP_MINUTES, "a broken treatment plant backs the drains up")
+	var shower_room := building.levels[level].room_at_point(shower.centre)
+	_check(utilities.smelly_rooms.has(shower_room) and people.quality(level, shower_room).parts.any(func(part: Array) -> bool:
+			return part[0] == "Backed-up drains"), "and the shower room smells, which costs it quality")
 	people.broken.erase(Vector2i(0, plant))
 	# A generator with the mains: spare power sold, fuel burnt, wear.
 	var generator := _place_anywhere(main, PrisonCatalogue.object(&"generator"))

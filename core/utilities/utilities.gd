@@ -33,6 +33,8 @@ const SOLD_LINE := "Power sold"
 ## Minutes of too little sewage capacity before the drains back up.
 const BACKED_UP_MINUTES := 30.0
 const SMELL := &"smelly_drains"
+## Room quality lost to backed-up drains.
+const SMELL_QUALITY := -2.0
 const DARK := &"lights_out"
 const NAMES := {&"power": "power", &"water": "water", &"sewage": "drains"}
 const RUNS := {&"power": "cable", &"water": "water pipe", &"sewage": "sewage pipe"}
@@ -88,6 +90,8 @@ var off: Dictionary[Vector2i, Array] = {}
 var on_stores: Dictionary[Vector2i, bool] = {}
 ## Indoor rooms with no light after dark.
 var dark_rooms: Dictionary[Room, bool] = {}
+## Rooms with backed-up drains, which count against their quality.
+var smelly_rooms: Dictionary[Room, bool] = {}
 ## Pence a unit when bought in; location packs may change them.
 var prices: Dictionary[StringName, int] = {&"power": 15, &"water": 10, &"sewage": 8}
 var building: Building:
@@ -99,6 +103,8 @@ var people: People:
 		people = value
 		people.use_filters.append(func(_person: Person, placed: BuildingMap.PlacedObject) -> bool:
 			return not _off_objects.has(placed))
+		people.quality_extras.append(func(_level: int, room: Room) -> Array:
+			return [["Backed-up drains", SMELL_QUALITY]] if smelly_rooms.has(room) else [])
 var ledger: Ledger
 var day_night: DayNight
 var calendar: Calendar
@@ -265,8 +271,12 @@ func balance(minutes: float) -> void:
 	_off_objects.clear()
 	dark_rooms.clear()
 	var lit: Dictionary[Room, bool] = {}
+	var smelt := smelly_rooms.duplicate()
+	smelly_rooms.clear()
 	for net in networks:
 		_balance(net, hours, lit)
+	if smelt != smelly_rooms and people != null:
+		people.quality_changed()
 	# What no run reaches is off; indoor rooms no cable reaches are dark.
 	for n: int in building.levels:
 		var map: BuildingMap = building.levels[n]
@@ -440,8 +450,7 @@ func _smell(net: Network) -> void:
 			var room := map.room_at_point((entry[1] as BuildingMap.PlacedObject).centre)
 			if room != null:
 				rooms[room] = true
-	if rooms.is_empty():
-		return
+	smelly_rooms.merge(rooms)
 	for person in people.people:
 		var here := people.room_of(person)
 		if not here.is_empty() and rooms.has(here[1]):
@@ -501,6 +510,9 @@ func _doors() -> void:
 
 ## Leaving Self-sufficient: everything back on.
 func _release() -> void:
+	if not smelly_rooms.is_empty() and people != null:
+		smelly_rooms.clear()
+		people.quality_changed()
 	off.clear()
 	on_stores.clear()
 	_off_objects.clear()
