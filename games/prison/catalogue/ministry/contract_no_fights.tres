@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="ContractDef" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/sim/contract_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+
+[sub_resource type="Resource" id="Resource_goal"]
+script = ExtResource("2_goal")
+id = &"contract_no_fights"
+title = "A week without a fight"
+grant = 0
+kind = &"fight"
+amount = 0.0
+target = &""
+hold_days = 7
+counted = true
+
+[resource]
+script = ExtResource("1_def")
+id = &"no_fights"
+title = "A week without a fight"
+goal = SubResource("Resource_goal")
+at_most = true
+days = 14
+reward = 2500
+penalty = 500
+min_grade = 2

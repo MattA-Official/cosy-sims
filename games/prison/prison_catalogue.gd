@@ -353,7 +353,24 @@ const REPUTATION: Array[ReputationEventDef] = [
 	preload("res://games/prison/catalogue/reputation/rep_celebrity.tres"),
 	preload("res://games/prison/catalogue/reputation/rep_hen.tres"),
 	preload("res://games/prison/catalogue/reputation/rep_town_meeting.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_inspection_good.tres"),
+	preload("res://games/prison/catalogue/reputation/rep_inspection_bad.tres"),
 ]
+
+## The Ministry's contracts, and what its inspector checks.
+const CONTRACTS: Array[ContractDef] = [
+	preload("res://games/prison/catalogue/ministry/contract_house_low.tres"),
+	preload("res://games/prison/catalogue/ministry/contract_house_medium.tres"),
+	preload("res://games/prison/catalogue/ministry/contract_house_high.tres"),
+	preload("res://games/prison/catalogue/ministry/contract_no_escapes.tres"),
+	preload("res://games/prison/catalogue/ministry/contract_no_fights.tres"),
+	preload("res://games/prison/catalogue/ministry/contract_courses.tres"),
+	preload("res://games/prison/catalogue/ministry/contract_parole.tres"),
+	preload("res://games/prison/catalogue/ministry/contract_reformed.tres"),
+	preload("res://games/prison/catalogue/ministry/contract_tidy.tres"),
+	preload("res://games/prison/catalogue/ministry/contract_mood.tres"),
+]
+const INSPECTION: InspectionDef = preload("res://games/prison/catalogue/ministry/inspection_standard.tres")
 
 ## Where a prison can stand (see Arrivals): the countryside, and the
 ## location packs, shown but not yet playable.

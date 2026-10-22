@@ -45,6 +45,10 @@ class Card:
 		return def.body.replace("{who}", words)
 
 var defs: Array[TrayCardDef] = []
+## (id: StringName) -> TrayCardDef: cards made on the spot rather than
+## listed in defs, such as the Ministry's offers, so saves find them.
+## Optional.
+var lookup: Callable
 ## Research bonuses: tray_days. Optional.
 var modifiers: Modifiers
 var desk_work: DeskWork
@@ -243,7 +247,7 @@ func find(id: StringName) -> TrayCardDef:
 	for def in defs:
 		if def.id == id:
 			return def
-	return null
+	return lookup.call(id) if lookup.is_valid() else null
 
 
 func capture() -> Dictionary:

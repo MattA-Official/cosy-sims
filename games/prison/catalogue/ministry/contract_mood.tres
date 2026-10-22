@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="ContractDef" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/sim/contract_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+
+[sub_resource type="Resource" id="Resource_goal"]
+script = ExtResource("2_goal")
+id = &"contract_mood"
+title = "Average mood over 65 for 5 nights"
+grant = 0
+kind = &"average_mood"
+amount = 65.0
+target = &""
+hold_days = 5
+counted = false
+
+[resource]
+script = ExtResource("1_def")
+id = &"mood"
+title = "Average mood over 65 for 5 nights"
+goal = SubResource("Resource_goal")
+at_most = false
+days = 14
+reward = 2000
+penalty = 500
+min_grade = 2

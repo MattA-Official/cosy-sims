@@ -131,6 +131,7 @@ static func capture(main: Node) -> Dictionary:
 		"surprises": (main.surprises as Surprises).capture(),
 		"utilities": (main.utilities as Utilities).capture(),
 		"backdrop": (main.backdrop as Backdrop).capture(),
+		"ministry": (main.ministry as Ministry).capture(),
 		"arrivals": (main.arrivals as Arrivals).capture(),
 		"usual_meal": String(main.get_meta(&"usual_meal", "")),
 		"suggestions": (main.suggestions as Suggestions).capture(),
@@ -379,6 +380,8 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	(main.utilities as Utilities).restore(data.get("utilities", {}))
 	if data.has("backdrop"):
 		(main.backdrop as Backdrop).restore(data["backdrop"])
+	if data.has("ministry"):
+		(main.ministry as Ministry).restore(data["ministry"])
 	(main.arrivals as Arrivals).restore(data.get("arrivals", {}))
 	if data.has("surprises"):
 		(main.surprises as Surprises).restore(data["surprises"])

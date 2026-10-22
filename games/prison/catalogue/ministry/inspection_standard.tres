@@ -1,0 +1,64 @@
+[gd_resource type="Resource" script_class="InspectionDef" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://core/sim/inspection_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/inspection_check_def.gd" id="2_check"]
+
+[sub_resource type="Resource" id="Check_rooms"]
+script = ExtResource("2_check")
+id = &"rooms"
+words = "the rooms"
+measure = &"rooms"
+pass_line = 50.0
+at_most = false
+passed_by_flag = &""
+
+[sub_resource type="Resource" id="Check_cleaning"]
+script = ExtResource("2_check")
+id = &"cleaning"
+words = "the cleaning"
+measure = &"litter_share"
+pass_line = 0.25
+at_most = true
+passed_by_flag = &""
+
+[sub_resource type="Resource" id="Check_meals"]
+script = ExtResource("2_check")
+id = &"meals"
+words = "the kitchen"
+measure = &"good_meals"
+pass_line = 0.6
+at_most = false
+passed_by_flag = &""
+
+[sub_resource type="Resource" id="Check_staffing"]
+script = ExtResource("2_check")
+id = &"staffing"
+words = "the staffing"
+measure = &"staff_ratio"
+pass_line = 0.2
+at_most = false
+passed_by_flag = &""
+
+[sub_resource type="Resource" id="Check_health"]
+script = ExtResource("2_check")
+id = &"health"
+words = "health care"
+measure = &"medical"
+pass_line = 1.0
+at_most = false
+passed_by_flag = &"health_inspection_ready"
+
+[sub_resource type="Resource" id="Check_safety"]
+script = ExtResource("2_check")
+id = &"safety"
+words = "safety"
+measure = &"safety_stars"
+pass_line = 3.0
+at_most = false
+passed_by_flag = &""
+
+[resource]
+script = ExtResource("1_def")
+id = &"standard"
+checks = Array[ExtResource("2_check")]([SubResource("Check_rooms"), SubResource("Check_cleaning"), SubResource("Check_meals"), SubResource("Check_staffing"), SubResource("Check_health"), SubResource("Check_safety")])
+allowed_fails = 1

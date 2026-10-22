@@ -79,6 +79,11 @@ var report_lines: Array[Callable] = []
 var star_adjusts: Array[Callable] = []
 ## () -> float: more scales on the daily grant.
 var grant_scales: Array[Callable] = []
+## () -> int: the most stars the grade may show, such as a Ministry cap.
+var grade_limits: Array[Callable] = []
+## Measure name -> how much more it weighs in the grade, such as a year's
+## focus counting double.
+var weight_scales: Dictionary[String, float] = {}
 ## The paper's news, if set: () -> Array of {words, change}, weightiest
 ## first. The first leads the paper; the rest go under "Town talk".
 var news: Callable
@@ -410,14 +415,20 @@ func grade_day() -> void:
 		var average := sum / (recent.size() + 1)
 		var stars := clampi(roundi(average), 1, 5)
 		measures[def.display_name] = stars
-		weighted += average * def.weight
-		weights += def.weight
+		var weight: float = def.weight * weight_scales.get(def.display_name, 1.0)
+		weighted += average * weight
+		weights += weight
 		if stars < lowest:
 			lowest = stars
 			lowest_name = def.display_name
 	var mean := clampi(roundi(weighted / maxf(weights, 0.001)), 1, 5)
 	grade = mini(mean, lowest + SPREAD)
 	held_by = lowest_name if grade < mean else ""
+	for limit in grade_limits:
+		var most: int = limit.call()
+		if grade > most:
+			grade = most
+			held_by = "the Ministry"
 	history.append({"day": clock.day() - 1 if clock != null else 0, "grade": grade,
 			"stars": tonight, "values": values.duplicate()})
 	if history.size() > HISTORY_NIGHTS:

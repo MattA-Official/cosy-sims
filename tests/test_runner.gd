@@ -9,6 +9,7 @@ var _escapes_on := false
 ## Weather is off too, but for the weather test, and so are surprises.
 var _weather_on := false
 var _surprises_on := false
+var _ministry_on := false
 
 
 func _initialize() -> void:
@@ -19,7 +20,10 @@ func _initialize() -> void:
 		if node is Weather and not _weather_on:
 			(node as Weather).enabled = false
 		if node is Surprises and not _surprises_on:
-			(node as Surprises).frequency = Surprises.Frequency.OFF)
+			(node as Surprises).frequency = Surprises.Frequency.OFF
+		# The Ministry's fifth-star rule and contracts only where a test wants them.
+		if node is Ministry and not _ministry_on:
+			(node as Ministry).enabled = false)
 
 
 func _process(_delta: float) -> bool:
@@ -145,6 +149,7 @@ func _process(_delta: float) -> bool:
 	_test_protest()
 	_test_seasons()
 	_test_surprises()
+	_test_ministry()
 	_test_utilities()
 	_test_arrivals()
 	if _failures == 0:
@@ -6998,6 +7003,143 @@ func _test_seasons() -> void:
 	copy.defs.assign(PrisonCatalogue.WEATHER)
 	copy.restore(saved)
 	_check(copy.today.id == &"heat", "the weather is saved")
+	copy.free()
+	main.queue_free()
+
+
+func _test_ministry() -> void:
+	_ministry_on = true
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	_ministry_on = false
+	var ministry: Ministry = main.ministry
+	var standing: Standing = main.standing
+	var in_tray: InTray = main.in_tray
+	var ledger: Ledger = main.ledger
+	var counters: Counters = main.counters
+	var research: Research = main.research
+	var clock: GameClock = main.clock
+	var desk: DeskWork = main.desk_work
+	(main.misconduct as Misconduct).enabled = false
+	desk.red_tape = DeskWork.RedTape.LIGHT
+	_check(ministry.enabled and ministry.grade_limit() == 4, "a fifth star needs a passed inspection")
+	# Contracts come as memos.
+	ministry.last_offer = -10
+	ministry.midnight()
+	var offers := in_tray.cards.filter(func(c: InTray.Card) -> bool: return String(c.def.id).begins_with("ministry_offer:"))
+	_check(offers.size() == 1, "the Ministry offers a contract in the in-tray")
+	in_tray.answer(offers[0], 0)
+	_check(ministry.running != null and not ministry.contract_words().is_empty(), "taking it on starts the contract")
+	var saved_offer := in_tray.find(offers[0].def.id)
+	_check(saved_offer != null and saved_offer.choices.size() == 2, "offers can be found again from a save")
+	var courses: ContractDef = PrisonCatalogue.CONTRACTS.filter(func(c: ContractDef) -> bool: return c.id == &"courses")[0]
+	ministry.take(courses)
+	var before := ledger.balance
+	standing.count(&"courses_passed", 4)
+	ministry.midnight()
+	_check(ministry.running == null and ledger.balance - before == courses.reward and counters.total(&"contract_done") == 1,
+			"a contract done pays its reward")
+	var tidy: ContractDef = PrisonCatalogue.CONTRACTS.filter(func(c: ContractDef) -> bool: return c.id == &"tidy")[0]
+	ministry.take(tidy)
+	ministry.started_day = clock.day() - tidy.days
+	desk.red_tape = DeskWork.RedTape.FULL
+	before = ledger.balance
+	ministry.held = 0
+	ministry.base = 0.0
+	ministry.measure = ministry.measure
+	(main.people as People).items.drop_on_floor(Vector3i(0, 30, 30), PrisonCatalogue.LITTER[0], 10)
+	ministry.midnight()
+	_check(ministry.running == null and before - ledger.balance == tidy.penalty, "a contract missed under Full red tape costs its fine")
+	desk.red_tape = DeskWork.RedTape.LIGHT
+	var house_low: ContractDef = PrisonCatalogue.CONTRACTS.filter(func(c: ContractDef) -> bool: return c.id == &"house_low")[0]
+	research._finish(research.card(&"lobbying"), 0, true)
+	_check(ministry.amount(house_low) == 8.0, "Lobbying makes targets easier")
+	# The seasonal review.
+	ministry.season_sum = 9.0
+	ministry.season_nights = 2
+	ministry.review()
+	_check(is_equal_approx(ministry.grant_scale(), 1.0 + Ministry.GOOD_BONUS) and ministry.booked != null
+			and ministry.booked.reason == &"claim" and ministry.booked.announced, "a good season earns a bigger grant and an inspector to earn a fifth star")
+	_check(in_tray.cards.any(func(c: InTray.Card) -> bool: return c.def.id == &"ministry_inspection"), "a letter says when the inspector comes")
+	_check(ministry.booked.day == clock.day() + Ministry.NOTICE_DAYS, "three days' notice")
+	ministry.booked = null
+	research._finish(research.card(&"inspection-prep"), 0, true)
+	_check(ministry.book(&"review").day == clock.day() + Ministry.NOTICE_DAYS + Ministry.PREP_DAYS, "Inspection prep gives more notice")
+	# The visit: an inspector walks round and checks six things.
+	var passing := func(check: InspectionCheckDef, _inspector: Object) -> Array: return [check.pass_line, "fine"]
+	ministry.measure = passing
+	ministry.booked.day = clock.day() + (1 if clock.hour() >= Ministry.INSPECT_HOUR else 0)
+	clock.jump_to_hour(Ministry.INSPECT_HOUR)
+	_check(ministry.booked != null and ministry.booked.started, "the inspector arrives at 10:00")
+	var inspectors := (main.people as People).people.filter(func(p: Person) -> bool: return p.profile.has("inspector"))
+	for i in 60:
+		clock.advance(1.0)
+	var told := inspectors.is_empty() or (inspectors[0] as Person).activity.begins_with("Checking") \
+			or String((inspectors[0] as Person).profile.get("doing", "")).begins_with("Checking")
+	for i in 70:
+		clock.advance(1.0)
+	_check(ministry.booked == null and ministry.last != null and ministry.last.results.size() == 6 and ministry.last.passed,
+			"and after two hours of checks passes the prison")
+	_check(told, "the inspector says what they're checking")
+	# The rest look round at once.
+	ministry.arrive = Callable()
+	_check(ministry.grade_limit() == 5 and counters.total(&"inspection") == 1, "a pass lets a fifth star show")
+	# A failed visit caps the grade until the fixes are done.
+	var failing := func(check: InspectionCheckDef, _inspector: Object) -> Array:
+		var bad := check.id in [&"meals", &"staffing"]
+		return [(check.pass_line + 1.0 if check.at_most else check.pass_line - 1.0) if bad else check.pass_line, "poor" if bad else "fine"]
+	ministry.measure = failing
+	standing.grade = 3
+	ministry.book(&"review", clock.day())
+	ministry.start_inspection()
+	_check(ministry.last != null and not ministry.last.passed and ministry.cap == 3 and ministry.last.fixes == [&"meals", &"staffing"],
+			"failing two checks holds the grade with fixes to do")
+	standing.grade_day()
+	_check(standing.grade <= 3, "the grade stays held")
+	_check(ministry.words().size() > 3, "the office lists the fixes")
+	ministry.measure = passing
+	ministry.midnight()
+	_check(ministry.cap == 0, "fixes done lift the hold")
+	research._finish(research.card(&"open-books"), 0, true)
+	ministry.measure = failing
+	ministry.book(&"review", clock.day())
+	ministry.start_inspection()
+	_check(ministry.last.passed, "Open books makes inspections friendlier")
+	# Health inspection ready passes the medical check.
+	var health_fails := func(check: InspectionCheckDef, _inspector: Object) -> Array:
+		return [0.0 if check.id == &"health" else check.pass_line, ""]
+	ministry.measure = health_fails
+	research._finish(research.card(&"health-inspection-ready"), 0, true)
+	ministry.book(&"review", clock.day())
+	ministry.start_inspection()
+	_check(ministry.last.results["health"][0] == true, "Health inspection ready passes the medical check")
+	# Long-term plan: a focus for the year.
+	research._finish(research.card(&"long-term-plan"), 0, true)
+	var calendar: Calendar = main.calendar
+	ministry.season_sum = 3.0
+	ministry.season_nights = 1
+	if calendar.season() == calendar.seasons[0]:
+		ministry.review()
+		var memo: Array = in_tray.cards.filter(func(c: InTray.Card) -> bool: return c.def.id == &"ministry_focus")
+		_check(memo.size() == 1, "a new year asks for a focus")
+		in_tray.answer(memo[0], 1)
+		standing.grade_day()
+		_check(ministry.focus == "Safety" and standing.weight_scales.get("Safety", 1.0) == 2.0, "the focus counts double")
+	# Red tape Off: no inspections and no star limit.
+	desk.red_tape = DeskWork.RedTape.OFF
+	_check(ministry.grade_limit() == 5 and not ministry.inspections_on(), "with Red tape off there are no inspections")
+	desk.red_tape = DeskWork.RedTape.LIGHT
+	# The real measures read the prison.
+	for check in PrisonCatalogue.INSPECTION.checks:
+		_check(not (PrisonMinistry.measure(main, check.measure, null)[1] as String).is_empty(), "the inspector can check %s" % check.words)
+	var copy := Ministry.new()
+	copy.contracts.assign(PrisonCatalogue.CONTRACTS)
+	copy.inspection = PrisonCatalogue.INSPECTION
+	ministry.take(house_low)
+	copy.restore(ministry.capture())
+	_check(copy.running == house_low and copy.last != null and copy.focus == ministry.focus and copy.ceiling_until == ministry.ceiling_until,
+			"the Ministry's state is saved")
 	copy.free()
 	main.queue_free()
 

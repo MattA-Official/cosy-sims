@@ -149,6 +149,7 @@ var protest := Protest.new()
 var calendar := Calendar.new()
 var weather := Weather.new()
 var surprises := Surprises.new()
+var ministry := Ministry.new()
 var utilities := Utilities.new()
 var arrivals := Arrivals.new()
 var health_tint := HealthTint.new()
@@ -1298,6 +1299,7 @@ func _ready() -> void:
 	ResearchWiring.setup(self)
 	PrisonLife.setup(self)
 	PrisonWorld.setup(self)
+	PrisonMinistry.setup(self)
 	if saved.is_empty():
 		ResearchWiring.new_game(self)
 	if not saved.is_empty():
@@ -1455,6 +1457,7 @@ func _add_hud() -> void:
 	office_window.events = events
 	office_window.shop = shop
 	office_window.reputation = reputation
+	office_window.ministry = ministry
 	book.add_page(&"office", "Office", "The warden's office: intake, goals and the grade. O", "office",
 			office_window)
 	heads_window.heads = heads

@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="ContractDef" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/sim/contract_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+
+[sub_resource type="Resource" id="Resource_goal"]
+script = ExtResource("2_goal")
+id = &"contract_parole"
+title = "Grant parole 3 times"
+grant = 0
+kind = &"parole_granted"
+amount = 3.0
+target = &""
+hold_days = 0
+counted = true
+
+[resource]
+script = ExtResource("1_def")
+id = &"parole"
+title = "Grant parole 3 times"
+goal = SubResource("Resource_goal")
+at_most = false
+days = 20
+reward = 2000
+penalty = 0
+min_grade = 2

@@ -102,6 +102,7 @@ const SOURCES := [
 	[&"tray_card", &"admin", 1.0, "In-tray"],
 	[&"tray_card_warden", &"admin", 1.0, "In-tray"],
 	[&"grant_goal", &"admin", 5.0, "Grant goals"],
+	[&"contract_done", &"admin", 5.0, "Ministry contracts"],
 ]
 
 ## Flags cards switch on for systems still to come, and where they'll be
@@ -110,8 +111,6 @@ const SOURCES := [
 const FUTURE_FLAGS := {
 	&"petitions": "M11 prisoner life",
 	&"phone_credit": "M11 privileges", &"earned_privileges": "M11 privileges",
-	&"lobbying": "M12 Ministry", &"long_term_plan": "M12 Ministry",
-	&"inspection_prep": "M12 inspections", &"health_inspection_ready": "M12 inspections",
 	&"escape_review": "Escape Mode", &"day_release": "Open Prison add-on", &"prison_farm": "Prison Farm add-on",
 	&"gang_intelligence": "Maximum Security add-on", &"armoury": "Maximum Security add-on",
 	&"marksmen": "Maximum Security add-on", &"mediation": "Maximum Security add-on",

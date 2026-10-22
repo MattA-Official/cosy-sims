@@ -22,6 +22,9 @@ var events: Events
 var shop: Shop
 ## What the town thinks, shown beside the grade. Optional.
 var reputation: Reputation
+## The Ministry's contract, review and inspections. Optional.
+var ministry: Ministry
+var _ministry := Label.new()
 ## Protestors at the gate, and () -> bool to have a word with them (and
 ## whether the warden may). Optional.
 var protest: Protest
@@ -192,6 +195,16 @@ func _ready() -> void:
 		box.add_child(goals_heading)
 		_goals.add_theme_constant_override(&"separation", 2)
 		box.add_child(_goals)
+		if ministry != null:
+			box.add_child(HSeparator.new())
+			var ministry_heading := Label.new()
+			ministry_heading.text = "The Ministry"
+			ministry_heading.theme_type_variation = &"HeaderLabel"
+			ministry_heading.tooltip_text = "A contract at a time, a review at the end of each season, and inspectors who check the prison against its grade. A fifth star shows only after a passed inspection (with Red tape on)."
+			ministry_heading.mouse_filter = MOUSE_FILTER_PASS
+			box.add_child(ministry_heading)
+			_ministry.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(_ministry)
 		_report.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_report.theme_type_variation = &"SubtleLabel"
 		box.add_child(_report)
@@ -540,6 +553,8 @@ func _show_standing(warden: bool) -> void:
 			grant.text = Ledger.text(goal.grant)
 			row.add_child(grant)
 			_goals.add_child(row)
+	if ministry != null:
+		_ministry.text = "\n".join(ministry.words())
 	_report.text = ("Today's report:\n" + standing.report) if warden and not standing.report.is_empty() else ""
 
 

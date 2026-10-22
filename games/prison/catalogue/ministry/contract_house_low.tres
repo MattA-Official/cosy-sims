@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="ContractDef" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/sim/contract_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+
+[sub_resource type="Resource" id="Resource_goal"]
+script = ExtResource("2_goal")
+id = &"contract_house_low"
+title = "House 10 low-category prisoners"
+grant = 0
+kind = &"prisoners_of"
+amount = 10.0
+target = &"low"
+hold_days = 3
+counted = false
+
+[resource]
+script = ExtResource("1_def")
+id = &"house_low"
+title = "House 10 low-category prisoners"
+goal = SubResource("Resource_goal")
+at_most = false
+days = 20
+reward = 2500
+penalty = 500
+min_grade = 1

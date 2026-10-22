@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ReputationEventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/world/reputation_event_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"inspection_good"
+change = 5.0
+tone = 0
+topic = &"kindness"
+headlines = Array[String](["Inspector gives the prison a clean bill of health", "Ministry praises a well-run prison"])
+weight = 5
+once_a_day = false

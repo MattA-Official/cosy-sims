@@ -169,7 +169,8 @@ static func _open_day(main: Node) -> void:
 			var key := [here[0], (here[1] as Room).cells[0]]
 			if not seen.has(key):
 				seen.append(key)
-		person.activity = "Touring the prison"
+		var touring: String = person.profile.get("doing", "Touring the prison")
+		person.activity = touring
 		person.timer = 3.0
 		var rooms := people._all_rooms().filter(func(pair: Array) -> bool: return (pair[1] as Room).type != &"")
 		for i in 3:
@@ -178,7 +179,7 @@ static func _open_day(main: Node) -> void:
 			var pair: Array = rooms[rng.randi() % rooms.size()]
 			var room: Room = pair[1]
 			var cell: Vector2i = room.cells[rng.randi() % room.cells.size()]
-			if people.walk_to(person, pair[0], Vector2(cell) + Vector2(0.5, 0.5), "Touring the prison"):
+			if people.walk_to(person, pair[0], Vector2(cell) + Vector2(0.5, 0.5), touring):
 				break
 		return true)
 
