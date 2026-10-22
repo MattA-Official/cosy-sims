@@ -1,0 +1,109 @@
+[gd_resource type="Resource" script_class="ScenarioDef" load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://core/sim/scenario_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+[ext_resource type="Script" path="res://core/sim/cast_line_def.gd" id="3_line"]
+
+[sub_resource type="Resource" id="goal_0"]
+script = ExtResource("2_goal")
+id = &"kitchen"
+title = "Open a kitchen"
+grant = 0
+kind = &"has_room"
+amount = 1.0
+target = &"kitchen"
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="goal_1"]
+script = ExtResource("2_goal")
+id = &"laundry"
+title = "Open a laundry"
+grant = 0
+kind = &"has_room"
+amount = 1.0
+target = &"laundry"
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="goal_2"]
+script = ExtResource("2_goal")
+id = &"workshop"
+title = "Open a workshop"
+grant = 0
+kind = &"has_room"
+amount = 1.0
+target = &"workshop"
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="goal_3"]
+script = ExtResource("2_goal")
+id = &"goods"
+title = "Sell 10 goods from the workshop"
+grant = 0
+kind = &"goods_sold"
+amount = 10.0
+target = &""
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="line_0"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"start"
+words = "A full block needs feeding, washing and keeping busy. The Ministry would like a kitchen, a laundry and a workshop, with prisoners at work in them."
+
+[sub_resource type="Resource" id="line_1"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"start"
+words = "Cooks cook, cleaners clean and the rest of us carry. Give each room the right things in it and the jobs board fills itself."
+
+[sub_resource type="Resource" id="line_2"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"goal:kitchen"
+words = "That's a proper kitchen. Mind the stores: no crates, no dinners."
+
+[sub_resource type="Resource" id="line_3"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"goal:workshop"
+words = "A workshop! Busy hands, quiet wings, and the goods pay their way."
+
+[sub_resource type="Resource" id="line_4"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"nudge"
+words = "Have a look at the jobs board. If nobody's taking a job, it's usually missing a person or a thing to do it with."
+
+[sub_resource type="Resource" id="line_5"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"won"
+words = "Kitchen, laundry and workshop, all running. Next, the Ministry would like to talk about money."
+
+[resource]
+script = ExtResource("1_def")
+id = &"ch2_running_it"
+title = "Running it"
+description = "The same block, now full. Get a kitchen, a laundry and a workshop running, and sell ten goods."
+layout = 0
+starting_money = -1
+starting_grade = 0
+starting_prisoners = 12
+win_goals = Array[ExtResource("2_goal")]([SubResource("goal_0"), SubResource("goal_1"), SubResource("goal_2"), SubResource("goal_3")])
+day_limit = 0
+chapter = 2
+next = &"ch3_money"
+teaches = "Staff, jobs and logistics: the kitchen, the laundry and the workshop."
+settings = {
+"utilities": 0,
+"weather": false,
+"surprises": 0,
+"red_tape": 0,
+"protestors": false
+}
+locked_tools = Array[StringName]([&"terrain", &"zone", &"route"])
+cast_lines = Array[ExtResource("3_line")]([SubResource("line_0"), SubResource("line_1"), SubResource("line_2"), SubResource("line_3"), SubResource("line_4"), SubResource("line_5")])

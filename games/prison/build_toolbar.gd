@@ -111,6 +111,19 @@ var _density_slider: HSlider
 var _strength_slider: HSlider
 
 
+## Tools hidden until a campaign chapter teaches them, by name in
+## lower case, such as &"terrain".
+var locked: Array[StringName] = []:
+	set(value):
+		locked = value
+		for tool: BuildController.Tool in _tool_buttons:
+			(_tool_buttons[tool] as Control).visible = not is_locked(tool)
+
+
+func is_locked(tool: BuildController.Tool) -> bool:
+	return locked.has(StringName(String(BuildController.Tool.keys()[tool]).to_lower()))
+
+
 func _ready() -> void:
 	alignment = BoxContainer.ALIGNMENT_END
 	add_child(_thumbnails)
@@ -152,6 +165,7 @@ func _ready() -> void:
 	controller.hint_changed.connect(func() -> void: _hint.text = controller.hint())
 	controller.brush_changed.connect(_show_brush)
 	_on_tool_changed(controller.tool)
+	locked = locked
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -165,7 +179,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		index = 11
 	elif index > 9:
 		index = -1
-	if index >= 0 and index < TOOLS.size():
+	if index >= 0 and index < TOOLS.size() and not is_locked(TOOLS[index][0]):
 		var tool: BuildController.Tool = TOOLS[index][0]
 		controller.tool = BuildController.Tool.NONE if controller.tool == tool else tool
 		get_viewport().set_input_as_handled()

@@ -22,3 +22,16 @@ extends Resource
 @export var win_goals: Array[GoalDef] = []
 ## Days to win in; 0 for no limit.
 @export var day_limit := 0
+## The campaign chapter this is, from 1; 0 for a lone scenario.
+@export var chapter := 0
+## The chapter after this one, or &"".
+@export var next: StringName
+## What the chapter teaches, for the new game screen.
+@export var teaches: String
+## Settings the chapter starts with, such as {"utilities": 0}; the game
+## says what each key sets.
+@export var settings: Dictionary = {}
+## Build tools hidden until a later chapter teaches them, such as &"terrain".
+@export var locked_tools: Array[StringName] = []
+## What the cast say, and when.
+@export var cast_lines: Array[CastLineDef] = []

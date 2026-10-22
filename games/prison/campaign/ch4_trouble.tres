@@ -1,0 +1,93 @@
+[gd_resource type="Resource" script_class="ScenarioDef" load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://core/sim/scenario_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+[ext_resource type="Script" path="res://core/sim/cast_line_def.gd" id="3_line"]
+
+[sub_resource type="Resource" id="goal_0"]
+script = ExtResource("2_goal")
+id = &"no_escapes"
+title = "Five nights without an escape"
+grant = 0
+kind = &"days_without"
+amount = 1.0
+target = &"escape"
+hold_days = 5
+counted = false
+
+[sub_resource type="Resource" id="goal_1"]
+script = ExtResource("2_goal")
+id = &"no_sit_ins"
+title = "Five nights without a sit-in"
+grant = 0
+kind = &"days_without"
+amount = 1.0
+target = &"sit_in"
+hold_days = 5
+counted = false
+
+[sub_resource type="Resource" id="line_0"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"start"
+words = "This prison has a reputation, Warden, and not a good one. Five quiet nights would go a long way with the Ministry."
+
+[sub_resource type="Resource" id="line_1"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"start"
+words = "Thirty of them and plenty of grumbles. Searches find the contraband, guards on patrol stop the scuffles, and a fence keeps the wanderers in."
+
+[sub_resource type="Resource" id="line_2"]
+script = ExtResource("3_line")
+who = &"gage"
+trigger = &"start"
+words = "I'll be keeping an eye on this one. A tidy, safe prison passes inspection; a muddle does not."
+
+[sub_resource type="Resource" id="line_3"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"first:escape"
+words = "One's gone over the wall. It happens to the best of us. A perimeter fence and a guard on the gate, and it won't happen twice."
+
+[sub_resource type="Resource" id="line_4"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"first:sit_in"
+words = "A sit-in. Find out what they want: usually it's something you can fix."
+
+[sub_resource type="Resource" id="line_5"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"nudge"
+words = "Rough few days. Look at what's got them riled: the Why lines in the inspector will tell you."
+
+[sub_resource type="Resource" id="line_6"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"won"
+words = "Five quiet nights. Well done, Warden. One last thing: the town would like to see inside."
+
+[resource]
+script = ExtResource("1_def")
+id = &"ch4_trouble"
+title = "Trouble"
+description = "A guarded prison with thirty restless prisoners. Go five nights without an escape or a sit-in."
+layout = 10
+starting_money = -1
+starting_grade = 0
+starting_prisoners = 30
+win_goals = Array[ExtResource("2_goal")]([SubResource("goal_0"), SubResource("goal_1")])
+day_limit = 0
+chapter = 4
+next = &"ch5_open_day"
+teaches = "Security: searches, contraband, escapes and sit-ins."
+settings = {
+"utilities": 1,
+"weather": true,
+"surprises": 1,
+"red_tape": 1,
+"protestors": false
+}
+locked_tools = Array[StringName]([&"terrain"])
+cast_lines = Array[ExtResource("3_line")]([SubResource("line_0"), SubResource("line_1"), SubResource("line_2"), SubResource("line_3"), SubResource("line_4"), SubResource("line_5"), SubResource("line_6")])

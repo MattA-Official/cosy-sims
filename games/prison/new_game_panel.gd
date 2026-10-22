@@ -10,6 +10,8 @@ signal back_pressed
 const EMPTY_ABOUT := "Flat land by the road, and nothing on it yet. Build the lot yourself."
 ## Scenarios come after the samples in the start choices, from this value.
 const FIRST_SCENARIO := 100
+## Campaign chapters come after the scenarios, from this value.
+const FIRST_CHAPTER := 200
 ## Short lines for the sample prisons offered, by SamplePrisons index.
 const START_ABOUT: Dictionary[int, String] = {
 	0: "A small cell block with a corridor and a fenced yard. Plenty of room to grow.",
@@ -84,6 +86,11 @@ func _ready() -> void:
 		starts.append([SamplePrisons.NAMES[index], index])
 	for i in PrisonCatalogue.SCENARIOS.size():
 		starts.append(["Scenario: %s" % PrisonCatalogue.SCENARIOS[i].title, FIRST_SCENARIO + i])
+	var campaign := Campaign.new()
+	campaign.chapters.assign(PrisonCatalogue.CHAPTERS)
+	for def in campaign.unlocked():
+		starts.append(["Chapter %d: %s" % [def.chapter, def.title], FIRST_CHAPTER + def.chapter - 1])
+	campaign.free()
 	box.add_child(_choices(starts, _start, func(value: int) -> void:
 		_start = value
 		_show_about()))
@@ -184,6 +191,8 @@ func _show_about() -> void:
 	var scenario := _scenario()
 	if scenario != null:
 		_start_about.text = scenario.description + (" You have %d days." % scenario.day_limit if scenario.day_limit > 0 else "")
+		if scenario.chapter > 0:
+			_start_about.text += " Teaches: " + scenario.teaches
 	else:
 		_start_about.text = EMPTY_ABOUT if _start < 0 else START_ABOUT.get(_start, SamplePrisons.CHALLENGES[_start])
 	_difficulty_about.text = Standing.DIFFICULTIES[_difficulty].description
@@ -199,6 +208,8 @@ func _show_about() -> void:
 
 
 func _scenario() -> ScenarioDef:
+	if _start >= FIRST_CHAPTER:
+		return PrisonCatalogue.CHAPTERS[_start - FIRST_CHAPTER]
 	return PrisonCatalogue.SCENARIOS[_start - FIRST_SCENARIO] if _start >= FIRST_SCENARIO else null
 
 

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="CastDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/sim/cast_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"stan"
+display_name = "Old Stan"
+role = "your longest-serving guard"
+staff_role = &"guard"

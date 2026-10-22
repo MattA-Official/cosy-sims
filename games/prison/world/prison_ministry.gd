@@ -3,7 +3,7 @@ class_name PrisonMinistry
 ## contracts and its inspector measure, the inspector's walk round as a
 ## visitor, and where its money, grade cap and focus land.
 
-const INSPECTOR_NAMES: Array[String] = ["Mrs Pennywhistle", "Mr Hargreaves", "Ms Okonkwo", "Mr Fairweather",
+const INSPECTOR_NAMES: Array[String] = ["Inspector Gage", "Mr Hargreaves", "Ms Okonkwo", "Mr Fairweather",
 		"Dr Ashby", "Mrs Lindqvist"]
 ## Meal moodlets that count as a good meal for the inspector.
 const GOOD_MEALS: Array[StringName] = [&"good_meal", &"hearty_meal", &"lovely_meal"]

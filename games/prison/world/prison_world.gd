@@ -218,6 +218,7 @@ static func close_doors(main: Node) -> float:
 	var tourists: Array = people.people.filter(func(p: Person) -> bool:
 		return p.profile.has("tour") and not p.profile.has("film_crew"))
 	var score := tour_score(main, tourists)
+	main.set_meta(&"open_day_score", score)
 	(main.protest as Protest).ease(OPEN_DAY_EASE)
 	if score > OPEN_GOOD:
 		reputation.report(&"open_day_good")

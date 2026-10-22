@@ -76,7 +76,7 @@ var inspection: InspectionDef
 var in_tray: InTray:
 	set(value):
 		in_tray = value
-		in_tray.lookup = _memo
+		in_tray.lookups.append(_memo)
 		in_tray.answered.connect(_on_answered)
 var calendar: Calendar:
 	set(value):

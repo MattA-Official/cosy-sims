@@ -1,0 +1,94 @@
+[gd_resource type="Resource" script_class="ScenarioDef" load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://core/sim/scenario_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+[ext_resource type="Script" path="res://core/sim/cast_line_def.gd" id="3_line"]
+
+[sub_resource type="Resource" id="goal_0"]
+script = ExtResource("2_goal")
+id = &"open_day"
+title = "An open day scoring 70"
+grant = 0
+kind = &"open_day_score"
+amount = 70.0
+target = &""
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="goal_1"]
+script = ExtResource("2_goal")
+id = &"town"
+title = "A town reputation of 65"
+grant = 0
+kind = &"reputation"
+amount = 65.0
+target = &""
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="line_0"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"start"
+words = "The town has questions, Warden, and the paper prints all of them. Open the doors, show them what you do, and send people home better than they came."
+
+[sub_resource type="Resource" id="line_1"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"start"
+words = "Classes, counselling and a kind word. Set an open day in the office when the place looks its best."
+
+[sub_resource type="Resource" id="line_2"]
+script = ExtResource("3_line")
+who = &"gage"
+trigger = &"first:inspection"
+words = "A fair inspection. I've written it all down, as I always do."
+
+[sub_resource type="Resource" id="line_3"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"first:bad_news"
+words = "Bad headline in the paper. Don't let it get you down; good news travels too."
+
+[sub_resource type="Resource" id="line_4"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"nudge"
+words = "The town's not won over yet. A tidy place and a good open day change minds."
+
+[sub_resource type="Resource" id="line_5"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"won"
+words = "The town is proud of its prison, and so is the Ministry. That's the last of my letters, Warden. Carry on as long as you like."
+
+[sub_resource type="Resource" id="line_6"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"won"
+words = "Thirty-one years now. Best one yet."
+
+[resource]
+script = ExtResource("1_def")
+id = &"ch5_open_day"
+title = "Open day"
+description = "A reforming prison with the town watching. Hold an open day that scores 70, and win the town's good opinion."
+layout = 12
+starting_money = -1
+starting_grade = 0
+starting_prisoners = 0
+win_goals = Array[ExtResource("2_goal")]([SubResource("goal_0"), SubResource("goal_1")])
+day_limit = 0
+chapter = 5
+next = &""
+teaches = "Reform, reputation, seasons and the town."
+settings = {
+"utilities": 1,
+"weather": true,
+"surprises": 2,
+"red_tape": 1,
+"seasons": true,
+"protestors": true
+}
+locked_tools = Array[StringName]([])
+cast_lines = Array[ExtResource("3_line")]([SubResource("line_0"), SubResource("line_1"), SubResource("line_2"), SubResource("line_3"), SubResource("line_4"), SubResource("line_5"), SubResource("line_6")])

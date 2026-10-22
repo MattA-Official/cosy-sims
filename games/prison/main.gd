@@ -150,6 +150,7 @@ var calendar := Calendar.new()
 var weather := Weather.new()
 var surprises := Surprises.new()
 var ministry := Ministry.new()
+var campaign := Campaign.new()
 var utilities := Utilities.new()
 var arrivals := Arrivals.new()
 var health_tint := HealthTint.new()
@@ -1300,6 +1301,7 @@ func _ready() -> void:
 	PrisonLife.setup(self)
 	PrisonWorld.setup(self)
 	PrisonMinistry.setup(self)
+	PrisonCampaign.setup(self, saved.is_empty())
 	if saved.is_empty():
 		ResearchWiring.new_game(self)
 	if not saved.is_empty():

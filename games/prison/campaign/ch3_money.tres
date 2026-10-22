@@ -1,0 +1,87 @@
+[gd_resource type="Resource" script_class="ScenarioDef" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://core/sim/scenario_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+[ext_resource type="Script" path="res://core/sim/cast_line_def.gd" id="3_line"]
+
+[sub_resource type="Resource" id="goal_0"]
+script = ExtResource("2_goal")
+id = &"three_stars"
+title = "Reach a three-star grade"
+grant = 0
+kind = &"grade"
+amount = 3.0
+target = &""
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="goal_1"]
+script = ExtResource("2_goal")
+id = &"in_credit"
+title = "Stay in credit for 3 nights"
+grant = 0
+kind = &"balance"
+amount = 0.0
+target = &""
+hold_days = 3
+counted = false
+
+[sub_resource type="Resource" id="line_0"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"start"
+words = "Every prisoner brings a grant, and every grant depends on the grade. Keep the books in order, Warden: the Ministry reads them closely."
+
+[sub_resource type="Resource" id="line_1"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"start"
+words = "Wages go out every day, whatever's coming in. Take in as many as you can look after and no more."
+
+[sub_resource type="Resource" id="line_2"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"goal:three_stars"
+words = "Three stars! The grant's going up, and so's morale in the staff room."
+
+[sub_resource type="Resource" id="line_3"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"first:grant_goal"
+words = "A grant goal met. The Ministry pays its debts promptly."
+
+[sub_resource type="Resource" id="line_4"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"nudge"
+words = "Money's tight. Check the finance window: one idle room or one too many staff on nights can do it."
+
+[sub_resource type="Resource" id="line_5"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"won"
+words = "Three stars and in credit. The Ministry is impressed. It has a harder posting for you."
+
+[resource]
+script = ExtResource("1_def")
+id = &"ch3_money"
+title = "Money and grade"
+description = "A paying prison on a tight budget. Reach three stars and keep the balance above nothing for three nights."
+layout = 11
+starting_money = 4000
+starting_grade = 0
+starting_prisoners = 0
+win_goals = Array[ExtResource("2_goal")]([SubResource("goal_0"), SubResource("goal_1")])
+day_limit = 0
+chapter = 3
+next = &"ch4_trouble"
+teaches = "The ledger, intake and grant goals."
+settings = {
+"utilities": 0,
+"weather": false,
+"surprises": 0,
+"red_tape": 1,
+"protestors": false
+}
+locked_tools = Array[StringName]([&"terrain", &"route"])
+cast_lines = Array[ExtResource("3_line")]([SubResource("line_0"), SubResource("line_1"), SubResource("line_2"), SubResource("line_3"), SubResource("line_4"), SubResource("line_5")])

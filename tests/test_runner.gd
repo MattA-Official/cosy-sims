@@ -150,6 +150,7 @@ func _process(_delta: float) -> bool:
 	_test_seasons()
 	_test_surprises()
 	_test_ministry()
+	_test_campaign()
 	_test_utilities()
 	_test_arrivals()
 	if _failures == 0:
@@ -7141,6 +7142,68 @@ func _test_ministry() -> void:
 	_check(copy.running == house_low and copy.last != null and copy.focus == ministry.focus and copy.ceiling_until == ministry.ceiling_until,
 			"the Ministry's state is saved")
 	copy.free()
+	main.queue_free()
+
+
+func _test_campaign() -> void:
+	Standing.next_scenario = &"ch1_new_warden"
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 0
+	root.add_child(main)
+	Standing.next_scenario = &""
+	var campaign: Campaign = main.campaign
+	campaign.progress_path = "user://test_campaign.cfg"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(campaign.progress_path))
+	var standing: Standing = main.standing
+	var in_tray: InTray = main.in_tray
+	var counters: Counters = main.counters
+	_check(campaign.active() and campaign.chapter.chapter == 1, "chapter one starts")
+	_check((main.utilities as Utilities).mode == Utilities.Mode.OFF and not (main.weather as Weather).enabled
+			and (main.desk_work as DeskWork).red_tape == DeskWork.RedTape.OFF, "it starts with the simple settings")
+	var toolbar = main.get_node("HUD/BuildToolbar")
+	_check(toolbar.is_locked(BuildController.Tool.TERRAIN) and not toolbar.is_locked(BuildController.Tool.ROOM)
+			and not (toolbar._tool_buttons[BuildController.Tool.TERRAIN] as Control).visible, "tools not taught yet are hidden")
+	campaign.trigger(&"start")
+	var letters := func() -> Array:
+		return in_tray.cards.filter(func(c: InTray.Card) -> bool: return String(c.def.id).begins_with("cast:"))
+	_check(letters.call().size() == 2 and (letters.call()[0] as InTray.Card).def.title.begins_with("Mrs Pennywhistle"),
+			"the Ministry and Old Stan write when it starts")
+	_check(campaign.trigger(&"start") == 0, "each line is said once")
+	_check(in_tray.find((letters.call()[0] as InTray.Card).def.id) != null, "letters can be found again from a save")
+	for card: InTray.Card in letters.call():
+		in_tray.answer(card, 0)
+	counters.add(&"fight")
+	_check(letters.call().size() == 1, "the first fight gets a word from Stan")
+	campaign.night(true)
+	campaign.night(true)
+	_check(letters.call().size() == 2, "a bad run gets a kind nudge")
+	# Winning the chapter.
+	standing.scenario_done[&"house_twelve"] = true
+	(main.clock as GameClock).advance(1.0)
+	_check(letters.call().size() == 3, "a goal done gets a word")
+	var next: Array = []
+	campaign.next_chosen.connect(func(def: ScenarioDef) -> void: next.append(def))
+	campaign.win()
+	_check(campaign.done().has(&"ch1_new_warden") and campaign.unlocked().size() == 2, "a won chapter unlocks the next")
+	var offer: Array = in_tray.cards.filter(func(c: InTray.Card) -> bool: return String(c.def.id).begins_with("chapter_done:"))
+	_check(offer.size() == 1, "the next chapter is offered")
+	in_tray.answer(offer[0], 0)
+	_check(next.size() == 1 and (next[0] as ScenarioDef).id == &"ch2_running_it", "and can be started")
+	# The chapters' own goals.
+	(main.ledger as Ledger).balance = 50
+	var in_credit: GoalDef = PrisonCatalogue.scenario(&"ch3_money").win_goals[1]
+	_check(standing.goal_value(in_credit) == 50.0, "the balance is a goal")
+	main.set_meta(&"open_day_score", 72.0)
+	_check(standing.goal_value(PrisonCatalogue.scenario(&"ch5_open_day").win_goals[0]) == 72.0, "so is the open day's score")
+	for def in PrisonCatalogue.CHAPTERS:
+		for line in def.cast_lines:
+			_check(campaign.cast_member(line.who) != null, "%s: everyone who speaks is in the cast" % def.title)
+		_check(def.next.is_empty() or PrisonCatalogue.scenario(def.next) != null, "%s leads on" % def.title)
+	var copy := Campaign.new()
+	copy.restore(campaign.capture())
+	_check(copy.shown.size() == campaign.shown.size() and copy.won, "the chapter's lines are saved")
+	copy.free()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(campaign.progress_path))
 	main.queue_free()
 
 

@@ -1,0 +1,87 @@
+[gd_resource type="Resource" script_class="ScenarioDef" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://core/sim/scenario_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://core/sim/goal_def.gd" id="2_goal"]
+[ext_resource type="Script" path="res://core/sim/cast_line_def.gd" id="3_line"]
+
+[sub_resource type="Resource" id="goal_0"]
+script = ExtResource("2_goal")
+id = &"house_twelve"
+title = "House 12 prisoners"
+grant = 0
+kind = &"prisoners"
+amount = 12.0
+target = &""
+hold_days = 0
+counted = false
+
+[sub_resource type="Resource" id="goal_1"]
+script = ExtResource("2_goal")
+id = &"content"
+title = "Average mood over 50 for 2 nights"
+grant = 0
+kind = &"average_mood"
+amount = 50.0
+target = &""
+hold_days = 2
+counted = false
+
+[sub_resource type="Resource" id="line_0"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"start"
+words = "Welcome, Warden. The Ministry needs twelve prisoners housed and content. Each one needs a bed, a meal and a wash, and the timetable says when they get them."
+
+[sub_resource type="Resource" id="line_1"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"start"
+words = "Thirty years I've walked these corridors. Give them a bed, a hot meal and a wash, and they'll give you no bother. Click on anyone and they'll tell you what's on their mind."
+
+[sub_resource type="Resource" id="line_2"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"goal:house_twelve"
+words = "Twelve under one roof. Now keep their spirits up: a yard to stretch their legs and a bit of quiet at night go a long way."
+
+[sub_resource type="Resource" id="line_3"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"first:fight"
+words = "A scuffle. It happens. Plenty to do and a full belly keep it rare."
+
+[sub_resource type="Resource" id="line_4"]
+script = ExtResource("3_line")
+who = &"stan"
+trigger = &"nudge"
+words = "Don't fret, Warden. Look at who's unhappy and ask them why. Usually it's something simple: no bed, no supper, no shower."
+
+[sub_resource type="Resource" id="line_5"]
+script = ExtResource("3_line")
+who = &"pennywhistle"
+trigger = &"won"
+words = "Splendid. Twelve housed and settled. The Ministry has another job for you when you're ready."
+
+[resource]
+script = ExtResource("1_def")
+id = &"ch1_new_warden"
+title = "New warden"
+description = "Your first prison: a small cell block and a yard. Take in twelve prisoners and keep them content for two nights."
+layout = 0
+starting_money = -1
+starting_grade = 0
+starting_prisoners = 0
+win_goals = Array[ExtResource("2_goal")]([SubResource("goal_0"), SubResource("goal_1")])
+day_limit = 0
+chapter = 1
+next = &"ch2_running_it"
+teaches = "Rooms, the daily regime and prisoners' needs."
+settings = {
+"utilities": 0,
+"weather": false,
+"surprises": 0,
+"red_tape": 0,
+"protestors": false
+}
+locked_tools = Array[StringName]([&"terrain", &"path", &"zone", &"route"])
+cast_lines = Array[ExtResource("3_line")]([SubResource("line_0"), SubResource("line_1"), SubResource("line_2"), SubResource("line_3"), SubResource("line_4"), SubResource("line_5")])

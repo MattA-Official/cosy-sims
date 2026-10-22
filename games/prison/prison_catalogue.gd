@@ -639,8 +639,23 @@ const SCENARIOS: Array[ScenarioDef] = [
 ]
 
 
+## The light campaign's chapters, in order, and its recurring cast.
+const CHAPTERS: Array[ScenarioDef] = [
+	preload("res://games/prison/campaign/ch1_new_warden.tres"),
+	preload("res://games/prison/campaign/ch2_running_it.tres"),
+	preload("res://games/prison/campaign/ch3_money.tres"),
+	preload("res://games/prison/campaign/ch4_trouble.tres"),
+	preload("res://games/prison/campaign/ch5_open_day.tres"),
+]
+const CAST: Array[CastDef] = [
+	preload("res://games/prison/campaign/cast_pennywhistle.tres"),
+	preload("res://games/prison/campaign/cast_gage.tres"),
+	preload("res://games/prison/campaign/cast_stan.tres"),
+]
+
+
 static func scenario(id: StringName) -> ScenarioDef:
-	for def in SCENARIOS:
+	for def in SCENARIOS + CHAPTERS:
 		if def.id == id:
 			return def
 	return null
