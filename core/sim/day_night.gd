@@ -50,6 +50,8 @@ func _ready() -> void:
 	if sky != null:
 		_day_sky_top = sky.sky_top_color
 		_day_sky_horizon = sky.sky_horizon_color
+		if sky.sky_cover == null:
+			sky.sky_cover = stars()
 	apply()
 
 
@@ -88,11 +90,34 @@ func apply() -> void:
 		var grey := Color(0.62, 0.65, 0.7)
 		sky.sky_top_color = night_sky_top.lerp(_day_sky_top.lerp(grey, overcast), light)
 		sky.sky_horizon_color = night_sky_horizon.lerp(_day_sky_horizon.lerp(grey, overcast * 0.6), light)
+		# Stars come out as it gets dark, unless it's cloudy.
+		sky.sky_cover_modulate = Color(1, 1, 1, (1.0 - light) * (1.0 - overcast))
 		var fog := night_fog.lerp(day_fog, light)
 		sky.ground_horizon_color = fog
 		sky.ground_bottom_color = fog
 		if fog_material != null:
 			fog_material.set_shader_parameter("fog_colour", fog)
+
+
+## A night sky's worth of stars, as a sky cover: soft dots, a few bright,
+## thinning towards the horizon.
+static func stars(count := 900) -> ImageTexture:
+	var image := Image.create(1024, 512, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for i in count:
+		# The top half of the picture is the sky; fewer down by the horizon.
+		var y := int(pow(rng.randf(), 1.4) * 250.0)
+		var x := rng.randi_range(0, 1023)
+		var bright := rng.randf_range(0.35, 1.0) * (1.0 - y / 300.0)
+		var tint := Color(1.0, 0.97, 0.9).lerp(Color(0.85, 0.9, 1.0), rng.randf())
+		image.set_pixel(x, y, Color(tint, bright))
+		if rng.randf() < 0.08:
+			for step: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+				var at := Vector2i(x, y) + step
+				if at.x >= 0 and at.x < 1024 and at.y >= 0:
+					image.set_pixelv(at, Color(tint, bright * 0.4))
+	return ImageTexture.create_from_image(image)
 
 
 func _sky_material() -> ProceduralSkyMaterial:

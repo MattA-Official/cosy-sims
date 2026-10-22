@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="NeedDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="NeedDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/people/need_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/need_hygiene.svg" id="9_icon"]
 
 [resource]
 script = ExtResource("1_def")
@@ -17,3 +18,4 @@ asleep_decay_per_hour = 1.0
 use_minutes = 10.0
 sleeping = false
 met_moodlet = &"feels_clean"
+icon = ExtResource("9_icon")

@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="NeedDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="NeedDef" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/people/need_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/need_bladder.svg" id="9_icon"]
 
 [resource]
 script = ExtResource("1_def")
@@ -20,3 +21,4 @@ empty_moodlet = &"had_an_accident"
 empty_costs = Dictionary[StringName, float]({
 &"hygiene": 50.0
 })
+icon = ExtResource("9_icon")

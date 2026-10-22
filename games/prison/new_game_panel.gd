@@ -8,6 +8,9 @@ signal started
 signal back_pressed
 
 const EMPTY_ABOUT := "Flat land by the road, and nothing on it yet. Build the lot yourself."
+const TUTORIAL_ABOUT := "Empty land and a guided first day: a card down the right says what to build next and rings the button to press, until the first bus brings prisoners."
+## The guided first day, in the start choices: empty land with the steps.
+const TUTORIAL := -2
 ## Scenarios come after the samples in the start choices, from this value.
 const FIRST_SCENARIO := 100
 ## Campaign chapters come after the scenarios, from this value.
@@ -81,7 +84,7 @@ func _ready() -> void:
 	box.add_child(name_row)
 
 	box.add_child(_heading("Start with"))
-	var starts: Array = [["Empty land", -1]]
+	var starts: Array = [["Tutorial: first day", TUTORIAL], ["Empty land", -1]]
 	for index in NewGame.STARTS:
 		starts.append([SamplePrisons.NAMES[index], index])
 	for i in PrisonCatalogue.SCENARIOS.size():
@@ -175,7 +178,8 @@ func _go() -> void:
 	NewGame.pending = true
 	NewGame.prison_name = _name.text.strip_edges() if _name.text.strip_edges() != "" else NewGame.random_name()
 	var scenario := _scenario()
-	NewGame.start = scenario.layout if scenario != null else _start
+	NewGame.start = scenario.layout if scenario != null else maxi(_start, -1)
+	NewGame.tutorial = _start == TUTORIAL
 	Standing.next_scenario = scenario.id if scenario != null else &""
 	SamplePrisons.next_map_size = _offered_sizes()[_map_size].id
 	NewGame.sentence_length = _length
@@ -194,7 +198,7 @@ func _show_about() -> void:
 		if scenario.chapter > 0:
 			_start_about.text += " Teaches: " + scenario.teaches
 	else:
-		_start_about.text = EMPTY_ABOUT if _start < 0 else START_ABOUT.get(_start, SamplePrisons.CHALLENGES[_start])
+		_start_about.text = TUTORIAL_ABOUT if _start == TUTORIAL else EMPTY_ABOUT if _start < 0 else START_ABOUT.get(_start, SamplePrisons.CHALLENGES[_start])
 	_difficulty_about.text = Standing.DIFFICULTIES[_difficulty].description
 	_map_box.visible = _start < 0
 	if _warden == 0:

@@ -38,6 +38,13 @@ const WANT_LINE := 70.0
 ## Needs below this come before everything, even where the block wants
 ## them.
 const URGENT_LINE := 15.0
+## Needs below this show over someone's head in a thought bubble.
+const THOUGHT_LINE := 20.0
+const BUBBLE_HEIGHT := 1.2
+const BUBBLE_FONT_SIZE := 36
+const BUBBLE_PIXEL := 0.005
+const BUBBLE_INK := Color(0.3, 0.24, 0.2)
+const BUBBLE_SHADER := preload("res://core/people/bubble.gdshader")
 ## Tiles within which people count as company, or a crowd.
 const NEARBY := 3.0
 ## Game minutes between each person looking around and deciding.
@@ -166,6 +173,8 @@ var categories: Dictionary[StringName, CategoryDef] = {}
 ## Objects broken and waiting to be mended, by (level, object id): nobody
 ## uses them.
 var broken: Dictionary[Vector2i, bool] = {}
+var _bubble_materials: Array[ShaderMaterial] = []
+var _bubble_quad := QuadMesh.new()
 ## Groups whose needs are switched off in the settings (staff, say): their
 ## needs stay met.
 var needs_off: Array[StringName] = []
@@ -2271,15 +2280,41 @@ func _update_bodies() -> void:
 		_sit_down(person, body)
 		body.get_node("Flag").visible = person.out_of_place and person.bubble.is_empty()
 		var bubble := body.get_node("Bubble") as Label3D
+		var box := body.get_node("BubbleBox") as Node3D
 		bubble.visible = not person.bubble.is_empty()
-		bubble.text = person.bubble
+		box.visible = bubble.visible
+		if bubble.text != person.bubble:
+			bubble.text = person.bubble
+			var size := bubble.font.get_string_size(person.bubble, HORIZONTAL_ALIGNMENT_LEFT, -1,
+					BUBBLE_FONT_SIZE) * BUBBLE_PIXEL
+			box.scale = Vector3(size.x + 0.12, size.y + 0.06, 1.0)
+		var icon := _thought_icon(person) if person.bubble.is_empty() and not person.out_of_place else null
+		var thought := body.get_node("Thought") as Sprite3D
+		thought.visible = icon != null
+		thought.texture = icon
+		(body.get_node("ThoughtBox") as Node3D).visible = icon != null
 		var face := body.get_node("Face") as Sprite3D
 		var mood_face := mood_model.face(person.mood)
-		face.visible = not person.out_of_place and person.bubble.is_empty() and mood_face >= MoodModel.Face.FED_UP \
-				and not person.mood_parts.is_empty()
+		face.visible = not person.out_of_place and person.bubble.is_empty() and icon == null \
+				and mood_face >= MoodModel.Face.FED_UP and not person.mood_parts.is_empty()
 		if face.visible:
 			face.texture = face_textures[mood_face]
 	_update_visibility()
+
+
+## The icon of someone's lowest need below THOUGHT_LINE, for a thought
+## bubble, or null. Asleep, nobody thinks about anything.
+func _thought_icon(person: Person) -> Texture2D:
+	if is_asleep(person) or person.away:
+		return null
+	var lowest: NeedDef = null
+	var level := THOUGHT_LINE
+	for need: StringName in person.needs:
+		var def := need_def(need)
+		if def != null and def.icon != null and person.needs[need] < level:
+			lowest = def
+			level = person.needs[need]
+	return lowest.icon if lowest != null else null
 
 
 ## The node drawing someone, or null before it is first drawn.
@@ -2434,19 +2469,56 @@ func _add_flag(root: Node3D) -> void:
 	flag.position.y = 1.15
 	flag.visible = false
 	root.add_child(flag)
-	# What they're grumbling about, or a warning before they act up.
+	# What they're grumbling about, or a warning before they act up, in a
+	# speech bubble.
 	var bubble := Label3D.new()
 	bubble.name = "Bubble"
-	bubble.font_size = 44
-	bubble.outline_size = 14
-	bubble.pixel_size = 0.006
-	bubble.modulate = Color(1.0, 0.96, 0.9)
-	bubble.outline_modulate = Color(0.45, 0.2, 0.15)
+	bubble.font = CosyTheme.bold_font()
+	bubble.font_size = BUBBLE_FONT_SIZE
+	bubble.outline_size = 0
+	bubble.pixel_size = BUBBLE_PIXEL
+	bubble.modulate = BUBBLE_INK
 	bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	bubble.no_depth_test = true
-	bubble.position.y = 1.2
+	bubble.render_priority = 3
+	bubble.position.y = BUBBLE_HEIGHT
 	bubble.visible = false
 	root.add_child(bubble)
+	root.add_child(_bubble_box("BubbleBox", false))
+	# A need running low, as its icon in a thought bubble.
+	var thought := Sprite3D.new()
+	thought.name = "Thought"
+	thought.pixel_size = 0.0042
+	thought.modulate = BUBBLE_INK
+	thought.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	thought.no_depth_test = true
+	thought.render_priority = 3
+	thought.position.y = BUBBLE_HEIGHT
+	thought.visible = false
+	root.add_child(thought)
+	var cloud := _bubble_box("ThoughtBox", true)
+	cloud.scale = Vector3(0.3, 0.27, 1.0)
+	root.add_child(cloud)
+
+
+## The box behind a speech or thought bubble, sized by its scale.
+func _bubble_box(called: String, thought: bool) -> MeshInstance3D:
+	if _bubble_materials.is_empty():
+		for kind: bool in [false, true]:
+			var material := ShaderMaterial.new()
+			material.shader = BUBBLE_SHADER
+			material.render_priority = 2
+			material.set_shader_parameter("thought", kind)
+			_bubble_materials.append(material)
+		_bubble_quad.size = Vector2.ONE
+	var box := MeshInstance3D.new()
+	box.name = called
+	box.mesh = _bubble_quad
+	box.material_override = _bubble_materials[1 if thought else 0]
+	box.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	box.position.y = BUBBLE_HEIGHT
+	box.visible = false
+	return box
 
 
 ## Shared between everyone of the same colour.

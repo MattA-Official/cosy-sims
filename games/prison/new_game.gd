@@ -15,6 +15,8 @@ static var pending := false
 static var prison_name := ""
 ## A sample prison (SamplePrisons index) to start in, or -1 for empty land.
 static var start := -1
+## Whether to run the guided first day (on empty land).
+static var tutorial := false
 static var sentence_length := Sentences.Length.NORMAL
 static var staff_cars := false
 static var split_levels := false

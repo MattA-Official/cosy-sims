@@ -19,6 +19,8 @@ var calendar: Calendar
 var weather: Weather
 var surprises: Surprises
 var utilities: Utilities
+## For the first-time tips setting.
+var guide: Guide
 
 var _difficulty := OptionButton.new()
 var _about := Label.new()
@@ -37,6 +39,7 @@ var _utilities := OptionButton.new()
 var _location := OptionButton.new()
 var _coast := OptionButton.new()
 var _backdrop := OptionButton.new()
+var _tips := CheckButton.new()
 ## For the backdrop detail setting: the scenery past the map.
 var backdrop: Backdrop
 ## For the coast setting.
@@ -186,6 +189,24 @@ func _ready() -> void:
 		if backdrop != null:
 			backdrop.detail = index as Backdrop.Detail)
 	box.add_child(_row("Scenery detail", _backdrop))
+	_tips.focus_mode = FOCUS_NONE
+	_tips.tooltip_text = "On, a short card explains each tool, page and new happening the first time it comes up. Kept on this computer for every prison."
+	_tips.toggled.connect(func(on: bool) -> void:
+		if guide != null:
+			guide.tips_on = on)
+	var tips_row := HBoxContainer.new()
+	var again := Button.new()
+	again.text = "Show again"
+	again.focus_mode = FOCUS_NONE
+	again.tooltip_text = "Forgets which tips you've seen, so each shows once more."
+	again.pressed.connect(func() -> void:
+		if guide != null:
+			guide.reset_tips()
+			guide.tips_on = true
+			_tips.set_pressed_no_signal(true))
+	tips_row.add_child(again)
+	tips_row.add_child(_tips)
+	box.add_child(_row("First-time tips", tips_row))
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()
 		slider.min_value = 0.0
@@ -228,6 +249,8 @@ func refresh() -> void:
 		_length.select(sentences.length)
 	if blueprints != null:
 		_instant.set_pressed_no_signal(blueprints.instant)
+	if guide != null:
+		_tips.set_pressed_no_signal(guide.tips_on)
 	if desk_work != null:
 		_red_tape.select(desk_work.red_tape)
 	if research != null:

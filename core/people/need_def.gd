@@ -22,6 +22,8 @@ enum Source {
 ## How the inspector says the need is low or well met, such as "Hungry"
 ## and "Well fed".
 @export var low_text: String
+## Shown in a thought bubble over someone's head when the need runs low.
+@export var icon: Texture2D
 @export var high_text: String
 ## People only go out of their way to see to it below this, with nothing
 ## else to do. Sleep waits for bedtime unless it is low; bladder doesn't

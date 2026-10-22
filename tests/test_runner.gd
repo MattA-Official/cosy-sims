@@ -154,6 +154,7 @@ func _process(_delta: float) -> bool:
 	_test_utilities()
 	_test_self_sufficient()
 	_test_arrivals()
+	_test_guide()
 	if _failures == 0:
 		print("All tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -7790,3 +7791,93 @@ func _test_rivers_and_sea() -> void:
 	arrivals.free()
 	water.free()
 	terrain.free()
+
+
+func _test_guide() -> void:
+	# Tips: once each, one at a time, and none when switched off.
+	var guide := Guide.new()
+	guide.seen_path = "user://test_guide.cfg"
+	root.add_child(guide)
+	guide.reset_tips()
+	guide.tips_on = true
+	_check(guide.tip(&"a", "First", "words") and guide.visible and guide.shown_title == "First", "a tip shows the first time")
+	_check(not guide.tip(&"b", "Second", "words") and guide.shown_title == "First", "another waits its turn")
+	guide._hide_tip()
+	_check(guide.shown_title == "Second" and guide.visible, "and shows when the first is put away")
+	guide._hide_tip()
+	_check(not guide.tip(&"a", "First", "words") and not guide.visible, "each tip shows once")
+	guide.tips_on = false
+	_check(not guide.tip(&"c", "Third", "words"), "no tips when they're off")
+	var again := Guide.new()
+	again.seen_path = guide.seen_path
+	root.add_child(again)
+	_check(again.has_seen(&"b") and not again.tips_on, "seen tips and the setting are remembered")
+	again.free()
+	guide.reset_tips()
+	guide.tips_on = true
+	# Steps: each ticks itself off when its check passes, and tips wait.
+	var flags := [false, false]
+	var list: Array[Guide.Step] = [Guide.Step.make("One", "words", func() -> bool: return flags[0]),
+			Guide.Step.make("Two", "words", func() -> bool: return flags[1])]
+	var finished := []
+	guide.steps_finished.connect(func() -> void: finished.append(true))
+	guide.start_steps(list)
+	_check(guide.running() and guide.shown_title == "One", "the steps start at the first")
+	_check(not guide.tip(&"d", "Tip", "words"), "tips wait while the steps run")
+	guide._process(1.0)
+	_check(guide.current == 0, "a step waits for its check")
+	flags[0] = true
+	guide._process(1.0)
+	_check(guide.current == 1 and guide.shown_title == "Two", "and moves on once it passes")
+	flags[1] = true
+	guide._process(1.0)
+	_check(not guide.running() and finished.size() == 1, "the last step finishes the run")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(guide.seen_path))
+	guide.free()
+
+	# The tutorial's first day, on empty land.
+	NewGame.pending = true
+	NewGame.start = -1
+	NewGame.tutorial = true
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	root.add_child(main)
+	NewGame.tutorial = false
+	var tutor: Guide = main.guide
+	_check(tutor.running() and tutor.current == 0 and main.get_meta(PrisonGuide.META) == 0, "the tutorial starts on empty land")
+	_check(tutor.steps.size() == PrisonGuide.steps(main).size(), "with every step")
+	var step := func() -> void:
+		tutor._wait = 0.0
+		tutor._process(0.0)
+	var rig: CameraRig = main.camera_rig
+	rig.focus_on(rig.position + Vector3(6, 0, 4))
+	step.call()
+	_check(tutor.current == 1 and tutor._ring.target == (main.book as ManagementBook)._pages[&"staff"].button,
+			"looking round ticks off the first step, and the next rings the Staff bookmark")
+	var shifts: Shifts = main.shifts
+	shifts.set_wanted(&"handyman", shifts.shifts[0].id, 1)
+	step.call()
+	_check(tutor.current == 2, "taking on a handyman")
+	var building: Building = main.building
+	var map := building.ground()
+	var origin := map.land[0].position + map.land[0].size / 2
+	map.build_room(Rect2i(origin, Vector2i(4, 3)))
+	step.call()
+	_check(tutor.current == 3, "building a room")
+	map.set_opening(Vector3i(origin.x + 1, origin.y, BuildingMap.EDGE_X), BuildingMap.Wall.DOOR)
+	step.call()
+	_check(tutor.current == 4, "putting in a door")
+	map.set_room_type(map.room_at(origin + Vector2i.ONE), &"cell")
+	step.call()
+	_check(tutor.current == 5, "marking a cell")
+	map.place_object(PrisonCatalogue.object(&"bed"), Vector2(origin), 0)
+	map.place_object(PrisonCatalogue.object(&"toilet"), Vector2(origin + Vector2i(2, 0)), 0)
+	step.call()
+	_check(tutor.current == 6, "furnishing it")
+	tutor._process(0.0)
+	(main.clock as GameClock).advance(1.0)
+	_check(main.get_meta(PrisonGuide.META) == 6, "the step reached is kept for saving")
+	var data: Dictionary = PrisonSave.capture(main)
+	_check(int(data.get("tutorial_step", -1)) == 6, "and saved")
+	tutor._buttons.get_child(0).emit_signal(&"pressed")
+	_check(not tutor.running() and main.get_meta(PrisonGuide.META) == -1, "the tutorial can be skipped")
+	main.queue_free()

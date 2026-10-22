@@ -68,6 +68,9 @@ var cut_direction := Vector2(1, 1).normalized():
 		show_roof = value
 		_roof_mesh.visible = value
 @export var roof_thickness := 0.12
+## The low wall round a flat roof's edge.
+const ROOF_LIP_HEIGHT := 0.16
+const ROOF_LIP_WIDTH := 0.1
 @export var roof_colour := Color(0.5, 0.47, 0.45)
 
 @export_group("Colours")
@@ -204,7 +207,7 @@ class WallRun:
 func _ready() -> void:
 	for child: Node in [_floor_mesh, _wall_mesh, _glass_mesh, _doors, _objects, _labels, _roof_mesh]:
 		add_child(child)
-	_roof_mesh.material_override = _material
+	_roof_mesh.material_override = _roof_material()
 	_roof_mesh.visible = show_roof
 	_glass_mesh.material_override = _glass_material
 	_glass_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -314,7 +317,102 @@ func _build_roof() -> void:
 			MeshShapes.add_prism(st, scaled, top - roof_thickness, top + 0.01, roof_colour.darkened(0.2),
 					roof_colour.lightened(0.04 * ((cell.x + cell.y) % 2)))
 			any = true
+	if any:
+		_build_roof_dressing(st)
 	_roof_mesh.mesh = st.commit() if any else null
+
+
+## A low parapet round each flat roof's edge, and vents and units on top:
+## a vent on every room, a flue over kitchens and showers, and a boxy
+## air unit on the bigger rooms. Placed by the room's own cells, so they
+## stay put as the prison changes elsewhere.
+func _build_roof_dressing(st: SurfaceTool) -> void:
+	var cs := grid.cell_size
+	var lip := roof_colour.darkened(0.12)
+	var metal := Color(0.7, 0.71, 0.72)
+	for cell: Vector2i in map.floors:
+		if not has_roof(cell) or map.holes.has(cell):
+			continue
+		var top := map.floor_height(cell) + wall_height
+		for side: Vector2i in BuildingMap.DIRECTIONS:
+			var next := cell + side
+			if has_roof(next) and is_equal_approx(map.floor_height(next), map.floor_height(cell)):
+				continue
+			# A strip along this side of the tile, just inside its edge.
+			var across := Vector2(side.y, side.x).abs()
+			var edge := Vector2(cell) + Vector2(0.5, 0.5) + Vector2(side) * (0.5 - ROOF_LIP_WIDTH * 0.5)
+			var half := across * 0.5 + Vector2(side).abs() * ROOF_LIP_WIDTH * 0.5
+			MeshShapes.add_prism(st, _square(edge, half, cs), top, top + ROOF_LIP_HEIGHT, lip,
+					lip.lightened(0.08))
+	for room: Room in map.rooms():
+		var roofed: Array[Vector2i] = []
+		for cell in room.cells:
+			if has_roof(cell) and not map.holes.has(cell) and map.pieces(cell).size() == 1:
+				# Clear of the parapet, so things stand on open roof.
+				if BuildingMap.DIRECTIONS.all(func(side: Vector2i) -> bool: return has_roof(cell + side)):
+					roofed.append(cell)
+		if roofed.is_empty():
+			continue
+		roofed.sort()
+		var pick := func(salt: int) -> Vector2i:
+			return roofed[absi(hash(Vector3i(roofed[0].x, roofed[0].y, salt))) % roofed.size()]
+		var vent: Vector2i = pick.call(1)
+		var top := map.floor_height(vent) + wall_height
+		var centre := Vector2(vent) + Vector2(0.5, 0.5)
+		MeshShapes.add_prism(st, _square(centre, Vector2(0.12, 0.12), cs), top, top + 0.3, metal)
+		MeshShapes.add_prism(st, _square(centre, Vector2(0.2, 0.2), cs), top + 0.3, top + 0.36, metal.darkened(0.15))
+		if room.type in [&"kitchen", &"shower", &"laundry"]:
+			var flue: Vector2i = pick.call(2)
+			if flue != vent:
+				var f_top := map.floor_height(flue) + wall_height
+				var f_centre := Vector2(flue) + Vector2(0.5, 0.5)
+				MeshShapes.add_prism(st, _circle(f_centre, 0.1, cs), f_top, f_top + 0.55, metal.darkened(0.05))
+				MeshShapes.add_prism(st, _circle(f_centre, 0.16, cs), f_top + 0.55, f_top + 0.6, metal.darkened(0.25))
+		if roofed.size() >= 12:
+			var unit: Vector2i = pick.call(3)
+			if unit != vent:
+				var u_top := map.floor_height(unit) + wall_height
+				var u_centre := Vector2(unit) + Vector2(0.5, 0.5)
+				MeshShapes.add_prism(st, _square(u_centre, Vector2(0.34, 0.26), cs), u_top, u_top + 0.32,
+						Color(0.82, 0.82, 0.8), Color(0.62, 0.63, 0.64))
+
+
+## A box's outline round a centre, in tiles, scaled to the world.
+static func _square(centre: Vector2, half: Vector2, cs: float) -> PackedVector2Array:
+	return PackedVector2Array([(centre + Vector2(-half.x, -half.y)) * cs, (centre + Vector2(half.x, -half.y)) * cs,
+			(centre + half) * cs, (centre + Vector2(-half.x, half.y)) * cs])
+
+
+static func _circle(centre: Vector2, radius: float, cs: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in 10:
+		out.append((centre + Vector2.from_angle(TAU * i / 10.0) * radius) * cs)
+	return out
+
+
+## The roof's own look: its vertex colours over a fine gravel speckle,
+## laid across the world so it needs no texture coordinates.
+func _roof_material() -> StandardMaterial3D:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_CELLULAR
+	noise.frequency = 0.08
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(0.86, 0.86, 0.86))
+	ramp.set_color(1, Color(1.0, 1.0, 1.0))
+	var texture := NoiseTexture2D.new()
+	texture.width = 128
+	texture.height = 128
+	texture.seamless = true
+	texture.noise = noise
+	texture.color_ramp = ramp
+	var material := StandardMaterial3D.new()
+	material.vertex_color_use_as_albedo = true
+	material.albedo_texture = texture
+	material.uv1_triplanar = true
+	material.uv1_world_triplanar = true
+	material.uv1_scale = Vector3.ONE * 0.5
+	material.roughness = 1.0
+	return material
 
 
 ## Is there a roof over this tile? For tests and the debug view.

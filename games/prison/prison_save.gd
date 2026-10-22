@@ -121,6 +121,7 @@ static func capture(main: Node) -> Dictionary:
 		"flu_week_until": main.get_meta(&"flu_week_until", -1),
 		"last_open_day": main.get_meta(&"last_open_day", -999),
 		"last_word": main.get_meta(&"last_word", -999),
+		"tutorial_step": main.get_meta(PrisonGuide.META, -1),
 		"reputation": (main.reputation as Reputation).capture(),
 		"protest": (main.protest as Protest).capture(),
 		"protest_on": (main.protest as Protest).enabled,
@@ -368,6 +369,7 @@ static func apply_rest(main: Node, data: Dictionary) -> void:
 	main.set_meta(&"flu_week_until", int(data.get("flu_week_until", -1)))
 	main.set_meta(&"last_open_day", int(data.get("last_open_day", -999)))
 	main.set_meta(&"last_word", int(data.get("last_word", -999)))
+	main.set_meta(PrisonGuide.META, int(data.get("tutorial_step", -1)))
 	if data.has("reputation"):
 		(main.reputation as Reputation).restore(data["reputation"])
 	if data.has("protest"):

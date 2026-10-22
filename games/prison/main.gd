@@ -230,6 +230,10 @@ var title := "My prison"
 var map_size: MapSizeDef
 ## The F3 inspector for people, objects and rooms.
 var inspector := Inspector.new()
+## Steam, smoke, sparkles and room lights at night.
+var effects := WorldEffects.new()
+## First-time tips and the tutorial's steps (see PrisonGuide).
+var guide: Guide
 ## Grid lines at the height of the level being built on, off the ground.
 var level_grid := LevelGrid.new()
 ## Room under the mouse and people, under the view bar.
@@ -1370,6 +1374,17 @@ func _ready() -> void:
 	cursor.height_at = _floor_level_at
 	building.changed.connect(func() -> void: _on_cell_hovered(cursor.hovered_cell))
 	_add_hud()
+	guide = PrisonGuide.setup(self)
+	effects.name = "WorldEffects"
+	effects.cell_size = grid.cell_size
+	effects.people = people
+	effects.building = building
+	effects.day_night = day_night
+	effects.clock = clock
+	effects.utilities = utilities
+	effects.wear = wear
+	grid.add_child(effects)
+	settings_window.guide = guide
 	_on_cell_hovered(cursor.hovered_cell)
 	_apply_wall_view()
 	var new_game := NewGame.pending
