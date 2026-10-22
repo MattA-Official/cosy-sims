@@ -43,6 +43,11 @@ colours a real prison would plausibly use.
 - Office: filing_cabinet (1 x 1, 1.3 m, two four-drawer cabinets against
   the wall at -z, drawers to +z), paper_stack_small, paper_stack_tall and
   paper_stack_teetering (0.3 x 0.22 desk dressing, 0.06 / 0.16 / 0.3 m).
+- Utilities: generator (2 x 2, 1.4 m to the stack), solar_panel (2 x 1, 0.5 m,
+  faces +z), battery (1 x 1, 1 m), well (1 x 1 pump on a plinth, 0.8 m),
+  water_tower (2 x 2, 2.5 m, ladder at +z), treatment_plant (2 x 2 settling
+  tank, 1 m), mains (1 x 1 grey utility box, 1 m). Origin at the footprint
+  middle on the floor, fronts to +z.
 - Arrivals: ferry (1.6 x 4 m, bow to -z, origin at the waterline, hull 0.3 m
   below), helicopter (3 m rotor span, nose to -z, on skids), jetty (2 x 1 m
   deck 0.2 m up, origin at the footprint middle at bank level, posts 0.5 m

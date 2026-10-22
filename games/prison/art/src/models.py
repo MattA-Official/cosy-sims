@@ -134,6 +134,9 @@ PALETTE = dict(
     cork=("#c8a275", 1.0, 0),
     soil=("#6e5644", 1.0, 0),
     rope=("#cdb58a", 1.0, 0),
+    solar=("#34465c", 0.2, 0.2),        # solar cells
+    utility=("#a3a8a6", 0.6, 0.1),      # roadside utility grey
+    water_tank=("#8fb5ad", 0.15, 0),    # still water in a tank
     walnut=("#7a5638", 0.45, 0),        # piano and dark wood
     fur_ginger=("#d6915a", 1.0, 0),
     fur_rabbit=("#a8978a", 1.0, 0),
@@ -1708,6 +1711,162 @@ def jetty():
     return p
 
 
+# ---------------------------------------------------------------- utilities (M13)
+# Origin at the middle of the footprint on the floor; fronts to Godot +z.
+
+def generator():
+    """2 x 2 diesel generator, about 1.2 m: a rounded green housing on a
+    skid, louvres down the sides, a control panel at the front and an
+    exhaust stack with a rain cap."""
+    p = Prop("generator")
+    p.box("steel_dark", (1.8, 1.4, 0.1), (0, 0, 0.05), 0.02, 2)  # skid
+    p.box("paint", (1.7, 1.2, 0.95), (0, 0, 0.58), 0.08, 3)  # housing
+    for side in (-1, 1):
+        for k in range(6):
+            p.box("steel_dark", (1.1, 0.02, 0.03), (-0.15, side * 0.605, 0.4 + k * 0.08), 0.008, 1)
+    p.box("steel", (0.36, 0.03, 0.3), (0.55, -0.61, 0.66), 0.015, 2)  # control panel
+    p.box("screen", (0.14, 0.012, 0.06), (0.5, -0.63, 0.73), 0.004, 1)
+    p.ball("cross", 0.018, (0.65, -0.625, 0.73), u=8, v=6)
+    p.ball("food_c", 0.018, (0.65, -0.625, 0.66), u=8, v=6)
+    p.box("hazard", (0.3, 0.012, 0.06), (0.55, -0.627, 0.56), 0.004, 1)
+    p.tube("steel_dark", [(-0.6, 0.3, 1.0), (-0.6, 0.3, 1.32)], 0.06, 0, n=14)  # exhaust
+    p.cyl("steel_dark", 0.1, 0.02, (-0.6, 0.3, 1.36), bevel=0.006, n=14, rot=(0, -20, 0))
+    p.box("steel", (0.5, 0.3, 0.04), (0.3, 0.2, 1.07), 0.012, 1)  # fuel filler plate
+    p.cyl("food_c", 0.05, 0.04, (0.45, 0.2, 1.1), bevel=0.01, n=12)
+    return p
+
+
+def solar_panel():
+    """2 x 1 solar panel, about 0.5 m at its top edge, tilted to face Godot
+    +z (the sun side) on a low galvanised frame."""
+    p = Prop("solar_panel")
+    tilt = (25, 0, 0)  # top edge raised at the back (-z)
+    p.box("steel", (1.9, 0.86, 0.04), (0, 0, 0.3), 0.012, 1, rot=tilt)
+    p.box("solar", (1.84, 0.8, 0.045), (0, 0, 0.3), 0.006, 1, rot=tilt)
+    for k in range(1, 6):  # cell lines
+        x = -0.92 + k * 1.84 / 6
+        p.box("steel", (0.008, 0.8, 0.05), (x, 0, 0.3), 0, 0, rot=tilt)
+    for k in (-1, 1):
+        p.box("steel", (1.84, 0.008, 0.05), (0, k * 0.2 * 0.906, 0.3 + k * 0.2 * 0.423), 0, 0, rot=tilt)
+    for x in (-0.8, 0.8):
+        p.tube("galv", [(x, -0.38, 0.0), (x, -0.38, 0.13)], 0.02, 0, n=8)
+        p.tube("galv", [(x, 0.38, 0.0), (x, 0.38, 0.47)], 0.02, 0, n=8)
+        p.tube("galv", [(x, -0.4, 0.02), (x, 0.4, 0.02)], 0.018, 0, n=8)
+    return p
+
+
+def battery():
+    """1 x 1 battery cabinet, about 1 m: a cream steel cabinet with a vent,
+    a little green status light and a lightning sticker."""
+    p = Prop("battery")
+    p.box("white", (0.8, 0.6, 0.95), (0, 0.05, 0.5), 0.04, 3)
+    p.box("steel_dark", (0.76, 0.56, 0.05), (0, 0.05, 0.025), 0.01, 1)
+    yf = 0.05 - 0.3
+    p.box("white", (0.36, 0.02, 0.8), (-0.19, yf - 0.005, 0.52), 0.015, 2)  # doors
+    p.box("white", (0.36, 0.02, 0.8), (0.19, yf - 0.005, 0.52), 0.015, 2)
+    for x in (-0.03, 0.03):
+        p.box("steel", (0.015, 0.03, 0.12), (x, yf - 0.02, 0.55), 0.005, 1)
+    for k in range(5):
+        p.box("steel_dark", (0.24, 0.025, 0.018), (-0.19, yf - 0.012, 0.8 + k * 0.03), 0.004, 1)  # vent
+    p.ball("cross", 0.02, (0.28, yf - 0.02, 0.88), u=10, v=6)
+    p.prism("hazard", [(0.14, 0.62), (0.2, 0.72), (0.18, 0.72), (0.24, 0.8), (0.17, 0.69),
+                       (0.19, 0.69)], 0.012, y=yf - 0.022, bevel=0.0)
+    return p
+
+
+def well():
+    """1 x 1 well pump, about 0.8 m: a green pump head with a motor on a
+    small concrete plinth, pipe out to the side."""
+    p = Prop("well")
+    p.box("stone", (0.8, 0.8, 0.16), (0, 0, 0.08), 0.03, 2)
+    p.cyl("steel_dark", 0.16, 0.06, (0, 0, 0.19), bevel=0.015, n=20)  # wellhead flange
+    for k in range(6):
+        a = k * math.pi / 3
+        p.ball("steel", 0.018, (0.13 * math.cos(a), 0.13 * math.sin(a), 0.225), u=8, v=6)
+    p.cyl("paint", 0.1, 0.3, (0, 0, 0.37), bevel=0.03, n=20)  # pump body
+    p.cyl("sign_blue", 0.13, 0.22, (0, 0, 0.63), bevel=0.04, segs=3, n=20)  # motor
+    for k in range(8):
+        a = k * math.pi / 4
+        p.box("sign_blue", (0.02, 0.02, 0.16), (0.13 * math.cos(a), 0.13 * math.sin(a), 0.63), 0.006, 1)
+    p.cyl("steel_dark", 0.06, 0.03, (0, 0, 0.75), bevel=0.01, n=16)
+    p.tube("galv", [(0.09, 0, 0.3), (0.3, 0, 0.3), (0.3, 0, 0.18)], 0.035, 0.06, n=10)  # outlet pipe
+    p.cyl("food_c", 0.06, 0.03, (0.18, 0, 0.36), bevel=0.01, n=12, rot=(0, 0, 0))  # valve wheel
+    p.tube("food_c", [(0.18, 0, 0.3), (0.18, 0, 0.35)], 0.01, 0, n=6)
+    return p
+
+
+def water_tower():
+    """2 x 2 water tower, about 2.5 m: a round cream tank with a cone roof
+    on four steel legs with cross braces and a ladder."""
+    p = Prop("water_tower")
+    legs = [(x, y) for x in (-0.7, 0.7) for y in (-0.7, 0.7)]
+    for x, y in legs:
+        p.tube("steel_dark", [(x, y, 0.0), (x * 0.75, y * 0.75, 1.45)], 0.04, 0, n=10)
+        p.cyl("stone", 0.1, 0.1, (x, y, 0.05), bevel=0.02, n=12)  # footing
+    for z0, z1, s0, s1 in ((0.15, 0.75, 1.0, 0.88), (0.75, 1.4, 0.88, 0.76)):
+        for (x0, y0), (x1, y1) in (((-0.7, -0.7), (0.7, -0.7)), ((0.7, -0.7), (0.7, 0.7)),
+                                   ((0.7, 0.7), (-0.7, 0.7)), ((-0.7, 0.7), (-0.7, -0.7))):
+            p.tube("steel_dark", [(x0 * s0, y0 * s0, z0), (x1 * s1, y1 * s1, z1)], 0.015, 0, n=6)
+            p.tube("steel_dark", [(x1 * s0, y1 * s0, z0), (x0 * s1, y0 * s1, z1)], 0.015, 0, n=6)
+    p.box("steel_dark", (1.2, 1.2, 0.06), (0, 0, 1.47), 0.02, 2)  # platform
+    p.cyl("white", 0.62, 0.75, (0, 0, 1.88), bevel=0.06, segs=3, n=32)  # tank
+    for z in (1.66, 2.1):
+        p.cyl("blue_stripe", 0.625, 0.05, (0, 0, z), bevel=0.01, n=32)
+    p.cyl("white", 0.66, 0.24, (0, 0, 2.37), r2=0.08, bevel=0.03, n=32)  # cone roof
+    p.cyl("steel_dark", 0.06, 0.08, (0, 0, 2.5), bevel=0.02, n=12)
+    # Ladder up one leg to the platform, facing +z.
+    for x in (-0.12, 0.12):
+        p.tube("galv", [(x, -0.62, 0.0), (x, -0.62, 1.5)], 0.015, 0, n=6)
+    for k in range(7):
+        p.tube("galv", [(-0.12, -0.62, 0.15 + k * 0.2), (0.12, -0.62, 0.15 + k * 0.2)], 0.01, 0, n=6)
+    p.tube("steel", [(0.4, 0.4, 1.5), (0.4, 0.4, 0.0)], 0.04, 0, n=10)  # down pipe
+    return p
+
+
+def treatment_plant():
+    """2 x 2 water treatment plant, about 1 m: a round concrete settling
+    tank with blue-green water, a bridge with a railing across the top and
+    a little pump house."""
+    p = Prop("treatment_plant")
+    p.cyl("stone", 0.9, 0.75, (0, 0, 0.375), bevel=0.04, segs=2, n=40)
+    p.cyl("water_tank", 0.8, 0.02, (0, 0, 0.755), bevel=0.0, n=40)
+    p.cyl("stone_dark", 0.1, 0.12, (0, 0, 0.72), bevel=0.02, n=16)  # centre column
+    p.box("galv", (1.7, 0.2, 0.04), (0, 0, 0.78), 0.01, 1)  # walkway
+    for side in (-1, 1):
+        y = side * 0.1
+        p.tube("hazard", [(-0.85, y, 1.0), (0.85, y, 1.0)], 0.014, 0, n=6)
+        for x in (-0.8, -0.4, 0.0, 0.4, 0.8):
+            p.tube("hazard", [(x, y, 0.8), (x, y, 1.0)], 0.01, 0, n=6)
+    for k in range(16):  # rim railing posts
+        a = k * math.tau / 16
+        if abs(math.sin(a)) < 0.2:
+            continue
+        p.tube("galv", [(0.9 * math.cos(a), 0.9 * math.sin(a), 0.75), (0.9 * math.cos(a), 0.9 * math.sin(a), 0.95)],
+               0.01, 0, n=6)
+    ring = [(0.9 * math.cos(a), 0.9 * math.sin(a), 0.95) for a in (k * math.tau / 32 for k in range(33))]
+    p.tube("galv", ring, 0.012, 0.0, n=6)
+    p.box("white", (0.3, 0.3, 0.4), (0.75, -0.75, 0.2), 0.03, 2)  # pump house
+    p.box("sign_blue", (0.34, 0.34, 0.04), (0.75, -0.75, 0.42), 0.015, 1)
+    return p
+
+
+def mains():
+    """1 x 1 mains connection, about 1 m: a grey roadside utility cabinet on
+    a plinth with a hazard sign and a meter window."""
+    p = Prop("mains")
+    p.box("stone", (0.75, 0.45, 0.1), (0, 0, 0.05), 0.02, 2)
+    p.box("utility", (0.68, 0.36, 0.86), (0, 0, 0.53), 0.04, 3)
+    p.box("utility", (0.74, 0.42, 0.04), (0, 0, 0.97), 0.015, 2)  # lid
+    yf = -0.18
+    for x in (-0.17, 0.17):
+        p.box("utility", (0.31, 0.02, 0.72), (x, yf - 0.006, 0.52), 0.012, 2)  # doors
+    p.box("steel_dark", (0.02, 0.03, 0.1), (0.03, yf - 0.02, 0.55), 0.005, 1)
+    p.box("glass", (0.12, 0.012, 0.08), (-0.17, yf - 0.018, 0.75), 0.004, 1)  # meter window
+    p.prism("hazard", [(0.11, 0.66), (0.23, 0.66), (0.17, 0.77)], 0.012, y=yf - 0.03, bevel=0.0)
+    p.prism("bag", [(0.165, 0.69), (0.18, 0.69), (0.172, 0.74)], 0.012, y=yf - 0.034, bevel=0.0)
+    return p
+
+
 # ---------------------------------------------------------------- office paperwork
 
 def filing_cabinet():
@@ -2235,7 +2394,9 @@ def lorry():
     return p
 
 
-MODELS = dict(ferry=ferry, helicopter=helicopter, jetty=jetty, easel=easel, piano=piano, knitting_chair=knitting_chair, till=till,
+MODELS = dict(generator=generator, solar_panel=solar_panel, battery=battery, well=well,
+              water_tower=water_tower, treatment_plant=treatment_plant, mains=mains,
+              ferry=ferry, helicopter=helicopter, jetty=jetty, easel=easel, piano=piano, knitting_chair=knitting_chair, till=till,
               pet_cage=pet_cage, visit_table=visit_table, cat=cat, rabbit=rabbit, budgie=budgie, hen=hen,
               therapy_dog=therapy_dog, **_looks(meeting_table), snack_machine=snack_machine, mobile_phone=mobile_phone, sweets=sweets,
               fruit=fruit, fizzy_pop=fizzy_pop,
