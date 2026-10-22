@@ -69,6 +69,7 @@ var vehicles := Vehicles.new()
 var car_park := CarPark.new()
 var staff_bus := StaffBus.new()
 var tunnels := Tunnels.new()
+var backdrop := Backdrop.new()
 var _passing_wait := 0.0
 var _rng := RandomNumberGenerator.new()
 var people := People.new()
@@ -771,6 +772,20 @@ func _ready() -> void:
 		var area_rect := Rect2(land_plots.area)
 		(terrain.ground_material as ShaderMaterial).set_shader_parameter("fog_rect",
 				Vector4(area_rect.position.x, area_rect.position.y, area_rect.size.x, area_rect.size.y) * grid.cell_size)
+		# Past the map the world carries on into fog: hills, woods, a farm
+		# and the town the road leads to.
+		backdrop.name = "Backdrop"
+		backdrop.cell_size = grid.cell_size
+		backdrop.ground = terrain.ground_material as ShaderMaterial
+		backdrop.water = water
+		backdrop.terrain = terrain
+		backdrop.roads = roads
+		backdrop.daylight = func() -> float: return day_night.daylight(clock.hour_float())
+		backdrop.outings = func() -> int:
+			return people.people.filter(func(p: Person) -> bool: return p.profile.has("outing")).size()
+		backdrop.detail = Backdrop.saved_detail()
+		backdrop.noise_seed = randi()
+		grid.add_child(backdrop)
 	for key: Vector2i in saved.get("land_paid", {}):
 		land_plots.paid[key] = saved["land_paid"][key]
 	for key: Vector2i in saved.get("land_pending", {}):
@@ -1532,6 +1547,7 @@ func _add_hud() -> void:
 	settings_window.surprises = surprises
 	settings_window.utilities = utilities
 	settings_window.water = water
+	settings_window.backdrop = backdrop if backdrop.is_inside_tree() else null
 	pause_menu.clock = clock
 	pause_menu.subtitle = title
 	pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")

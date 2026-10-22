@@ -36,6 +36,9 @@ var _surprises := OptionButton.new()
 var _utilities := OptionButton.new()
 var _location := OptionButton.new()
 var _coast := OptionButton.new()
+var _backdrop := OptionButton.new()
+## For the backdrop detail setting: the scenery past the map.
+var backdrop: Backdrop
 ## For the coast setting.
 var water: WaterLayer
 const SEASON_LENGTHS: Array[int] = [3, 5, 7, 10, 14, 30]
@@ -173,6 +176,16 @@ func _ready() -> void:
 			water.update_sea())
 	box.add_child(_row("Coast", _coast))
 	box.add_child(HSeparator.new())
+	for words in ["Low", "High"]:
+		_backdrop.add_item(words)
+	_backdrop.focus_mode = FOCUS_NONE
+	_backdrop.tooltip_text = "High draws the world past your land: hills, woods, a farm and the town, fading into fog. Low swaps it for plain fog, for slower computers. Kept on this computer for every prison."
+	_backdrop.select(Backdrop.saved_detail())
+	_backdrop.item_selected.connect(func(index: int) -> void:
+		Backdrop.remember_detail(index as Backdrop.Detail)
+		if backdrop != null:
+			backdrop.detail = index as Backdrop.Detail)
+	box.add_child(_row("Scenery detail", _backdrop))
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()
 		slider.min_value = 0.0

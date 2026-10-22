@@ -39,6 +39,7 @@ func _process(_delta: float) -> bool:
 	_test_terrain()
 	_test_water()
 	_test_rivers_and_sea()
+	_test_backdrop()
 	_test_path_network()
 	_test_building_levels()
 	_test_walls_beside_stairs()
@@ -7249,6 +7250,83 @@ func _test_arrivals() -> void:
 	var copy := Arrivals.new()
 	copy.restore(arrivals.capture())
 	_check(copy.trips[Arrivals.PRISONERS].point == &"dock", "the timetable is saved")
+	copy.free()
+	main.queue_free()
+
+
+func _test_backdrop() -> void:
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	var backdrop: Backdrop = main.backdrop
+	var terrain: Terrain = main.terrain
+	var water: WaterLayer = main.water
+	var ground: ShaderMaterial = terrain.ground_material
+	backdrop.detail = Backdrop.Detail.HIGH
+	backdrop.rebuild()
+	_check(backdrop.is_inside_tree() and backdrop.get_child_count() > 4, "the world past the map is drawn")
+	var size := Vector2(terrain.size)
+	var seams := true
+	for x in range(0, terrain.size.x + 1, 7):
+		seams = seams and is_equal_approx(backdrop.height_at(Vector2(x, 0)), terrain.corner_height(Vector2i(x, 0))) \
+				and is_equal_approx(backdrop.height_at(Vector2(x, size.y)), terrain.corner_height(Vector2i(x, terrain.size.y)))
+	_check(seams, "the ring meets the map's edge without a seam")
+	var near := 0.0
+	var far := 0.0
+	for x in range(0, terrain.size.x, 4):
+		near += backdrop.height_at(Vector2(x, -4.0))
+		far += backdrop.height_at(Vector2(x, -60.0))
+	_check(far > near + 10.0, "hills rise into the distance")
+	var town := backdrop.town()
+	var past_edge := town.distance_to(town.clamp(Vector2.ZERO, size))
+	_check(past_edge > 20.0 and backdrop.road().size() == 2 and backdrop.road()[0].distance_to(backdrop.road()[0].clamp(Vector2.ZERO, size)) < 0.01,
+			"the road runs on from the map's edge to a town")
+	var roads: Roads = main.roads
+	var exits := roads.edge_nodes()
+	if not exits.is_empty():
+		var out := roads.outward(exits[0])
+		_check((town - size * 0.5).dot(out) > 0.0, "the town sits on the side the road leaves by")
+	_check(backdrop.trees().size() > 100, "woods grow past the map")
+	var clear := true
+	for t in backdrop.trees():
+		for f in backdrop.fields():
+			clear = clear and not f.has_point(t)
+		clear = clear and t.distance_to(town) > 12.0
+	_check(clear, "but not in the town or the fields")
+	_check(backdrop.fields().size() == 8 and backdrop.farm().is_finite(), "a farm with fields")
+	_check(is_equal_approx(ground.get_shader_parameter(&"fog_start"), Backdrop.FOG_START), "the fog starts further out")
+	# The ring follows the season and the snow.
+	ground.set_shader_parameter(&"snow", 1.0)
+	ground.set_shader_parameter(&"base_colour", Color(0.6, 0.5, 0.3))
+	backdrop._sync()
+	_check(backdrop._ground_material.get_shader_parameter(&"snow") == 1.0
+			and backdrop._ground_material.get_shader_parameter(&"base_colour") == Color(0.6, 0.5, 0.3), "snow and the season reach the ring")
+	ground.set_shader_parameter(&"snow", 0.0)
+	# Community service shows in the town.
+	var people: People = main.people
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	prisoner.profile["outing"] = "Litter picking"
+	backdrop._sync()
+	_check(backdrop._workers.filter(func(w: MeshInstance3D) -> bool: return w.visible).size() == 1, "prisoners out on community service work in the town")
+	prisoner.profile.erase("outing")
+	# A coast runs down into the sea, with the town elsewhere.
+	water.coast = WaterLayer.Coast.NORTH
+	water.update_sea()
+	backdrop.rebuild()
+	_check(backdrop.height_at(Vector2(size.x * 0.5, -30.0)) < water.sea_level() - 1.0 and backdrop.sea_amount(Vector2(size.x * 0.5, -30.0)) == 1.0,
+			"off a coast the ground falls into the sea")
+	_check(backdrop._sea.size() == 1, "and the sea fills the ring on that side")
+	_check(backdrop.town().y > 0.0, "the town is never in the sea")
+	water.coast = 0
+	water.update_sea()
+	# Low detail swaps it for plain fog.
+	backdrop.detail = Backdrop.Detail.LOW
+	_check(not backdrop.visible and is_equal_approx(ground.get_shader_parameter(&"fog_start"), 0.0), "low detail keeps the plain fog")
+	backdrop.detail = Backdrop.Detail.HIGH
+	# Only the seed is saved; the ring is rebuilt on load.
+	var copy := Backdrop.new()
+	copy.restore(backdrop.capture())
+	_check(copy.noise_seed == backdrop.noise_seed and copy.town_side == backdrop.town_side, "the scenery's seed is saved")
 	copy.free()
 	main.queue_free()
 

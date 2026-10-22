@@ -255,10 +255,12 @@ func rebuild() -> void:
 			var i := z * stride + x
 			var h := _heights[i]
 			vertices[i] = Vector3(x * cell_size, h, z * cell_size)
-			var left := _heights[i - 1] if x > 0 else 0.0
-			var right := _heights[i + 1] if x < size.x else 0.0
-			var up := _heights[i - stride] if z > 0 else 0.0
-			var down := _heights[i + stride] if z < size.y else 0.0
+			# On the edge the ground carries on level, so the border doesn't
+			# shade as a cliff where the scenery past the map meets it.
+			var left := _heights[i - 1] if x > 0 else h
+			var right := _heights[i + 1] if x < size.x else h
+			var up := _heights[i - stride] if z > 0 else h
+			var down := _heights[i + stride] if z < size.y else h
 			normals[i] = Vector3(left - right, two, up - down).normalized()
 	if _indices.size() != size.x * size.y * 6:
 		_indices.resize(size.x * size.y * 6)
