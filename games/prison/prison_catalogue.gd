@@ -4,7 +4,7 @@ class_name PrisonCatalogue
 
 ## Tabs of the objects menu, in order (see ObjectDef.category).
 const OBJECT_CATEGORIES: Array[String] = ["Cells", "Kitchen", "Work", "Leisure", "Hobbies",
-		"Classes", "Staff", "Decoration"]
+		"Classes", "Staff", "Decoration", "Utilities"]
 const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/bed.tres"),
 	preload("res://games/prison/catalogue/toilet.tres"),
@@ -38,6 +38,13 @@ const OBJECTS: Array[ObjectDef] = [
 	preload("res://games/prison/catalogue/cooker.tres"),
 	preload("res://games/prison/catalogue/serving_counter.tres"),
 	preload("res://games/prison/catalogue/delivery_pallet.tres"),
+	preload("res://games/prison/catalogue/utility_generator.tres"),
+	preload("res://games/prison/catalogue/utility_solar_panel.tres"),
+	preload("res://games/prison/catalogue/utility_battery.tres"),
+	preload("res://games/prison/catalogue/utility_well.tres"),
+	preload("res://games/prison/catalogue/utility_water_tower.tres"),
+	preload("res://games/prison/catalogue/utility_treatment_plant.tres"),
+	preload("res://games/prison/catalogue/utility_mains.tres"),
 	preload("res://games/prison/catalogue/bin.tres"),
 	preload("res://games/prison/catalogue/skip.tres"),
 	preload("res://games/prison/catalogue/laundry_basket.tres"),
@@ -407,6 +414,7 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_cat_about.tres"),
 	preload("res://games/prison/catalogue/moodlet_laughed.tres"),
 	preload("res://games/prison/catalogue/moodlet_lights_out.tres"),
+	preload("res://games/prison/catalogue/moodlet_smelly_drains.tres"),
 	preload("res://games/prison/catalogue/moodlet_wet_feet.tres"),
 	preload("res://games/prison/catalogue/moodlet_cat_on_lap.tres"),
 	preload("res://games/prison/catalogue/moodlet_my_pet.tres"),

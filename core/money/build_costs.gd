@@ -13,6 +13,8 @@ const DOOR_PRICE := 100
 const WINDOW_PRICES: Dictionary[StringName, int] = {&"glass": 60, &"bars": 80}
 const STAIR_TILE_PRICE := 60
 const RAMP_TILE_PRICE := 30
+## Each kind of cable or pipe, by the tile.
+const CONDUIT_TILE_PRICE := 5
 
 var building: Building
 var ledger: Ledger
@@ -65,6 +67,8 @@ func level_worth(map: BuildingMap) -> int:
 		sum += flight.cells.size() * STAIR_TILE_PRICE
 	for ramp in map.ramps:
 		sum += ramp.rect.get_area() * RAMP_TILE_PRICE
+	for bits: int in map.conduits.values():
+		sum += CONDUIT_TILE_PRICE * ((bits & 1) + (bits >> 1 & 1) + (bits >> 2 & 1))
 	return sum
 
 

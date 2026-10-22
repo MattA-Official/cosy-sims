@@ -30,7 +30,7 @@ const REVEALS := {
 	"Staff needs setting on": [RevealDef.Kind.SETTING, &"staff_needs", 1, true, false],
 	"Red tape setting on": [RevealDef.Kind.SETTING, &"red_tape", 1, true, false],
 	"5 course passes": [RevealDef.Kind.COUNT, &"course_passed", 5, null, true],
-	# No utilities setting yet: word of mouth turns these up.
+	# Word of mouth turns these up too.
 	"Utilities set to Self-sufficient": [RevealDef.Kind.SETTING, &"utilities", 1, &"self_sufficient", true],
 	"Utilities set to Bought in": [RevealDef.Kind.SETTING, &"utilities", 1, &"bought_in", true],
 	"A kitchen, laundry or workshop is built": [RevealDef.Kind.BUILT, &"kitchen|laundry|workshop", 1, null, true],
@@ -118,8 +118,8 @@ const FUTURE_FLAGS := {
 	&"patrol_planner": "patrol planner", &"sniffer_dogs": "dog handler role", &"cctv_room": "camera cover",
 	&"lockdown_button": "lockdown button", &"remote_doors": "door control desk", &"watchtowers": "watchtowers",
 	&"tactical_team": "response squad", &"ambulance_bay": "ambulances", &"computer_room": "flexible objects",
-	&"furniture_workshop": "flexible objects", &"road_works": "roads", &"generators": "utilities",
-	&"solar_and_water": "utilities", &"jetty_and_helipad": "location packs", &"bookkeeping": "the daily report",
+	&"furniture_workshop": "flexible objects", &"road_works": "roads",
+	&"jetty_and_helipad": "location packs", &"bookkeeping": "the daily report",
 	&"intake_desk": "intake choices", &"logistics": "deliveries",
 }
 ## Modifier keys read with the group or role in front, and the pattern

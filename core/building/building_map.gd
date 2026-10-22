@@ -43,6 +43,10 @@ const DOOR_STEPS_MAX := 1.0
 
 enum Wall { NONE, WALL, DOOR, WINDOW }
 
+## The bit in `conduits` for each utility: power cables, water pipes,
+## sewage pipes.
+const CONDUIT_BITS: Dictionary[StringName, int] = {&"power": 1, &"water": 2, &"sewage": 4}
+
 ## Kinds of window. Both let light and sight through but nobody past.
 const WINDOW_GLASS := &"glass"
 const WINDOW_BARS := &"bars"
@@ -127,6 +131,10 @@ var door_kinds: Dictionary[Vector3i, StringName] = {}
 ## once built. Planned walls and doors already block people; planned floor
 ## is still ground, though objects may stand on it.
 var planned_floors: Dictionary[Vector2i, Array] = {}
+## Cables and pipes under the floor, for utilities Self-sufficient: a bit
+## for each kind (see CONDUIT_BITS) by cell. They only show in the
+## utilities tool.
+var conduits: Dictionary[Vector2i, int] = {}
 var planned_walls: Dictionary[Vector3i, Array] = {}
 ## Batches of planned work already paid for, and how many pieces each
 ## had when planned (for its progress).
@@ -1341,6 +1349,7 @@ func to_data() -> Dictionary:
 		"room_zones": _room_zones.duplicate(),
 		"door_kinds": door_kinds.duplicate(),
 		"planned_floors": planned_floors.duplicate(true),
+		"conduits": conduits.duplicate(),
 		"planned_walls": planned_walls.duplicate(true),
 		"paid_batches": paid_batches.duplicate(),
 		"batch_sizes": batch_sizes.duplicate(),
@@ -1365,6 +1374,7 @@ func load_data(data: Dictionary, find_object: Callable) -> void:
 	slant_paints.assign(data.get("slant_paints", {}).duplicate(true))
 	piece_styles.assign(data.get("piece_styles", {}).duplicate(true))
 	planned_floors.assign(data.get("planned_floors", {}).duplicate(true))
+	conduits.assign(data.get("conduits", {}))
 	planned_walls.assign(data.get("planned_walls", {}).duplicate(true))
 	paid_batches.assign(data.get("paid_batches", {}))
 	batch_sizes.assign(data.get("batch_sizes", {}))
@@ -1413,6 +1423,30 @@ func load_data(data: Dictionary, find_object: Callable) -> void:
 #endregion
 
 #region Compound actions
+
+## Whether a cell has a cable or pipe of a kind.
+func has_conduit(cell: Vector2i, kind: StringName) -> bool:
+	return (conduits.get(cell, 0) & CONDUIT_BITS.get(kind, 0)) != 0
+
+
+## Lays or takes up a kind of cable or pipe along some cells, on land you
+## own. Returns how many changed.
+func set_conduits(cells: Array[Vector2i], kind: StringName, on: bool) -> int:
+	var bit: int = CONDUIT_BITS.get(kind, 0)
+	var count := 0
+	for cell in cells:
+		if bit == 0 or (on and not owns(cell)) or has_conduit(cell, kind) == on:
+			continue
+		var bits: int = conduits.get(cell, 0) ^ bit
+		if bits == 0:
+			conduits.erase(cell)
+		else:
+			conduits[cell] = bits
+		count += 1
+	if count > 0:
+		changed.emit()
+	return count
+
 
 ## Floor plus walls all round, like the room tool in Software Inc.
 func build_room(rect: Rect2i, floor_type: StringName = DEFAULT_FLOOR,

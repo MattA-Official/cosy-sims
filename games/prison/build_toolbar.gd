@@ -4,7 +4,7 @@ extends VBoxContainer
 ## catalogue (objects, floors, walls, rooms, plants, paths) are picture tiles
 ## with their name on hover, so new entries slot in without new code.
 ## Number keys 1 to 9, then 0, pick tools, Z the zones tool and X the
-## patrol route tool and B the move tool.
+## patrol route tool, B the move tool and U the utilities tool.
 
 @export var controller: BuildController
 ## (kind: "room" or "object", id) -> bool: whether research has unlocked
@@ -13,6 +13,9 @@ var allowed: Callable
 ## (id) -> Array[String]: what research has upgraded about a room type or
 ## object, for its tooltip. Optional.
 var upgrades: Callable
+## (def) -> bool: whether an object shows in the menu at all, such as
+## plant only with utilities Self-sufficient. Optional.
+var object_shown: Callable
 
 ## In the order they're used: put up rooms, then fit them out, then the
 ## grounds, with demolish set apart, then running the prison, then moving. Keys 1 to 9 then 0 follow
@@ -31,12 +34,13 @@ const TOOLS := [
 	[BuildController.Tool.ZONE, "Zones", "Say who may go where, and lock doors by hand.", "tool_zones"],
 	[BuildController.Tool.ROUTE, "Patrol routes", "Draw loops for guards to walk; put guards on them in the Staff window (P).", "tool_route"],
 	[BuildController.Tool.MOVE, "Move and templates", "Pick up an object, a room or a box of things and put it somewhere else. Ctrl+C and Ctrl+V copy; keep rooms as templates.", "tool_move"],
+	[BuildController.Tool.CONDUIT, "Utilities", "Lay cables and pipes from plant to what needs it, and see what's on and off. Only with utilities Self-sufficient.", "tool_utilities"],
 ]
 ## A divider goes before each of these tools, grouping building, grounds,
 ## demolish and running the prison.
 const GROUP_STARTS: Array[int] = [6, 9, 10, 12]
 ## Keys for tools past the tenth, which have no number.
-const EXTRA_KEYS: Array[String] = ["Z", "X", "B"]
+const EXTRA_KEYS: Array[String] = ["Z", "X", "B", "U"]
 
 const ICONS := "res://core/ui/icons/%s.svg"
 
@@ -84,6 +88,12 @@ const WATER_MODES := [
 	[BuildController.WaterMode.RIVER, "Draw a river", "water_add", "Click along its course; click the last point again to finish."],
 ]
 
+const CONDUIT_KINDS := [
+	[&"power", "Power cables", "kind_power", "From generators, solar panels and batteries to lights, cookers and electric doors."],
+	[&"water", "Water pipes", "kind_water", "From wells and water towers to showers, sinks and toilets."],
+	[&"sewage", "Sewage pipes", "kind_sewage", "From toilets, showers and sinks to a treatment plant."],
+]
+
 const LAND_MODES := [
 	[1, "Buy land", "money", "Buy plots next to your land, one at a time or several with a drag."],
 	[2, "Sell land", "money", "Sell empty plots back for half what they cost."],
@@ -118,10 +128,18 @@ var locked: Array[StringName] = []:
 		locked = value
 		for tool: BuildController.Tool in _tool_buttons:
 			(_tool_buttons[tool] as Control).visible = not is_locked(tool)
+## Tools hidden by a setting, such as the utilities tool unless utilities
+## are Self-sufficient.
+var hidden_tools: Array[BuildController.Tool] = []:
+	set(value):
+		hidden_tools = value
+		locked = locked
+		if is_locked(controller.tool):
+			controller.tool = BuildController.Tool.NONE
 
 
 func is_locked(tool: BuildController.Tool) -> bool:
-	return locked.has(StringName(String(BuildController.Tool.keys()[tool]).to_lower()))
+	return hidden_tools.has(tool) or locked.has(StringName(String(BuildController.Tool.keys()[tool]).to_lower()))
 
 
 func _ready() -> void:
@@ -177,6 +195,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		index = 10
 	elif key.physical_keycode == KEY_X:
 		index = 11
+	elif key.physical_keycode == KEY_U:
+		index = 13
 	elif index > 9:
 		index = -1
 	if index >= 0 and index < TOOLS.size() and not is_locked(TOOLS[index][0]):
@@ -222,6 +242,9 @@ func _on_tool_changed(tool: BuildController.Tool) -> void:
 			_add_opening_choices()
 		BuildController.Tool.MOVE:
 			_add_template_choices()
+		BuildController.Tool.CONDUIT:
+			_icon_tiles("Lay", CONDUIT_KINDS, controller.conduit_kind,
+					func(kind: StringName) -> void: controller.conduit_kind = kind)
 		BuildController.Tool.ZONE:
 			_add_choices("Who may be here", PrisonCatalogue.ZONES, controller.zone,
 					func(def: Resource) -> void: controller.zone = def, "Room type's")
@@ -597,9 +620,16 @@ func _add_object_choices() -> void:
 	if _object_category.is_empty():
 		_object_category = controller.object_def.category if controller.object_def != null \
 				else PrisonCatalogue.OBJECT_CATEGORIES[0]
+	var shown := func(def: ObjectDef) -> bool:
+		return (not allowed.is_valid() or allowed.call("object", def.id)) \
+				and (not object_shown.is_valid() or object_shown.call(def))
+	var categories := PrisonCatalogue.OBJECT_CATEGORIES.filter(func(category: String) -> bool:
+		return PrisonCatalogue.OBJECTS.any(func(def: ObjectDef) -> bool: return def.category == category and shown.call(def)))
+	if not categories.has(_object_category):
+		_object_category = categories[0]
 	var group := ButtonGroup.new()
 	var tabs: Array[Button] = []
-	for category in PrisonCatalogue.OBJECT_CATEGORIES:
+	for category: String in categories:
 		var tab := Button.new()
 		tab.text = category
 		tab.toggle_mode = true
@@ -613,7 +643,7 @@ func _add_object_choices() -> void:
 		tabs.append(tab)
 	_columns("Kind", tabs)
 	var defs := PrisonCatalogue.OBJECTS.filter(func(def: ObjectDef) -> bool:
-		return def.category == _object_category and (not allowed.is_valid() or allowed.call("object", def.id)))
+		return def.category == _object_category and shown.call(def))
 	var current: Resource = controller.object_def if defs.has(controller.object_def) else null
 	_add_choices("Objects", defs, current, func(def: Resource) -> void: controller.object_def = def)
 

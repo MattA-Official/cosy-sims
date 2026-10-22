@@ -45,7 +45,7 @@ var wall_view := WallView.UP:
 		wall_view = value
 		wall_view_changed.emit(value)
 
-enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE, ROUTE, MOVE }
+enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE, ROUTE, MOVE, CONDUIT }
 enum WaterMode { NONE, ADD, REMOVE, RIVER }
 ## What the floor tool does: lay floor, or nudge existing floor up or down.
 enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS }
@@ -75,6 +75,7 @@ const HINTS := {
 	Tool.PATH: "",
 	Tool.ZONE: "Click a room to say who may be in it. Click a door to lock or unlock it until the next block; Shift-click to keep it so.",
 	Tool.ROUTE: "Click to add points to a patrol route; click the first point or press Enter to close the loop. Esc stops drawing; Ctrl-click a route to remove it.",
+	Tool.CONDUIT: "Drag to lay a run of cable or pipe; things on it or beside it join it. Hold Ctrl to take it up.",
 }
 
 const PATH_HINTS := {
@@ -189,6 +190,11 @@ var window_kind := BuildingMap.WINDOW_GLASS
 var door_kind: StringName = &""
 ## The zone the zones tool paints. Null goes back to the room type's.
 var zone: ZoneDef
+## What the utilities tool lays: &"power", &"water" or &"sewage".
+var conduit_kind: StringName = &"power"
+## () -> String: how the utilities stand, shown under the tool's hint.
+## Optional.
+var conduit_summary: Callable
 var terrain_brush := Terrain.Brush.RAISE
 ## When not NONE, the terrain tool adds or removes water instead of sculpting.
 var water_mode := WaterMode.NONE
@@ -445,7 +451,7 @@ func _on_press() -> void:
 			_press_stairs()
 		Tool.MOVE when _carried != null:
 			drop()
-		Tool.ROOM, Tool.FLOOR, Tool.DEMOLISH, Tool.MOVE:
+		Tool.ROOM, Tool.FLOOR, Tool.DEMOLISH, Tool.MOVE, Tool.CONDUIT:
 			_dragging = true
 			_drag_start_cell = _hover_cell()
 			_drag_start_point = _hover_point
@@ -572,6 +578,9 @@ func _on_release() -> void:
 				land_refused.emit()
 		Tool.MOVE:
 			pick_up(rect)
+		Tool.CONDUIT:
+			map.set_conduits(planned_conduit(), conduit_kind, not erase)
+			hint_changed.emit()
 		Tool.DEMOLISH:
 			if rect.size != Vector2i.ONE:
 				map.demolish(rect)
@@ -599,7 +608,7 @@ func _spends() -> bool:
 	if _erasing():
 		return false
 	match tool:
-		Tool.ROOM, Tool.OPENING, Tool.OBJECT:
+		Tool.ROOM, Tool.OPENING, Tool.OBJECT, Tool.CONDUIT:
 			return true
 		Tool.MOVE:
 			return _carried != null and (_pasting or _carried.is_structure())
@@ -676,6 +685,8 @@ func hint() -> String:
 		return text
 	if tool == Tool.OPENING:
 		return (HINTS[tool] + "\n" + _door_status_shown).strip_edges()
+	if tool == Tool.CONDUIT and conduit_summary.is_valid():
+		return (HINTS[tool] + "\n" + conduit_summary.call()).strip_edges()
 	if tool == Tool.MOVE and _carried != null:
 		return ("Click to put down another copy. " if _pasting else "Click to put it down. ") \
 				+ "R or [ and ] turn it, Ctrl+C copies it, Esc puts it back."
@@ -1256,6 +1267,22 @@ func _hover_edge() -> Vector3i:
 	return Vector3i(cell.x, cell.y + 1, BuildingMap.EDGE_X)
 
 
+## The tiles a utilities drag covers: along, then across, as an L.
+func planned_conduit() -> Array[Vector2i]:
+	var bounds := map.land_bounds()
+	var end := _hover_cell().clamp(bounds.position, bounds.end - Vector2i.ONE)
+	var start := _drag_start_cell if _dragging else end
+	var at := start
+	var out: Array[Vector2i] = [at]
+	while at.x != end.x:
+		at.x += signi(end.x - at.x)
+		out.append(at)
+	while at.y != end.y:
+		at.y += signi(end.y - at.y)
+		out.append(at)
+	return out
+
+
 func _drag_rect() -> Rect2i:
 	var bounds := map.land_bounds()
 	var end := _hover_cell().clamp(bounds.position, bounds.end - Vector2i.ONE)
@@ -1543,6 +1570,8 @@ func _draw_preview() -> void:
 				_shapes.rect(placed.rect, ok_colour, placed.def.height + 0.05)
 			elif room != null:
 				_shapes.cells(room.cells, ok_colour)
+		Tool.CONDUIT:
+			_shapes.cells(planned_conduit(), demolish_colour if _erasing() else ok_colour)
 		Tool.ROOM_TYPE:
 			var room := map.room_at_point(_hover_point)
 			if room != null:

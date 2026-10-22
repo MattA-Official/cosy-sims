@@ -81,6 +81,8 @@ static func _setting(main: Node, id: StringName) -> Variant:
 			return (main.desk_work as DeskWork).red_tape != DeskWork.RedTape.OFF
 		&"no_road":
 			return not (main.roads as Roads).has_roads()
+		&"utilities":
+			return [&"off", &"bought_in", &"self_sufficient"][(main.utilities as Utilities).mode]
 	return null
 
 

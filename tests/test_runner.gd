@@ -152,6 +152,7 @@ func _process(_delta: float) -> bool:
 	_test_ministry()
 	_test_campaign()
 	_test_utilities()
+	_test_self_sufficient()
 	_test_arrivals()
 	if _failures == 0:
 		print("All tests passed.")
@@ -7378,6 +7379,176 @@ func _test_utilities() -> void:
 	_check(copy.mode == Utilities.Mode.BOUGHT_IN, "the setting is saved")
 	copy.free()
 	main.queue_free()
+
+
+## Utilities Self-sufficient: plant, cables and pipes, sharing out, stores,
+## the mains, wear, dark rooms and locked doors.
+func _test_self_sufficient() -> void:
+	# Sharing out on its own: the nearest gets the supply first.
+	var building := Building.new(Rect2i(0, 0, 20, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var map := building.ground()
+	map.fill_floor(Rect2i(0, 0, 20, 4))
+	var pump := ObjectDef.new()
+	pump.id = &"test_pump"
+	pump.supplies = {&"water": 1.0}
+	var tap := ObjectDef.new()
+	tap.id = &"test_tap"
+	tap.idle_uses = {&"water": 0.6}
+	var source := map.place_object(pump, Vector2(0, 0), 0)
+	var near := map.place_object(tap, Vector2(5, 0), 0)
+	var far := map.place_object(tap, Vector2(12, 0), 0)
+	var lone := map.place_object(tap, Vector2(15, 3), 0)
+	var line: Array[Vector2i] = []
+	for x in range(0, 13):
+		line.append(Vector2i(x, 1))
+	_check(map.set_conduits(line, &"water", true) == 13 and map.has_conduit(Vector2i(4, 1), &"water")
+			and not map.has_conduit(Vector2i(4, 1), &"power"), "a water pipe is laid")
+	var utilities := Utilities.new()
+	utilities.building = building
+	utilities.mode = Utilities.Mode.SELF_SUFFICIENT
+	utilities.balance(10.0)
+	_check(utilities.networks.size() == 1 and utilities.networks[0].plant.size() == 1
+			and utilities.networks[0].users.size() == 2, "the run joins the pump and the taps beside it")
+	_check(not utilities.off.has(Vector2i(0, near)) and utilities.off.has(Vector2i(0, far)),
+			"short of water, the tap furthest along is switched off first")
+	_check(String(utilities.off[Vector2i(0, far)][1]) == "No water: 1 plant supplies 1, demand is 1" or
+			String(utilities.off[Vector2i(0, far)][1]).begins_with("No water:"), "and says why")
+	_check(utilities.off.has(Vector2i(0, lone)) and String(utilities.off[Vector2i(0, lone)][1]).contains("no water pipe"),
+			"a tap no pipe reaches is off")
+	_check(utilities.supply_of(0, map.objects[source]) == Utilities.Supply.ON
+			and utilities.supply_of(0, map.objects[far]) == Utilities.Supply.OFF, "the view shows what's on and off")
+	var cut: Array[Vector2i] = [Vector2i(3, 1)]
+	map.set_conduits(cut, &"water", false)
+	utilities.balance(10.0)
+	_check(utilities.networks.size() == 2 and utilities.off.has(Vector2i(0, near))
+			and utilities.off.has(Vector2i(0, far)), "taking up a length splits the run from the pump")
+	_check(BuildCosts.CONDUIT_TILE_PRICE * 12 == _conduit_worth(map), "pipes cost by the tile")
+	var copy := BuildingMap.new(Rect2i(0, 0, 20, 20))
+	copy.load_data(map.to_data(), func(_id: StringName) -> ObjectDef: return null)
+	_check(copy.conduits == map.conduits, "cables and pipes are saved")
+	utilities.free()
+
+	# In the prison.
+	var main: Node = load("res://games/prison/main.tscn").instantiate()
+	main.sample = 12
+	root.add_child(main)
+	utilities = main.utilities
+	var people: People = main.people
+	var ledger: Ledger = main.ledger
+	var clock: GameClock = main.clock
+	var wear: Wear = main.wear
+	var toolbar: Node = main.get_node("HUD/BuildToolbar")
+	building = main.building
+	map = building.ground()
+	(main.misconduct as Misconduct).enabled = false
+	var well_def := PrisonCatalogue.object(&"well")
+	_check(toolbar.is_locked(BuildController.Tool.CONDUIT) and not toolbar.object_shown.call(well_def),
+			"no utilities tool or plant unless Self-sufficient")
+	utilities.mode = Utilities.Mode.SELF_SUFFICIENT
+	_check(not toolbar.is_locked(BuildController.Tool.CONDUIT) and toolbar.object_shown.call(well_def),
+			"Self-sufficient brings the tool and the well")
+	clock.jump_to_hour(12)
+	utilities.balance(10.0)
+	var shower: BuildingMap.PlacedObject = null
+	var level := 0
+	for n: int in building.levels:
+		for placed: BuildingMap.PlacedObject in building.levels[n].objects.values():
+			if placed.def.id == &"shower" and shower == null:
+				shower = placed
+				level = n
+	var prisoner: Person = people.people.filter(func(p: Person) -> bool: return p.group == &"prisoner")[0]
+	_check(shower != null and utilities.off.has(Vector2i(level, shower.id)) and not people._may_use(prisoner, level, shower),
+			"with nothing laid, nobody can use a shower")
+	var unlocked := 0
+	for n: int in building.levels:
+		for edge: Vector3i in building.levels[n].door_kinds:
+			var kind: DoorKindDef = people.access.door_kinds.get(building.levels[n].door_kinds[edge])
+			if kind != null and kind.electric and not people.is_door_locked(n, edge):
+				unlocked += 1
+	_check(unlocked == 0, "electric doors with no power fail locked")
+	# A well, a treatment plant and pipes to the shower.
+	var well := _place_anywhere(main, well_def)
+	var plant := _place_anywhere(main, PrisonCatalogue.object(&"treatment_plant"))
+	_check(well != 0 and plant != 0, "plant goes down")
+	var to: Vector2i = Vector2i(shower.centre.floor())
+	_lay(building, &"water", Vector2i(map.objects[well].centre.floor()), to, level)
+	_lay(building, &"sewage", Vector2i(map.objects[plant].centre.floor()), to, level)
+	utilities.balance(10.0)
+	_check(not utilities.off.has(Vector2i(level, shower.id)) and people._may_use(prisoner, level, shower),
+			"piped from a well to a treatment plant, the shower works")
+	_check(utilities.object_words(0, map.objects[well]).begins_with("Makes 30"), "the inspector says what the well makes")
+	people.broken[Vector2i(0, well)] = true
+	utilities.balance(10.0)
+	_check(utilities.off.has(Vector2i(level, shower.id)) and String(utilities.off[Vector2i(level, shower.id)][1]).begins_with("No water: the well pump supplies 0"),
+			"a broken well leaves the shower dry, and the inspector says why")
+	var tower := _place_anywhere(main, PrisonCatalogue.object(&"water_tower"))
+	_lay(building, &"water", Vector2i(map.objects[tower].centre.floor()), Vector2i(map.objects[well].centre.floor()), 0)
+	utilities.store_levels[Vector2i(0, tower)] = 80.0
+	utilities.balance(10.0)
+	_check(not utilities.off.has(Vector2i(level, shower.id)) and utilities.on_stores.has(Vector2i(level, shower.id))
+			and utilities.supply_of(level, shower) == Utilities.Supply.STORES, "a full water tower keeps it running")
+	people.broken.erase(Vector2i(0, well))
+	# Sewage with nowhere to go backs up.
+	people.broken[Vector2i(0, plant)] = true
+	for i in 3:
+		utilities.balance(10.0)
+	var drains: Utilities.Network = null
+	for net in utilities.networks:
+		if net.kind == &"sewage" and not net.plant.is_empty():
+			drains = net
+	_check(drains != null and drains.short_minutes >= Utilities.BACKED_UP_MINUTES, "a broken treatment plant backs the drains up")
+	people.broken.erase(Vector2i(0, plant))
+	# A generator with the mains: spare power sold, fuel burnt, wear.
+	var generator := _place_anywhere(main, PrisonCatalogue.object(&"generator"))
+	var mains := _place_anywhere(main, PrisonCatalogue.object(&"mains"))
+	_lay(building, &"power", Vector2i(map.objects[generator].centre.floor()), Vector2i(map.objects[mains].centre.floor()), 0)
+	utilities.balance(60.0)
+	var sold: int = ledger.today.get(Utilities.SOLD_LINE, 0)
+	var fuel: int = ledger.today.get(Utilities.FUEL_LINE, 0)
+	utilities.bill_hour()
+	_check(ledger.today.get(Utilities.SOLD_LINE, 0) > sold and ledger.today.get(Utilities.FUEL_LINE, 0) < fuel,
+			"spare power is sold to the mains, and the generator burns fuel")
+	utilities.balance(10.0)
+	utilities.hourly()
+	_check(wear.uses.get(Vector2i(0, generator), 0) == 1, "plant wears with the hours it runs")
+	_check(utilities.summary().contains("Power 40 made"), "the tool sums up each kind")
+	clock.jump_to_hour(23)
+	utilities.balance(10.0)
+	_check(not utilities.dark_rooms.is_empty(), "rooms no cable reaches are dark at night")
+	var data := utilities.capture()
+	_check((data.stores as Dictionary).has(Vector2i(0, tower)), "stores are saved")
+	utilities.mode = Utilities.Mode.BOUGHT_IN
+	_check(utilities._locked.is_empty() and utilities.off.is_empty() and people._may_use(prisoner, level, shower)
+			and toolbar.is_locked(BuildController.Tool.CONDUIT), "leaving Self-sufficient puts everything back on")
+	main.queue_free()
+
+
+## Lays a run of one kind from a ground floor tile to a tile on some level,
+## along then across, then up a riser.
+func _lay(building: Building, kind: StringName, from: Vector2i, to: Vector2i, level: int) -> void:
+	var cells: Array[Vector2i] = [from]
+	var at := from
+	while at.x != to.x:
+		at.x += signi(to.x - at.x)
+		cells.append(at)
+	while at.y != to.y:
+		at.y += signi(to.y - at.y)
+		cells.append(at)
+	building.ground().set_conduits(cells, kind, true)
+	var riser: Array[Vector2i] = [to]
+	for n in range(1, level + 1):
+		(building.levels[n] as BuildingMap).set_conduits(riser, kind, true)
+
+
+func _conduit_worth(map: BuildingMap) -> int:
+	var costs := BuildCosts.new()
+	var with := costs.level_worth(map)
+	var laid := map.conduits.duplicate()
+	map.conduits.clear()
+	var without := costs.level_worth(map)
+	map.conduits = laid
+	costs.free()
+	return with - without
 
 
 ## Places an object anywhere it fits on the ground floor; its id or 0.

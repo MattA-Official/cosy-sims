@@ -151,10 +151,10 @@ func _ready() -> void:
 		if surprises != null:
 			surprises.frequency = index as Surprises.Frequency)
 	box.add_child(_row("Surprises", _surprises))
-	for words in ["Off", "Bought in"]:
+	for words: String in ["Off", "Bought in", "Self-sufficient"]:
 		_utilities.add_item(words)
 	_utilities.focus_mode = FOCUS_NONE
-	_utilities.tooltip_text = "Off, power, water and sewage just work. Bought in, the prison pays for what it uses by the hour, and for heating by the day (more in winter), and power cuts can happen."
+	_utilities.tooltip_text = "Off, power, water and sewage just work. Bought in, the prison pays for what it uses by the hour, and for heating by the day (more in winter), and power cuts can happen. Self-sufficient, you build generators, wells and treatment plants and lay cables and pipes to what needs them (the utilities tool, U); short of supply, the things furthest along a run go off."
 	_utilities.item_selected.connect(func(index: int) -> void:
 		if utilities != null:
 			utilities.mode = index as Utilities.Mode)

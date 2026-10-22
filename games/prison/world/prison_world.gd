@@ -56,6 +56,11 @@ const TASKS: Array[String] = ["Painting the bandstand", "Litter picking in the p
 		"Helping at the food bank", "Mending the village hall fence"]
 
 
+## The research flag each piece of plant waits on.
+const PLANT_FLAGS := {&"generator": &"generators", &"battery": &"generators",
+		&"solar_panel": &"solar_and_water", &"treatment_plant": &"solar_and_water", &"water_tower": &"solar_and_water"}
+
+
 static func setup(main: Node) -> void:
 	_reputation(main)
 	_open_day(main)
@@ -674,7 +679,57 @@ static func _utilities(main: Node) -> void:
 		var words := utilities.words()
 		return [words + "."] if not words.is_empty() else ([] as Array[String]))
 	(main.inspector as Inspector).person_lines.append(func(person: Person) -> String:
-		return "In the dark: the power is off" if utilities.cut and person.moodlets.has(&"lights_out") else "")
+		if not person.moodlets.has(&"lights_out"):
+			return ""
+		if utilities.cut:
+			return "In the dark: the power is off"
+		var here := (main.people as People).room_of(person)
+		return "In the dark: no power reaches this room's lights" if not here.is_empty() and utilities.dark_rooms.has(here[1]) else "")
+	_self_sufficient(main)
+
+
+## Utilities Self-sufficient: plant in the objects menu (as research
+## allows), the utilities tool and its view, and the inspector's word on
+## what's on or off.
+static func _self_sufficient(main: Node) -> void:
+	var utilities: Utilities = main.utilities
+	var research: Research = main.research
+	var controller: BuildController = main.controller
+	utilities.wear = main.wear
+	var view := UtilityView.new()
+	view.name = "UtilityView"
+	view.cell_size = (main.grid as BuildGrid).cell_size
+	view.ground_height = (main.terrain as Terrain).cell_height
+	view.utilities = utilities
+	view.controller = controller
+	view.building = main.building
+	(main.grid as Node).add_child(view)
+	controller.conduit_summary = utilities.summary
+	(main.inspector as Inspector).object_lines.append(func(level: int, id: int) -> String:
+		var placed := (main.building as Building).object_at(Vector2i(level, id))
+		return utilities.object_words(level, placed) if placed != null else "")
+	var toolbar := main.get_node_or_null("HUD/BuildToolbar")
+	if toolbar == null:
+		return
+	toolbar.object_shown = func(def: ObjectDef) -> bool:
+		if not def.tags.has(&"plant"):
+			return true
+		if utilities.mode != Utilities.Mode.SELF_SUFFICIENT:
+			return false
+		var flag: StringName = PLANT_FLAGS.get(def.id, &"")
+		return flag.is_empty() or research.mode == Research.Mode.OFF or research.has_flag(flag)
+	var show := func() -> void:
+		var hidden: Array[BuildController.Tool] = []
+		if utilities.mode != Utilities.Mode.SELF_SUFFICIENT:
+			hidden.append(BuildController.Tool.CONDUIT)
+		toolbar.hidden_tools = hidden
+		if controller.tool == BuildController.Tool.OBJECT:
+			controller.tool = controller.tool
+	utilities.mode_changed.connect(show)
+	research.changed.connect(func() -> void:
+		if controller.tool == BuildController.Tool.OBJECT:
+			controller.tool = controller.tool)
+	show.call()
 
 
 ## Ways in: the bus stop, a jetty for the ferry, and the timetable of who

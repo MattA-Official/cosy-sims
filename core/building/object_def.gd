@@ -78,6 +78,18 @@ enum Connects {
 ## &"sewage" while someone uses it, and always.
 @export var uses: Dictionary[StringName, float] = {}
 @export var idle_uses: Dictionary[StringName, float] = {}
+## Plant, with utilities Self-sufficient: units an hour it makes (a
+## generator's power, a well's water, a treatment plant's sewage taken
+## away), and units it holds in store (a battery, a water tower).
+@export var supplies: Dictionary[StringName, float] = {}
+@export var stores: Dictionary[StringName, float] = {}
+## It supplies only by day, more in full sun, as solar panels do.
+@export var solar := false
+## The mains: buys whatever its network is short of, and sells spare power
+## back.
+@export var mains := false
+## Pence for each unit it makes, such as a generator's fuel.
+@export var unit_cost := 0.0
 
 ## Where it can stand: on the floor, only on a surface's spot (a chess
 ## board on a table), or either (a radio).
