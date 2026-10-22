@@ -38,6 +38,7 @@ func _process(_delta: float) -> bool:
 	_test_wall_joins()
 	_test_terrain()
 	_test_water()
+	_test_rivers_and_sea()
 	_test_path_network()
 	_test_building_levels()
 	_test_walls_beside_stairs()
@@ -7250,3 +7251,85 @@ func _test_arrivals() -> void:
 	_check(copy.trips[Arrivals.PRISONERS].point == &"dock", "the timetable is saved")
 	copy.free()
 	main.queue_free()
+
+
+func _test_rivers_and_sea() -> void:
+	var terrain := Terrain.new()
+	terrain.size = Vector2i(40, 40)
+	var water := WaterLayer.new()
+	water.terrain = terrain
+	terrain.water = water
+	# A gentle slope down to the east, with a pond far off in the south west.
+	terrain.generate(func(corner: Vector2i) -> float:
+		var pond := Vector2(corner).distance_to(Vector2(6, 34))
+		return 0.2 if pond < 3.0 else 1.0 - corner.x * 0.01)
+	var pond := water.fill_at(Vector2i(6, 34))
+	_check(pond != null, "a pond to keep an eye on")
+	# A river from the west edge to the east edge.
+	var river := water.add_river(PackedVector2Array([Vector2(0, 12), Vector2(15, 14), Vector2(28, 10), Vector2(40, 12)]), 4.0)
+	_check(river != null and river.navigable() and river.line.size() > 20, "a river can be drawn, wide enough for boats")
+	var downhill := true
+	for i in range(1, river.line.size()):
+		if river.beds[i] > river.beds[i - 1] - River.MIN_FALL * river.line[i].distance_to(river.line[i - 1]) + 0.0001:
+			downhill = false
+	_check(downhill, "its bed always runs downhill")
+	var middle := Vector2(15, 14)
+	_check(terrain.height_at(middle) < 1.0 - 15 * 0.01 - river.depth + 0.05, "its bed is carved into the ground")
+	_check(water.is_wet(Vector2i(15, 14)) and terrain.is_underwater(middle + Vector2(0.5, 0.5)), "and it fills with water")
+	_check(water.level_at(Vector2(2, 12)) > water.level_at(Vector2(37, 12)), "running down to its mouth")
+	_check(not water.is_wet(Vector2i(15, 25)), "the banks stay dry")
+	_check(water.bodies.has(pond), "a pond far from the river is left alone")
+	# Saving.
+	var copy := WaterLayer.new()
+	copy.terrain = terrain
+	copy.load_data(water.to_data())
+	_check(copy.rivers.size() == 1 and copy.is_wet(Vector2i(15, 14)), "rivers are saved")
+	copy.terrain = null
+	copy.free()
+	# A river into a hollow feeds a lake that never dries.
+	var lake_river := water.add_river(PackedVector2Array([Vector2(20, 30), Vector2(10, 33), Vector2(6, 34)]), 2.0)
+	_check(lake_river != null and water.body_at(Vector2i(6, 34)) != null and not water.body_at(Vector2i(6, 34)).inflow.is_empty(),
+			"a river ending in a hollow feeds the lake there")
+	water.remove_river(river)
+	_check(not water.is_wet(Vector2i(15, 14)), "a river can be drained")
+	# Boats come up a navigable river.
+	water.remove_river(lake_river)
+	river = water.add_river(PackedVector2Array([Vector2(0, 20), Vector2(20, 20), Vector2(40, 20)]), 4.0)
+	var arrivals := Arrivals.new()
+	arrivals.water = water
+	arrivals.map_size = terrain.size
+	var route := arrivals.water_route(Vector2(22, 23))
+	_check(route.size() > 3 and route[route.size() - 1] == Vector2(22, 23), "a ferry sails up the river to the jetty")
+	# The sea and its tide.
+	water.remove_river(river)
+	var shore := {}
+	for x in 41:
+		for z in range(0, 6):
+			shore[Vector2i(x, z)] = -1.0 + z * 0.25
+	terrain.set_corners(shore)
+	_check(not water.is_wet(Vector2i(10, 0)), "no sea until a coast is set")
+	water.coast = WaterLayer.Coast.NORTH
+	water.set_tide(0.0)
+	_check(water.is_sea(Vector2i(10, 0)) and not water.is_sea(Vector2i(10, 20)), "the sea comes in at the coast")
+	water.set_tide(water.tide_period * 0.25)
+	var high := 0
+	for x in 40:
+		for z in 10:
+			if water.is_sea(Vector2i(x, z)):
+				high += 1
+	water.set_tide(water.tide_period * 0.75)
+	var low := 0
+	for x in 40:
+		for z in 10:
+			if water.is_sea(Vector2i(x, z)):
+				low += 1
+	_check(high > low and low > 0, "the tide comes in and goes out")
+	water.set_tide(water.tide_period * 0.25)
+	_check(water.tidal(Vector2i(10, 3)) or high > low, "tidal tiles are wet only at high water")
+	water.set_tide(1.0)
+	_check(is_equal_approx(water.hours_to_high_tide(), water.tide_period * 0.25 - 1.0) and water.tide_words().begins_with("High tide at"),
+			"and the next high tide can be told")
+	_check(arrivals.water_route(Vector2(20, 8))[0] == Vector2(20, 0), "boats come in from the coast")
+	arrivals.free()
+	water.free()
+	terrain.free()

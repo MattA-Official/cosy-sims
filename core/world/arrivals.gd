@@ -35,6 +35,10 @@ var trips: Dictionary[StringName, Trip] = {}
 var building: Building
 var people: People
 var vehicles: Vehicles
+## Rivers and the sea, for boats' routes. Optional.
+var water: WaterLayer
+## How near a navigable river must pass a point for boats to use it.
+const RIVER_REACH := 4.0
 ## The whole map in tiles, for where boats and aircraft come from.
 var map_size := Vector2i(96, 96)
 ## () -> StringName: today's weather id. Optional.
@@ -154,10 +158,60 @@ func send(carries: StringName, model: PackedScene, to: Vector2, arrived := Calla
 		var vehicle := def.vehicle if def != null and def.vehicle != null else model
 		return vehicles.drive_in(vehicle, to, arrived, stay)
 	var at := stop_at(carries, to)
-	var route := PackedVector2Array([edge_point(at), at])
+	var route := water_route(at) if def.route == ArrivalPointDef.Route.WATER else PackedVector2Array([edge_point(at), at])
 	var lift := FLY_HEIGHT if def.route == ArrivalPointDef.Route.AIR or def.route == ArrivalPointDef.Route.CABLE else 0.0
 	return vehicles.arrive_along(def.vehicle if def.vehicle != null else model, route, arrived, stay, lift,
 			def.route == ArrivalPointDef.Route.WATER)
+
+
+## How a boat reaches a spot: up a navigable river that runs off the map
+## edge and passes close by; else in from the coast; else straight in from
+## the nearest edge.
+func water_route(at: Vector2) -> PackedVector2Array:
+	if water != null:
+		for river in water.rivers:
+			if not river.navigable() or river.line.size() < 2:
+				continue
+			var near: Array = river.nearest(at)
+			if near[1] > RIVER_REACH:
+				continue
+			var line := river.line
+			var mouth_out := _at_edge(line[line.size() - 1])
+			if not mouth_out and not _at_edge(line[0]):
+				continue
+			var out := PackedVector2Array()
+			if mouth_out:
+				for i in range(line.size() - 1, near[0] - 1, -1):
+					out.append(line[i])
+			else:
+				for i in range(0, near[0] + 1):
+					out.append(line[i])
+			out.append(at)
+			return out
+		if water.coast != 0:
+			var best := Vector2.INF
+			for edge in _coast_points(at):
+				if best == Vector2.INF or edge.distance_to(at) < best.distance_to(at):
+					best = edge
+			return PackedVector2Array([best, at])
+	return PackedVector2Array([edge_point(at), at])
+
+
+func _at_edge(point: Vector2) -> bool:
+	return point.x < 1.5 or point.y < 1.5 or point.x > map_size.x - 1.5 or point.y > map_size.y - 1.5
+
+
+func _coast_points(at: Vector2) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	if water.coast & WaterLayer.Coast.NORTH:
+		out.append(Vector2(at.x, 0.0))
+	if water.coast & WaterLayer.Coast.SOUTH:
+		out.append(Vector2(at.x, map_size.y))
+	if water.coast & WaterLayer.Coast.WEST:
+		out.append(Vector2(0.0, at.y))
+	if water.coast & WaterLayer.Coast.EAST:
+		out.append(Vector2(map_size.x, at.y))
+	return out
 
 
 ## The nearest point on the map edge to a spot, where boats and aircraft

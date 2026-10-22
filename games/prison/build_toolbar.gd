@@ -80,7 +80,8 @@ const BRUSHES := [
 
 const WATER_MODES := [
 	[BuildController.WaterMode.ADD, "Add water", "water_add", "Click a hollow to fill it."],
-	[BuildController.WaterMode.REMOVE, "Drain water", "water_drain", "Click a pond to drain it."],
+	[BuildController.WaterMode.REMOVE, "Drain water", "water_drain", "Click a pond or river to drain it."],
+	[BuildController.WaterMode.RIVER, "Draw a river", "water_add", "Click along its course; click the last point again to finish."],
 ]
 
 const LAND_MODES := [

@@ -1531,6 +1531,7 @@ func _add_hud() -> void:
 	settings_window.weather = weather
 	settings_window.surprises = surprises
 	settings_window.utilities = utilities
+	settings_window.water = water
 	pause_menu.clock = clock
 	pause_menu.subtitle = title
 	pause_menu.add_page(&"saves", "Save and load", saves_window, &"saves_toggle")

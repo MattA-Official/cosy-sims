@@ -1,8 +1,9 @@
 class_name PrisonWorld
 ## Wires M12's outside world into the prison: the town's opinion and the
 ## local paper, open days, community service, protestors, seasons,
-## weather and festive days, utilities, arrival points, and small
-## surprises. Each system keeps to its own node; this only connects them.
+## weather and festive days, utilities, arrival points, the tide, and
+## small surprises. Each system keeps to its own node; this only connects
+## them.
 
 ## Below LOW_REPUTATION Safety loses a star; above HIGH_REPUTATION the
 ## grant gains HIGH_GRANT.
@@ -39,6 +40,7 @@ const FESTIVE_SWAPS: Array[StringName] = [&"work", &"learn", &"club", &"yard"]
 ## Hotheads lose their temper this much sooner in a heatwave.
 const HEAT_TEMPER := 1.3
 const GRIT_KIND := &"grit"
+const WET_FEET := &"wet_feet"
 ## The difficulty that brings the harder surprises.
 const HARD_DIFFICULTY := &"tough"
 const GRIT_SPOTS := 4
@@ -62,6 +64,7 @@ static func setup(main: Node) -> void:
 	_seasons(main)
 	_utilities(main)
 	_arrivals(main)
+	_water(main)
 	_surprises(main)
 
 
@@ -684,6 +687,7 @@ static func _arrivals(main: Node) -> void:
 	arrivals.people = main.people
 	arrivals.vehicles = main.vehicles
 	arrivals.map_size = (main.terrain as Terrain).size
+	arrivals.water = main.water
 	arrivals.set_location(PrisonCatalogue.LOCATIONS[0])
 	arrivals.weather_id = func() -> StringName:
 		return weather.current().id if weather.enabled and weather.current() != null else &""
@@ -731,3 +735,24 @@ static func _arrivals(main: Node) -> void:
 	var timetable: Node = main.get(&"timetable")
 	if timetable != null:
 		timetable.set(&"arrivals", arrivals)
+
+
+## The tide comes in and goes out; anyone caught on a tidal tile gets wet
+## feet.
+static func _water(main: Node) -> void:
+	var water: WaterLayer = main.water
+	var people: People = main.people
+	var clock: GameClock = main.clock
+	var wait := [0.0]
+	water.set_tide(clock.total_minutes / 60.0)
+	clock.minute_passed.connect(func(_minute: int) -> void:
+		wait[0] -= 1.0
+		if wait[0] <= 0.0:
+			wait[0] = WaterLayer.TIDE_MINUTES
+			water.set_tide(clock.total_minutes / 60.0))
+	clock.hour_changed.connect(func(_hour: int) -> void:
+		if water.coast == 0:
+			return
+		for person: Person in people.people:
+			if person.level == 0 and water.tidal(Vector2i(person.flat().floor())):
+				people.add_moodlet(person, WET_FEET))

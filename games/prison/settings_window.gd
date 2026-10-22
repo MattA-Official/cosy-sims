@@ -35,6 +35,9 @@ var _weather := CheckButton.new()
 var _surprises := OptionButton.new()
 var _utilities := OptionButton.new()
 var _location := OptionButton.new()
+var _coast := OptionButton.new()
+## For the coast setting.
+var water: WaterLayer
 const SEASON_LENGTHS: Array[int] = [3, 5, 7, 10, 14, 30]
 
 
@@ -160,6 +163,15 @@ func _ready() -> void:
 	_location.focus_mode = FOCUS_NONE
 	_location.tooltip_text = "Where the prison stands, which decides the ways in. The countryside has a road and buses, and a jetty for the ferry where there's water. Other places come as location packs."
 	box.add_child(_row("Location", _location))
+	for words in ["None", "North", "East", "South", "West"]:
+		_coast.add_item(words)
+	_coast.focus_mode = FOCUS_NONE
+	_coast.tooltip_text = "Which edge of the map meets the sea. Ground dug below the sea's level near that edge floods, and the tide comes and goes twice a day."
+	_coast.item_selected.connect(func(index: int) -> void:
+		if water != null:
+			water.coast = 0 if index == 0 else 1 << (index - 1)
+			water.update_sea())
+	box.add_child(_row("Coast", _coast))
 	box.add_child(HSeparator.new())
 	for entry: Array in VOLUMES:
 		var slider := HSlider.new()
@@ -218,5 +230,7 @@ func refresh() -> void:
 		_weather.set_pressed_no_signal(weather.enabled)
 	if surprises != null:
 		_surprises.select(surprises.frequency)
+	if water != null:
+		_coast.select(0 if water.coast == 0 else [1, 2, 4, 8].find(water.coast) + 1)
 	if utilities != null:
 		_utilities.select(mini(utilities.mode, _utilities.item_count - 1))

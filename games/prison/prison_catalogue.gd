@@ -390,6 +390,7 @@ const MOODLETS: Array[MoodletDef] = [
 	preload("res://games/prison/catalogue/moodlet_cat_about.tres"),
 	preload("res://games/prison/catalogue/moodlet_laughed.tres"),
 	preload("res://games/prison/catalogue/moodlet_lights_out.tres"),
+	preload("res://games/prison/catalogue/moodlet_wet_feet.tres"),
 	preload("res://games/prison/catalogue/moodlet_cat_on_lap.tres"),
 	preload("res://games/prison/catalogue/moodlet_my_pet.tres"),
 	preload("res://games/prison/catalogue/moodlet_lost_my_pet.tres"),

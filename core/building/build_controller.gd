@@ -46,7 +46,7 @@ var wall_view := WallView.UP:
 		wall_view_changed.emit(value)
 
 enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE, ROUTE, MOVE }
-enum WaterMode { NONE, ADD, REMOVE }
+enum WaterMode { NONE, ADD, REMOVE, RIVER }
 ## What the floor tool does: lay floor, or nudge existing floor up or down.
 enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS }
 ## What the wall tool does: build whole walls, or paint one side of them.
@@ -97,7 +97,8 @@ const SELL_HINT := "Click or drag across your empty plots to sell them back for 
 
 const WATER_HINTS := {
 	WaterMode.ADD: "Click a hollow to fill it with water. Digging deeper or cutting the rim moves the water.",
-	WaterMode.REMOVE: "Click a pond or lake to drain it.",
+	WaterMode.REMOVE: "Click a pond, lake or river to drain it.",
+	WaterMode.RIVER: "Click along where the river runs, from its source; click the last point again to finish. [ and ] set its width. Esc to start again.",
 }
 
 @export var grid: BuildGrid
@@ -191,6 +192,9 @@ var zone: ZoneDef
 var terrain_brush := Terrain.Brush.RAISE
 ## When not NONE, the terrain tool adds or removes water instead of sculpting.
 var water_mode := WaterMode.NONE
+## Rivers being drawn: their width in tiles, and the points so far.
+var river_width := 3.0
+var _river_points := PackedVector2Array()
 ## Plots of land for sale, or null where land can't be bought.
 var land_plots: LandPlots
 ## The terrain tool buys land instead of sculpting, flattening it if asked.
@@ -363,6 +367,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			pass
 		elif tool == Tool.FLOOR and stair_tool.cancel():
 			pass
+		elif tool == Tool.TERRAIN and not _river_points.is_empty():
+			_river_points.clear()
 		else:
 			tool = Tool.NONE
 		get_viewport().set_input_as_handled()
@@ -402,6 +408,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		var index := ROTATION_STEPS.find(rotation_step)
 		index += 1 if event.is_action_pressed("build_brush_smaller") else -1
 		rotation_step = ROTATION_STEPS[clampi(index, 0, ROTATION_STEPS.size() - 1)]
+		hint_changed.emit()
+		get_viewport().set_input_as_handled()
+	elif tool == Tool.TERRAIN and water_mode == WaterMode.RIVER and (event.is_action_pressed("build_brush_smaller")
+			or event.is_action_pressed("build_brush_bigger")):
+		river_width = clampf(river_width + (-1.0 if event.is_action_pressed("build_brush_smaller") else 1.0),
+				River.LEAST_WIDTH, River.MOST_WIDTH)
 		hint_changed.emit()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_brush_smaller") and _uses_brush():
@@ -492,8 +504,14 @@ func _on_press() -> void:
 		Tool.TERRAIN when water_mode != WaterMode.NONE:
 			if water != null and water_mode == WaterMode.ADD:
 				water.fill_at(_hover_cell())
+			elif water != null and water_mode == WaterMode.RIVER:
+				press_river(_hover_point)
 			elif water != null:
-				water.remove_at(_hover_cell())
+				var river := water.river_at(_hover_cell())
+				if river != null and water.body_at(_hover_cell()) == null:
+					water.remove_river(river)
+				else:
+					water.remove_at(_hover_cell())
 		Tool.PLANTS when brush_radius < 0.5:
 			# The smallest size places or removes one plant per click.
 			if foliage == null or _level() != 0:
@@ -642,6 +660,8 @@ func hint() -> String:
 		return "This tool works on the ground floor. Page Down to go back to it."
 	if _buying():
 		return ((SELL_HINT if selling_land else LAND_HINT) + "\n" + _land_status_shown).strip_edges()
+	if tool == Tool.TERRAIN and water_mode == WaterMode.RIVER:
+		return "%s Width %d." % [WATER_HINTS[water_mode], roundi(river_width)]
 	if tool == Tool.TERRAIN and water_mode != WaterMode.NONE:
 		return WATER_HINTS[water_mode]
 	if tool == Tool.PATH:
@@ -1563,6 +1583,8 @@ func _buying() -> bool:
 func readout() -> Array:
 	if not _has_hover or map == null:
 		return []
+	if tool == Tool.TERRAIN and water != null and water.is_sea(_hover_cell()):
+		return [water.tide_words(), true]
 	match tool:
 		Tool.ROOM when _dragging:
 			var rect := _drag_rect()
@@ -1760,12 +1782,39 @@ func _land_status() -> String:
 	return text
 
 
+## Adds a point to the river being drawn; a click on the last point again
+## finishes it. Returns the river once made.
+func press_river(point: Vector2) -> River:
+	if _river_points.size() >= 2 and point.distance_to(_river_points[_river_points.size() - 1]) < 0.75:
+		var river := water.add_river(_river_points, river_width)
+		_river_points.clear()
+		return river
+	if _river_points.is_empty() or point.distance_to(_river_points[_river_points.size() - 1]) >= 0.75:
+		_river_points.append(point)
+	return null
+
+
 ## Shows the water a click would add (or a red tile if there is no hollow),
 ## or the body a click would drain.
 func _preview_water() -> void:
 	if water == null:
 		return
 	var cell := _hover_cell()
+	if water_mode == WaterMode.RIVER:
+		var drawn := _river_points.duplicate()
+		drawn.append(_hover_point)
+		if drawn.size() < 2:
+			_shapes.cells([cell], ok_colour)
+			return
+		var river := River.new()
+		river.points = drawn
+		river.width = river_width
+		river.line = River.sample(drawn)
+		river.beds.resize(river.line.size())
+		for i in river.line.size():
+			river.beds[i] = (terrain.height_at(river.line[i]) if terrain != null else 0.0) - river.depth
+		_shapes.cells(river.cells().keys(), ok_colour)
+		return
 	var existing := water.body_at(cell)
 	if water_mode == WaterMode.REMOVE:
 		if existing != null:
