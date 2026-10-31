@@ -215,7 +215,7 @@ func _add_point(key: Vector4i, level: int, position: Vector3, weight := 1.0) -> 
 func _add_floors(n: int) -> void:
 	var map := _building.levels[n]
 	for cell: Vector2i in map.floors:
-		if map.holes.has(cell) or map.stairs_at(cell) != null:
+		if map.holes.has(cell) or map.stairs_at(cell) != null or _building.belts.has(n, cell):
 			continue
 		for piece: TilePiece in map.pieces(cell):
 			if not map.piece_has_floor(piece):
@@ -261,7 +261,7 @@ func _work_out_ground() -> GroundLayer:
 func _add_ground() -> void:
 	var map := _building.ground()
 	for cell: Vector2i in ground_layer.points:
-		if map.has_floor(cell):
+		if map.has_floor(cell) or _building.belts.has(0, cell):
 			continue
 		var id := _add_point(Vector4i(0, cell.x, cell.y, -1), 0, ground_layer.points[cell],
 				ground_layer.weights[cell])

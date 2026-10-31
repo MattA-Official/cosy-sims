@@ -14,6 +14,7 @@ func _process(_delta: float) -> bool:
 	_test_queue_lines()
 	_test_signage()
 	_test_movers()
+	_test_belts()
 	if _failures == 0:
 		print("All airport tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -269,3 +270,38 @@ func _test_movers() -> void:
 	var back := graph.find_path(0, Vector2(3.5, 16.5), 0, Vector2(3.5, 2.5))
 	_check(not back.is_empty() and back.all(func(p: Vector3) -> bool: return graph.pace_towards(p) == 1.0),
 			"and walk beside it the other way")
+
+
+func _test_belts() -> void:
+	var building := Building.new(Rect2i(0, 0, 30, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var ground := building.ground()
+	ground.build_room(Rect2i(2, 2, 10, 8), &"concrete", &"brick", 0.0)
+	var belts := building.belts
+	var changes := [0]
+	building.changed.connect(func() -> void: changes[0] += 1)
+	var run := Belts.route(Vector2i(3, 3), Vector2i(8, 6))
+	_check(run.size() == 9 and run[5] == Vector2i(8, 3), "a run goes along, then across")
+	_check(belts.lay(building, 0, run) == 9 and changes[0] > 0, "a belt goes down and the building hears of it")
+	_check(belts.direction(0, Vector2i(3, 3)) == Vector2i.RIGHT and belts.direction(0, Vector2i(8, 3)) == Vector2i.DOWN,
+			"each piece points to the next")
+	_check(belts.kind_at(0, Vector2i(3, 3)) == &"start" and belts.kind_at(0, Vector2i(5, 3)) == &"straight"
+			and belts.kind_at(0, Vector2i(8, 3)) == &"corner" and belts.kind_at(0, Vector2i(8, 6)) == &"end",
+			"pieces know what they are")
+	# A second run feeding into the first makes a merge.
+	belts.lay(building, 0, Belts.route(Vector2i(5, 8), Vector2i(5, 4)))
+	_check(belts.direction(0, Vector2i(5, 4)) == Vector2i.UP and belts.kind_at(0, Vector2i(5, 3)) == &"merge",
+			"a run ending on a belt feeds into it")
+	_check(belts.next_cell(0, Vector2i(5, 4)) == Vector2i(5, 3), "things hand on along the belt")
+	var graph := NavGraph.build(building)
+	_check(graph.point_at(0, Vector2(5.5, 3.5)) == -1, "nobody walks on a belt")
+	_check(not graph.find_path(0, Vector2(3.5, 8.5), 0, Vector2(10.5, 8.5)).is_empty(), "people walk round belts")
+	_check(not belts.can_lay(building, 0, Belts.route(Vector2i(10, 4), Vector2i(14, 4))),
+			"belts don't go through walls")
+	_check(belts.reverse(0, Vector2i(3, 3)) and belts.direction(0, Vector2i(3, 3)) == Vector2i.LEFT,
+			"a piece turns round")
+	var data := building.to_data()
+	var copy := Building.new(Rect2i(0, 0, 30, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	copy.load_data(data, PrisonCatalogue.object)
+	_check(copy.belts.pieces == belts.pieces, "belts are saved with the building")
+	_check(belts.remove(0, run) == 9 and not belts.has(0, Vector2i(8, 3)) and belts.has(0, Vector2i(5, 6)),
+			"taking up a run leaves the rest")

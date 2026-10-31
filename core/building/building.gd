@@ -31,6 +31,9 @@ const MAX_LEVEL := 4
 
 var land: Array[Rect2i] = []
 var levels: Dictionary[int, BuildingMap] = {}
+## Conveyor belts on every level (see Belts), kept here so they save and
+## undo with the rest of the build.
+var belts := Belts.new()
 ## The level the player is looking at and building on.
 var active := 0:
 	set(value):
@@ -63,6 +66,9 @@ func _init(starting_land: Rect2i, floor_list: Array[FloorDef] = [],
 	_floor_defs = floor_list
 	_wall_defs = wall_list
 	level(0)
+	belts.changed.connect(func() -> void:
+		if not _syncing:
+			changed.emit())
 
 
 ## The map for a level, made the first time it is asked for.
@@ -223,7 +229,7 @@ func to_data() -> Dictionary:
 	var out := {}
 	for n: int in levels:
 		out[n] = levels[n].to_data()
-	return {"land": land.duplicate(), "levels": out}
+	return {"land": land.duplicate(), "levels": out, "belts": belts.to_data()}
 
 
 ## Puts every level back as to_data() left them. Levels not in the data
@@ -237,6 +243,7 @@ func load_data(data: Dictionary, find_object: Callable) -> void:
 	for n: int in levels:
 		if not saved.has(n):
 			levels[n].load_data({"land": land.duplicate()}, find_object)
+	belts.load_data(data.get("belts", {}))
 	_syncing = false
 	changed.emit()
 

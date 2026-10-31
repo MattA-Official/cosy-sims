@@ -45,7 +45,7 @@ var wall_view := WallView.UP:
 		wall_view = value
 		wall_view_changed.emit(value)
 
-enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE, ROUTE, MOVE, CONDUIT }
+enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE, ROUTE, MOVE, CONDUIT, BELT }
 enum WaterMode { NONE, ADD, REMOVE, RIVER }
 ## What the floor tool does: lay floor, or nudge existing floor up or down.
 enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS, VOID }
@@ -76,6 +76,7 @@ const HINTS := {
 	Tool.ZONE: "Click a room to say who may be in it. Click a door to lock or unlock it until the next block; Shift-click to keep it so.",
 	Tool.ROUTE: "Click to add points to a patrol route; click the first point or press Enter to close the loop. Esc stops drawing; Ctrl-click a route to remove it.",
 	Tool.CONDUIT: "Drag to lay a run of cable or pipe; things on it or beside it join it. Hold Ctrl to take it up.",
+	Tool.BELT: "Drag to lay a belt, along then across; it carries things the way you drag. End it on another belt to feed into it. Click a piece to turn it round, Ctrl-drag to take it up.",
 }
 
 const PATH_HINTS := {
@@ -456,7 +457,7 @@ func _on_press() -> void:
 			_press_stairs()
 		Tool.MOVE when _carried != null:
 			drop()
-		Tool.ROOM, Tool.FLOOR, Tool.DEMOLISH, Tool.MOVE, Tool.CONDUIT:
+		Tool.ROOM, Tool.FLOOR, Tool.DEMOLISH, Tool.MOVE, Tool.CONDUIT, Tool.BELT:
 			_dragging = true
 			_drag_start_cell = _hover_cell()
 			_drag_start_point = _hover_point
@@ -594,6 +595,14 @@ func _on_release() -> void:
 		Tool.CONDUIT:
 			map.set_conduits(planned_conduit(), conduit_kind, not erase)
 			hint_changed.emit()
+		Tool.BELT:
+			var run := planned_conduit()
+			if erase:
+				building.belts.remove(_level(), run)
+			elif run.size() == 1 and building.belts.has(_level(), run[0]):
+				building.belts.reverse(_level(), run[0])
+			elif building.belts.lay(building, _level(), run) == 0 and not building.belts.can_lay(building, _level(), run):
+				drop_refused.emit("A belt needs clear floor, with no wall in the way.")
 		Tool.DEMOLISH:
 			if rect.size != Vector2i.ONE:
 				map.demolish(rect)
@@ -621,7 +630,7 @@ func _spends() -> bool:
 	if _erasing():
 		return false
 	match tool:
-		Tool.ROOM, Tool.OPENING, Tool.OBJECT, Tool.CONDUIT:
+		Tool.ROOM, Tool.OPENING, Tool.OBJECT, Tool.CONDUIT, Tool.BELT:
 			return true
 		Tool.MOVE:
 			return _carried != null and (_pasting or _carried.is_structure())
@@ -1588,6 +1597,10 @@ func _draw_preview() -> void:
 				_shapes.cells(room.cells, ok_colour)
 		Tool.CONDUIT:
 			_shapes.cells(planned_conduit(), demolish_colour if _erasing() else ok_colour)
+		Tool.BELT:
+			var run := planned_conduit()
+			_shapes.cells(run, demolish_colour if _erasing()
+					else (ok_colour if building.belts.can_lay(building, _level(), run) else bad_colour))
 		Tool.ROOM_TYPE:
 			var room := map.room_at_point(_hover_point)
 			if room != null:
