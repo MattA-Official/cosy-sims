@@ -37,6 +37,10 @@ enum Connects {
 ## What the object is good for, such as "bed" or "toilet". Room types and,
 ## later, people's needs look objects up by tag rather than by id.
 @export var tags: Array[StringName] = []
+## For a sign: what it shows people the way to, by room type or object
+## tag, such as &"gate" or &"toilet" (see Signage). Empty for anything
+## that isn't a sign.
+@export var signs_to: Array[StringName] = []
 ## Whether this links to the level above, and how.
 @export var connects := Connects.NONE
 ## People may help themselves to what it holds, as at a serving counter.

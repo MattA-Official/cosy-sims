@@ -124,6 +124,12 @@ var record: Array = []
 ## A rung they are about to act on, and game minutes until they do.
 var warning: StringName = &""
 var warning_minutes := 0.0
+## Lost: looking for somewhere and seeing no sign of the way (see
+## People.find_way_to). What they are looking for, and the game minute
+## they got lost.
+var lost := false
+var lost_for: StringName = &""
+var lost_since := 0.0
 ## Words over their head, and game minutes left to show them.
 var bubble := ""
 var bubble_minutes := 0.0

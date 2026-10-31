@@ -211,6 +211,16 @@ var holding_room_types: Array[StringName] = []
 ## where its line starts.
 var queues: Dictionary[Vector2i, Array] = {}
 var _queue_fronts: Dictionary[Vector2i, Vector2] = {}
+## Each line's route through queue posts (see QueueLine.posted_route),
+## worked out when first wanted.
+var _queue_routes: Dictionary[Vector2i, PackedVector2Array] = {}
+## Signs and finding the way (see find_way_to); null for everyone always
+## knowing it.
+var signage: Signage
+## Game minutes the "Where's the gate?" bubble shows for.
+const LOST_BUBBLE_MINUTES := 3.0
+## The object tag of queue posts, which lay out the lines at counters.
+var queue_post_tag: StringName = &"queue_post"
 
 var _dirty := true
 ## Whether the ground under the building has changed too (terrain, water or
@@ -330,6 +340,7 @@ func mark_dirty() -> void:
 	_where.clear()
 	_by_tag.clear()
 	_givers.clear()
+	_queue_routes.clear()
 	access.changed()
 
 
@@ -1836,6 +1847,42 @@ func _need_for_tag(tag: StringName) -> StringName:
 	return &""
 
 
+## Sends someone towards a spot, if they know the way to `target` (a room
+## type or object tag, such as &"gate"): they can see it, a sign in sight
+## points to it (see Signage) or they have found it before. If not, they
+## are lost: they mill about where they are with a bubble asking where it
+## is, until a later call finds the way. With no `signage` set, everyone
+## knows the way. Returns whether they set off.
+func find_way_to(person: Person, level: int, spot: Vector2, target: StringName, called := "") -> bool:
+	if signage != null and not signage.knows_way(person, target):
+		if not person.lost or person.lost_for != target:
+			person.lost = true
+			person.lost_for = target
+			person.lost_since = clock.total_minutes if clock != null else 0.0
+		var looking := called if called != "" else String(target).replace("_", " ")
+		person.bubble = "Where's the %s?" % looking
+		person.bubble_minutes = LOST_BUBBLE_MINUTES
+		if person.state != Person.State.WALKING:
+			_wander(person)
+		person.activity = "Lost, looking for the %s" % looking
+		return false
+	if not _walk_to(person, level, spot):
+		return false
+	if person.lost:
+		person.lost = false
+		person.lost_for = &""
+	if signage != null:
+		Signage.learn(person, target)
+	return true
+
+
+## How long someone has been lost, in game minutes; 0 if they aren't.
+func minutes_lost(person: Person) -> float:
+	if not person.lost or clock == null:
+		return 0.0
+	return clock.total_minutes - person.lost_since
+
+
 ## Sends someone for a stroll somewhere nearby they may go.
 func wander(person: Person) -> void:
 	_wander(person)
@@ -2102,6 +2149,7 @@ func _queue_spot(person: Person, source: Vector2i, front: Vector2) -> Vector2:
 	line.append(person)
 	if line.size() == 1 or not _queue_fronts.has(source):
 		_queue_fronts[source] = front
+		_queue_routes.erase(source)
 	return _place_in_line(source, line.size() - 1)
 
 
@@ -2110,6 +2158,13 @@ func _place_in_line(source: Vector2i, index: int) -> Vector2:
 	var giver := building.levels[source.x].objects.get(source.y) as BuildingMap.PlacedObject
 	if giver == null or index == 0:
 		return front
+	if not _queue_routes.has(source):
+		_queue_routes[source] = QueueLine.posted_route(building.levels[source.x], front, queue_post_tag)
+	if _queue_routes[source].size() > 1:
+		# Queue posts lay the line out; past the last post it carries on.
+		var posted := QueueLine.along(_queue_routes[source], QUEUE_GAP).spot(index)
+		if nav().point_at(source.x, posted) != -1:
+			return posted
 	var back := (front - giver.centre).normalized()
 	if back == Vector2.ZERO:
 		back = Vector2.DOWN
@@ -2137,6 +2192,7 @@ func _leave_queue(person: Person) -> void:
 			if line.is_empty():
 				queues.erase(source)
 				_queue_fronts.erase(source)
+				_queue_routes.erase(source)
 
 
 ## In a line at a counter: moving up as it goes down, served at the front,

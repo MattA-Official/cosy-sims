@@ -11,6 +11,8 @@ func _process(_delta: float) -> bool:
 	_test_one_way_doors()
 	_test_double_height()
 	_test_licences()
+	_test_queue_lines()
+	_test_signage()
 	if _failures == 0:
 		print("All airport tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -138,3 +140,80 @@ func _test_licences() -> void:
 	_check(board.may_take(person, job) and Licences.held(person).size() == 2, "both licences held")
 	Licences.revoke(person, &"airside_driving")
 	_check(not board.may_take(person, job), "a revoked licence stops the work")
+
+
+func _test_queue_lines() -> void:
+	var line := QueueLine.along(PackedVector2Array([Vector2(0, 0), Vector2(3, 0), Vector2(3, 3)]))
+	var people: Array[Person] = []
+	for i in 6:
+		people.append(Person.new())
+		_check(line.join(people[i]) == i, "people join at the back, in order")
+	_check(line.join(people[2]) == 2, "joining again keeps your place")
+	_check(line.spot(0) == Vector2(0, 0) and line.spot(4).is_equal_approx(Vector2(3, 0)),
+			"the line runs back along its route")
+	_check(line.spot(5).is_equal_approx(Vector2(3, 0.75)), "and turns the corner at a post")
+	_check(line.room() == 9 and not line.overflowing(), "nine fit along six tiles of posts")
+	_check(line.spot(12).is_equal_approx(Vector2(3, 6)), "past the last post it carries straight on")
+	_check(line.serve() == people[0] and line.index_of(people[1]) == 0, "the front is served and everyone moves up")
+	line.leave(people[3])
+	_check(line.index_of(people[4]) == 2 and line.size() == 4, "leaving lets those behind move up")
+	# Posts laid on the floor make the route.
+	var map := BuildingMap.new(Rect2i(0, 0, 20, 20))
+	map.fill_floor(Rect2i(0, 0, 20, 20))
+	var post := ObjectDef.new()
+	post.id = &"queue_post"
+	post.size = Vector2(0.25, 0.25)
+	post.snap = ObjectDef.Snap.FREE
+	post.tags = [&"queue_post"]
+	for spot in [Vector2(5.5, 3.5), Vector2(5.5, 5.5), Vector2(7.5, 5.5), Vector2(7.5, 3.5), Vector2(15.5, 15.5)]:
+		map.place_object_at(post, spot, 0.0)
+	var route := QueueLine.posted_route(map, Vector2(5.5, 1.5))
+	_check(route.size() == 5 and route[1] == Vector2(5.5, 3.5) and route[4] == Vector2(7.5, 3.5),
+			"posts chain into a snaking route, nearest first")
+	_check(not route.has(Vector2(15.5, 15.5)), "a post far off is left out")
+	_check(QueueLine.posted_route(map, Vector2(15.5, 1.5)).size() == 1, "no posts near, just the front")
+
+
+func _test_signage() -> void:
+	var building := Building.new(Rect2i(0, 0, 30, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var ground := building.ground()
+	ground.build_room(Rect2i(2, 2, 6, 6), &"concrete", &"brick", 0.0)
+	ground.build_room(Rect2i(8, 2, 6, 6), &"concrete", &"brick", 0.0)
+	ground.set_door(BuildingMap.edge_between(Vector2i(7, 4), Vector2i(8, 4)), true)
+	ground.set_room_type(ground.room_at(Vector2i(10, 4)), &"gate")
+	var signage := Signage.new()
+	signage.building = building
+	var person := Person.new()
+	person.group = &"passenger"
+	person.position = Vector3(3.5, 0.0, 3.5)
+	_check(not signage.knows_way(person, &"gate"), "with no sign, a newcomer doesn't know the way")
+	var staff := Person.new()
+	staff.group = &"staff"
+	staff.position = person.position
+	_check(signage.knows_way(staff, &"gate"), "staff know their way about")
+	var sign := ObjectDef.new()
+	sign.id = &"sign_gates"
+	sign.size = Vector2(0.5, 0.25)
+	sign.snap = ObjectDef.Snap.FREE
+	sign.signs_to = [&"gate", &"toilet"]
+	var placed := ground.place_object_at(sign, Vector2(5.0, 3.0), 0.0)
+	_check(signage.signs_seen(0, person.flat()).size() == 1, "they see the sign in their room")
+	_check(signage.knows_way(person, &"gate") and not signage.knows_way(person, &"check_in"),
+			"a sign shows the way only to what it says")
+	person.position = Vector3(10.5, 0.0, 4.5)
+	_check(signage.signs_seen(0, person.flat()).is_empty() and signage.knows_way(person, &"gate"),
+			"in the gate room, the gate is in sight")
+	ground.remove_object(placed)
+	person.position = Vector3(3.5, 0.0, 3.5)
+	_check(not signage.knows_way(person, &"gate"), "sign gone, lost again")
+	Signage.learn(person, &"gate")
+	_check(signage.knows_way(person, &"gate"), "once found, a place needs no sign")
+	# Out on open ground, signs within sight count.
+	var outside := Person.new()
+	outside.group = &"passenger"
+	outside.position = Vector3(20.5, 0.0, 12.5)
+	ground.fill_floor(Rect2i(23, 11, 2, 2))
+	ground.place_object_at(sign, Vector2(24.0, 12.0), 0.0)
+	_check(signage.knows_way(outside, &"toilet"), "a sign across open ground is seen")
+	outside.position = Vector3(1.5, 0.0, 18.5)
+	_check(not signage.knows_way(outside, &"toilet"), "but not from far off")
