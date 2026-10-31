@@ -137,6 +137,10 @@ static var _cut_outs: Dictionary[Texture2D, bool] = {}
 ## every level.
 static var _textured_materials := {} # Texture2D -> StandardMaterial3D
 var _doors := Node3D.new()
+## The chevrons on the floor by one-way doors.
+const WAY_ARROW_COLOUR := Color(0.36, 0.62, 0.42)
+## The balustrade round a void.
+const RAIL_HEIGHT := 0.55
 var _rebuild_queued := false
 ## Shared by every level's labels.
 static var _label_font := CosyTheme.bold_font()
@@ -298,7 +302,10 @@ func _build_roof() -> void:
 					roof_colour.darkened(0.2), roof_colour)
 			any = true
 	for cell: Vector2i in map.floors:
-		if above != null and (above.has_floor(cell) or above.holes.has(cell)):
+		var lift := 0.0
+		if above != null and above.voids.has(cell):
+			lift = Building.STOREY # A double-height room's roof, a storey up.
+		elif above != null and (above.has_floor(cell) or above.holes.has(cell)):
 			continue
 		for piece: TilePiece in map.pieces(cell):
 			if not map.piece_has_floor(piece):
@@ -313,13 +320,45 @@ func _build_roof() -> void:
 			var scaled := PackedVector2Array()
 			for point in piece.polygon:
 				scaled.append(point * cs)
-			var top := map.floor_height(cell) + wall_height
+			var top := map.floor_height(cell) + wall_height + lift
 			MeshShapes.add_prism(st, scaled, top - roof_thickness, top + 0.01, roof_colour.darkened(0.2),
 					roof_colour.lightened(0.04 * ((cell.x + cell.y) % 2)))
 			any = true
 	if any:
 		_build_roof_dressing(st)
 	_roof_mesh.mesh = st.commit() if any else null
+
+
+## A glass balustrade with a rail along every open edge between floor and
+## a void, so a mezzanine looks down into the hall below.
+func _add_void_rails() -> void:
+	var cs := grid.cell_size
+	var st := _surface(_surfaces, null)
+	for cell: Vector2i in map.voids:
+		for side: Vector2i in BuildingMap.DIRECTIONS:
+			var next: Vector2i = cell + side
+			var edge := BuildingMap.edge_between(cell, next)
+			if not map.has_floor(next) or map.wall_at(edge) != BuildingMap.Wall.NONE:
+				continue
+			var ends := BuildingMap.edge_ends(edge)
+			var middle := (ends[0] + ends[1]) * 0.5 * cs
+			var along := (ends[1] - ends[0]).abs() * cs * 0.5
+			var half := Vector3(maxf(along.x, 0.03), 0.0, maxf(along.y, 0.03))
+			var floor_y := map.floor_height(next)
+			MeshShapes.add_box(_glass, Vector3(middle.x, floor_y + RAIL_HEIGHT * 0.5, middle.y),
+					Vector3(half.x, RAIL_HEIGHT * 0.5, half.z), glass_colour)
+			_has_glass = true
+			MeshShapes.add_box(st, Vector3(middle.x, floor_y + RAIL_HEIGHT, middle.y),
+					Vector3(maxf(along.x, 0.05), 0.03, maxf(along.y, 0.05)), wall_top_colour)
+
+
+## Does a wall rise through the level above, round a double-height room?
+## It does where the tile above either side is a void and nothing is built
+## on that edge upstairs.
+func rises_through(edge: Vector3i) -> bool:
+	if above == null or above.voids.is_empty() or above.wall_at(edge) != BuildingMap.Wall.NONE:
+		return false
+	return BuildingMap.edge_cells(edge).any(func(cell: Vector2i) -> bool: return above.voids.has(cell))
 
 
 ## A low parapet round each flat roof's edge, and vents and units on top:
@@ -419,6 +458,9 @@ func _roof_material() -> StandardMaterial3D:
 func has_roof(cell: Vector2i) -> bool:
 	if map.holes.has(cell):
 		return not is_nan(_stairwell_roof(cell))
+	if map.has_floor(cell) and above != null and above.voids.has(cell):
+		var hall := map.room_at(cell)
+		return hall != null and hall.indoor
 	if not map.has_floor(cell) or (above != null and (above.has_floor(cell) or above.holes.has(cell))):
 		return false
 	var room := map.room_at(cell)
@@ -428,8 +470,8 @@ func has_roof(cell: Vector2i) -> bool:
 ## The roof height over a stairwell's top on this level, from the indoor
 ## floor beside it, or NAN if it has none (or the floor above covers it).
 func _stairwell_roof(cell: Vector2i) -> float:
-	if above != null and above.has_floor(cell):
-		return NAN
+	if (above != null and above.has_floor(cell)) or map.voids.has(cell):
+		return NAN # A void's roof is drawn with the room below.
 	for side in BuildingMap.DIRECTIONS:
 		var next: Vector2i = cell + side
 		var room := map.room_at(next) if map.has_floor(next) else null
@@ -638,6 +680,7 @@ func _build_walls() -> void:
 		_add_wall_run(run)
 	for hub: Array in hubs:
 		_add_hub(hub[0], hub[1])
+	_add_void_rails()
 	_wall_mesh.mesh = _commit(_surfaces)
 	_glass_mesh.mesh = _glass.commit() if _has_glass else null
 	_surfaces = {}
@@ -677,6 +720,8 @@ func _make_run(wall: Variant, base: float, drop: float, kind: int, window: Strin
 	run.drop = drop
 	run.low = walls_low or (cutaway and _cut_away(ends[0], ends[1]))
 	run.full_height = run.def.height if run.def != null else wall_height
+	if wall is Vector3i and rises_through(wall) and (run.def == null or not run.def.outdoor):
+		run.full_height += Building.STOREY
 	run.height = minf(low_wall_height, run.full_height) if run.low else run.full_height
 	run.half = (run.def.thickness if run.def != null else wall_thickness) * 0.5
 	run.top_colour = run.def.top_colour if run.def != null else wall_top_colour
@@ -866,6 +911,8 @@ func _add_door(run: WallRun, from: float, to: float) -> void:
 		return
 	_add_slab(run, from, to, door_height, run.full_height)
 	var width := to - from
+	if run.wall is Vector3i and map.door_way(run.wall) != 0:
+		_add_way_arrows(run, (from + to) * 0.5)
 	var kind := map.door_kind_at(run.wall) if run.wall is Vector3i else &""
 	var model: PackedScene = door_models.get(kind, door_model)
 	if model == null:
@@ -878,6 +925,29 @@ func _add_door(run: WallRun, from: float, to: float) -> void:
 	door.transform = Transform3D(Basis(Vector3(run.along.x, 0.0, run.along.y) * width, Vector3.UP,
 			Vector3(run.across.x, 0.0, run.across.y)), Vector3(middle.x, run.base, middle.y))
 	_doors.add_child(door)
+
+
+## Chevrons on the floor each side of a one-way door, pointing the way
+## people may go through.
+func _add_way_arrows(run: WallRun, middle: float) -> void:
+	var edge: Vector3i = run.wall
+	var cells := BuildingMap.edge_cells(edge)
+	var ahead := Vector2(cells[1] - cells[0]) * map.door_way(edge) * grid.cell_size
+	var side := Vector2(-ahead.y, ahead.x)
+	var at := run.start + run.along * middle
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for offset: float in [-0.55, 0.45]:
+		var tip: Vector2 = at + ahead * (offset + 0.3)
+		var back: Vector2 = at + ahead * offset
+		var points := PackedVector2Array([tip, back + side * 0.22, back + ahead * 0.08,
+				back - side * 0.22])
+		MeshShapes.add_prism(st, points, run.base + 0.035, run.base + 0.05, WAY_ARROW_COLOUR)
+	var arrows := MeshInstance3D.new()
+	arrows.mesh = st.commit()
+	arrows.material_override = MeshShapes.vertex_colour_material(true)
+	arrows.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_doors.add_child(arrows)
 
 
 ## Wall below the sill and above the head, with glass or bars between.

@@ -168,10 +168,14 @@ func wants_work(person: Person) -> bool:
 
 ## May someone take a job?
 func may_take(person: Person, job: Job) -> bool:
+	if not Licences.has(person, job.licence):
+		return false
 	if job.only_for != null:
 		return job.only_for == person
 	if person.role != &"":
 		var role: StaffRoleDef = roles.get(person.role)
+		if not Licences.may_work(person, role):
+			return false
 		return job.roles.has(person.role) or (role != null and role.job_kinds.has(job.kind) and job.roles.is_empty())
 	if person.programme == &"":
 		return false

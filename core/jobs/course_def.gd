@@ -25,4 +25,7 @@ extends Resource
 @export var session_source: StringName = &"course_session"
 ## Moodlet given on a pass, and any lasting effect, such as &"calmer".
 @export var pass_moodlet: StringName = &"proud"
+## The licence a pass gives (see Licences), such as &"airside_driving";
+## empty for none.
+@export var licence: StringName
 @export var after_pass: StringName

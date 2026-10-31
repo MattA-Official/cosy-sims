@@ -125,6 +125,14 @@ var _room_zones: Dictionary[Vector2i, StringName] = {}
 ## The DoorKindDef id of each door that has one, such as a staff door.
 ## Plain doors have none.
 var door_kinds: Dictionary[Vector3i, StringName] = {}
+## One-way doors: 1 lets people through only from the first of the edge's
+## cells (see edge_cells) to the second, -1 only the other way. Doors not
+## listed work both ways.
+var door_ways: Dictionary[Vector3i, int] = {}
+## Floor left open over a double-height room below: no floor can go here,
+## and the walls of the room below rise through this level (see
+## Building.is_double_height).
+var voids: Dictionary[Vector2i, bool] = {}
 ## Building work planned but not done yet, waiting for a handyman (see
 ## Blueprints). Floor by cell: [style, height, batch]; walls by edge:
 ## [kind, style, window kind, door kind, batch], what the wall will be
@@ -414,6 +422,7 @@ func remove_walls(edges: Array[Vector3i]) -> int:
 			window_kinds.erase(edge)
 			wall_paints.erase(edge)
 			door_kinds.erase(edge)
+			door_ways.erase(edge)
 			count += 1
 	if count > 0:
 		_changed()
@@ -506,8 +515,50 @@ func set_opening(edge: Vector3i, kind: Wall, window: StringName = WINDOW_GLASS,
 		door_kinds[edge] = door_kind
 	else:
 		door_kinds.erase(edge)
+	if kind != Wall.DOOR:
+		door_ways.erase(edge)
 	_changed()
 	return true
+
+
+## Which way a door lets people through: 1 only from the edge's first cell
+## to its second (see edge_cells), -1 only the other way, 0 both ways or
+## no door.
+func door_way(edge: Vector3i) -> int:
+	return door_ways.get(edge, 0) if wall_at(edge) == Wall.DOOR else 0
+
+
+## Makes a door one-way (1 or -1, as door_way() reads) or two-way (0).
+## Returns whether anything changed.
+func set_door_way(edge: Vector3i, way: int) -> bool:
+	if wall_at(edge) != Wall.DOOR or door_way(edge) == signi(way):
+		return false
+	if way == 0:
+		door_ways.erase(edge)
+	else:
+		door_ways[edge] = signi(way)
+	_changed()
+	return true
+
+
+## The way a one-way door should face for people going from `cell` through
+## it: 1 or -1 as door_way() reads, or 0 if `cell` is on neither side.
+static func way_from(edge: Vector3i, cell: Vector2i) -> int:
+	var cells := edge_cells(edge)
+	if cell == cells[0]:
+		return 1
+	if cell == cells[1]:
+		return -1
+	return 0
+
+
+## May people walk through the edge from `from` to the cell across it?
+## Open edges and two-way doors let them either way.
+func passable_from(edge: Vector3i, from: Vector2i) -> bool:
+	if not passable(edge):
+		return false
+	var way := door_way(edge)
+	return way == 0 or way == way_from(edge, from)
 
 
 ## The kind of door in a wall, such as &"staff", or empty for a plain door
@@ -1348,6 +1399,8 @@ func to_data() -> Dictionary:
 		"room_types": _room_types.duplicate(),
 		"room_zones": _room_zones.duplicate(),
 		"door_kinds": door_kinds.duplicate(),
+		"door_ways": door_ways.duplicate(),
+		"voids": voids.duplicate(),
 		"planned_floors": planned_floors.duplicate(true),
 		"conduits": conduits.duplicate(),
 		"planned_walls": planned_walls.duplicate(true),
@@ -1416,6 +1469,8 @@ func load_data(data: Dictionary, find_object: Callable) -> void:
 	_room_types.assign(data.get("room_types", {}))
 	_room_zones.assign(data.get("room_zones", {}))
 	door_kinds.assign(data.get("door_kinds", {}))
+	door_ways.assign(data.get("door_ways", {}))
+	voids.assign(data.get("voids", {}))
 	_next_object_id = data.get("next_object_id", 1)
 	_next_stairs_id = data.get("next_stairs_id", 1)
 	_changed()

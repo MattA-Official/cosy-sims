@@ -264,5 +264,35 @@ func _sync_holes() -> void:
 	for n: int in levels.keys():
 		var cells: Dictionary[Vector2i, bool] = {}
 		cells.assign(holes.get(n, {}))
+		# Voids over double-height rooms are left open like stairwells.
+		for cell: Vector2i in levels[n].voids:
+			cells[cell] = true
 		levels[n].set_holes(cells)
 	_syncing = false
+
+
+## Marks tiles on an upper level as a void, or fills them back in: a void
+## has no floor, so the room below rises through it as a double-height
+## hall. Returns how many tiles changed.
+func set_void(n: int, cells: Array[Vector2i], on := true) -> int:
+	if n <= 0 or n > MAX_LEVEL:
+		return 0
+	var map := level(n)
+	var count := 0
+	for cell in cells:
+		if not map.owns(cell) or map.voids.has(cell) == on:
+			continue
+		if on:
+			map.voids[cell] = true
+		else:
+			map.voids.erase(cell)
+		count += 1
+	if count > 0:
+		map.planned_changed() # Sends `changed`, which syncs the holes.
+	return count
+
+
+## Is a tile on level `n` part of a double-height room: open to the level
+## above through a void?
+func is_double_height(n: int, cell: Vector2i) -> bool:
+	return levels.has(n + 1) and levels[n + 1].voids.has(cell)

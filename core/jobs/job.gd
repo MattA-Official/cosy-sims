@@ -54,6 +54,9 @@ var only_for: Person
 ## A job just for someone that they go to whatever their timetable says,
 ## such as a family visit.
 var any_time := false
+## A licence the worker must hold (see Licences), such as &"airside_driving"
+## for a tug; empty for none.
+var licence: StringName
 var stages: Array[Stage] = []
 ## The stage being worked on.
 var stage := 0

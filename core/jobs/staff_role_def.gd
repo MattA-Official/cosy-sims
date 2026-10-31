@@ -26,6 +26,9 @@ extends Resource
 @export var claims: StringName
 ## What they set out on the free spots of what they claim, in order.
 @export var dressing: Array[ObjectDef] = []
+## A licence (see Licences) they need before taking any job, such as a
+## screener's ticket; empty for none.
+@export var licence: StringName
 ## Their role's course, such as "De-escalation"; empty for none.
 @export var course_name: String
 ## What they get better at from level StaffRoster.PERK_LEVEL, or after their

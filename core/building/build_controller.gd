@@ -48,7 +48,7 @@ var wall_view := WallView.UP:
 enum Tool { NONE, ROOM, FLOOR, WALL, OPENING, OBJECT, ROOM_TYPE, DEMOLISH, TERRAIN, PLANTS, PATH, ZONE, ROUTE, MOVE, CONDUIT }
 enum WaterMode { NONE, ADD, REMOVE, RIVER }
 ## What the floor tool does: lay floor, or nudge existing floor up or down.
-enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS }
+enum FloorMode { LAY, RAISE, LOWER, RAMP, STAIRS, VOID }
 ## What the wall tool does: build whole walls, or paint one side of them.
 enum WallMode { BUILD, PAINT }
 
@@ -88,6 +88,7 @@ const FLOOR_HINTS := {
 	FloorMode.RAISE: "Drag over floor to raise it a step, for split levels.",
 	FloorMode.LOWER: "Drag over floor to lower it a step, for split levels.",
 	FloorMode.RAMP: "Drag over floor from the low side to the high side to lay a ramp between them.",
+	FloorMode.VOID: "Drag over an upper floor to leave it open, so the room below becomes a double-height hall. Ctrl-drag fills it back in.",
 	FloorMode.STAIRS: "Click the foot of the stairs and move the way they climb. Click short of the top for a landing, at the top to build. Esc starts again, Ctrl-click removes stairs.",
 }
 
@@ -188,6 +189,10 @@ var window_kind := BuildingMap.WINDOW_GLASS
 ## The kind of door the opening tool puts in, such as &"staff", or empty
 ## for a plain door.
 var door_kind: StringName = &""
+## Whether that kind of door is one-way. It lets people through from the
+## side you click on; clicking it again turns it round, and Ctrl-click
+## fills it in.
+var door_one_way := false
 ## The zone the zones tool paints. Null goes back to the room type's.
 var zone: ZoneDef
 ## What the utilities tool lays: &"power", &"water" or &"sewage".
@@ -470,10 +475,16 @@ func _on_press() -> void:
 					map.set_slant_opening(slant, opening, window_kind)
 				return
 			var edge := _hover_edge()
-			if _has_chosen_opening(edge):
+			var from := Vector2i(_hover_point.floor())
+			if door_one_way and opening == BuildingMap.Wall.DOOR and _has_chosen_opening(edge) \
+					and not _erasing():
+				map.set_door_way(edge, -map.door_way(edge) if map.door_way(edge) != 0
+						else BuildingMap.way_from(edge, from))
+			elif _has_chosen_opening(edge):
 				map.set_opening(edge, BuildingMap.Wall.WALL)
-			else:
-				map.set_opening(edge, opening, window_kind, door_kind)
+			elif map.set_opening(edge, opening, window_kind, door_kind) and opening == BuildingMap.Wall.DOOR:
+				var way := BuildingMap.way_from(edge, from) if door_one_way else 0
+				map.set_door_way(edge, way if way != 0 or not door_one_way else 1)
 		Tool.OBJECT:
 			if object_def == null:
 				return
@@ -551,6 +562,8 @@ func _on_release() -> void:
 		Tool.FLOOR when floor_mode == FloorMode.RAMP:
 			if ramp != null:
 				map.add_ramp(ramp.rect, ramp.rise, ramp.low, ramp.high)
+		Tool.FLOOR when floor_mode == FloorMode.VOID:
+			building.set_void(_level(), BuildingMap.cells_in(rect), not erase)
 		Tool.FLOOR when floor_mode != FloorMode.LAY:
 			nudge_floors(rect, NUDGE_STEP if floor_mode == FloorMode.RAISE else -NUDGE_STEP)
 		Tool.FLOOR:
@@ -1480,6 +1493,9 @@ func _draw_preview() -> void:
 		Tool.FLOOR when floor_mode == FloorMode.RAMP:
 			var ramp := planned_ramp()
 			_shapes.cells(BuildingMap.cells_in(_drag_rect()), ok_colour if ramp != null else bad_colour)
+		Tool.FLOOR when floor_mode == FloorMode.VOID:
+			_shapes.cells(BuildingMap.cells_in(_drag_rect()), (demolish_colour if _erasing() else ok_colour)
+					if _level() > 0 else bad_colour)
 		Tool.FLOOR when floor_mode != FloorMode.LAY:
 			var cells: Array[Vector2i] = []
 			for cell in BuildingMap.cells_in(_drag_rect()):

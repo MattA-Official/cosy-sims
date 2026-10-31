@@ -50,7 +50,8 @@ var _next_id := 1
 var _ids: Dictionary[Vector4i, int] = {}
 var _levels: Dictionary[int, int] = {} ## Point id: its level.
 ## Each door on a straight wall, as (level, edge x, edge y, edge axis): the
-## pairs of points it joins, so it can be locked without a rebuild.
+## pairs of points it joins, so it can be locked without a rebuild, as
+## (from, to, 1 if only from `from` to `to` through a one-way door, else 0).
 var _door_links: Dictionary[Vector4i, Array] = {}
 
 
@@ -182,7 +183,7 @@ func _clear_between(a: int, b: int) -> bool:
 			return false
 		if here != previous:
 			if _stepped.has(here) or astar.is_point_disabled(here) \
-					or not astar.are_points_connected(previous, here):
+					or not astar.are_points_connected(previous, here, false):
 				return false
 			previous = here
 	return previous == b
@@ -295,8 +296,10 @@ func _join_floors(n: int) -> void:
 				# kept as a corner of every route so people climb them there.
 				var across: int = _ids.get(Vector4i(n, next_cell.x, next_cell.y, 0), -1)
 				if across != -1 and piece.is_whole():
-					_join(id, across)
-					_note_door(door_key, id, across)
+					if map.door_way(edge) != 0 and not map.passable_from(edge, cell):
+						continue # The other side joins it, the one way.
+					_join(id, across, map.door_way(edge) != 0)
+					_note_door(door_key, id, across, map.door_way(edge) != 0)
 					var low := cell if map.floor_height(cell) < map.floor_height(next_cell) else next_cell
 					_stepped[_ids.get(Vector4i(n, low.x, low.y, 0), -1)] = true
 				continue
@@ -312,6 +315,21 @@ func _join_floors(n: int) -> void:
 					other = _ids.get(Vector4i(0, next_cell.x, next_cell.y, -1), -1)
 				if other != -1 and absf(map.edge_height(cell, BuildingMap.DIRECTIONS[tag])
 						- _edge_height_of(other, n, next_cell, -BuildingMap.DIRECTIONS[tag])) <= BuildingMap.MAX_STEP + 0.01:
+					if map.door_way(edge) != 0:
+						# One-way: joined from the side it lets people out of.
+						# Open ground beyond never joins floor itself, so the
+						# floor side joins it either way round.
+						var from := id
+						var to := other
+						if not map.passable_from(edge, cell):
+							if _surface.has(other) and not map.has_floor(next_cell):
+								from = other
+								to = id
+							else:
+								continue
+						_join(from, to, true)
+						_note_door(door_key, from, to, true)
+						continue
 					_join(id, other)
 					if kind == BuildingMap.Wall.DOOR:
 						_note_door(door_key, id, other)
@@ -329,8 +347,20 @@ func _join_ground() -> void:
 	var blocked: Dictionary[Vector4i, bool] = {}
 	var walled: Dictionary[Vector2i, bool] = {}
 	var map := _building.ground()
+	# One-way doors on open ground: the way through each, as (from x,
+	# from y, to x, to y).
+	var one_way: Dictionary[Vector4i, bool] = {}
 	for edge: Vector3i in map.walls:
 		if map.walls[edge] == BuildingMap.Wall.DOOR:
+			var way := map.door_way(edge)
+			if way == 0:
+				continue
+			var ends := BuildingMap.edge_cells(edge)
+			if way < 0:
+				ends.reverse()
+			one_way[Vector4i(ends[0].x, ends[0].y, ends[1].x, ends[1].y)] = true
+			walled[ends[0]] = true
+			walled[ends[1]] = true
 			continue
 		var cells := BuildingMap.edge_cells(edge)
 		blocked[Vector4i(cells[0].x, cells[0].y, cells[1].x, cells[1].y)] = true
@@ -345,13 +375,24 @@ func _join_ground() -> void:
 		if walled.has(Vector2i(link.x, link.y)) or walled.has(Vector2i(link.z, link.w)):
 			if blocked.has(link):
 				continue
-			# A diagonal also needs both ways round open.
-			if link.x != link.z and link.y != link.w and (
-					blocked.has(Vector4i(link.x, link.y, link.z, link.y))
-					or blocked.has(Vector4i(link.x, link.y, link.x, link.w))
-					or blocked.has(Vector4i(link.z, link.y, link.z, link.w))
-					or blocked.has(Vector4i(link.x, link.w, link.z, link.w))):
+			var back := Vector4i(link.z, link.w, link.x, link.y)
+			if one_way.has(link) or one_way.has(back):
+				# Straight through a one-way door, only the way it opens.
+				if one_way.has(link):
+					astar.connect_points(id, other, false)
+				else:
+					astar.connect_points(other, id, false)
 				continue
+			# A diagonal also needs both ways round open, and not past a
+			# one-way door.
+			if link.x != link.z and link.y != link.w:
+				var sides: Array[Vector4i] = [Vector4i(link.x, link.y, link.z, link.y),
+						Vector4i(link.x, link.y, link.x, link.w), Vector4i(link.z, link.y, link.z, link.w),
+						Vector4i(link.x, link.w, link.z, link.w)]
+				if sides.any(func(side: Vector4i) -> bool:
+						var flipped := Vector4i(side.z, side.w, side.x, side.y)
+						return blocked.has(side) or one_way.has(side) or one_way.has(flipped)):
+					continue
 		# Each pair of new ground points comes up once, so no need to check
 		# whether they are joined already.
 		astar.connect_points(id, other)
@@ -442,20 +483,24 @@ func _join_diagonal(n: int, cell: Vector2i, d: Vector2i) -> void:
 	if map.pieces(corner).size() != 1 or map.pieces(cell + Vector2i(d.x, 0)).size() != 1 \
 			or map.pieces(cell + Vector2i(0, d.y)).size() != 1:
 		return
-	if astar.are_points_connected(a, side_x) and astar.are_points_connected(a, side_y) \
-			and astar.are_points_connected(side_x, b) and astar.are_points_connected(side_y, b):
+	if _both_ways(a, side_x) and _both_ways(a, side_y) and _both_ways(side_x, b) and _both_ways(side_y, b):
 		_join(a, b)
+
+
+## Are two points joined both ways, not just one way through a one-way door?
+func _both_ways(a: int, b: int) -> bool:
+	return astar.are_points_connected(a, b, false) and astar.are_points_connected(b, a, false)
 
 
 ## Locks or unlocks a door on a straight wall: locked, nobody walks
 ## through it. Doors in angled walls can't be locked yet.
 func set_door_locked(level: int, edge: Vector3i, locked: bool) -> void:
-	for pair: Vector2i in _door_links.get(Vector4i(level, edge.x, edge.y, edge.z), []):
+	for pair: Vector3i in _door_links.get(Vector4i(level, edge.x, edge.y, edge.z), []):
 		if locked:
 			if astar.are_points_connected(pair.x, pair.y):
 				astar.disconnect_points(pair.x, pair.y)
 		else:
-			_join(pair.x, pair.y)
+			_join(pair.x, pair.y, pair.z == 1)
 
 
 ## Every door on a straight wall that joins anything, as (level, edge x,
@@ -484,16 +529,28 @@ func is_door_locked(level: int, edge: Vector3i) -> bool:
 	return not pairs.is_empty() and not astar.are_points_connected(pairs[0].x, pairs[0].y)
 
 
-func _note_door(key: Vector4i, a: int, b: int) -> void:
+## Can people walk straight from point `a` to point `b`? False where only a
+## one-way door's other way joins them.
+func leads(a: int, b: int) -> bool:
+	return astar.are_points_connected(a, b, false)
+
+
+func _note_door(key: Vector4i, a: int, b: int, one_way := false) -> void:
 	if a == -1 or b == -1:
 		return
 	if not _door_links.has(key):
 		_door_links[key] = []
-	_door_links[key].append(Vector2i(a, b))
+	_door_links[key].append(Vector3i(a, b, 1 if one_way else 0))
 
 
-func _join(a: int, b: int) -> void:
-	if a != -1 and b != -1 and a != b and not astar.are_points_connected(a, b):
+## Joins two points both ways, or only from `a` to `b` if `one_way`.
+func _join(a: int, b: int, one_way := false) -> void:
+	if a == -1 or b == -1 or a == b:
+		return
+	if one_way:
+		if not astar.are_points_connected(a, b, false):
+			astar.connect_points(a, b, false)
+	elif not _both_ways(a, b):
 		astar.connect_points(a, b)
 
 
