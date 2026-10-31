@@ -3,7 +3,7 @@ extends Node3D
 ## Draws the conveyor belts (see Belts): a frame on legs at waist height on
 ## each tile, reaching across to the pieces it joins, with a dark running
 ## surface and chevrons the way it carries things. Levels above
-## `top_level` are hidden, as the building's are.
+## `highest_level` are hidden, as the building's are.
 
 const WIDTH := 0.7 ## Of the running surface, in tiles.
 const FRAME := 0.06 ## The rim either side of it.
@@ -23,10 +23,10 @@ var building: Building:
 var terrain: Terrain
 var cell_size := 1.0
 ## The highest level drawn; belts on levels above are hidden.
-var top_level := 99:
+var highest_level := 99:
 	set(value):
-		if value != top_level:
-			top_level = value
+		if value != highest_level:
+			highest_level = value
 			queue_rebuild()
 
 var _mesh := MeshInstance3D.new()
@@ -56,7 +56,7 @@ func rebuild() -> void:
 	var belts := building.belts
 	for k: Vector3i in belts.pieces:
 		var level := k.z
-		if level > top_level or not building.levels.has(level):
+		if level > highest_level or not building.levels.has(level):
 			continue
 		var cell := Vector2i(k.x, k.y)
 		var floor_y := _floor_at(level, cell)

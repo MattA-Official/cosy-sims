@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DoorKindDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/door_kind_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/opening_badge_door.svg" id="2_ext"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"staff_security"
+display_name = "Staff security door"
+description = "A badge reader: only staff walk through. A proper crossing between landside and airside."
+groups = Array[StringName]([&"staff"])
+colour = Color(0.35, 0.5, 0.85, 1)
+icon = ExtResource("2_ext")
+price = 400
+electric = true
+checkpoint = true

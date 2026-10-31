@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ZoneDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/zone_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/zone_landside.svg" id="2_ext"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"landside"
+display_name = "Landside"
+description = "Open to everyone: the kerb, check-in hall, arrivals hall and landside shops."
+groups = Array[StringName]([&"passenger", &"visitor", &"staff"])
+side = &"landside"
+colour = Color(0.98, 0.88, 0.66, 1)
+icon = ExtResource("2_ext")

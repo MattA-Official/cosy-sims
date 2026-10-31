@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="RoomTypeDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/room_type_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://core/ui/icons/room_staff.svg" id="2_ext"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"staff_room"
+display_name = "Staff room"
+colour = Color(0.72, 0.7, 0.66, 1)
+icon = ExtResource("2_ext")
+location = 0
+required_tags = Array[StringName]([])
+zone = &"staff_landside"

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="FloorDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/floor_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://games/airport/art/textures/floor_tarmac.png" id="2_ext"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"tarmac"
+display_name = "Tarmac"
+colour = Color(0.48, 0.48, 0.5, 1)
+outdoor = true
+texture = ExtResource("2_ext")
+price = 12

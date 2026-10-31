@@ -30,6 +30,8 @@ var person_pickers: Array = []
 var person_lines: Array[Callable] = []
 ## Likewise for objects: Callable(level, id) -> String, empty for none.
 var object_lines: Array[Callable] = []
+## Who the tile and room panels offer to add, as [group, button text].
+var add_groups: Array = [[&"prisoner", "Add a prisoner here"], [&"staff", "Add a member of staff here"]]
 
 var _layer := CanvasLayer.new()
 var _panel := PanelContainer.new()
@@ -488,14 +490,14 @@ func _show_room(room: Room) -> void:
 		if not sleepers.is_empty():
 			_text("Sleeps here: %s" % ", ".join(sleepers.map(func(p: Person) -> String: return p.name)))
 	var inside := room.cells[0]
-	_button("Add a prisoner here", func() -> void: _add_prisoner(inside))
-	_button("Add a member of staff here", func() -> void: _add_prisoner(inside, &"staff"))
+	for entry: Array in add_groups:
+		_button(entry[1], _add_prisoner.bind(inside, entry[0]))
 
 
 func _show_tile(cell: Vector2i) -> void:
 	_text("Tile %d, %d on the %s" % [cell.x, cell.y, Building.level_name(_selected_level).to_lower()])
-	_button("Add a prisoner here", func() -> void: _add_prisoner(cell))
-	_button("Add a member of staff here", func() -> void: _add_prisoner(cell, &"staff"))
+	for entry: Array in add_groups:
+		_button(entry[1], _add_prisoner.bind(cell, entry[0]))
 
 
 func _add_prisoner(cell: Vector2i, group: StringName = &"prisoner") -> void:

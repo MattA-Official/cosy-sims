@@ -13,6 +13,11 @@ extends Resource
 ## prisoners. Empty lets in every category; people with no category (staff)
 ## are always let in if their group is.
 @export var categories: Array[StringName] = []
+## Which side of a security line rooms in this zone are on, such as
+## &"landside" or &"airside": a door between zones on different sides must
+## be a checkpoint (DoorKindDef.checkpoint), or the game flags it (see
+## SecuritySides). Empty for zones on no side.
+@export var side: StringName
 ## How rooms in this zone are tinted while the Zones tool is open.
 @export var colour := Color.WHITE
 ## A white line drawing for the build menu.

@@ -13,6 +13,10 @@ extends Node3D
 var access: Access
 ## Optional: secure ground inside a perimeter.
 var secure_area: SecureArea
+## (level) -> Array[Vector3i]: doors to flag red in the zone view, such as
+## gaps in a security line (see SecuritySides). Optional.
+var flagged_doors: Callable
+var flag_colour := Color(0.92, 0.25, 0.22, 0.85)
 var secure_colour := Color(0.55, 0.85, 0.5, 0.4)
 var outside_colour := Color(0.95, 0.6, 0.3, 0.45)
 ## (cell: Vector2i) -> float: the ground's height, for the open ground tint.
@@ -84,6 +88,15 @@ func _redraw() -> void:
 		var centre := room.centre()
 		label.position = Vector3(centre.x * cell_size, top + 0.1, centre.y * cell_size)
 		_labels.add_child(label)
+	if flagged_doors.is_valid():
+		for edge: Vector3i in flagged_doors.call(building.active):
+			var ends := BuildingMap.edge_ends(edge)
+			var middle := (ends[0] + ends[1]) * 0.5
+			var along := (ends[1] - ends[0]).abs()
+			var cells := BuildingMap.edge_cells(edge)
+			var height := maxf(map.floor_height(cells[0]), map.floor_height(cells[1])) + lift + 0.02
+			MeshShapes.add_box_immediate(_mesh, Vector3(middle.x * cell_size, height + 0.6, middle.y * cell_size),
+					Vector3(maxf(along.x * 0.5, 0.12), 0.6, maxf(along.y * 0.5, 0.12)) * cell_size, flag_colour)
 	_mesh.surface_end()
 
 

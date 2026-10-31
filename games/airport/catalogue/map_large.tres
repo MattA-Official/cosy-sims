@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MapSizeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/building/map_size_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"large"
+display_name = "Large"
+description = "Start on 4 × 4 plots and buy up to 14 × 14, for a hub."
+plots = 14
+start_plots = 4
+margin = 24
+offered = true

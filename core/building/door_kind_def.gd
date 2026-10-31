@@ -21,6 +21,9 @@ extends Resource
 @export var detects_metal := false
 ## Worked by power: in a power cut it fails locked (see Utilities).
 @export var electric := false
+## A proper crossing between zones on different sides of a security line
+## (see ZoneDef.side), such as a screening point or a badge door.
+@export var checkpoint := false
 
 
 func lets_through(group: StringName) -> bool:

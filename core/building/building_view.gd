@@ -67,6 +67,14 @@ var cut_direction := Vector2(1, 1).normalized():
 	set(value):
 		show_roof = value
 		_roof_mesh.visible = value
+		_void_roof_mesh.visible = value and show_void_roof
+## The roof over a double-height room, a storey up, shows only with
+## show_roof and this: off while building on the level the void is on, so
+## you see down into the hall.
+var show_void_roof := true:
+	set(value):
+		show_void_roof = value
+		_void_roof_mesh.visible = show_roof and value
 @export var roof_thickness := 0.12
 ## The low wall round a flat roof's edge.
 const ROOF_LIP_HEIGHT := 0.16
@@ -113,6 +121,7 @@ var above: BuildingMap:
 		queue_rebuild()
 
 var _roof_mesh := MeshInstance3D.new()
+var _void_roof_mesh := MeshInstance3D.new()
 var _floor_mesh := MeshInstance3D.new()
 var _wall_mesh := MeshInstance3D.new()
 var _glass_mesh := MeshInstance3D.new()
@@ -216,10 +225,12 @@ class WallRun:
 
 
 func _ready() -> void:
-	for child: Node in [_floor_mesh, _wall_mesh, _glass_mesh, _doors, _objects, _labels, _roof_mesh]:
+	for child: Node in [_floor_mesh, _wall_mesh, _glass_mesh, _doors, _objects, _labels, _roof_mesh, _void_roof_mesh]:
 		add_child(child)
 	_roof_mesh.material_override = _roof_material()
 	_roof_mesh.visible = show_roof
+	_void_roof_mesh.material_override = _roof_mesh.material_override
+	_void_roof_mesh.visible = show_roof and show_void_roof
 	_glass_mesh.material_override = _glass_material
 	_glass_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_floor_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -296,6 +307,9 @@ func rebuild() -> void:
 func _build_roof() -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var void_st := SurfaceTool.new()
+	void_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var any_void := false
 	var cs := grid.cell_size
 	var any := false
 	for cell: Vector2i in map.holes:
@@ -328,12 +342,16 @@ func _build_roof() -> void:
 			for point in piece.polygon:
 				scaled.append(point * cs)
 			var top := map.floor_height(cell) + wall_height + lift
-			MeshShapes.add_prism(st, scaled, top - roof_thickness, top + 0.01, roof_colour.darkened(0.2),
-					roof_colour.lightened(0.04 * ((cell.x + cell.y) % 2)))
-			any = true
+			MeshShapes.add_prism(void_st if lift > 0.0 else st, scaled, top - roof_thickness, top + 0.01,
+					roof_colour.darkened(0.2), roof_colour.lightened(0.04 * ((cell.x + cell.y) % 2)))
+			if lift > 0.0:
+				any_void = true
+			else:
+				any = true
 	if any:
 		_build_roof_dressing(st)
 	_roof_mesh.mesh = st.commit() if any else null
+	_void_roof_mesh.mesh = void_st.commit() if any_void else null
 
 
 ## A glass balustrade with a rail along every open edge between floor and
@@ -849,6 +867,8 @@ func _add_wall_run(run: WallRun) -> void:
 		_add_door(run, from, to)
 	elif run.kind == BuildingMap.Wall.WINDOW:
 		_add_window(run, from, to)
+	elif run.def != null and run.def.glazed and not run.low:
+		_add_glazing(run)
 	elif run.def != null and run.def.see_through and not run.low:
 		_add_fence(run)
 	else:
@@ -1018,6 +1038,26 @@ func _add_fence(run: WallRun) -> void:
 	MeshShapes.add_quad(_surface(_surfaces, mesh_texture), Vector3(a.x, low, a.y),
 			Vector3(b.x, low, b.y), Vector3(b.x, high, b.y), Vector3(a.x, high, a.y),
 			Vector3(run.across.x, 0.0, run.across.y), run.own.colour)
+
+
+## Glass panes in a slim frame of the wall's top colour: a mullion about
+## every tile, with a sill and a head along the run. Corners share their
+## mullion.
+func _add_glazing(run: WallRun) -> void:
+	var frame := run.top_colour
+	var panes := maxi(roundi(run.length / grid.cell_size), 1)
+	for i in panes + 1:
+		var at := run.length * i / panes
+		if i == 0 or i == panes:
+			var corner: Variant = run.corners[0 if i == 0 else 1]
+			if _posts.has(corner):
+				continue
+			_posts[corner] = true
+		_add_slab(run, at - 0.04, at + 0.04, -run.drop, run.height, frame, frame, 0.6)
+	_add_slab(run, 0.0, run.length, -run.drop, 0.1, frame, frame, 0.6)
+	_add_slab(run, 0.0, run.length, run.height - 0.06, run.height, frame, frame, 0.6)
+	_add_slab(run, 0.0, run.length, 0.1, run.height - 0.06, glass_colour, glass_colour, 0.25, _glass)
+	_has_glass = true
 
 
 func _build_objects() -> void:

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="WallDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/building/wall_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://games/prison/art/textures/wall_brick.png" id="2_ext"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"brick"
+display_name = "Brick"
+colour = Color(0.78, 0.52, 0.42, 1)
+top_colour = Color(0.37, 0.33, 0.31, 1)
+outdoor = false
+height = 1.5
+thickness = 0.15
+see_through = false
+texture = ExtResource("2_ext")
+price = 30

@@ -13,6 +13,9 @@ extends Resource
 @export var thickness := 0.15
 ## Draw as posts and rails rather than a solid wall.
 @export var see_through := false
+## A see-through wall drawn as glass panes in a slim frame (curtain
+## walling), rather than a fence. Needs see_through.
+@export var glazed := false
 ## Optional pattern laid over the colour, one repeat a metre: near-white
 ## greyscale, so the colour still decides how it looks.
 @export var texture: Texture2D

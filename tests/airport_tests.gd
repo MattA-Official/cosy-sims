@@ -5,16 +5,30 @@ extends SceneTree
 ##   godot --headless -s res://tests/airport_tests.gd
 
 var _failures := 0
+var _frame := 0
+var _main: Node
 
 
 func _process(_delta: float) -> bool:
-	_test_one_way_doors()
-	_test_double_height()
-	_test_licences()
-	_test_queue_lines()
-	_test_signage()
-	_test_movers()
-	_test_belts()
+	_frame += 1
+	if _frame == 1:
+		_test_one_way_doors()
+		_test_double_height()
+		_test_licences()
+		_test_queue_lines()
+		_test_signage()
+		_test_movers()
+		_test_belts()
+		AirportNewGame.pending = true
+		AirportNewGame.start = AirportNewGame.Start.SHED
+		AirportNewGame.airport_name = "Test Field"
+		_main = (load("res://games/airport/main.tscn") as PackedScene).instantiate()
+		root.add_child(_main)
+		return false
+	if _frame < 4:
+		return false
+	_test_shed()
+	_main.queue_free()
 	if _failures == 0:
 		print("All airport tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -305,3 +319,74 @@ func _test_belts() -> void:
 	_check(copy.belts.pieces == belts.pieces, "belts are saved with the building")
 	_check(belts.remove(0, run) == 9 and not belts.has(0, Vector2i(8, 3)) and belts.has(0, Vector2i(5, 6)),
 			"taking up a run leaves the rest")
+
+
+## The airport scene with the shed: it loads, everything in it is wired up,
+## and the shed shows off each A0 piece.
+func _test_shed() -> void:
+	var building: Building = _main.building
+	var ground := building.ground()
+	_check(_main.title == "Test Field", "the new game card's name is used")
+	var o: Vector2i = ground.land_bounds().get_center() - SampleAirports.SHED_SIZE / 2
+	var types: Array[StringName] = []
+	for room: Room in ground.rooms():
+		types.append(room.type)
+	for type: StringName in [&"check_in_hall", &"departure_lounge", &"gate", &"arrivals_hall", &"toilets", &"bag_hall"]:
+		_check(types.has(type), "the shed has a %s" % type)
+	var counts: Dictionary[StringName, int] = {}
+	for placed: BuildingMap.PlacedObject in ground.objects.values():
+		counts[placed.def.id] = counts.get(placed.def.id, 0) + 1
+	for id: StringName in [&"check_in_desk", &"queue_post", &"escalator_up", &"escalator_down", &"sign_gates",
+			&"sign_toilets", &"seat_row", &"gate_desk", &"toilet", &"info_desk", &"departures_board", &"sign_exit"]:
+		_check(counts.get(id, 0) > 0, "the shed has a %s" % id)
+	_check(counts.get(&"check_in_desk", 0) == 3 and counts.get(&"queue_post", 0) == 5, "three desks and five posts")
+	# The toolbar is the airport's.
+	var toolbar: Node = _main.toolbar
+	_check(toolbar.catalogue == AirportCatalogue and toolbar.tools.size() == AirportCatalogue.TOOLS.size(),
+			"the toolbar uses the airport's tools")
+	# The line between landside and airside: no gaps as built, and a plain
+	# door through it shows red.
+	var sides: SecuritySides = _main.sides
+	_check(sides.all_gaps().is_empty(), "the shed's security line has no gaps: %s" % [sides.all_gaps()])
+	var screening := BuildingMap.edge_between(o + Vector2i(11, 5), o + Vector2i(12, 5))
+	ground.set_door(screening, true, &"")
+	_check(sides.gaps(0).size() == 1 and sides.gaps(0)[0] == screening, "a plain door through the line is a gap")
+	ground.set_door(screening, true, &"screening")
+	_check(sides.gaps(0).is_empty(), "a screening point is a proper crossing")
+	var off := BuildingMap.edge_between(o + Vector2i(22, 9), o + Vector2i(22, 10))
+	ground.set_door_way(off, -ground.door_way(off))
+	_check(sides.gaps(0).size() == 1 and sides.gaps(0)[0] == off, "a one-way door into airside is a gap")
+	ground.set_door_way(off, -ground.door_way(off))
+	_check(sides.gaps(0).is_empty(), "a one-way exit out of airside is fine")
+	# Getting about: through the gate and out through arrivals one way
+	# only; up the escalator to the mezzanine and down again.
+	var people: People = _main.people
+	var nav := people.nav()
+	var gate_spot := Vector2(o) + Vector2(22.5, 8.5)
+	var arrivals_spot := Vector2(o) + Vector2(22.5, 11.5)
+	_check(not nav.find_path(0, gate_spot, 0, arrivals_spot).is_empty(), "off the plane into arrivals")
+	_check(not ground.passable_from(off, o + Vector2i(22, 10)), "nobody walks back from arrivals to the gate")
+	var hall_spot := Vector2(o) + Vector2(6.5, 8.5)
+	var deck_spot := Vector2(o) + Vector2(6.5, 8.5)
+	_check(building.is_double_height(0, o + Vector2i(6, 4)), "the check-in hall is double height")
+	_check(not building.is_double_height(0, o + Vector2i(6, 8)), "but not under the mezzanine")
+	_check(not nav.find_path(0, hall_spot, 1, deck_spot).is_empty(), "up the escalator to the viewing deck")
+	_check(not nav.find_path(1, deck_spot, 0, hall_spot).is_empty(), "and down again")
+	# The snaking queue for the middle desk follows the posts.
+	var route := QueueLine.posted_route(ground, Vector2(o) + Vector2(7.0, 3.75))
+	_check(route.size() == 6, "the queue runs through all five posts: %s" % [route])
+	# Belts in the bag hall.
+	_check(building.belts.cells_on(0).size() >= 18, "belts are laid in the bag hall")
+	_check(building.belts.kind_at(0, o + Vector2i(9, 11)) == &"corner", "a belt turns the corner")
+	# Signs: from the hall, the gates are signposted; the toilets aren't.
+	var passenger: Person = null
+	for person: Person in people.people:
+		if person.group == &"passenger" and ground.room_at(Vector2i(person.flat().floor())) != null \
+				and ground.room_at(Vector2i(person.flat().floor())).type == &"check_in_hall":
+			passenger = person
+			break
+	_check(passenger != null, "passengers are in the hall")
+	if passenger != null:
+		_check(people.signage.knows_way(passenger, &"gate"), "the hall signposts the gates")
+		_check(not people.signage.knows_way(passenger, &"toilets"), "the hall doesn't signpost the toilets")
+	_check(people.people.size() == 12, "twelve people to start: %d" % people.people.size())

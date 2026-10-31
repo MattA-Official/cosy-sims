@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/building/object_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"escalator_up"
+display_name = "Escalator (up)"
+category = "Movers"
+size = Vector2(1, 4)
+snap = 0
+height = 0.6
+colour = Color(0.78, 0.8, 0.82, 1)
+tags = Array[StringName]([&"escalator"])
+price = 3000
+connects = 2
+mover_way = 1
+mover_speed = 1.8

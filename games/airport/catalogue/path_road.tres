@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="PathStyleDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/paths/path_style_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://games/prison/art/textures/path_tarmac.png" id="2_ext"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"road"
+display_name = "Road"
+colour = Color(0.42, 0.42, 0.44, 1)
+edge_colour = Color(0.6, 0.6, 0.58, 1)
+width = 4.0
+texture = ExtResource("2_ext")
+markings = true
