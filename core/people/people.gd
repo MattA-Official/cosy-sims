@@ -2063,16 +2063,18 @@ func _walk(person: Person, minutes: float) -> void:
 		var next := person.route[0]
 		var here := person.flat()
 		var there := Vector2(next.x, next.z)
+		# Carried along an escalator or travelator, they go further.
+		var boost := nav().pace_towards(next)
 		var gap := here.distance_to(there)
-		if gap <= budget:
-			budget -= gap
+		if gap / boost <= budget:
+			budget -= gap / boost
 			person.position = next
 			person.level = person.route_levels[0]
 			person.route.pop_front()
 			person.route_levels.pop_front()
 			person.route_on_surface.pop_front()
 			continue
-		var moved := here.move_toward(there, budget)
+		var moved := here.move_toward(there, budget * boost)
 		budget = 0.0
 		# On floor or ground, stand on it; on stairs and bridges, climb
 		# steadily from one point to the next.

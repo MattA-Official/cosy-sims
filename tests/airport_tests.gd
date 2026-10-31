@@ -13,6 +13,7 @@ func _process(_delta: float) -> bool:
 	_test_licences()
 	_test_queue_lines()
 	_test_signage()
+	_test_movers()
 	if _failures == 0:
 		print("All airport tests passed.")
 	quit(1 if _failures > 0 else 0)
@@ -217,3 +218,54 @@ func _test_signage() -> void:
 	_check(signage.knows_way(outside, &"toilet"), "a sign across open ground is seen")
 	outside.position = Vector3(1.5, 0.0, 18.5)
 	_check(not signage.knows_way(outside, &"toilet"), "but not from far off")
+
+
+func _mover_def(id: StringName, connects: ObjectDef.Connects, length: float, way: int) -> ObjectDef:
+	var def := ObjectDef.new()
+	def.id = id
+	def.size = Vector2(1, length)
+	def.connects = connects
+	def.mover_way = way
+	def.mover_speed = 2.0
+	return def
+
+
+func _test_movers() -> void:
+	var building := Building.new(Rect2i(0, 0, 30, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	var ground := building.ground()
+	ground.build_room(Rect2i(2, 2, 6, 12), &"concrete", &"brick", 0.0)
+	var up := building.level(1)
+	up.build_room(Rect2i(2, 2, 6, 12), &"wood", &"brick", Building.STOREY)
+	var escalator := _mover_def(&"escalator_up", ObjectDef.Connects.ESCALATOR, 4, 1)
+	var id := ground.place_object_at(escalator, Vector2(3.5, 6.0), 0.0)
+	_check(id != 0, "an escalator goes down on the floor")
+	_check(not up.has_floor(Vector2i(3, 5)) and up.holes.has(Vector2i(3, 7)) and up.has_floor(Vector2i(3, 9)),
+			"it opens the floor above it, like stairs")
+	var mover := Movers.of(0, ground.objects[id])
+	_check(mover.foot.is_equal_approx(Vector2(3.5, 3.5)) and mover.head.is_equal_approx(Vector2(3.5, 8.5))
+			and mover.head_level == 1, "it runs from its foot to its head a level up")
+	var graph := NavGraph.build(building)
+	var climb := graph.find_path(0, Vector2(3.5, 2.5), 1, Vector2(3.5, 11.5))
+	_check(not climb.is_empty(), "people ride the escalator up")
+	_check(climb.any(func(p: Vector3) -> bool: return graph.pace_towards(p) > 1.0), "riding is quicker than walking")
+	_check(graph.find_path(1, Vector2(3.5, 11.5), 0, Vector2(3.5, 2.5)).is_empty(), "nobody walks down the up escalator")
+	var stepped_on_side := false
+	for p in climb:
+		if p.x > 3.0 and p.x < 4.0 and p.z > 4.2 and p.z < 7.8 and graph.pace_towards(p) == 1.0:
+			stepped_on_side = true
+	_check(not stepped_on_side, "nobody walks across the escalator's side")
+	var down := _mover_def(&"escalator_down", ObjectDef.Connects.ESCALATOR, 4, -1)
+	ground.place_object_at(down, Vector2(5.5, 6.0), 0.0)
+	graph = NavGraph.build(building)
+	_check(not graph.find_path(1, Vector2(5.5, 11.5), 0, Vector2(5.5, 2.5)).is_empty(), "and down the down one")
+	# A travelator on one floor.
+	var hall := Building.new(Rect2i(0, 0, 30, 20), PrisonCatalogue.FLOORS, PrisonCatalogue.WALLS)
+	hall.ground().build_room(Rect2i(2, 2, 3, 16), &"concrete", &"brick", 0.0)
+	var walkway := _mover_def(&"travelator", ObjectDef.Connects.TRAVELATOR, 10, 1)
+	hall.ground().place_object_at(walkway, Vector2(3.5, 9.0), 0.0)
+	graph = NavGraph.build(hall)
+	var along := graph.find_path(0, Vector2(3.5, 2.5), 0, Vector2(3.5, 16.5))
+	_check(along.any(func(p: Vector3) -> bool: return graph.pace_towards(p) > 1.0), "people take the travelator its way")
+	var back := graph.find_path(0, Vector2(3.5, 16.5), 0, Vector2(3.5, 2.5))
+	_check(not back.is_empty() and back.all(func(p: Vector3) -> bool: return graph.pace_towards(p) == 1.0),
+			"and walk beside it the other way")

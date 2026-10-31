@@ -259,6 +259,9 @@ func _sync_holes() -> void:
 			var cells: Dictionary = holes.get_or_add(n + 1, {})
 			for cell in flight.cells:
 				cells[cell] = true
+		# Escalators climb through the floor above, like stairs.
+		for cell in Movers.openings(levels[n]):
+			(holes.get_or_add(n + 1, {}) as Dictionary)[cell] = true
 	for n: int in holes:
 		level(n)
 	for n: int in levels.keys():

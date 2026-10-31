@@ -77,6 +77,7 @@ static func build(building: Building, paths: PathNetwork = null, terrain: Terrai
 	graph._join_ground()
 	graph._add_stairs()
 	graph._add_lifts()
+	graph._add_movers()
 	graph._add_built_paths()
 	return graph
 
@@ -190,6 +191,9 @@ func _clear_between(a: int, b: int) -> bool:
 
 
 var _surface: Dictionary[int, bool] = {} ## Floor and ground points.
+## Points on escalators and travelators, by position: how much quicker
+## than walking.
+var _mover_paces: Dictionary[Vector3, float] = {}
 ## Points on tiles with door steps, which routes must not cut past.
 var _stepped: Dictionary[int, bool] = {}
 
@@ -439,6 +443,47 @@ func _add_lifts() -> void:
 				if map.passable(BuildingMap.edge_between(cell, cell + d)):
 					_join(car, point_at(n, middle + Vector2(d)))
 		_join(cars[0], cars[1])
+
+
+## Escalators and travelators: points along each one's length, joined to
+## the floor at its foot and head only, the way it runs. Riding one is
+## quicker than walking (see pace_towards).
+func _add_movers() -> void:
+	for mover: Movers.Mover in Movers.all(_building):
+		var map := _building.levels[mover.level]
+		var top := _building.levels.get(mover.head_level) as BuildingMap
+		if top == null:
+			continue
+		var start := point_at(mover.level, mover.foot)
+		var end := point_at(mover.head_level, mover.head)
+		if start == -1 or end == -1:
+			continue
+		var low := map.floor_height(Vector2i(mover.foot.floor()))
+		var high := top.floor_height(Vector2i(mover.head.floor()))
+		var length := mover.placed.def.size.y
+		var count := maxi(1, ceili(length / PATH_STEP))
+		var ahead := mover.ahead()
+		var from := mover.placed.centre - ahead * length * 0.5
+		var chain: Array[int] = [start]
+		for k in count + 1:
+			var t := float(k) / count
+			var spot := from + ahead * length * t
+			var id := _add_point(Vector4i(0, 0, 0, -2), mover.level if t < 0.5 else mover.head_level,
+					Vector3(spot.x, lerpf(low, high, t), spot.y), 1.0 / mover.speed)
+			_mover_paces[position_of(id)] = mover.speed
+			chain.append(id)
+		chain.append(end)
+		for i in range(1, chain.size()):
+			if mover.way >= 0:
+				_join(chain[i - 1], chain[i], mover.way != 0)
+			else:
+				_join(chain[i], chain[i - 1], true)
+
+
+## How much faster than walking someone goes heading for a position on a
+## route: quicker on an escalator or travelator, 1 elsewhere.
+func pace_towards(position: Vector3) -> float:
+	return _mover_paces.get(position, 1.0)
 
 
 ## Built paths: points along each stairway, ramp or bridge, joined at their

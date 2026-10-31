@@ -22,6 +22,8 @@ enum Snap {
 enum Connects {
 	NONE,
 	LIFT, ## Links with a lift in the same spot on the next level up.
+	ESCALATOR, ## Climbs a storey along its length to the level above (see Movers).
+	TRAVELATOR, ## A moving walkway along its length on the one level (see Movers).
 }
 
 ## Its model, origin at the middle of its footprint on the floor. Without
@@ -37,6 +39,11 @@ enum Connects {
 ## What the object is good for, such as "bed" or "toilet". Room types and,
 ## later, people's needs look objects up by tag rather than by id.
 @export var tags: Array[StringName] = []
+## For an escalator or travelator: which way it carries people along its
+## length (1 up or forwards, -1 down or backwards, 0 either way), and how
+## much faster than walking.
+@export var mover_way := 1
+@export var mover_speed := 1.8
 ## For a sign: what it shows people the way to, by room type or object
 ## tag, such as &"gate" or &"toilet" (see Signage). Empty for anything
 ## that isn't a sign.

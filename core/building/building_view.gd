@@ -141,6 +141,13 @@ var _doors := Node3D.new()
 const WAY_ARROW_COLOUR := Color(0.36, 0.62, 0.42)
 ## The balustrade round a void.
 const RAIL_HEIGHT := 0.55
+## Escalators and travelators drawn without a model.
+const MOVER_DECK := 0.08
+const MOVER_SIDE := 0.12
+const MOVER_RAIL := 0.55
+const MOVER_DECK_COLOUR := Color(0.42, 0.44, 0.47)
+const MOVER_SIDE_COLOUR := Color(0.78, 0.8, 0.82)
+const MOVER_RAIL_COLOUR := Color(0.2, 0.21, 0.23)
 var _rebuild_queued := false
 ## Shared by every level's labels.
 static var _label_font := CosyTheme.bold_font()
@@ -1031,6 +1038,8 @@ func _build_objects() -> void:
 		if surface != null:
 			ground = map.floor_height(Vector2i(surface.centre.floor())) + surface.def.height
 		var model := placed.def.make_model(placed.look)
+		if model == null and Movers.is_mover(placed.def):
+			model = _mover_model(placed.def)
 		if model != null:
 			model.position = Vector3(centre.x, ground + 0.03, centre.y)
 			model.rotation.y = -placed.angle
@@ -1054,6 +1063,61 @@ func _build_objects() -> void:
 		_objects.add_child(instance)
 		_pop(placed, instance, popping)
 		_add_dressing(placed, ground + 0.03)
+
+
+## A stand-in for an escalator or travelator with no model of its own: a
+## deck that climbs (or runs flat) along its length between solid side
+## panels, with a dark handrail on each and chevrons the way it runs.
+func _mover_model(def: ObjectDef) -> Node3D:
+	var cs := grid.cell_size
+	var length := def.size.y * cs
+	var width := def.size.x * cs
+	var rise := Building.STOREY if def.connects == ObjectDef.Connects.ESCALATOR else 0.0
+	var flat := minf(0.6 * cs, length * 0.2)
+	# The deck's height along its length, from the foot (-z) to the head.
+	var profile: Array[Vector2] = [Vector2(-length * 0.5, MOVER_DECK), Vector2(-length * 0.5 + flat, MOVER_DECK),
+			Vector2(length * 0.5 - flat, MOVER_DECK + rise), Vector2(length * 0.5, MOVER_DECK + rise)]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var deck_half := width * 0.5 - MOVER_SIDE
+	for i in range(1, profile.size()):
+		var a := profile[i - 1]
+		var b := profile[i]
+		MeshShapes.add_quad(st, Vector3(-deck_half, a.y, a.x), Vector3(deck_half, a.y, a.x),
+				Vector3(deck_half, b.y, b.x), Vector3(-deck_half, b.y, b.x), Vector3.UP, MOVER_DECK_COLOUR)
+		for x: float in [-width * 0.5, width * 0.5]:
+			var inner := x - signf(x) * MOVER_SIDE
+			for face: float in [x, inner]:
+				MeshShapes.add_quad(st, Vector3(face, 0.0, a.x), Vector3(face, 0.0, b.x),
+						Vector3(face, b.y + MOVER_RAIL, b.x), Vector3(face, a.y + MOVER_RAIL, a.x),
+						Vector3(signf(x) if face == x else -signf(x), 0.0, 0.0), MOVER_SIDE_COLOUR)
+			MeshShapes.add_quad(st, Vector3(x, a.y + MOVER_RAIL, a.x), Vector3(inner, a.y + MOVER_RAIL, a.x),
+					Vector3(inner, b.y + MOVER_RAIL, b.x), Vector3(x, b.y + MOVER_RAIL, b.x), Vector3.UP,
+					MOVER_RAIL_COLOUR)
+	# Chevrons the way it carries people.
+	var way := signf(def.mover_way)
+	if way != 0.0:
+		for i in range(1, profile.size()):
+			var a := profile[i - 1]
+			var b := profile[i]
+			var steps := maxi(1, floori(absf(b.x - a.x) / (0.8 * cs)))
+			for k in steps:
+				var t := (k + 0.5) / steps
+				var z := lerpf(a.x, b.x, t)
+				var y := lerpf(a.y, b.y, t) + 0.01
+				var tip := Vector3(0.0, y, z + way * 0.15 * cs)
+				var left := Vector3(-deck_half * 0.6, y, z - way * 0.1 * cs)
+				var right := Vector3(deck_half * 0.6, y, z - way * 0.1 * cs)
+				st.set_normal(Vector3.UP)
+				st.set_color(WAY_ARROW_COLOUR)
+				for vertex: Vector3 in [left, tip, right, left, right, tip]: # Both sides, whichever way up.
+					st.add_vertex(vertex)
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = st.commit()
+	mesh.material_override = MeshShapes.vertex_colour_material()
+	var root := Node3D.new()
+	root.add_child(mesh)
+	return root
 
 
 ## Things set out on a surface's free spots for whoever has claimed it
